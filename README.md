@@ -67,6 +67,16 @@ personalized outreach message staff can send.
 | Product C: Member Support Chatbot | Dennis |
 | Product D: Member Re-engagement Tool | Rensley |
 
+## How the team builds
+
+The app lives in `app/` — plain HTML, CSS, and TypeScript, no framework. Each
+product has its own folder under `app/products/`; the shared vocabulary, theme,
+and fixtures live in `app/shared/` and are team-owned. The working agreement
+every developer's AI follows is [CLAUDE.md](CLAUDE.md) — read it before the
+first edit. Gate before committing: `npm run check`. Run it with
+`npm install && npm run build && npm run start`, then open
+http://localhost:4173.
+
 ## Current phase
 
 Problem framing and shared project setup. The team will agree on the shared

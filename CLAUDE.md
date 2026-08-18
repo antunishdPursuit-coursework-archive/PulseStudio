@@ -1,0 +1,88 @@
+# Pulse Studio — instructions for the AI (read before doing anything)
+
+Four people build four products in this one repo. This file is how all four
+AIs work in agreement instead of colliding. It is TEAM-OWNED: change it only
+with team agreement.
+
+## Step 1 — know who you are working with
+
+Before your first edit, identify your developer. If the person has not told
+you and you cannot tell from context, ASK: "Who am I working with — Kerrian,
+Manny, Dennis, or Rensley?" Then work only in their lane.
+
+| Developer | Product | Their lane (the only folder they edit) | Color |
+| --- | --- | --- | --- |
+| Kerrian | A — Member Booking App | `app/products/a-booking/` | Blue `#3b82f6` |
+| Manny | B — Staff Scheduling Dashboard | `app/products/b-dashboard/` | Amber `#f59e0b` |
+| Dennis | C — Member Support Chatbot | `app/products/c-chatbot/` | Green `#10b981` |
+| Rensley | D — Member Re-engagement Tool | `app/products/d-reengagement/` | Violet `#8b5cf6` |
+
+Each product's brief (`PRODUCT_<X>_*.md` in the repo root) defines its scope.
+Do not build features from another product's brief.
+
+## The lane law (why merges never conflict)
+
+- Create and edit files ONLY inside your developer's product folder.
+- Everything else is TEAM-OWNED — `app/shared/`, `app/index.html`, the root
+  docs, `package.json`, `tsconfig.json`, this file. Changing a team-owned file
+  requires team agreement first, stated in the PR. Never change one silently.
+- Never commit compiled `.js` (it is gitignored). Build artifacts create
+  conflicts the source never had.
+
+Because every developer writes only inside their own folder, two branches can
+never touch the same file — that is what makes merge conflicts structurally
+impossible. If you believe you need to edit outside your lane, stop and say so
+instead of doing it.
+
+## The color law
+
+- Backgrounds are black or white ONLY — always `var(--bg)` from
+  `app/shared/theme.css`. Both are supported; nothing else is a background.
+- Every visible feature carries its developer's color: the page `<body>` has
+  `class="product-a|b|c|d"` and controls use `var(--accent)` /
+  `var(--accent-ink)`. Anyone looking at any screen can tell who built what.
+- Never restyle another developer's color or add a fifth.
+
+## The data law
+
+- `SHARED_DATA_CONTRACT.md` is the vocabulary. `app/shared/contract.ts` is
+  that contract as TypeScript types. If they ever disagree, stop and raise it
+  with the team — never improvise a fix inside one product.
+- All shared records load through `loadFixtures()` in `app/shared/data.ts`.
+  No product keeps its own copy of shared data or redefines a shared field.
+- Members see only their own data; staff-only information (rosters,
+  attendance, cancellation risk) never appears in a member-facing surface.
+- Product D drafts outreach for staff review only — nothing in this repo ever
+  sends a message automatically.
+
+## The language law
+
+- Never use the words "demo", "example", or "mock" anywhere in this repo —
+  code, comments, docs, commits, or UI copy. This is a real app that will be
+  real. The team's word for shared sample records is "fixture", and the first
+  shipped version is "the first release".
+- State negatives explicitly: a screen with nothing to show says what it
+  checked ("5 members checked, 0 flagged"), never a blank panel.
+- Never claim something works that you have not watched work.
+
+## The git law
+
+- Gate before every commit: `npm run check` must pass (and `npm run build`
+  must succeed if you touched TypeScript).
+- One branch per product change, plain commit messages anyone can read.
+  Merge to `main` through a PR using the template.
+- The AI is NEVER a contributor: no Claude or AI names, no `Co-Authored-By`,
+  no "Generated with" — not in commits, PR bodies, code comments, or anywhere
+  else. Work is authored by the developer alone.
+- This repo is PUBLIC: no secrets, no keys, no real member data. Every person
+  in the fixtures is fictional.
+
+## Running the app
+
+```bash
+npm install
+npm run build
+npm run start
+```
+
+Then open http://localhost:4173 — the front door links to all four products.
