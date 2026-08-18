@@ -1,0 +1,122 @@
+/* Pulse Studio — shared theme.
+   TEAM-OWNED: change only by team agreement (see CLAUDE.md).
+
+   The two laws this file enforces:
+   1. Backgrounds are black or white only — every page uses var(--bg).
+      Light and dark are both supported; nothing else is a background.
+   2. Every visible feature carries its developer's color, so anyone
+      looking at a screen can tell who built what:
+        Kerrian  · Product A · blue
+        Manny    · Product B · amber
+        Dennis   · Product C · green
+        Rensley  · Product D · violet
+      Put class="product-a|b|c|d" on your page's <body> and style your
+      controls with var(--accent) / var(--accent-ink). */
+
+:root {
+  color-scheme: light dark;
+
+  /* the only backgrounds: white (light) / black (dark) */
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --line: #d4d4d4;
+  --muted: #595959;
+
+  /* one color per developer */
+  --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
+  --manny:   #f59e0b;  --manny-ink:   #0a0a0a;
+  --dennis:  #10b981;  --dennis-ink:  #0a0a0a;
+  --rensley: #8b5cf6;  --rensley-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --fg: #ffffff;
+    --line: #333333;
+    --muted: #a3a3a3;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --fg: #ffffff;
+  --line: #333333;
+  --muted: #a3a3a3;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main { padding: 24px; max-width: 960px; margin: 0 auto; }
+
+a { color: var(--accent, var(--fg)); }
+
+/* developer scoping — the color law in one class */
+.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
+.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink); }
+.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink); }
+.product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); }
+
+/* shared building blocks — every control a developer ships uses their accent */
+.btn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.owner-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 3px solid var(--accent, var(--line));
+}
+.page-head h1 { font-size: 1.25rem; margin: 0; flex: 1; }
+.page-head .back { text-decoration: none; color: var(--muted); }
+
+.card {
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--accent, var(--line));
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 12px 0;
+}
+.card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.card p { margin: 4px 0; color: var(--muted); }
+
+/* status lines state what ran — a stated result, never a blank panel */
+.status { color: var(--muted); border-left: 4px solid var(--accent, var(--line)); padding-left: 12px; }
+
+.theme-toggle {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
