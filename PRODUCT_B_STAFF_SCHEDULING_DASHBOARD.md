@@ -67,4 +67,4 @@ not part of the first fixture-backed MVP.
 
 Agree on the underbooked threshold, the time window for upcoming classes, how
 waitlists affect capacity, what staff roles can see, and whether a roster shows
-member names or anonymized IDs in the demo.
+member names or anonymized IDs in the first release.

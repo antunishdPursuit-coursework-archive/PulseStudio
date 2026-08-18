@@ -104,6 +104,6 @@ Ratify or adjust the 14/60-day thresholds and record the reason. Agree on what
 a *missing* attendance record means for a reserved session (unknown vs.
 no-show) and whether attendance recording is expected for every reservation in
 the fixtures. Decide whether a reservation without attendance counts as any
-engagement signal. Decide whether the demo shows member names or anonymized
-IDs (same question Manny has for rosters). Decide whether the view caps at a
-top-5 weekly digest or shows every flagged member.
+engagement signal. Decide whether staff screens show member names or anonymized
+IDs in the first release (same question Manny has for rosters). Decide whether
+the view caps at a top-5 weekly digest or shows every flagged member.

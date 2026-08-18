@@ -22,14 +22,14 @@ class and reserve a spot when capacity is available. After booking, the member
 can see their own reservation and confirmation; the MVP does not expose other
 members' names, bookings, or attendance.
 
-For the shared-fixture demo, the team must decide how a demo member is selected
-without building a full authentication system. Real authentication is outside
+For the shared-fixture first release, the team must decide how the signed-in
+member is selected without building a full authentication system. Real authentication is outside
 this first increment unless the team explicitly approves it.
 
 ## Golden path
 
 1. A visitor opens the public weekly calendar.
-2. A member selects a scheduled class and identifies the demo member account.
+2. A member selects a scheduled class and identifies their member account.
 3. The app checks capacity and creates a reservation.
 4. The member sees a confirmation and a list of their own reservations.
 
@@ -65,5 +65,5 @@ of the first fixture-backed MVP.
 
 ## Open decisions for Kerrian and the team
 
-Agree on the demo-member selection method, whether availability counts are
+Agree on the member-selection method, whether availability counts are
 public, the cancellation rule, and whether waitlists are deferred entirely.
