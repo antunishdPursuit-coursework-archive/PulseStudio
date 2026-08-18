@@ -1,0 +1,120 @@
+/* Product D — Member Re-engagement Tool. Rensley's lane.
+ *
+ * Everything here builds on the shared theme's tokens: backgrounds stay
+ * var(--bg) (black or white only), and every splash of color is
+ * var(--accent) — the violet assigned to this product. A reseller who
+ * changes the accent token in the shared theme recolors this whole page
+ * with zero edits here.
+ */
+
+/* The violet presence: a glowing seam under the header and a charged
+   summary line, so this product's owner is unmistakable at a glance. */
+.page-head {
+  box-shadow: 0 6px 30px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.status {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--fg);
+  border-left-width: 6px;
+  padding: 8px 0 8px 14px;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+#rule {
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 70ch;
+}
+
+/* Flagged member cards — violet edge, violet glow on hover. */
+.member-card {
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+.member-card:hover {
+  box-shadow: 0 4px 28px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.member-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.member-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.quiet-pill {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  padding: 3px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: quiet-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes quiet-pulse {
+  0%, 100% { box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent); }
+  50%      { box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 70%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiet-pill { animation: none; }
+  .member-card { transition: none; }
+}
+
+.evidence {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 10px 0;
+}
+
+/* The draft reads like a note, not a form — staff copy it, they never
+   send from here. */
+.draft {
+  font: inherit;
+  white-space: pre-wrap;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  box-shadow: 0 2px 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  text-decoration: none;
+  display: inline-block;
+}
+
+.footer-note {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.footer-note a { color: var(--accent); }
+
+@media (max-width: 560px) {
+  .member-head { flex-direction: column; align-items: flex-start; }
+}
