@@ -51,9 +51,19 @@ export function dayNumberFromIso(iso: string): number {
   return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1) / 86_400_000;
 }
 
-/** Whole-day number of the machine's current local date. */
-export function todayDayNumber(now: Date = new Date()): number {
-  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86_400_000;
+/** Whole-day number of the CURRENT date in the studio's timezone — not the
+ *  viewer's. A staff member checking from another timezone at 11:30pm studio
+ *  time must get the studio's answer, or every threshold boundary shifts by
+ *  a day. en-CA formatting yields YYYY-MM-DD, the same shape the fixture
+ *  dates use. */
+export function todayDayNumber(timeZone: string, now: Date = new Date()): number {
+  const studioDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return dayNumberFromIso(studioDate);
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,16 +116,23 @@ export function findQuietMembers(
   for (const member of data.members) {
     if (member.membership_status !== "active") continue;
 
-    // Every class they truly attended, most recent first.
-    const attendedSessions = data.attendance
-      .filter(
-        (a) =>
-          a.member_id === member.member_id &&
-          a.attendance_status === "attended",
-      )
-      .map((a) => sessionById.get(a.session_id))
+    // Every class they truly attended, most recent first. Deduplicated by
+    // session — a data-entry duplicate must never inflate the evidence or
+    // the ranking — and sorted by the full timestamp so two classes on the
+    // same day still order by when they actually happened.
+    const attendedSessionIds = new Set(
+      data.attendance
+        .filter(
+          (a) =>
+            a.member_id === member.member_id &&
+            a.attendance_status === "attended",
+        )
+        .map((a) => a.session_id),
+    );
+    const attendedSessions = [...attendedSessionIds]
+      .map((id) => sessionById.get(id))
       .filter((s): s is ClassSession => s !== undefined)
-      .sort((a, b) => dayNumberFromIso(b.starts_at) - dayNumberFromIso(a.starts_at));
+      .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
 
     const lastSession = attendedSessions[0];
     if (!lastSession) continue; // never attended — onboarding, not ours

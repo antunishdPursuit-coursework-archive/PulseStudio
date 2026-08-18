@@ -28,6 +28,22 @@ function requiredElement<T extends Element>(selector: string): T {
 const statusEl = requiredElement<HTMLParagraphElement>("#status");
 const ruleEl = requiredElement<HTMLParagraphElement>("#rule");
 const flaggedEl = requiredElement<HTMLElement>("#flagged");
+const footerEl = requiredElement<HTMLParagraphElement>("#footer-note");
+const backEl = requiredElement<HTMLAnchorElement>("#back-link");
+
+/* Apply the brand from config so a reseller edits config.ts and one theme
+ * token — never this file, never the page copy. */
+document.title = `Member Re-engagement — ${brand.studioName}`;
+backEl.textContent = `← ${brand.studioName}`;
+footerEl.textContent =
+  `Drafts only — staff review and send every message themselves; nothing on ` +
+  `this page can send. Studio record copy: ${brand.studioEmail} · `;
+{
+  const testsLink = document.createElement("a");
+  testsLink.href = "./tests.html";
+  testsLink.textContent = "Run the unit checks";
+  footerEl.append(testsLink);
+}
 
 /** Studio-local calendar date of a fixture timestamp, for evidence lines. */
 function evidenceDate(iso: string): string {
@@ -40,11 +56,17 @@ function evidenceDate(iso: string): string {
 }
 
 function buildDraftText(f: FlaggedMember): string {
+  // The "the team" fallback (used when an instructor record is missing) must
+  // not go through firstNameOf — "the" is not a name.
+  const instructorFirst =
+    f.usualInstructorName === "the team"
+      ? "The team"
+      : firstNameOf(f.usualInstructorName);
   return draftMessage({
     firstName: firstNameOf(f.member.display_name),
     daysSince: f.daysSince,
     usualClassType: f.usualClassType,
-    usualInstructorFirstName: firstNameOf(f.usualInstructorName),
+    usualInstructorFirstName: instructorFirst,
     studioName: brand.studioName,
   });
 }
@@ -54,11 +76,13 @@ function buildDraftText(f: FlaggedMember): string {
  *  studio mailbox rides along as BCC so the studio keeps its own record. */
 function mailtoHref(f: FlaggedMember, draft: string): string {
   const subject = `We miss you at ${brand.studioName}, ${firstNameOf(f.member.display_name)}!`;
+  // RFC 6068 wants CRLF line breaks in a mailto body; some clients collapse
+  // bare %0A. Only the URL gets CRLF — screen and clipboard stay LF.
   return (
     "mailto:?" +
     `bcc=${encodeURIComponent(brand.studioEmail)}` +
     `&subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(draft)}`
+    `&body=${encodeURIComponent(draft.replace(/\n/g, "\r\n"))}`
   );
 }
 
@@ -96,13 +120,19 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
   copyBtn.type = "button";
   copyBtn.textContent = "Copy message";
   copyBtn.addEventListener("click", () => {
+    // A failed copy must be loud, never a silent shrug — including on
+    // non-secure origins where navigator.clipboard does not exist at all
+    // (e.g. the page opened over plain http from another device).
+    if (!navigator.clipboard) {
+      copyBtn.textContent = "Copy failed — select the text above";
+      return;
+    }
     navigator.clipboard.writeText(draft).then(
       () => {
         copyBtn.textContent = "Copied ✓";
         setTimeout(() => (copyBtn.textContent = "Copy message"), 2000);
       },
       () => {
-        // A failed copy must be loud, never a silent shrug.
         copyBtn.textContent = "Copy failed — select the text above";
       },
     );
@@ -120,7 +150,9 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
 
 function render(): Promise<void> {
   return loadFixtures().then((data) => {
-    const today = todayDayNumber();
+    // "Today" is the studio's calendar date, not the viewer's — the fixture
+    // declares the timezone precisely so thresholds never shift per machine.
+    const today = todayDayNumber(data.timezone);
     const result = findQuietMembers(data, today, proposedRules);
 
     const asOf = new Date().toLocaleDateString("en-US", {

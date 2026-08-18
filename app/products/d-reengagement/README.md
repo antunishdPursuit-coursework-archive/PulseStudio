@@ -38,13 +38,20 @@ http://localhost:4173/products/d-reengagement/ — the unit checks live at
 
 ## Reproduce this for another studio
 
-This product is built to be rebranded without touching its logic:
+This product is built to be rebranded without touching its logic. The
+complete checklist — nothing else needs an edit:
 
 1. `config.ts` — new studio name, mailbox, voice, and (if ratified
-   differently) thresholds.
+   differently) thresholds. The page title, back link, and footer all read
+   from this file at runtime.
 2. The shared theme's accent token for this product — one color change
    recolors every control, glow, and pill on the page.
-3. That's the whole list. The rule, evidence, and checks carry over as-is.
+3. The `theme-color` meta tag in `index.html` — the one hex a meta tag
+   cannot read from a CSS token; set it to the new accent.
+
+The rule, the evidence, and the checks carry over as-is: the unit checks
+assert facts (name, days, class, the configured studio name), not the voice,
+so rewriting the voice in `config.ts` keeps them green.
 
 ## Laws this product lives by
 

@@ -85,7 +85,9 @@
   border-radius: 10px;
   padding: 14px 16px;
   margin: 12px 0;
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+  /* No tinted surface here: backgrounds are black or white ONLY (the
+     team's background law) — the dashed accent border marks ownership. */
+  background: var(--bg);
 }
 
 .actions {

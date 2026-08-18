@@ -12,12 +12,13 @@
  */
 
 import type { FixtureSet } from "../../shared/contract.js";
-import { draftMessage, proposedRules } from "./config.js";
+import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   dayNumberFromIso,
   findQuietMembers,
   firstNameOf,
   summaryLine,
+  todayDayNumber,
 } from "./logic.js";
 
 /* ------------------------------------------------------------------ */
@@ -55,18 +56,26 @@ function recordsFor(
     id: string;
     name: string;
     status: "active" | "paused" | "canceled" | "expired";
+    /** Attended class dates, optionally "date@type" to pin the class type. */
     attended: string[];
     noShows?: string[];
+    unknowns?: string[];
+    /** Dates whose attended session gets a DUPLICATE attendance row, the
+     *  way a data-entry mistake would produce one. */
+    duplicated?: string[];
   }>,
 ): FixtureSet {
   const sessions = new Map<string, { date: string; type: string }>();
   const attendance: FixtureSet["attendance"] = [];
+  const sessionIdByPersonDate = new Map<string, string>();
   let n = 0;
   for (const p of people) {
-    for (const date of p.attended) {
+    for (const entry of p.attended) {
       n += 1;
+      const [date, type] = entry.split("@") as [string, string | undefined];
       const sid = `s_${n}`;
-      sessions.set(sid, { date, type: n % 2 === 0 ? "yoga" : "cycling" });
+      sessions.set(sid, { date, type: type ?? (n % 2 === 0 ? "yoga" : "cycling") });
+      sessionIdByPersonDate.set(`${p.id}|${date}`, sid);
       attendance.push({
         attendance_id: `a_${n}`,
         member_id: p.id,
@@ -85,6 +94,30 @@ function recordsFor(
         session_id: sid,
         attendance_status: "no_show",
         recorded_at: `${date}T10:00:00-04:00`,
+      });
+    }
+    for (const date of p.unknowns ?? []) {
+      n += 1;
+      const sid = `s_${n}`;
+      sessions.set(sid, { date, type: "yoga" });
+      attendance.push({
+        attendance_id: `a_${n}`,
+        member_id: p.id,
+        session_id: sid,
+        attendance_status: "unknown",
+        recorded_at: `${date}T10:00:00-04:00`,
+      });
+    }
+    for (const date of p.duplicated ?? []) {
+      const sid = sessionIdByPersonDate.get(`${p.id}|${date.split("@")[0]}`);
+      if (!sid) throw new Error(`duplicated date ${date} was never attended`);
+      n += 1;
+      attendance.push({
+        attendance_id: `a_${n}`,
+        member_id: p.id,
+        session_id: sid,
+        attendance_status: "attended",
+        recorded_at: `${date.split("@")[0]}T10:05:00-04:00`,
       });
     }
   }
@@ -146,6 +179,40 @@ check("61 days quiet is NOT flagged (older is a different conversation)",
   check("a no_show is never a visit (days count from real visit)", r.flagged[0]?.daysSince, 20);
 }
 
+// 6b. Same trap, third status: an "unknown" record is never a visit either.
+{
+  const r = run(recordsFor([{ id: "m1", name: "Unknown Trap", status: "active", attended: ["2026-07-29"], unknowns: ["2026-08-13"] }]));
+  check("an unknown record is never a visit (still flagged)", r.flagged.length, 1);
+  check("an unknown record is never a visit (days count from real visit)", r.flagged[0]?.daysSince, 20);
+}
+
+// 6c. A data-entry duplicate of the same class must not inflate evidence:
+//     one real class attended, duplicated once, is ONE class — not two.
+{
+  const r = run(recordsFor([{ id: "m1", name: "Duplicate Row", status: "active", attended: ["2026-07-29"], duplicated: ["2026-07-29"] }]));
+  check("a duplicated attendance row counts once", r.flagged[0]?.priorCount, 1);
+}
+
+// 6d. The prior-attendance window is real: a class 70 days before the last
+//     visit is outside the 60-day window and must not count.
+{
+  const r = run(recordsFor([{ id: "m1", name: "Old Timer", status: "active", attended: ["2026-05-20", "2026-07-29"] }]));
+  check("classes outside the prior window never count", r.flagged[0]?.priorCount, 1);
+}
+
+// 6e. "Usual" resolves ties toward the recent: one cycling then one yoga
+//     means their usual class today is yoga, not the one they drifted from.
+{
+  const r = run(recordsFor([{ id: "m1", name: "Switched Class", status: "active", attended: ["2026-07-20@cycling", "2026-07-29@yoga"] }]));
+  check("usual class resolves ties toward the recent", r.flagged[0]?.usualClassType, "yoga");
+}
+
+// 6f. "Today" is the studio's date, not the viewer's: 02:30 UTC on Aug 19
+//     is still Aug 18 in America/New_York.
+check("today is computed in the studio timezone",
+  todayDayNumber("America/New_York", new Date(Date.UTC(2026, 7, 19, 2, 30))),
+  dayNumberFromIso("2026-08-18"));
+
 // 7-9. The excluded conversations.
 check("paused member is NOT flagged",
   run(recordsFor([{ id: "m1", name: "Paused Person", status: "paused", attended: ["2026-07-29"] }])).flagged.length, 0);
@@ -179,19 +246,22 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
     "1 members checked, 0 flagged as of August 18, 2026.");
 }
 
-// 12. The draft: every placeholder filled, nothing template-shaped left.
+// 12. The draft: every fact present, nothing template-shaped left. These
+//     assert FACTS (name, days, class, brand) rather than voice — a reseller
+//     who rewrites the voice in config.ts keeps every check green as long as
+//     the facts survive, because the expectations read from the same config.
 {
   const text = draftMessage({
     firstName: firstNameOf("Maria Santos"),
     daysSince: 17,
     usualClassType: "yoga",
     usualInstructorFirstName: firstNameOf("Ana Torres"),
-    studioName: "Pulse Studio",
+    studioName: brand.studioName,
   });
-  check("draft greets by first name", text.startsWith("Hi Maria"), true);
-  check("draft names the days away", text.includes("17 days"), true);
-  check("draft names their usual class", text.includes("yoga"), true);
-  check("draft carries the studio signature", text.includes("— Pulse Studio"), true);
+  check("draft carries the member's first name", text.includes("Maria"), true);
+  check("draft carries the days away", text.includes("17"), true);
+  check("draft carries their usual class", text.includes("yoga"), true);
+  check("draft carries the studio name from config", text.includes(brand.studioName), true);
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
 }
 
