@@ -5,16 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Staff Scheduling — Pulse Studio</title>
   <link rel="stylesheet" href="../../shared/theme.css">
+  <style>
+    .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .metric { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+    .metric strong { display: block; font-size: 1.8rem; color: var(--accent); }
+    .session-meta, .roster-meta { color: var(--muted); }
+    .session-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+    .occupancy { margin: 12px 0; }
+    progress { width: min(100%, 360px); accent-color: var(--accent); }
+    .tag { display: inline-block; border: 1px solid currentColor; border-radius: 999px; font-size: .82rem; font-weight: 700; padding: 2px 9px; }
+    .tag.attention { color: #a16207; } .tag.good { color: #15803d; } .tag.full { color: #b91c1c; }
+    dialog { color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; max-width: 640px; width: calc(100% - 32px); }
+    dialog::backdrop { background: rgb(0 0 0 / .45); }
+    .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .close { background: transparent; border: 1px solid var(--line); color: var(--fg); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+    .roster { list-style: none; padding: 0; }
+    .roster li { border-top: 1px solid var(--line); padding: 12px 0; display: grid; gap: 3px; }
+    @media (max-width: 640px) { .summary { grid-template-columns: 1fr; } .session-row { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body class="product-b">
   <header class="page-head">
     <a class="back" href="../../index.html">← Pulse Studio</a>
-    <h1>Product B — Staff Scheduling Dashboard</h1>
+    <h1>Staff Scheduling Dashboard</h1>
     <span class="owner-badge">Manny</span>
   </header>
   <main>
-    <p class="status" id="status">Manny builds here. This page is wired to the shared theme, contract, and fixtures — see CLAUDE.md for the lane and color laws.</p>
+    <p class="status" id="status" aria-live="polite">Loading scheduled sessions and staff records.</p>
+    <section class="summary" aria-label="Scheduling summary" id="summary"></section>
+    <section aria-labelledby="sessions-title">
+      <h2 id="sessions-title">Upcoming scheduled sessions</h2>
+      <p>Confirmed reservations count toward occupancy. Waitlisted and canceled reservations do not.</p>
+      <div id="sessions"></div>
+    </section>
   </main>
+  <dialog id="roster-dialog" aria-labelledby="roster-title">
+    <div class="dialog-head"><h2 id="roster-title">Class roster</h2><button class="close" id="close-roster" type="button">Close</button></div>
+    <div id="roster-content"></div>
+  </dialog>
   <script type="module" src="../../shared/theme-boot.js"></script>
   <script type="module" src="./main.js"></script>
 </body>
