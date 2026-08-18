@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pulse Studio</title>
 <style>
   :root{
@@ -15,6 +16,7 @@
   h2{font-size:16px;margin:24px 0 10px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
   .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+  .card.confirm{border-color:var(--ok)}
   .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
   .btn{background:var(--accent2);color:#0f1115;border:none;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px}
   .btn:hover{opacity:.9}
@@ -27,7 +29,7 @@
   .pill.ok{background:rgba(74,222,128,.15);color:var(--ok)}
   .pill.full{background:rgba(248,113,113,.15);color:var(--danger)}
   .pill.warn{background:rgba(250,204,21,.15);color:#facc15}
-  .login-box{max-width:380px;margin:80px auto;text-align:center}
+  .login-box{max-width:380px;margin:40px auto 28px;text-align:center}
   .tabs{display:flex;gap:8px;margin-bottom:24px}
   .tab{flex:1;padding:12px;text-align:center;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--card)}
   .tab.active{border-color:var(--accent2);background:rgba(129,140,248,.1)}
@@ -59,8 +61,11 @@
    The shape/rules match booking.py exactly:
      - capacity lives on classes (default) AND class_instances (copy)
      - remaining spots = capacity - COUNT(bookings for that instance) [never stored]
-     - booking blocked if full, or if member already booked that instance
+     - booking blocked if full, already booked, or the instance is canceled
+   Bookings are also written to localStorage so a refresh does not wipe them.
    ============================================================ */
+
+const STORE_KEY = "pulse-studio-product-a";
 
 let members = [
   { member_id: 1, name: "Alex Kim",    email: "alex@pulse.demo",    password: "member123" },
@@ -73,24 +78,53 @@ let staff = [
 ];
 
 let classes = [
-  { class_id: 1, name: "Yoga", instructor: "Priya",  day_of_week: "Tuesday",   time: "18:00", capacity: 12 },
-  { class_id: 2, name: "HIIT", instructor: "Marcus", day_of_week: "Wednesday", time: "07:00", capacity: 8 },
+  { class_id: 1, name: "Yoga",     instructor: "Priya",  day_of_week: "Tuesday",   time: "18:00", capacity: 12 },
+  { class_id: 2, name: "HIIT",     instructor: "Marcus", day_of_week: "Wednesday", time: "07:00", capacity: 8 },
+  { class_id: 3, name: "Cycling",  instructor: "Dana",   day_of_week: "Thursday",  time: "17:30", capacity: 10 },
 ];
 
 let class_instances = [
-  { instance_id: 1, class_id: 1, date: "2026-08-25", capacity: 12 },
-  { instance_id: 2, class_id: 2, date: "2026-08-26", capacity: 8 },
+  { instance_id: 1, class_id: 1, date: "2026-08-25", capacity: 12, session_status: "scheduled" },
+  { instance_id: 2, class_id: 2, date: "2026-08-26", capacity: 8,  session_status: "scheduled" },
+  { instance_id: 3, class_id: 3, date: "2026-08-27", capacity: 10, session_status: "scheduled" },
 ];
 
 let bookings = [
   // { booking_id, member_id, instance_id, booked_at }
 ];
 
-let nextInstanceId = 3;
+let nextInstanceId = 4;
 let nextBookingId = 1;
-let nextClassId = 3;
+let nextClassId = 4;
+let lastConfirmation = null;
 
 class BookingError extends Error {}
+
+function saveStore() {
+  localStorage.setItem(STORE_KEY, JSON.stringify({
+    members, staff, classes, class_instances, bookings,
+    nextInstanceId, nextBookingId, nextClassId
+  }));
+}
+
+function loadStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    members = data.members || members;
+    staff = data.staff || staff;
+    classes = data.classes || classes;
+    class_instances = (data.class_instances || class_instances).map(inst => ({
+      session_status: "scheduled",
+      ...inst
+    }));
+    bookings = data.bookings || bookings;
+    nextInstanceId = data.nextInstanceId || nextInstanceId;
+    nextBookingId = data.nextBookingId || nextBookingId;
+    nextClassId = data.nextClassId || nextClassId;
+  } catch (e) { /* keep defaults */ }
+}
 
 function getRemainingSpots(instance_id) {
   const inst = class_instances.find(i => i.instance_id === instance_id);
@@ -110,14 +144,38 @@ function getSchedule() {
       time: cls.time,
       date: inst.date,
       capacity: inst.capacity,
+      session_status: inst.session_status || "scheduled",
       remaining: getRemainingSpots(inst.instance_id),
     };
   }).sort((a,b) => a.date.localeCompare(b.date));
 }
 
+function scheduleCard(s, extra) {
+  const canceled = s.session_status === "canceled";
+  const isFull = s.remaining <= 0;
+  const pillClass = canceled ? "full" : (isFull ? "full" : (s.remaining <= 2 ? "warn" : "ok"));
+  const pillText = canceled ? "Canceled" : (isFull ? "Full" : `${s.remaining} left`);
+  return `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div style="font-weight:600">${s.name} <span class="muted-small">with ${s.instructor}</span></div>
+          <div class="muted-small">${fmtDate(s.date)} · ${s.time}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="pill ${pillClass}">${pillText}</span>
+          ${extra || ""}
+        </div>
+      </div>
+    </div>`;
+}
+
 function bookClass(member_id, instance_id) {
   const inst = class_instances.find(i => i.instance_id === instance_id);
   if (!inst) throw new BookingError("That class doesn't exist.");
+  if ((inst.session_status || "scheduled") === "canceled") {
+    throw new BookingError("This class was canceled.");
+  }
 
   const already = bookings.find(b => b.member_id === member_id && b.instance_id === instance_id);
   if (already) throw new BookingError("You're already booked into this class.");
@@ -132,6 +190,7 @@ function bookClass(member_id, instance_id) {
     booked_at: new Date().toISOString(),
   };
   bookings.push(booking);
+  saveStore();
   return booking;
 }
 
@@ -139,6 +198,14 @@ function cancelBooking(booking_id, member_id) {
   const idx = bookings.findIndex(b => b.booking_id === booking_id && b.member_id === member_id);
   if (idx === -1) throw new BookingError("Booking not found.");
   bookings.splice(idx, 1);
+  saveStore();
+}
+
+function cancelClassInstance(instance_id) {
+  const inst = class_instances.find(i => i.instance_id === instance_id);
+  if (!inst) throw new BookingError("That class doesn't exist.");
+  inst.session_status = "canceled";
+  saveStore();
 }
 
 function myBookings(member_id) {
@@ -152,14 +219,16 @@ function myBookings(member_id) {
 function addClassInstance(class_id, date) {
   const cls = classes.find(c => c.class_id === class_id);
   if (!cls) throw new BookingError("Class not found.");
-  const inst = { instance_id: nextInstanceId++, class_id, date, capacity: cls.capacity };
+  const inst = { instance_id: nextInstanceId++, class_id, date, capacity: cls.capacity, session_status: "scheduled" };
   class_instances.push(inst);
+  saveStore();
   return inst;
 }
 
 function addClass(name, instructor, day_of_week, time, capacity) {
   const c = { class_id: nextClassId++, name, instructor, day_of_week, time, capacity: Number(capacity) };
   classes.push(c);
+  saveStore();
   return c;
 }
 
@@ -207,10 +276,11 @@ function fmtDate(d) {
 /* ---------- LOGIN ---------- */
 
 function loginView() {
+  const publicRows = getSchedule().map(s => scheduleCard(s)).join("");
   return `
     <div class="login-box">
       <h1>Pulse Studio</h1>
-      <p class="sub">Sign in to book classes or manage the schedule</p>
+      <p class="sub">This week's schedule is public. Sign in to book a class or manage the studio.</p>
       <div class="tabs">
         <div class="tab active" id="tabMember">Member</div>
         <div class="tab" id="tabStaff">Staff</div>
@@ -228,6 +298,8 @@ function loginView() {
       </div>
       <p class="muted-small">Demo logins — Member: <b>alex@pulse.demo</b> / <b>member123</b>. Staff: <b>staff@pulse.demo</b> / <b>staff123</b></p>
     </div>
+    <h2>This week's classes</h2>
+    ${publicRows || '<p class="muted-small">No classes scheduled.</p>'}
   `;
 }
 
@@ -251,6 +323,7 @@ function wireLogin() {
       if (!s) { toast("No matching staff login. Try staff@pulse.demo / staff123.", "error"); return; }
       session = { role: 'staff', id: s.staff_id, name: s.name };
     }
+    lastConfirmation = null;
     render();
   };
 
@@ -266,26 +339,21 @@ function memberView() {
   const mine = myBookings(session.id);
   const myInstanceIds = new Set(mine.map(b => b.instance_id));
 
+  const confirm = lastConfirmation ? `
+    <div class="card confirm">
+      <div style="font-weight:600">You're booked, ${session.name}.</div>
+      <div class="muted-small">${lastConfirmation.class_name} on ${fmtDate(lastConfirmation.date)} at ${lastConfirmation.time} with ${lastConfirmation.instructor}.</div>
+    </div>` : "";
+
   const rows = schedule.map(s => {
+    const canceled = s.session_status === "canceled";
     const isFull = s.remaining <= 0;
     const alreadyIn = myInstanceIds.has(s.instance_id);
-    let pillClass = isFull ? 'full' : (s.remaining <= 2 ? 'warn' : 'ok');
-    let pillText = isFull ? 'Full' : `${s.remaining} left`;
-    return `
-      <div class="card">
-        <div class="row">
-          <div>
-            <div style="font-weight:600">${s.name} <span class="muted-small">with ${s.instructor}</span></div>
-            <div class="muted-small">${fmtDate(s.date)} · ${s.time}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span class="pill ${pillClass}">${pillText}</span>
-            ${alreadyIn
-              ? `<button class="btn secondary" disabled>Booked</button>`
-              : `<button class="btn" data-instance="${s.instance_id}" ${isFull ? 'disabled' : ''}>${isFull ? 'Full' : 'Book'}</button>`}
-          </div>
-        </div>
-      </div>`;
+    let action = "";
+    if (canceled) action = `<button class="btn secondary" disabled>Canceled</button>`;
+    else if (alreadyIn) action = `<button class="btn secondary" disabled>Booked</button>`;
+    else action = `<button class="btn" data-instance="${s.instance_id}" ${isFull ? "disabled" : ""}>${isFull ? "Full" : "Book"}</button>`;
+    return scheduleCard(s, action);
   }).join("");
 
   const myRows = mine.length ? mine.map(b => `
@@ -307,22 +375,22 @@ function memberView() {
       </div>
       <button class="btn secondary" id="logoutBtn">Log out</button>
     </div>
-
+    ${confirm}
     <h2>Upcoming classes</h2>
     ${rows || '<p class="muted-small">No classes scheduled.</p>'}
-
     <h2>My bookings</h2>
     ${myRows}
   `;
 }
 
 function wireMember() {
-  document.getElementById('logoutBtn').onclick = () => { session = null; render(); };
+  document.getElementById('logoutBtn').onclick = () => { session = null; lastConfirmation = null; render(); };
   document.querySelectorAll('[data-instance]').forEach(btn => {
     btn.onclick = () => {
       const instance_id = Number(btn.getAttribute('data-instance'));
       try {
-        bookClass(session.id, instance_id);
+        const booking = bookClass(session.id, instance_id);
+        lastConfirmation = myBookings(session.id).find(b => b.booking_id === booking.booking_id);
         toast("Booked!", "success");
       } catch (e) {
         toast(e.message, "error");
@@ -335,6 +403,7 @@ function wireMember() {
       const booking_id = Number(btn.getAttribute('data-cancel'));
       try {
         cancelBooking(booking_id, session.id);
+        lastConfirmation = null;
         toast("Booking cancelled.", "success");
       } catch (e) {
         toast(e.message, "error");
@@ -351,6 +420,7 @@ function staffView() {
 
   const scheduleRows = schedule.map(s => {
     const roster = rosterForInstance(s.instance_id);
+    const canceled = s.session_status === "canceled";
     return `
       <div class="card">
         <div class="row">
@@ -358,7 +428,10 @@ function staffView() {
             <div style="font-weight:600">${s.name} <span class="muted-small">with ${s.instructor}</span></div>
             <div class="muted-small">${fmtDate(s.date)} · ${s.time} · capacity ${s.capacity}</div>
           </div>
-          <span class="pill ${s.remaining<=0?'full':(s.remaining<=2?'warn':'ok')}">${s.remaining} spots left</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="pill ${canceled?'full':(s.remaining<=0?'full':(s.remaining<=2?'warn':'ok'))}">${canceled ? "Canceled" : s.remaining + " spots left"}</span>
+            ${canceled ? "" : `<button class="btn danger" data-cancel-class="${s.instance_id}">Cancel class</button>`}
+          </div>
         </div>
         ${roster.length ? `
           <div class="divider"></div>
@@ -428,6 +501,19 @@ function staffView() {
 function wireStaff() {
   document.getElementById('logoutBtn').onclick = () => { session = null; render(); };
 
+  document.querySelectorAll('[data-cancel-class]').forEach(btn => {
+    btn.onclick = () => {
+      const instance_id = Number(btn.getAttribute('data-cancel-class'));
+      try {
+        cancelClassInstance(instance_id);
+        toast("Class canceled.", "success");
+      } catch (e) {
+        toast(e.message, "error");
+      }
+      render();
+    };
+  });
+
   document.getElementById('addInstanceBtn').onclick = () => {
     const class_id = Number(document.getElementById('instClassSelect').value);
     const date = document.getElementById('instDate').value;
@@ -454,6 +540,7 @@ function wireStaff() {
   };
 }
 
+loadStore();
 render();
 </script>
 </body>
