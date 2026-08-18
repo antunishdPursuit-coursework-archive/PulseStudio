@@ -159,7 +159,7 @@ Each owner should add answers below before implementation:
 
 | Owner | Product | Required fields | Fields created/updated | Open questions |
 | --- | --- | --- | --- | --- |
-| Kerrian | Product A | TBD | TBD | TBD |
+| Kerrian | Product A | `member`, `class_session` public fields, remaining spots | `reservation` (`reserved` / `canceled`) | Demo login stands in for auth; availability counts are public |
 | Manny | Product B | TBD | TBD | TBD |
 | Dennis | Product C | TBD | TBD | TBD |
 | Rensley | Product D | TBD | TBD | TBD |
