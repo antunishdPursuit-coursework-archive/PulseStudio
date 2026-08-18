@@ -1,0 +1,59 @@
+{
+  "timezone": "America/New_York",
+  "note": "Starter fixture, draft for team ratification. Every person and record is fictional. One row in each list is one record of that entity as defined in SHARED_DATA_CONTRACT.md.",
+  "members": [
+    { "member_id": "mem_001", "display_name": "Maria Santos", "membership_status": "active" },
+    { "member_id": "mem_002", "display_name": "James Okafor", "membership_status": "active" },
+    { "member_id": "mem_003", "display_name": "Priya Patel", "membership_status": "paused" },
+    { "member_id": "mem_004", "display_name": "Leo Kim", "membership_status": "active" },
+    { "member_id": "mem_005", "display_name": "Sofia Reyes", "membership_status": "canceled" }
+  ],
+  "memberships": [
+    { "membership_id": "mship_001", "member_id": "mem_001", "plan_name": "Unlimited Monthly", "status": "active", "started_on": "2026-03-01", "renews_on": "2026-09-01", "canceled_on": null },
+    { "membership_id": "mship_002", "member_id": "mem_002", "plan_name": "8 Classes Monthly", "status": "active", "started_on": "2026-01-15", "renews_on": "2026-09-15", "canceled_on": null },
+    { "membership_id": "mship_003", "member_id": "mem_003", "plan_name": "Unlimited Monthly", "status": "paused", "started_on": "2026-02-01", "renews_on": null, "canceled_on": null },
+    { "membership_id": "mship_004", "member_id": "mem_004", "plan_name": "4 Classes Monthly", "status": "active", "started_on": "2026-08-10", "renews_on": "2026-09-10", "canceled_on": null },
+    { "membership_id": "mship_005", "member_id": "mem_005", "plan_name": "8 Classes Monthly", "status": "canceled", "started_on": "2025-11-01", "renews_on": null, "canceled_on": "2026-07-20" }
+  ],
+  "instructors": [
+    { "instructor_id": "ins_001", "display_name": "Ana Torres" },
+    { "instructor_id": "ins_002", "display_name": "Marco Silva" }
+  ],
+  "class_sessions": [
+    { "session_id": "ses_001", "class_type": "yoga", "level": "all levels", "instructor_id": "ins_001", "starts_at": "2026-07-28T09:00:00-04:00", "ends_at": "2026-07-28T10:00:00-04:00", "capacity": 12, "session_status": "completed" },
+    { "session_id": "ses_002", "class_type": "HIIT", "level": "advanced", "instructor_id": "ins_002", "starts_at": "2026-07-30T18:00:00-04:00", "ends_at": "2026-07-30T18:45:00-04:00", "capacity": 10, "session_status": "completed" },
+    { "session_id": "ses_003", "class_type": "yoga", "level": "all levels", "instructor_id": "ins_001", "starts_at": "2026-08-01T09:00:00-04:00", "ends_at": "2026-08-01T10:00:00-04:00", "capacity": 12, "session_status": "completed" },
+    { "session_id": "ses_004", "class_type": "cycling", "level": "beginner", "instructor_id": "ins_002", "starts_at": "2026-08-08T18:00:00-04:00", "ends_at": "2026-08-08T18:45:00-04:00", "capacity": 10, "session_status": "completed" },
+    { "session_id": "ses_005", "class_type": "yoga", "level": "all levels", "instructor_id": "ins_001", "starts_at": "2026-08-15T09:00:00-04:00", "ends_at": "2026-08-15T10:00:00-04:00", "capacity": 12, "session_status": "completed" },
+    { "session_id": "ses_006", "class_type": "yoga", "level": "all levels", "instructor_id": "ins_001", "starts_at": "2026-08-19T09:00:00-04:00", "ends_at": "2026-08-19T10:00:00-04:00", "capacity": 12, "session_status": "scheduled" },
+    { "session_id": "ses_007", "class_type": "HIIT", "level": "advanced", "instructor_id": "ins_002", "starts_at": "2026-08-20T18:00:00-04:00", "ends_at": "2026-08-20T18:45:00-04:00", "capacity": 10, "session_status": "scheduled" },
+    { "session_id": "ses_008", "class_type": "cycling", "level": "beginner", "instructor_id": "ins_002", "starts_at": "2026-08-21T07:00:00-04:00", "ends_at": "2026-08-21T07:45:00-04:00", "capacity": 10, "session_status": "scheduled" }
+  ],
+  "reservations": [
+    { "reservation_id": "res_001", "member_id": "mem_001", "session_id": "ses_001", "reservation_status": "reserved", "reserved_at": "2026-07-26T12:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_002", "member_id": "mem_005", "session_id": "ses_001", "reservation_status": "reserved", "reserved_at": "2026-07-26T14:30:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_003", "member_id": "mem_001", "session_id": "ses_002", "reservation_status": "reserved", "reserved_at": "2026-07-28T09:10:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_004", "member_id": "mem_001", "session_id": "ses_003", "reservation_status": "reserved", "reserved_at": "2026-07-30T20:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_005", "member_id": "mem_002", "session_id": "ses_003", "reservation_status": "canceled", "reserved_at": "2026-07-29T08:00:00-04:00", "canceled_at": "2026-07-31T18:00:00-04:00" },
+    { "reservation_id": "res_006", "member_id": "mem_001", "session_id": "ses_004", "reservation_status": "reserved", "reserved_at": "2026-08-05T10:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_007", "member_id": "mem_002", "session_id": "ses_004", "reservation_status": "reserved", "reserved_at": "2026-08-06T09:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_008", "member_id": "mem_002", "session_id": "ses_005", "reservation_status": "reserved", "reserved_at": "2026-08-13T07:30:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_009", "member_id": "mem_002", "session_id": "ses_006", "reservation_status": "reserved", "reserved_at": "2026-08-16T19:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_010", "member_id": "mem_004", "session_id": "ses_006", "reservation_status": "reserved", "reserved_at": "2026-08-17T11:00:00-04:00", "canceled_at": null },
+    { "reservation_id": "res_011", "member_id": "mem_004", "session_id": "ses_007", "reservation_status": "waitlisted", "reserved_at": "2026-08-17T11:05:00-04:00", "canceled_at": null }
+  ],
+  "attendance": [
+    { "attendance_id": "att_001", "member_id": "mem_001", "session_id": "ses_001", "attendance_status": "attended", "recorded_at": "2026-07-28T10:05:00-04:00" },
+    { "attendance_id": "att_002", "member_id": "mem_005", "session_id": "ses_001", "attendance_status": "attended", "recorded_at": "2026-07-28T10:05:00-04:00" },
+    { "attendance_id": "att_003", "member_id": "mem_001", "session_id": "ses_002", "attendance_status": "attended", "recorded_at": "2026-07-30T18:50:00-04:00" },
+    { "attendance_id": "att_004", "member_id": "mem_001", "session_id": "ses_003", "attendance_status": "attended", "recorded_at": "2026-08-01T10:05:00-04:00" },
+    { "attendance_id": "att_005", "member_id": "mem_001", "session_id": "ses_004", "attendance_status": "no_show", "recorded_at": "2026-08-08T19:00:00-04:00" },
+    { "attendance_id": "att_006", "member_id": "mem_002", "session_id": "ses_004", "attendance_status": "attended", "recorded_at": "2026-08-08T19:00:00-04:00" },
+    { "attendance_id": "att_007", "member_id": "mem_002", "session_id": "ses_005", "attendance_status": "attended", "recorded_at": "2026-08-15T10:05:00-04:00" }
+  ],
+  "studio_policies": [
+    { "policy_id": "pol_001", "topic": "cancellation", "answer": "Cancel a reservation up to 12 hours before class starts at no charge. Later cancellations count against your monthly class allowance.", "effective_from": "2026-01-01", "updated_at": "2026-01-01T09:00:00-05:00", "is_current": true },
+    { "policy_id": "pol_002", "topic": "what to bring", "answer": "Bring a water bottle and a towel. Yoga mats and cycling shoes are provided free at the front desk.", "effective_from": "2026-01-01", "updated_at": "2026-01-01T09:00:00-05:00", "is_current": true },
+    { "policy_id": "pol_003", "topic": "class levels", "answer": "All-levels classes welcome everyone. Beginner classes move slower with more instruction. Advanced classes assume you have attended at least ten classes.", "effective_from": "2026-01-01", "updated_at": "2026-01-01T09:00:00-05:00", "is_current": true }
+  ]
+}
