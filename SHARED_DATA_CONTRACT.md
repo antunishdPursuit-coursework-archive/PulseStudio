@@ -162,6 +162,6 @@ Each owner should add answers below before implementation:
 | Kerrian | Product A | TBD | TBD | TBD |
 | Manny | Product B | TBD | TBD | TBD |
 | Dennis | Product C | TBD | TBD | TBD |
-| Rensley | Product D | TBD | TBD | TBD |
+| Rensley | Product D | `member.member_id/display_name/membership_status`, `membership.status/renews_on`, `reservation.member_id/session_id/reservation_status`, `attendance.member_id/session_id/attendance_status/recorded_at`, `class_session.class_type/instructor_id`, `instructor.display_name` | None shared — product-local draft messages only, never sent automatically | Ratify 14/60-day drop-off thresholds; what does a missing attendance record mean for a reserved session; names vs. anonymized IDs in the demo |
 
 Product briefs: [Product A](PRODUCT_A_MEMBER_BOOKING_APP.md) and [Product B](PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md).
