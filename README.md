@@ -43,6 +43,9 @@ Each teammate builds one product:
 Lets a member view the week's class schedule and reserve a spot in a specific
 class.
 
+Open [member-booking.html](member-booking.html) in a browser. Demo member:
+`alex@pulse.demo` / `member123`. Demo staff: `staff@pulse.demo` / `staff123`.
+
 ### Product B: Staff Scheduling Dashboard
 
 Shows staff the roster and capacity for each upcoming class, flagging any class
