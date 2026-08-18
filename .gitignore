@@ -4,6 +4,11 @@ dist/
 build/
 .next/
 
+# Compiled TypeScript output — never commit build artifacts (they cause
+# merge conflicts that the source never had)
+app/**/*.js
+app/**/*.js.map
+
 # Python environments and caches
 .venv/
 venv/
