@@ -9,7 +9,7 @@
 
 import { ID_PATTERN } from "./contracts.js";
 import type { GeneratedStudioBundle } from "./contracts.js";
-import { DEFAULT_CONFIG, type SyntheticStudioConfig } from "./config.js";
+import { DEFAULT_CONFIG, organicMemberCount, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
@@ -246,6 +246,25 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
 }
 
 /* ------------------------------------------------------------------ */
+/* The attendance CSV export                                            */
+/* ------------------------------------------------------------------ */
+
+{
+  const { attendanceCsv } = await import("./csv-export.js");
+  const csv = attendanceCsv(first.dataset);
+  const lines = csv.trim().split("\n");
+  check("the CSV header speaks the re-engagement door's vocabulary",
+    lines[0], "member id,member,date,status,class,instructor");
+  check("the CSV carries one row per readable recorded outcome",
+    lines.length - 1, first.dataset.attendance.length);
+  check("the CSV status vocabulary is attended / no-show / unknown",
+    lines.slice(1).every((l) => / (attended|no-show|unknown),/.test(l.replace(/,/g, " , ")) ||
+      /,(attended|no-show|unknown),/.test(l)), true);
+  check("the CSV export is deterministic",
+    attendanceCsv(second.dataset) === csv, true);
+}
+
+/* ------------------------------------------------------------------ */
 /* Serialization round-trip                                             */
 /* ------------------------------------------------------------------ */
 
@@ -260,6 +279,25 @@ check("serialize -> parse -> serialize is byte-identical",
   }
   check("parsing a malformed bundle throws a named reason",
     message.includes("missing"), true);
+}
+
+/* ------------------------------------------------------------------ */
+/* Organic sizing: the studio is the size it is                         */
+/* ------------------------------------------------------------------ */
+
+check("organic size is deterministic per seed",
+  organicMemberCount("proof-seed-0001") === organicMemberCount("proof-seed-0001"), true);
+check("organic size stays within the supported population",
+  ["a", "b", "c", "d", "e"].every((s) => {
+    const n = organicMemberCount(s);
+    return n >= 1 && n <= 500;
+  }), true);
+check("different seeds grow different studios",
+  new Set(["a", "b", "c", "d", "e"].map((s) => organicMemberCount(s))).size > 1, true);
+{
+  const organic = generateStudio({ ...BASE, memberCount: organicMemberCount(BASE.seed) });
+  check("an organically sized studio validates clean",
+    validateBundle(organic).problems.length, 0);
 }
 
 /* ------------------------------------------------------------------ */

@@ -15,6 +15,15 @@
  */
 
 export { loadFixtures } from "../../shared/data.js";
+
+/* The shared synthetic studio engine (team-owned, contract PROPOSED). Used
+ * by this product's proof suite to walk a generated studio's attendance
+ * export through the CSV door and reconcile the flags against the engine's
+ * INDEPENDENT truth metadata. Products may depend on shared code; shared
+ * code never depends on a product. */
+export { generateStudio } from "../../shared/synthetic/generate.js";
+export { attendanceCsv } from "../../shared/synthetic/csv-export.js";
+export { DEFAULT_CONFIG as SYNTHETIC_DEFAULT_CONFIG } from "../../shared/synthetic/config.js";
 export type {
   Attendance,
   AttendanceStatus,

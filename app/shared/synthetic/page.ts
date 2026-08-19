@@ -5,10 +5,16 @@
  * proof suite audits the engine sources for exactly that.
  */
 
-import { DEFAULT_CONFIG, GENERATOR_VERSION, type SyntheticStudioConfig } from "./config.js";
+import {
+  DEFAULT_CONFIG,
+  GENERATOR_VERSION,
+  organicMemberCount,
+  type SyntheticStudioConfig,
+} from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { serializeBundle } from "./serialize.js";
+import { attendanceCsv } from "./csv-export.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
@@ -25,12 +31,14 @@ const countEl = requiredElement<HTMLInputElement>("#memberCount");
 const modeEl = requiredElement<HTMLSelectElement>("#mode");
 const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 const downloadBtn = requiredElement<HTMLButtonElement>("#download");
+const downloadCsvBtn = requiredElement<HTMLButtonElement>("#download-csv");
 
 // UI-layer clock read: prefill today's date. The engine itself only ever
 // sees the date as data.
 dateEl.value = new Date().toISOString().slice(0, 10);
 
 let lastSerialized: string | null = null;
+let lastCsv: string | null = null;
 let lastSeed = "";
 
 function metric(label: string, value: string | number, note: string): HTMLElement {
@@ -47,12 +55,17 @@ function metric(label: string, value: string | number, note: string): HTMLElemen
 }
 
 generateBtn.addEventListener("click", () => {
+  // A blank member count is the honest default: the studio is the size it
+  // is, decided by the seed — nobody fills their own gym by declaration.
+  const seed = seedEl.value.trim();
+  const memberCount =
+    countEl.value.trim() === "" ? organicMemberCount(seed) : Number(countEl.value);
   const config: SyntheticStudioConfig = {
     ...DEFAULT_CONFIG,
     generatorVersion: GENERATOR_VERSION,
-    seed: seedEl.value.trim(),
+    seed,
     asOfDate: dateEl.value,
-    memberCount: Number(countEl.value),
+    memberCount,
     mode: modeEl.value as SyntheticStudioConfig["mode"],
   };
   const t0 = performance.now();
@@ -97,18 +110,29 @@ generateBtn.addEventListener("click", () => {
         bundle.truth.declaredViolations.map((v) => `· ${v.code} — ${v.detail}`).join("\n");
 
   lastSerialized = serializeBundle(bundle);
+  lastCsv = attendanceCsv(bundle.dataset);
   lastSeed = meta.seed;
   downloadBtn.hidden = false;
+  downloadCsvBtn.hidden = false;
 });
 
-// A LOCAL save only — the page never transmits anything anywhere.
-downloadBtn.addEventListener("click", () => {
-  if (lastSerialized === null) return;
-  const blob = new Blob([lastSerialized], { type: "application/json" });
+// LOCAL saves only — the page never transmits anything anywhere.
+function saveLocally(text: string, name: string, type: string): void {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `synthetic-studio-${lastSeed}.json`;
+  a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+downloadBtn.addEventListener("click", () => {
+  if (lastSerialized !== null) {
+    saveLocally(lastSerialized, `synthetic-studio-${lastSeed}.json`, "application/json");
+  }
+});
+downloadCsvBtn.addEventListener("click", () => {
+  if (lastCsv !== null) {
+    saveLocally(lastCsv, `synthetic-attendance-${lastSeed}.csv`, "text/csv");
+  }
 });

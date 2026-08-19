@@ -12,6 +12,11 @@
  */
 
 import type { FixtureSet } from "./deps.js";
+import {
+  attendanceCsv,
+  generateStudio as generateSharedStudio,
+  SYNTHETIC_DEFAULT_CONFIG,
+} from "./deps.js";
 import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
@@ -501,6 +506,76 @@ check("clean records produce no data-quality line",
   const imp = adaptAttendanceCsv("Member,Day,Date\nMaria Santos,Monday,2026-08-01\nJose Reyes,Tuesday,2026-08-02\n", "America/New_York");
   check("a Day column never shadows the Date column", imp.skipped.length, 0);
   check("dates read from the Date column", imp.memberCount, 2);
+}
+
+/* ------------------------------------------------------------------ */
+/* The shared synthetic studio, through the CSV door                    */
+/* ------------------------------------------------------------------ */
+
+// 30. The strongest proof this product has: a synthetic studio's attendance
+//     export walks through THIS product's CSV door, and the flags are
+//     reconciled against the shared engine's INDEPENDENT truth — computed
+//     from construction intent, never from this engine. Agreement means two
+//     independent implementations of the policy meet; disagreement means a
+//     defect in one of them.
+{
+  const bundle = generateSharedStudio({
+    ...SYNTHETIC_DEFAULT_CONFIG,
+    seed: "door-proof-0001",
+    asOfDate: "2026-08-18",
+    memberCount: 60,
+    mode: "clean",
+  });
+  const csvText = attendanceCsv(bundle.dataset);
+  const imp = adaptAttendanceCsv(csvText, "America/New_York");
+  check("the synthetic export walks through the door with zero skips",
+    imp.skipped.length, 0);
+  check("identity matched on the stable member id column", imp.identityIsName, false);
+
+  const r = findQuietMembers(imp.records, TODAY, proposedRules);
+  // Map adapter members back to synthetic ids by replaying the adapter's
+  // own rule: member N is the Nth NEW identity cell in row order. (The
+  // adapter's readable id fragment is the name, not the identity — names
+  // repeat, so the identity cell is the only faithful bridge.)
+  const rows = parseCsv(csvText);
+  const headerCells = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
+  const idCol = headerCells.indexOf("member id");
+  const firstAppearance: string[] = [];
+  const seenIdentity = new Set<string>();
+  for (const row of rows.slice(1)) {
+    const raw = (row[idCol] ?? "").trim();
+    if (raw !== "" && !seenIdentity.has(raw.toLowerCase())) {
+      seenIdentity.add(raw.toLowerCase());
+      firstAppearance.push(raw);
+    }
+  }
+  const syntheticIdOf = (adapterId: string): string => {
+    const m = adapterId.match(/^csv_m_(\d+)_/);
+    return m ? (firstAppearance[Number(m[1]) - 1] ?? adapterId) : adapterId;
+  };
+  const flaggedIds = new Set(r.flagged.map((f) => syntheticIdOf(f.member.member_id)));
+  const truthEligible = new Set(
+    Object.entries(bundle.truth.expectedReengagementEligibility)
+      .filter(([, v]) => v)
+      .map(([id]) => id),
+  );
+  // The one DOCUMENTED divergence: a bare attendance export says nothing
+  // about memberships, so the door treats everyone as active. Members the
+  // truth knows are paused/canceled but who sit in the quiet window are the
+  // only extra flags the door may produce — and nothing else.
+  const statuses = bundle.truth.expectedCurrentMembershipStatus;
+  const quiet = bundle.truth.expectedQuietDays;
+  const windowQuietNonActive = new Set(
+    Object.entries(quiet)
+      .filter(([id, q]) => q > 14 && q <= 60 && statuses[id] !== "active")
+      .map(([id]) => id),
+  );
+  check("every truth-eligible member is flagged by the door",
+    [...truthEligible].every((id) => flaggedIds.has(id)), true);
+  check("extra door flags are exactly the members the export cannot reveal as inactive",
+    [...flaggedIds].every((id) => truthEligible.has(id) || windowQuietNonActive.has(id)), true);
+  check("the door's quiet-day counts match the shared truth exactly",
+    r.flagged.every((f) => quiet[syntheticIdOf(f.member.member_id)] === f.daysSince), true);
 }
 
 /* ------------------------------------------------------------------ */

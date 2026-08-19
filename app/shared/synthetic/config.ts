@@ -7,6 +7,7 @@
  */
 
 import type { SyntheticMode } from "./contracts.js";
+import { makeStream } from "./random.js";
 
 export const GENERATOR_VERSION = "1.0.0";
 
@@ -19,6 +20,15 @@ export interface SyntheticStudioConfig {
   historyDays: number; // 90..730 — boundary cohorts need >= 61 + prior window
   facilityCapacity?: number;
   mode: SyntheticMode;
+}
+
+/** The studio's own size, derived deterministically from the seed. In the
+ *  real world nobody decides "my gym has exactly N people" — the studio is
+ *  the size it is. Callers who need exact control (the proof suite, scale
+ *  runs) still pass memberCount explicitly; everyone else lets the seed
+ *  decide. Same seed, same size, forever. */
+export function organicMemberCount(seed: string): number {
+  return makeStream(seed, "population").int(35, 220);
 }
 
 export const DEFAULT_CONFIG: SyntheticStudioConfig = {

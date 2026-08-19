@@ -41,7 +41,7 @@
     <section class="controls" aria-label="Generator configuration">
       <label>Seed <input id="seed" value="pulse-shared-0001"></label>
       <label>As-of date <input id="asOfDate" type="date"></label>
-      <label>Members (1–500) <input id="memberCount" type="number" min="1" max="500" value="60"></label>
+      <label>Members — blank lets the studio be its own size <input id="memberCount" type="number" min="1" max="500" placeholder="organic (from seed)"></label>
       <label>Mode
         <select id="mode">
           <option value="clean">clean</option>
@@ -52,6 +52,7 @@
     </section>
     <button class="neutral-btn" id="generate" type="button">Generate the studio</button>
     <button class="ghost-btn" id="download" type="button" hidden>Download JSON (stays on this device)</button>
+    <button class="ghost-btn" id="download-csv" type="button" hidden>Download attendance CSV — drops straight into the re-engagement tool</button>
     <section class="report" id="report" aria-label="Generation report"></section>
     <p id="violations"></p>
     <p class="footer-note">
