@@ -227,10 +227,8 @@ function remainingOnDay(day: string): number {
   return sessionsOnDay(day).reduce((total, session) => total + remainingSpots(session), 0);
 }
 
-function tightestSession(): { session: SyntheticClassSession; left: number } | undefined {
-  return upcomingSessions()
-    .map((session) => ({ session, left: remainingSpots(session) }))
-    .sort((left, right) => left.left - right.left || left.session.startsAt.localeCompare(right.session.startsAt))[0];
+function fullOnDay(day: string): number {
+  return sessionsOnDay(day).filter((session) => remainingSpots(session) <= 0).length;
 }
 
 function appendReservation(reservation: Reservation): void {
@@ -507,18 +505,17 @@ function render(): void {
   const member = memberById.get(memberId);
   const sessions = upcomingSessions();
   const openSpots = sessions.reduce((total, session) => total + remainingSpots(session), 0);
+  const fullStudio = sessions.filter((session) => remainingSpots(session) <= 0).length;
   renderAuth(member);
   renderConfirmation(member);
   renderDays();
-  const dayLabel = selectedDay ? formatDayChip(selectedDay) : "the selected day";
-  const shown = sessionsOnDay(selectedDay).length;
-  const full = sessions.filter((session) => remainingSpots(session) <= 0).length;
-  const closest = tightestSession();
-  const closestNote =
-    full === 0 && closest
-      ? ` Fewest spots: ${closest.left} left for ${sessionLabel(closest.session).name} on ${formatWhen(closest.session)}. Book those seats to open the waitlist.`
-      : "";
-  statusEl.textContent = `${sessions.length} scheduled classes checked, ${full} currently full. ${shown} on ${dayLabel}. ${openSpots} spots remaining across the shared studio.${closestNote}`;
+  if (!selectedDay) {
+    statusEl.textContent = `${sessions.length} scheduled classes checked, ${fullStudio} currently full. ${openSpots} spots remaining across the shared studio.`;
+  } else {
+    const shown = sessionsOnDay(selectedDay).length;
+    const dayLabel = formatDayChip(selectedDay);
+    statusEl.textContent = `${dayLabel}: ${shown} classes checked, ${fullOnDay(selectedDay)} full, ${remainingOnDay(selectedDay)} spots left. Studio-wide: ${sessions.length} scheduled classes, ${fullStudio} full, ${openSpots} spots left.`;
+  }
   renderSchedule(memberId);
   renderMine(memberId);
   if (requestedSessionId) {
