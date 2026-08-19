@@ -367,6 +367,50 @@ check("unrecognized status maps to unknown, never attended", normalizeStatus("ma
     message.includes("member column") && message.includes("date column"), true);
 }
 
+// 19b. Identity: a stable id column beats the name. Two different people
+//      who share a name stay two people when the export carries ids — the
+//      merge that name-only matching cannot avoid.
+{
+  const csv = [
+    "member id,name,date",
+    "m-100,John Smith,2026-08-01",
+    "m-200,John Smith,2026-08-16",
+  ].join("\n");
+  const imp = adaptAttendanceCsv(csv, "America/New_York");
+  check("a stable id keeps same-named people distinct", imp.memberCount, 2);
+  check("the page can state which column identity used", imp.identityIsName, false);
+}
+
+// 19c. An email column serves as identity when no explicit id exists.
+{
+  const csv = [
+    "email,name,date",
+    "a@studio.test,John Smith,2026-08-01",
+    "b@studio.test,John Smith,2026-08-16",
+  ].join("\n");
+  check("an email column serves as identity", adaptAttendanceCsv(csv, "America/New_York").memberCount, 2);
+}
+
+// 19d. Name-only files still work, and the limitation is DISCLOSED rather
+//      than hidden — the page states how members were matched.
+{
+  const imp = adaptAttendanceCsv("name,date\nJohn Smith,2026-08-01\nJohn Smith,2026-08-16\n", "America/New_York");
+  check("a name-only file still groups by name", imp.memberCount, 1);
+  check("name matching is disclosed, not hidden", imp.identityIsName, true);
+  check("the disclosure names the fix", imp.identityMethod.includes("member id"), true);
+}
+
+// 19e. A blank identifier cell falls back to that row's name — blanks must
+//      never collapse several people into one.
+{
+  const csv = [
+    "member id,name,date",
+    ",Ana Ruiz,2026-08-01",
+    ",Beto Cruz,2026-08-16",
+  ].join("\n");
+  check("blank identifiers fall back to the name, never merge", adaptAttendanceCsv(csv, "America/New_York").memberCount, 2);
+}
+
 // 20. Impossible calendar dates are stated skips, never guessed visits.
 //     13/1/2026 looks European; 2/30/2026 is a typo — neither may become a
 //     fabricated future date that silently un-flags a quiet member.

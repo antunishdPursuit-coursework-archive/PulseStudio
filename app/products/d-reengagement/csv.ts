@@ -34,6 +34,11 @@ export interface CsvImport {
   /** Rows we could not use, each naming its physical file line and the
    *  reason — never silent. */
   skipped: string[];
+  /** Which column identity was matched on, so the page can say so. Name
+   *  matching is a real limitation, not a detail to hide. */
+  identityMethod: string;
+  /** True when identity fell back to the member's name. */
+  identityIsName: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,6 +114,12 @@ export function parseCsv(text: string): string[][] {
 /* ------------------------------------------------------------------ */
 
 const HEADER_NAMES = {
+  // A stable identifier, when the studio's export has one. Priority order:
+  // an explicit id beats an email, and either beats a name. Names are NOT
+  // reliable identity — two members can share one, and one member can be
+  // spelled two ways — but a name-only export is still worth reading, so
+  // the name is the documented fallback and the page states which was used.
+  identity: ["member id", "customer id", "client id", "member_id", "id", "email", "email address"],
   member: ["member", "name", "member name", "customer", "client"],
   date: ["date", "class date", "visit date", "day"],
   status: ["status", "attendance", "attended", "showed"],
@@ -203,6 +214,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     ].filter((m): m is string => m !== null);
     throw new Error(`The file is missing ${missing.join(" and ")}. Found headers: ${headers.join(", ")}`);
   }
+  const identityCol = findColumn(headers, HEADER_NAMES.identity);
   const statusCol = findColumn(headers, HEADER_NAMES.status);
   const classCol = findColumn(headers, HEADER_NAMES.classType);
   const instructorCol = findColumn(headers, HEADER_NAMES.instructor);
@@ -231,7 +243,11 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     const classType = classCol === -1 ? "class" : (cells[classCol] ?? "").trim() || "class";
     const instructorName = instructorCol === -1 ? "" : (cells[instructorCol] ?? "").trim();
 
-    const nameKey = name.toLowerCase();
+    // Identity: the stable identifier when the export carries one, the
+    // name otherwise. A blank identifier cell falls back to that row's
+    // name rather than collapsing every blank into one person.
+    const rawIdentity = identityCol === -1 ? "" : (cells[identityCol] ?? "").trim();
+    const nameKey = (rawIdentity || name).toLowerCase();
     let memberId = memberIdByName.get(nameKey);
     if (memberId === undefined) {
       memberId = `csv_m_${memberIdByName.size + 1}_${slug(name) || "member"}`;
@@ -288,10 +304,15 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     studio_policies: [],
   };
 
+  const identityIsName = identityCol === -1;
   return {
     records,
     rowCount: rows.length - 1,
     memberCount: members.length,
     skipped,
+    identityIsName,
+    identityMethod: identityIsName
+      ? "member name (add a member id or email column for exact matching)"
+      : `the "${headers[identityCol]}" column`,
   };
 }

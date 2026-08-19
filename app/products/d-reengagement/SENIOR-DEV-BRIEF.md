@@ -338,15 +338,21 @@ everything in this repo.
 
 ## Logic and data — verified by running the compiled code, not recalled
 
-**14. Identity.** Two different keys, deliberately:
+**14. Identity.**
 - **Shared records:** `member_id`, a stable id.
-- **CSV import:** the member **name as written, compared case-insensitively**.
-  Names are NOT slugged to ASCII — that bug merged 王伟 and 佐藤花子 into one
-  person and hid a quiet member behind another's visit. There is no email in
-  the CSV contract, so name is the only available key; two real people sharing
-  a name will merge, and that is a known accepted limitation worth challenging
-  if you have a better idea that does not require the studio to change its
-  export.
+- **CSV import:** a stable identifier when the export has one — `member id`,
+  `customer id`, `client id`, `id`, or `email` — otherwise the member **name as
+  written, compared case-insensitively**. Names are NOT slugged to ASCII: that
+  bug merged 王伟 and 佐藤花子 into one person and hid a quiet member behind
+  another's visit. A blank identifier cell falls back to that row's name so
+  blanks never collapse several people into one.
+- **The limitation is disclosed, not hidden.** When identity falls back to
+  names the page says so and names the fix ("add a member id or email column
+  for exact matching"). Name matching can still merge two people who share a
+  name or split one person spelled two ways — an unsolvable inference problem
+  from a name-only file, since every returning member produces duplicate name
+  rows. Detecting "ambiguous duplicates" from names alone would flag every
+  loyal regular; the honest answer is a one-column request to the studio.
 
 **15. Attendance rows referencing an unknown member are silently ignored** —
 verified. The engine iterates over `members` and filters attendance to each, so

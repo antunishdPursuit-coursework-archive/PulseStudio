@@ -230,6 +230,7 @@ csvInput.addEventListener("change", () => {
       renderRecords(
         imported.records,
         `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
+          `Members matched by ${imported.identityMethod}. ` +
           `Everyone in the file is treated as an active member. ` +
           `This data never left your browser.`,
       );

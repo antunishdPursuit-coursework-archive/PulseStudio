@@ -95,6 +95,14 @@ The page has a "Use your studio's attendance (CSV)" button. A staff member
 drops in their own export and the same engine runs on it — **entirely in the
 browser: the file is never uploaded anywhere**, which the page states.
 
+**Identity:** if the export carries a stable identifier — `member id`,
+`customer id`, `client id`, `id`, or `email` — that is used to tell members
+apart, so two different people who share a name stay two people. Without one,
+members are matched by name, which can merge two people or split one; the page
+states which method was used rather than hiding the limitation. A blank
+identifier cell falls back to that row's name so blanks never collapse several
+people into one.
+
 Accepted columns (case-insensitive, any order): a member column
 (`member`/`name`/`member name`/`customer`/`client`) and a date column
 (`date`/`class date`/`visit date`/`day` — earlier synonyms win, so a real
