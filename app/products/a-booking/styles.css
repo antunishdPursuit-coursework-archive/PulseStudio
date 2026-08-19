@@ -1,5 +1,29 @@
 .lede { color: var(--muted); max-width: 40rem; margin: 0 0 16px; }
 h2 { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 28px 0 8px; }
+.day-title { font-size: 1.15rem; margin: 8px 0 12px; }
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.days button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.days button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.days button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 
 .who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 20px; }
 .who label { font-weight: 600; }

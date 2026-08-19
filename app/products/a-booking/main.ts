@@ -77,6 +77,8 @@ const errorEl = requiredElement<HTMLParagraphElement>("#error");
 const whoEl = requiredElement<HTMLElement>("#who");
 const memberSelect = requiredElement<HTMLSelectElement>("#member-select");
 const confirmationEl = requiredElement<HTMLElement>("#confirmation");
+const daysEl = requiredElement<HTMLElement>("#days");
+const dayTitleEl = requiredElement<HTMLElement>("#day-title");
 const scheduleEl = requiredElement<HTMLElement>("#schedule");
 const mineWrap = requiredElement<HTMLElement>("#mine-wrap");
 const mineEl = requiredElement<HTMLElement>("#mine");
@@ -137,15 +139,46 @@ function upcomingSessions(): SyntheticClassSession[] {
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt));
 }
 
-function formatWhen(session: SyntheticClassSession): string {
+function sessionDate(session: SyntheticClassSession): string {
+  return session.startsAt.slice(0, 10);
+}
+
+function scheduleDays(): string[] {
+  return [...new Set(upcomingSessions().map(sessionDate))];
+}
+
+function sessionsOnDay(day: string): SyntheticClassSession[] {
+  return upcomingSessions().filter((session) => sessionDate(session) === day);
+}
+
+function formatDayChip(day: string): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
+    timeZone: dataset.meta.timezone,
+  }).format(new Date(`${day}T12:00:00-04:00`));
+}
+
+function formatDayTitle(day: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: dataset.meta.timezone,
+  }).format(new Date(`${day}T12:00:00-04:00`));
+}
+
+function formatTime(session: SyntheticClassSession): string {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: dataset.meta.timezone,
   }).format(new Date(`${session.startsAt}-04:00`));
+}
+
+function formatWhen(session: SyntheticClassSession): string {
+  return `${formatDayChip(sessionDate(session))} · ${formatTime(session)}`;
 }
 
 function sessionLabel(session: SyntheticClassSession): { name: string; instructor: string; level: string } {
@@ -227,6 +260,13 @@ function memberReservations(memberId: string): SyntheticClassSession[] {
 }
 
 let lastConfirmation: { sessionId: string; reservationId: string } | null = null;
+let selectedDay = "";
+
+function requestedSessionDay(): string {
+  if (!requestedSessionId) return "";
+  const session = dataset.classSessions.find((item) => item.id === requestedSessionId);
+  return session ? sessionDate(session) : "";
+}
 
 function renderConfirmation(member: SyntheticMember | undefined): void {
   if (!lastConfirmation || !member) {
@@ -244,10 +284,43 @@ function renderConfirmation(member: SyntheticMember | undefined): void {
   confirmationEl.innerHTML = `<strong>You're booked, ${escapeHtml(member.displayName)}.</strong><span>${escapeHtml(label.name)} on ${escapeHtml(formatWhen(session))} with ${escapeHtml(label.instructor)}. Confirmation ${escapeHtml(lastConfirmation.reservationId)}.</span>`;
 }
 
+function renderDays(): void {
+  const days = scheduleDays();
+  if (days.length === 0) {
+    daysEl.innerHTML = "";
+    dayTitleEl.textContent = "";
+    return;
+  }
+  const requested = requestedSessionDay();
+  if (!days.includes(selectedDay)) {
+    selectedDay = requested && days.includes(requested) ? requested : (days[0] ?? "");
+  }
+  daysEl.innerHTML = days
+    .map((day) => {
+      const count = sessionsOnDay(day).length;
+      const active = day === selectedDay;
+      return `<button type="button" class="${active ? "active" : ""}" data-day="${escapeHtml(day)}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(formatDayChip(day))} · ${count}</button>`;
+    })
+    .join("");
+  dayTitleEl.textContent = selectedDay ? formatDayTitle(selectedDay) : "";
+  daysEl.querySelectorAll<HTMLButtonElement>("[data-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedDay = button.dataset.day ?? "";
+      clearError();
+      render();
+    });
+  });
+}
+
 function renderSchedule(memberId: string): void {
-  const sessions = upcomingSessions();
-  if (sessions.length === 0) {
+  const allUpcoming = upcomingSessions();
+  if (allUpcoming.length === 0) {
     scheduleEl.innerHTML = `<p class="status">${dataset.classSessions.length} class sessions checked, 0 currently scheduled.</p>`;
+    return;
+  }
+  const sessions = sessionsOnDay(selectedDay);
+  if (sessions.length === 0) {
+    scheduleEl.innerHTML = `<p class="status">${allUpcoming.length} scheduled classes checked, 0 on the selected day.</p>`;
     return;
   }
   scheduleEl.innerHTML = sessions
@@ -273,7 +346,7 @@ function renderSchedule(memberId: string): void {
         <div class="session">
           <div>
             <h3>${escapeHtml(label.name)}</h3>
-            <p class="meta">${escapeHtml(formatWhen(session))} · ${escapeHtml(label.level)} · ${escapeHtml(label.instructor)}</p>
+            <p class="meta">${escapeHtml(formatTime(session))} · ${escapeHtml(label.level)} · ${escapeHtml(label.instructor)}</p>
           </div>
           <div class="session-actions">
             <span class="pill ${badge.className}">${escapeHtml(badge.text)}</span>
@@ -348,8 +421,11 @@ function render(): void {
   const member = memberById.get(memberId);
   const sessions = upcomingSessions();
   const openSpots = sessions.reduce((total, session) => total + remainingSpots(session), 0);
-  statusEl.textContent = `${sessions.length} scheduled classes checked. ${openSpots} spots remaining across the shared studio. ${dataset.members.length} members in the studio.`;
   renderConfirmation(member);
+  renderDays();
+  const dayLabel = selectedDay ? formatDayChip(selectedDay) : "the selected day";
+  const shown = sessionsOnDay(selectedDay).length;
+  statusEl.textContent = `${sessions.length} scheduled classes checked across ${scheduleDays().length} days. ${shown} on ${dayLabel}. ${openSpots} spots remaining across the shared studio.`;
   renderSchedule(memberId);
   renderMine(memberId);
   mineWrap.hidden = memberId === "";
