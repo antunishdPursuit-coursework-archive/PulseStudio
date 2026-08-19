@@ -142,6 +142,15 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     if (!sessionOk) add("orphan-booking-session", b.id, `classSessionId ${b.classSessionId}`);
     if (!isStrictTimestamp(b.bookedAt)) add("invalid-timestamp", b.id, `bookedAt "${b.bookedAt}"`);
     if (!memberOk || !sessionOk) continue;
+    const bookedSession = sessionById.get(b.classSessionId);
+    if (
+      bookedSession &&
+      isStrictTimestamp(b.bookedAt) &&
+      sessionReadable.has(bookedSession.id) &&
+      b.bookedAt > bookedSession.startsAt
+    ) {
+      add("booking-after-session", b.id, `booked at ${b.bookedAt}, class started ${bookedSession.startsAt}`);
+    }
     if (b.status === "booked") {
       bookedCountBySession.set(
         b.classSessionId,
@@ -355,6 +364,25 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       );
       continue;
     }
+    const expectedPrior = truth.expectedPriorAttendance[m.id];
+    if (realized !== undefined) {
+      const lastDay = asOfDay - realized;
+      const seenSessions = new Set<string>();
+      let priorCount = 0;
+      for (const rows of attendanceByMemberSession.values()) {
+        const row = rows[0];
+        if (!row || row.memberId !== m.id || row.status !== "attended") continue;
+        const sess = sessionById.get(row.classSessionId);
+        if (!sess || !sessionReadable.has(sess.id) || seenSessions.has(sess.id)) continue;
+        seenSessions.add(sess.id);
+        const day = dayNumberOf(dateOfTimestamp(sess.startsAt));
+        if (day >= asOfDay) continue;
+        if (day >= lastDay - 60 && day <= lastDay) priorCount += 1;
+      }
+      if (expectedPrior !== priorCount) {
+        add("truth-prior-mismatch", m.id, `answer key says ${expectedPrior ?? "absent"} prior classes, records show ${priorCount}`);
+      }
+    }
     const periods = periodsByMember.get(m.id) ?? [];
     const derived = deriveStatusOn(periods, dataset.meta.asOfDate);
     const expectedStatus = truth.expectedCurrentMembershipStatus[m.id];
@@ -370,6 +398,84 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
         `truth says ${String(truth.expectedReengagementEligibility[m.id])}, records say ${String(eligible)}`,
       );
     }
+  }
+
+  // --- canonical order: collections ascending by id ---------------------
+  const collections: Array<[string, ReadonlyArray<{ id: string }>]> = [
+    ["members", dataset.members],
+    ["memberships", dataset.memberships],
+    ["classSessions", dataset.classSessions],
+    ["bookings", dataset.bookings],
+    ["attendance", dataset.attendance],
+  ];
+  for (const [name, rows] of collections) {
+    for (let i = 1; i < rows.length; i += 1) {
+      const prev = rows[i - 1];
+      const cur = rows[i];
+      if (prev && cur && cur.id <= prev.id) {
+        add("unsorted-collection", cur.id, `${name} is not in ascending id order`);
+        break;
+      }
+    }
+  }
+
+  // --- the answer key never leaks into normal records -------------------
+  // Answer vocabulary on a production-shaped record would let a product
+  // read the answers instead of inferring them. Decided by key NAME, so a
+  // parsed dataset from anywhere is held to it, not just our own types.
+  {
+    // "answer" is deliberately NOT here: a studio policy's answer field is
+    // the member-facing text itself — production data. The forbidden
+    // vocabulary is the kind that would let a product read a verdict.
+    const forbiddenKey = /^(cohort|group|expected|eligib|quiet)/i;
+    const scan = (value: unknown, path: string): void => {
+      if (Array.isArray(value)) {
+        const sample = value.length > 0 ? [value[0]] : [];
+        for (const v of sample) scan(v, `${path}[0]`);
+        return;
+      }
+      if (typeof value !== "object" || value === null) return;
+      for (const [k, v] of Object.entries(value)) {
+        if (forbiddenKey.test(k)) {
+          add("answer-label-leak", path, `record key "${k}" belongs in the answer key, not on records`);
+        }
+        scan(v, `${path}.${k}`);
+      }
+    };
+    scan(
+      {
+        members: dataset.members,
+        memberships: dataset.memberships,
+        classSessions: dataset.classSessions,
+        bookings: dataset.bookings,
+        attendance: dataset.attendance,
+        studioPolicies: dataset.studioPolicies,
+      },
+      "dataset",
+    );
+  }
+
+  // --- sensitive data: scan DECODED field values, not file text ---------
+  // Nothing in this dataset may even be SHAPED like a credential: no long
+  // digit runs (card-shaped), no nine-digit runs (government-id-shaped).
+  {
+    const credentialShaped = /\d{13,19}|(?<!\d)\d{9}(?!\d)/;
+    const scanStrings = (value: unknown, path: string): void => {
+      if (typeof value === "string") {
+        if (credentialShaped.test(value)) {
+          add("real-pii-pattern", path, `value looks credential-shaped: "${value.slice(0, 40)}"`);
+        }
+        return;
+      }
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) scanStrings(value[i], `${path}[${i}]`);
+        return;
+      }
+      if (typeof value === "object" && value !== null) {
+        for (const [k, v] of Object.entries(value)) scanStrings(v, `${path}.${k}`);
+      }
+    };
+    scanStrings(dataset, "dataset");
   }
 
   // --- reconcile with declared violations ------------------------------

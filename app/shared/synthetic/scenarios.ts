@@ -63,6 +63,15 @@ export interface CohortPlan {
   joinDaysAgo: number;
   /** Attendance gap band [from, to] days ago — the returning cohort. */
   gapBand: [number, number] | null;
+  /** Persistent habits: which weekdays this member usually comes (0=Sun),
+   *  and which part of the day. Real regulars have rhythms, not uniform
+   *  randomness. */
+  preferredWeekdays: number[];
+  preferredSlot: "early" | "midday" | "evening";
+  /** Gradual decliner: visits thin out as the anchor approaches. */
+  fades: boolean;
+  /** Books often, cancels often — a real and annoying kind of member. */
+  cancelRate: number;
 }
 
 /** Priority-ordered guaranteed scenarios; weighted fill afterward. */
@@ -84,6 +93,8 @@ const SINGLETONS: readonly string[] = [
   "no-show-prone",
   "class-switcher",
   "returning",
+  "fading",
+  "books-then-cancels",
   "regular",
   "ordinary",
 ];
@@ -100,6 +111,8 @@ const WEIGHTED: ReadonlyArray<[string, number]> = [
   ["no-show-prone", 0.05],
   ["class-switcher", 0.04],
   ["returning", 0.02],
+  ["fading", 0.05],
+  ["books-then-cancels", 0.03],
 ];
 
 export function planCohorts(config: SyntheticStudioConfig): CohortPlan[] {
@@ -162,6 +175,10 @@ function planFor(
     cancelDaysAgo: null,
     joinDaysAgo: 0,
     gapBand: null,
+    preferredWeekdays: [],
+    preferredSlot: "evening",
+    fades: false,
+    cancelRate: 0.1,
   };
 
   const boundary = key.match(/^quiet-boundary-(\d+)$/);
@@ -216,6 +233,16 @@ function planFor(
     base.anchorDaysAgo = stream.int(2, 10);
     base.switchesPreference = true;
     base.cadencePerWeek = 1.5 + stream.next();
+  } else if (key === "fading") {
+    // Gradual decline: credible engagement that thins out before the quiet.
+    base.anchorDaysAgo = stream.int(8, 20);
+    base.cadencePerWeek = 2 + stream.next();
+    base.fades = true;
+  } else if (key === "books-then-cancels") {
+    base.anchorDaysAgo = stream.int(2, 12);
+    base.cadencePerWeek = 1.2 + stream.next();
+    base.cancelRate = 0.6;
+    base.futureBookings = stream.int(1, 3);
   } else if (key === "shared-name") {
     base.nameKind = "shared";
     base.sharedNameGroup = sharedNameGroup;
@@ -232,6 +259,18 @@ function planFor(
     base.anchorDaysAgo = index % 2 === 0 ? 17 : 3;
     base.cadencePerWeek = 1.5 + stream.next();
   }
+
+  // Persistent habits, drawn per member: two to four usual weekdays and a
+  // usual time of day. The fill honours these softly — most visits land on
+  // habit days, the occasional one does not, like a person.
+  const weekdayPool = [0, 1, 2, 3, 4, 5, 6];
+  const habitCount = stream.int(2, 4);
+  for (let w = 0; w < habitCount; w += 1) {
+    const pickAt = stream.int(0, weekdayPool.length - 1);
+    const picked = weekdayPool.splice(pickAt, 1)[0];
+    if (picked !== undefined) base.preferredWeekdays.push(picked);
+  }
+  base.preferredSlot = (["early", "midday", "evening"] as const)[stream.int(0, 2)] ?? "evening";
 
   // Join long enough before the anchor that the prior-60-day window has
   // real history inside the membership — and spread joins across the WHOLE

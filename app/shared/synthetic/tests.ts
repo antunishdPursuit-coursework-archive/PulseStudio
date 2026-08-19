@@ -389,6 +389,104 @@ for (const n of [1, 2, 5, 12]) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Habits, decline, cancellers, and the answer key's new column         */
+/* ------------------------------------------------------------------ */
+
+// Regulars have rhythms: most visits land on the member's usual weekdays.
+{
+  const regularId = cohortMemberId(first, "regular");
+  const sessions = new Map(first.dataset.classSessions.map((x) => [x.id, x]));
+  const seen = new Set<string>();
+  const days: number[] = [];
+  for (const a of first.dataset.attendance) {
+    if (a.memberId !== regularId || a.status !== "attended" || seen.has(a.classSessionId)) continue;
+    seen.add(a.classSessionId);
+    const sess = sessions.get(a.classSessionId);
+    if (sess) days.push(weekdayOf(dateOfTimestamp(sess.startsAt)));
+  }
+  const counts = new Map<number, number>();
+  for (const d of days) counts.set(d, (counts.get(d) ?? 0) + 1);
+  const top2 = [...counts.values()].sort((a, b) => b - a).slice(0, 2).reduce((x, y) => x + y, 0);
+  check("a regular's visits concentrate on habit weekdays", top2 * 2 >= days.length, true);
+}
+
+// The gradual decliner's recent gaps are wider than their old ones.
+{
+  const fadingId = cohortMemberId(first, "fading");
+  const sessions = new Map(first.dataset.classSessions.map((x) => [x.id, x]));
+  const days = [...new Set(
+    first.dataset.attendance
+      .filter((a) => a.memberId === fadingId && a.status === "attended")
+      .map((a) => sessions.get(a.classSessionId))
+      .filter((x): x is NonNullable<typeof x> => x !== undefined)
+      .map((x) => dayNumberOf(dateOfTimestamp(x.startsAt))),
+  )].sort((a, b) => a - b);
+  const gaps = days.slice(1).map((d, i) => d - (days[i] ?? d));
+  const firstHalf = gaps.slice(0, Math.floor(gaps.length / 2));
+  const lastHalf = gaps.slice(Math.floor(gaps.length / 2));
+  const mean = (xs: number[]): number => xs.reduce((x, y) => x + y, 0) / Math.max(1, xs.length);
+  check("a fading member's engagement visibly thins before the quiet",
+    gaps.length >= 4 && mean(lastHalf) > mean(firstHalf), true);
+}
+
+// The books-then-cancels member actually books and cancels, repeatedly.
+{
+  const cancellerId = cohortMemberId(first, "books-then-cancels");
+  const canceled = first.dataset.bookings.filter(
+    (b) => b.memberId === cancellerId && b.status === "canceled",
+  ).length;
+  check("the books-then-cancels member has real canceled bookings", canceled >= 2, true);
+}
+
+// The answer key's prior-attendance column agrees with the records.
+{
+  const maria = cohortMemberId(first, "quiet-boundary-15");
+  check("the answer key carries a prior-attendance count for attenders",
+    typeof first.truth.expectedPriorAttendance[maria], "number");
+  check("prior-attendance truth reconciles (validator found no mismatch)",
+    cleanReport.problems.filter((p) => p.code === "truth-prior-mismatch").length, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* The validator's own new teeth, proven on doctored bundles            */
+/* ------------------------------------------------------------------ */
+
+// Answer vocabulary planted on a record must scream.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  (doctored.dataset.members[0] as unknown as Record<string, unknown>)["cohort"] = "regular";
+  const report = validateBundle(doctored);
+  check("an answer label leaked onto a record is caught",
+    report.problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+// A credential-shaped value anywhere must scream.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const victim = doctored.dataset.members[1];
+  if (victim) victim.displayName = "Card 4111111111111111";
+  check("a credential-shaped value is caught by the decoded-value scan",
+    validateBundle(doctored).problems.some((p) => p.code === "real-pii-pattern"), true);
+}
+
+// A booking stamped after its class must scream.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const b = doctored.dataset.bookings[0];
+  if (b) b.bookedAt = "2027-12-31T23:59:59";
+  check("a booking made after its class is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "booking-after-session"), true);
+}
+
+// A shuffled collection must scream — order is contract.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  doctored.dataset.attendance.reverse();
+  check("an out-of-order collection is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "unsorted-collection"), true);
+}
+
+/* ------------------------------------------------------------------ */
 /* Organic sizing: the studio is the size it is                         */
 /* ------------------------------------------------------------------ */
 

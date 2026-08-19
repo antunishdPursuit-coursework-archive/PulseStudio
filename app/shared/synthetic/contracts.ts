@@ -20,6 +20,13 @@
  * ("member:000042"). Names and emails are attributes, never keys.
  * Relationships are by id only — never by display name.
  *
+ * Serialization order is part of the contract: every collection is sorted
+ * by ascending id before output, so identical configurations reproduce
+ * byte-for-byte and diffs are meaningful. "No event after asOfDate" means
+ * OUTCOMES — attendance never post-dates the reference date; scheduled
+ * future sessions and the bookings pointing at them are the studio's
+ * forward calendar and are expected.
+ *
  * Time: dates are strict YYYY-MM-DD. Timestamps are strict
  * YYYY-MM-DDTHH:MM:SS in STUDIO-LOCAL time; the timezone is stated once in
  * the dataset meta. No per-row offsets: one studio, one zone, deterministic
@@ -172,6 +179,10 @@ export interface SyntheticTruth {
   /** Days since last attended class as of asOfDate. Members who have never
    *  attended are absent from this record. */
   expectedQuietDays: Record<string, number>;
+  /** Attended classes in the 60 days up to and including the last visit —
+   *  the evidence count a re-engagement surface should show. Same key rule
+   *  as expectedQuietDays. */
+  expectedPriorAttendance: Record<string, number>;
   /** The shared re-engagement policy, computed independently here:
    *  derived status is active AND quiet days > 14 AND <= 60. */
   expectedReengagementEligibility: Record<string, boolean>;

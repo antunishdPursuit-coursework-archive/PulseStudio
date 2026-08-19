@@ -36,6 +36,7 @@ import {
   dateOfTimestamp,
   dayNumberOf,
   minutesOfTimestamp,
+  weekdayOf,
 } from "./normalize.js";
 import { buildSchedule, roomsPerSlot } from "./schedule.js";
 import { demandFactor, planCohorts, type CohortPlan } from "./scenarios.js";
@@ -167,8 +168,19 @@ export function generateStudio(
         (outcome !== "attended" || !overlapsAttended(memberId, s)),
     );
     if (usable.length === 0) return null;
-    const preferred = usable.filter((s) => s.classTypeId === preferredTypeId);
-    const session = (preferred.length > 0 ? preferred : usable)[0];
+    // Habit-aware choice: the member's usual time of day first, then their
+    // usual class, then anything with a seat. Real people repeat themselves.
+    const slotOf = (s: SyntheticClassSession): "early" | "midday" | "evening" => {
+      const min = minutesOfTimestamp(s.startsAt);
+      return min < 600 ? "early" : min < 960 ? "midday" : "evening";
+    };
+    const ranked = [...usable].sort((a, b) => {
+      const score = (x: SyntheticClassSession): number =>
+        (slotOf(x) === plan.preferredSlot ? 2 : 0) +
+        (x.classTypeId === preferredTypeId ? 1 : 0);
+      return score(b) - score(a);
+    });
+    const session = ranked[0];
     if (!session) return null;
 
     seatsUsed.set(session.id, (seatsUsed.get(session.id) ?? 0) + 1);
@@ -257,13 +269,26 @@ export function generateStudio(
     let day = asOfDay - plan.anchorDaysAgo;
     let visits = 0;
     while (visits < visitCap) {
-      day -= stride + behavior.int(0, 2);
+      // A gradual decliner's recent gaps are wide and their older gaps are
+      // tight — engagement that visibly thins before the quiet.
+      const fadeStretch = plan.fades
+        ? Math.max(0, Math.ceil((70 - (asOfDay - day)) / 12))
+        : 0;
+      day -= stride + fadeStretch + behavior.int(0, 2);
       if (day < windowStartDay || day < joinDay) break;
       const agoDays = asOfDay - day;
       if (plan.gapBand && agoDays >= plan.gapBand[0] && agoDays <= plan.gapBand[1]) {
         continue; // the returning cohort's silent stretch
       }
       if (!activeOn(periods, dateOfDayNumber(day))) continue; // paused/canceled span
+      // Habit days: most visits land on the member's usual weekdays; the
+      // occasional one does not, like a person.
+      if (
+        !plan.preferredWeekdays.includes(weekdayOf(dateOfDayNumber(day))) &&
+        behavior.chance(0.8)
+      ) {
+        continue;
+      }
       // Slow days are real: the day's demand decides whether this visit
       // happens at all. Anchors are exempt — intent stays exact.
       if (!behavior.chance(demandFactor(config.seed, day))) continue;
@@ -318,9 +343,12 @@ export function generateStudio(
         status: "booked",
       });
     }
-    // An occasional canceled booking on a past session — canceled bookings
+    // Canceled bookings on past sessions — the books-then-cancels group
+    // does this constantly; everyone else occasionally. Canceled bookings
     // release their seat and never gain attendance.
-    if (plan.anchorDaysAgo !== null && behavior.chance(0.1)) {
+    const cancelDraws = plan.cancelRate > 0.3 ? 4 : 1;
+    for (let c = 0; c < cancelDraws; c += 1) {
+      if (plan.anchorDaysAgo === null || !behavior.chance(plan.cancelRate)) continue;
       const day = asOfDay - behavior.int(3, 30);
       const date = dateOfDayNumber(day);
       if (activeOn(periods, date)) {
@@ -391,11 +419,32 @@ export function generateStudio(
     memberCohorts: {},
     expectedCurrentMembershipStatus: {},
     expectedQuietDays: {},
+    expectedPriorAttendance: {},
     expectedReengagementEligibility: {},
     expectedDashboardMetrics: {},
     expectedUpcomingAvailability,
     declaredViolations: [],
   };
+  // Prior-attendance bookkeeping from the generator's own records — the
+  // window is the 60 days up to and including the realized last visit.
+  const attendedDaysByMember = new Map<string, number[]>();
+  {
+    const sessionDayById = new Map(
+      schedule.sessions.map((s) => [s.id, dayNumberOf(dateOfTimestamp(s.startsAt))]),
+    );
+    const seen = new Set<string>();
+    for (const a of attendance) {
+      if (a.status !== "attended") continue;
+      const key = `${a.memberId}|${a.classSessionId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const day = sessionDayById.get(a.classSessionId);
+      if (day === undefined) continue;
+      const list = attendedDaysByMember.get(a.memberId) ?? [];
+      list.push(day);
+      attendedDaysByMember.set(a.memberId, list);
+    }
+  }
   for (let i = 0; i < plans.length; i += 1) {
     const plan = plans[i];
     const member = members[i];
@@ -404,6 +453,11 @@ export function generateStudio(
     truth.expectedCurrentMembershipStatus[member.id] = member.currentStatusSnapshot;
     if (plan.anchorDaysAgo !== null) {
       truth.expectedQuietDays[member.id] = plan.anchorDaysAgo;
+      const days = attendedDaysByMember.get(member.id) ?? [];
+      const last = Math.max(...days, Number.NEGATIVE_INFINITY);
+      truth.expectedPriorAttendance[member.id] = days.filter(
+        (d) => d >= last - 60 && d <= last,
+      ).length;
     }
     truth.expectedReengagementEligibility[member.id] =
       member.currentStatusSnapshot === "active" &&
@@ -478,6 +532,18 @@ export function generateStudio(
     dataset.meta.counts["attendance"] = dataset.attendance.length;
     dataset.meta.counts["classSessions"] = dataset.classSessions.length;
   }
+
+  // Canonical order: every collection ascending by id. Order is contract —
+  // identical configurations must serialize byte-for-byte.
+  const byId = (a: { id: string }, b: { id: string }): number =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  dataset.members.sort(byId);
+  dataset.memberships.sort(byId);
+  dataset.instructors.sort(byId);
+  dataset.classTypes.sort(byId);
+  dataset.classSessions.sort(byId);
+  dataset.bookings.sort(byId);
+  dataset.attendance.sort(byId);
 
   return { dataset, truth };
 }
@@ -756,6 +822,10 @@ function injectEdgeCases(
           entityId: member.id,
           detail: "the paused-period injection shifts realized last-attended",
         });
+        // No truth-prior-mismatch declared here: the validator deliberately
+        // short-circuits a member whose last-visit truth is already broken,
+        // so the prior-count check never runs for them — declaring it would
+        // promise a finding the validator correctly refuses to make.
       }
     }
   }
@@ -804,6 +874,11 @@ function injectEdgeCases(
           code: "overlapping-attendance",
           entityId: id,
           detail: "attends two sessions occupying the same time",
+        });
+        declared.push({
+          code: "truth-prior-mismatch",
+          entityId: member.id,
+          detail: "the overlap injection adds one attended class inside the prior window",
         });
       }
     }
