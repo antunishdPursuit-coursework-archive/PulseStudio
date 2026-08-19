@@ -13,6 +13,7 @@
 
 import type { FixtureSet } from "./deps.js";
 import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
+import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   dayNumberFromIso,
@@ -367,6 +368,61 @@ check("unrecognized status maps to unknown, never attended", normalizeStatus("ma
   const imp = adaptAttendanceCsv("Member,Day,Date\nMaria Santos,Monday,2026-08-01\nJose Reyes,Tuesday,2026-08-02\n", "America/New_York");
   check("a Day column never shadows the Date column", imp.skipped.length, 0);
   check("dates read from the Date column", imp.memberCount, 2);
+}
+
+/* ------------------------------------------------------------------ */
+/* The studio generator                                                */
+/* ------------------------------------------------------------------ */
+
+// 25. Seeded means reproducible: same seed and same day, same studio.
+{
+  const a = generateStudio(7, "2026-08-18");
+  const b = generateStudio(7, "2026-08-18");
+  check("the same seed rebuilds the identical studio",
+    JSON.stringify(a.records) === JSON.stringify(b.records), true);
+  const c = generateStudio(8, "2026-08-18");
+  check("a different seed builds a different studio",
+    JSON.stringify(a.records) === JSON.stringify(c.records), false);
+}
+
+// 26. The generator's claim is held to account: it says how many members
+//     SHOULD be flagged, and the engine must agree exactly.
+{
+  const studio = generateStudio(7, "2026-08-18");
+  const r = findQuietMembers(studio.records, dayNumberFromIso("2026-08-18"), proposedRules);
+  check("the generated studio flags exactly what it claims",
+    r.flagged.length, studio.expectedFlagged);
+  check("every generated member was checked", r.checkedCount, studio.memberCount);
+}
+
+// 27. Nobody who should be excluded is ever flagged, at any scale.
+{
+  const studio = generateStudio(42, "2026-08-18");
+  const r = findQuietMembers(studio.records, dayNumberFromIso("2026-08-18"), proposedRules);
+  check("no paused or canceled member is ever flagged",
+    r.flagged.every((f) => f.member.membership_status === "active"), true);
+  check("every flag sits inside the proposed window",
+    r.flagged.every((f) => f.daysSince > proposedRules.minDaysQuiet && f.daysSince <= proposedRules.maxDaysQuiet), true);
+  check("every flag carries its evidence",
+    r.flagged.every((f) => f.priorCount >= 1 && f.usualClassType !== ""), true);
+}
+
+// 28. Generated histories never rot: the same seed a year later still
+//     produces the same shape, because history is built from that day.
+{
+  const now = generateStudio(7, "2026-08-18");
+  const later = generateStudio(7, "2027-08-18");
+  const flaggedNow = findQuietMembers(now.records, dayNumberFromIso("2026-08-18"), proposedRules);
+  const flaggedLater = findQuietMembers(later.records, dayNumberFromIso("2027-08-18"), proposedRules);
+  check("a generated studio holds up a year later",
+    flaggedLater.flagged.length, flaggedNow.flagged.length);
+}
+
+// 29. Distinct people stay distinct at scale — no name collisions.
+{
+  const studio = generateStudio(7, "2026-08-18");
+  const names = new Set(studio.records.members.map((m) => m.display_name));
+  check("every generated member has a distinct name", names.size, studio.memberCount);
 }
 
 /* ------------------------------------------------------------------ */

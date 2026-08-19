@@ -25,6 +25,8 @@ Flag a member when all of these hold, measured in studio-local calendar days:
 | --- | --- |
 | `config.ts` | Every brand-specific value: studio name, mailbox, thresholds, the outreach voice |
 | `deps.ts` | The ONE file that imports from outside this folder — the portability seam |
+| `csv.ts` | The CSV door: a studio's own attendance export, adapted in-browser |
+| `generate.ts` | Seeded studio generator — see the tool at real scale, reproducibly |
 | `logic.ts` | Pure rule functions — no DOM, no clock, no fetch; "today" is a parameter |
 | `main.ts` | The page: loads shared records, renders flags, evidence, drafts |
 | `styles.css` | Violet-on-black/white styling over the shared theme tokens |
@@ -101,6 +103,20 @@ calendar; unreadable or impossible dates are skipped with the physical file
 line stated, never silently. A bare attendance export says nothing about
 memberships, so everyone in the file is treated as an active member — the
 page states that too.
+
+## See it at studio scale
+
+The page's "See it at studio scale" button builds a whole studio — 60
+fictional members: loyal regulars, quiet faders, newcomers, people who
+paused or left, and no-shows sprinkled through — then runs the same rule
+over it. Eight members flag, ranked most-valuable-save first, so the
+ranking is visible instead of theoretical.
+
+It is **seeded, not random**: the seed is the calendar day, so everyone who
+opens the page on the same day sees the same studio, and a screenshot can
+be reproduced exactly. Because the history is generated relative to today,
+it never goes stale. The page states plainly that these members are
+fictional — a generated studio must never be mistaken for a real one.
 
 ## Laws this product lives by
 

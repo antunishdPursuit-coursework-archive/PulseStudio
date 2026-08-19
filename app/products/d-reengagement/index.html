@@ -27,9 +27,10 @@
   </header>
   <main>
     <p class="status" id="status" aria-live="polite">Checking the member records…</p>
-    <section class="import" aria-label="Use your own attendance records">
+    <section class="import" aria-label="Choose which records to check">
       <label class="btn btn-outline" for="csv-input">Use your studio's attendance (CSV)</label>
       <input type="file" id="csv-input" accept=".csv,text/csv">
+      <button class="btn-ghost" id="generate" type="button">See it at studio scale</button>
       <button class="btn-ghost" id="csv-reset" type="button" hidden>Back to the shared records</button>
       <p id="source" class="evidence" aria-live="polite"></p>
     </section>

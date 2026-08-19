@@ -9,6 +9,7 @@
 
 import { loadFixtures, type FixtureSet } from "./deps.js";
 import { adaptAttendanceCsv } from "./csv.js";
+import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   findQuietMembers,
@@ -34,6 +35,7 @@ const backEl = requiredElement<HTMLAnchorElement>("#back-link");
 const sourceEl = requiredElement<HTMLParagraphElement>("#source");
 const csvInput = requiredElement<HTMLInputElement>("#csv-input");
 const csvReset = requiredElement<HTMLButtonElement>("#csv-reset");
+const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 
 /* Apply the brand from config so a reseller edits config.ts and one theme
  * token — never this file, never the page copy. */
@@ -241,6 +243,22 @@ csvInput.addEventListener("change", () => {
       // Allow re-selecting the same file after edits.
       csvInput.value = "";
     });
+});
+
+/* A generated studio at real scale, so the ranking and the drafts can be
+ * seen doing their job. Seeded from the calendar day, so everyone opening
+ * the page on the same day sees the same studio — and it never goes stale,
+ * because the history is generated relative to today. */
+generateBtn.addEventListener("click", () => {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const seed = Number(todayIso.replace(/-/g, ""));
+  const studio = generateStudio(seed, todayIso);
+  renderRecords(
+    studio.records,
+    `Data: a generated studio (seed ${studio.seed}) — ${studio.memberCount} members, ` +
+      `every one of them fictional. This is not a real studio's records.`,
+  );
+  csvReset.hidden = false;
 });
 
 csvReset.addEventListener("click", loadSharedRecords);
