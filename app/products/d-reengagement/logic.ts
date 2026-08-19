@@ -10,11 +10,7 @@
  * members this product exists to catch.
  */
 
-import type {
-  ClassSession,
-  FixtureSet,
-  Member,
-} from "../../shared/contract.js";
+import type { ClassSession, FixtureSet, Member } from "./deps.js";
 import type { QuietRules } from "./config.js";
 
 /** One flagged member with the evidence for why — no flag without evidence. */

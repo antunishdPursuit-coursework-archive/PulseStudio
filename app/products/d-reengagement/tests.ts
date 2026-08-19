@@ -11,7 +11,7 @@
  *    that fails loudly if it ever appears.
  */
 
-import type { FixtureSet } from "../../shared/contract.js";
+import type { FixtureSet } from "./deps.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   dayNumberFromIso,

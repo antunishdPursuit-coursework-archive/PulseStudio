@@ -7,7 +7,7 @@
  * SHARED_DATA_CONTRACT.md and is not negotiable.
  */
 
-import { loadFixtures } from "../../shared/data.js";
+import { loadFixtures } from "./deps.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   findQuietMembers,
