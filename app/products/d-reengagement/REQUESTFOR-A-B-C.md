@@ -76,10 +76,18 @@ whose last attended class is more than 14 days old is Maria Santos.
 dashboard is live at a public URL and has no
 `<meta name="robots" content="noindex, nofollow">` in its `<head>`, so a
 search engine may index a page showing member names, rosters, and attendance.
-I added `app/robots.txt` at the root, which asks crawlers to stay away from
-`/products/b-dashboard/` and `/products/d-reengagement/` — but robots.txt is
-a request, and the meta tag is the real guarantee. It is one line in your
-file, and your file is yours, so it is yours to add. Mine already has it.
+Mine has that tag; yours is one line away from it.
+
+Until then I have blocked `/products/b-dashboard/` in `app/robots.txt`, which
+stops the crawl but is the weaker protection — the URL can still be listed.
+When you add the meta tag, **delete that Disallow line**: a page that is
+blocked from crawling can never be read, so its noindex tag is never seen and
+never takes effect. Crawlable + noindex is the combination that actually
+keeps a page out of the index. The reasoning is written into
+`app/robots.txt` itself.
+
+Neither is a security control — a staff page holding real member data
+eventually belongs behind a sign-in.
 
 **THE ONE ASK:** confirm whether attendance recording will live in your
 dashboard's next increment or stays an ops flow outside both our products —

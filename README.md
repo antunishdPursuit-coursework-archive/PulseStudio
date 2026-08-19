@@ -100,10 +100,16 @@ and CI does the building.
 
 The booking app and the support chatbot are member-facing and public. The
 staff dashboard and the re-engagement tool are **staff-only**: they show
-rosters, attendance, and cancellation risk. `app/robots.txt` keeps both out of
-search indexes and `app/sitemap.xml` lists the public pages only. A page that
-serves staff should also carry its own
-`<meta name="robots" content="noindex, nofollow">` — the stronger guarantee.
+rosters, attendance, and cancellation risk, and `app/sitemap.xml` lists the
+public pages only.
+
+Every staff page should carry
+`<meta name="robots" content="noindex, nofollow">` in its own `<head>` — that
+is the guaranteed way to stay out of a search index, and it only works if the
+page stays crawlable so the tag can be read. `app/robots.txt` blocks the crawl
+only for a staff page that does not have the tag yet, because blocking is the
+weaker fallback: it stops the content being fetched, but the URL can still be
+listed. Read the comments in that file before changing it.
 
 ## Current phase
 
