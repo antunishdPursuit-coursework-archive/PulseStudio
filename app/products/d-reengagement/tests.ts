@@ -16,6 +16,7 @@ import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
+  dataQualityLine,
   dayNumberFromIso,
   findQuietMembers,
   firstNameOf,
@@ -365,6 +366,58 @@ check("unrecognized status maps to unknown, never attended", normalizeStatus("ma
   }
   check("missing required columns are named in the error",
     message.includes("member column") && message.includes("date column"), true);
+}
+
+// 18b. Orphan attendance: rows matching no member are COUNTED, never
+//      silently dropped — and they neither invent a member nor touch a
+//      real member's history.
+{
+  const fx = recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }]);
+  fx.attendance.push({
+    attendance_id: "a_ghost", member_id: "GHOST", session_id: fx.class_sessions[0]!.session_id,
+    attendance_status: "attended", recorded_at: "2026-08-16T10:00:00-04:00",
+  });
+  const r = run(fx);
+  check("orphan attendance is counted", r.unmatchedAttendanceCount, 1);
+  check("orphan attendance invents no member", r.checkedCount, 1);
+  check("orphan attendance leaves the real member's days untouched", r.flagged[0]?.daysSince, 17);
+  check("the data-quality line names the unmatched rows",
+    dataQualityLine(r), "1 attendance row could not be matched to a member.");
+}
+
+// 18c. Unusable evidence for a KNOWN member is counted too — a future or
+//      unreadable class date is no longer a silent exclusion.
+{
+  const fx = recordsFor([{ id: "m1", name: "Future Row", status: "active", attended: ["2026-08-01"] }]);
+  fx.class_sessions.push({
+    session_id: "s_future", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+    starts_at: "2027-01-01T09:00:00-04:00", ends_at: "2027-01-01T10:00:00-04:00",
+    capacity: 12, session_status: "completed",
+  });
+  fx.attendance.push({
+    attendance_id: "a_future", member_id: "m1", session_id: "s_future",
+    attendance_status: "attended", recorded_at: "2027-01-01T10:00:00-04:00",
+  });
+  const r = run(fx);
+  check("unusable evidence is counted", r.unusableEvidenceCount, 1);
+  check("unusable evidence still does not hide the member", r.flagged.length, 1);
+}
+
+// 18d. Clean records say nothing — a data-quality line only appears when
+//      there is a real problem to repair.
+check("clean records produce no data-quality line",
+  dataQualityLine(run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }]))), null);
+
+// 18e. An identifier whose value equals somebody's NAME must not collide
+//      with that person — keys are namespaced by source.
+{
+  const csv = [
+    "member id,name,date",
+    "Ana Ruiz,Beto Cruz,2026-08-01",
+    ",Ana Ruiz,2026-08-16",
+  ].join("\n");
+  check("an id equal to a name never collides with that person",
+    adaptAttendanceCsv(csv, "America/New_York").memberCount, 2);
 }
 
 // 19b. Identity: a stable id column beats the name. Two different people

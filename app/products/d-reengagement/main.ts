@@ -12,6 +12,7 @@ import { adaptAttendanceCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
+  dataQualityLine,
   findQuietMembers,
   firstNameOf,
   summaryLine,
@@ -169,7 +170,13 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     year: "numeric",
   });
 
-  statusEl.textContent = summaryLine(result, asOf);
+  // The result line states what was found; the data-quality line states
+  // what could not be judged. Reporting only the first would let unusable
+  // evidence pass as a clean answer.
+  const quality = dataQualityLine(result);
+  statusEl.textContent = quality
+    ? `${summaryLine(result, asOf)} ${quality}`
+    : summaryLine(result, asOf);
   sourceEl.textContent = sourceNote;
   ruleEl.textContent =
     `Proposed thresholds (not yet ratified by the team): flag active members ` +

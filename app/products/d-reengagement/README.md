@@ -133,9 +133,25 @@ be reproduced exactly. Because the history is generated relative to today,
 it never goes stale. The page states plainly that these members are
 fictional — a generated studio must never be mistaken for a real one.
 
+## Evidence accounting
+
+Stating what the tool processed is not the same as stating what the evidence
+supported, so every attendance row is accounted for. Rows matching no member
+are counted — they never invent a member and never touch a real member's
+history. Attended rows whose class is missing, or whose date is unreadable or
+in the future, are counted as unusable evidence rather than silently dropped.
+When either count is non-zero the page says so beside the result:
+
+> 3 members checked, 1 flagged as of August 19, 2026. 1 could not be used as
+> evidence (the class is missing, or its date is unreadable or in the future).
+
+Clean records produce no such line — a disclosure that always appears teaches
+staff to ignore it.
+
 ## Laws this product lives by
 
 Read-only over shared records (fixtures are byte-identical after any use).
 Draft-only forever — no send action exists. Staff-only surface
 (`noindex, nofollow`). Stated results everywhere: the page says
-"5 members checked, 1 flagged", never a blank panel.
+"5 members checked, 1 flagged", never a blank panel — and never a clean
+answer built on evidence it could not read.

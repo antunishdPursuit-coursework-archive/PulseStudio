@@ -88,7 +88,7 @@ All inside `app/products/d-reengagement/`:
 | `main.ts` | 266 | The page: renders flags, evidence, drafts; wires the three data doors. |
 | `csv.ts` | 297 | Parses and adapts a studio's own attendance export, in-browser. |
 | `generate.ts` | 277 | Seeded studio generator (60 fictional members) so the ranking is visible. |
-| `tests.ts` / `tests.html` | 488 / 37 | 60 browser-run unit checks with a pinned reference date. |
+| `tests.ts` / `tests.html` | 585 / 37 | 75 browser-run unit checks with a pinned reference date. |
 | `styles.css` | 144 | Violet-on-black/white, built entirely on shared theme tokens. |
 | `index.html` | 48 | The page. Staff-only: carries `noindex, nofollow`. |
 | `README.md` | 133 | Folder documentation, rebrand checklist, plug-in spec. |
@@ -135,7 +135,7 @@ Three ways data gets in, all through one render path:
 Do not take these on trust — reproduce them. But they were true at the time of
 writing, checked in a real browser, not inferred from code.
 
-- **60 checks run, 60 passed, 0 failed** at
+- **75 checks run, 75 passed, 0 failed** at
   `/products/d-reengagement/tests.html`. The suite pins "today" to
   2026-08-18 so verdicts never drift with the real clock.
 - On the shared records: **5 members checked, 1 flagged** — Maria Santos, last
@@ -246,7 +246,7 @@ Be specific and be hard on it. In rough priority:
 1. **Try to break the rule.** Find an input where the flag list is wrong and
    nothing says so. Concrete input, wrong output, cite the file and line.
 2. **Attack the test suite, not just the code.** Which real bug classes would
-   pass all 60 checks today? Mutate `logic.ts` and find a change that keeps the
+   pass all 75 checks today? Mutate `logic.ts` and find a change that keeps the
    suite green — that is a missing check, and it is worth more than a style note.
 3. **Judge the ranking rule.** "Most classes in the prior 60 days" is a proxy
    for "most valuable save". Is it the right proxy for a gym? What would you
@@ -354,12 +354,13 @@ everything in this repo.
   rows. Detecting "ambiguous duplicates" from names alone would flag every
   loyal regular; the honest answer is a one-column request to the studio.
 
-**15. Attendance rows referencing an unknown member are silently ignored** —
-verified. The engine iterates over `members` and filters attendance to each, so
-a row whose `member_id` matches nobody is never seen and nothing reports it.
-This cannot produce a wrong flag (the ghost is not in the roster), but it is
-silent, which is against the house style. A stated count of orphaned rows would
-be a legitimate improvement.
+**15. Attendance rows referencing an unknown member are COUNTED and
+disclosed** (this was silent until 2026-08-19; the reviewer's question closed
+it). Such a row never invents a member and never touches a real member's
+history, but it is counted as unmatched and named on the page. Attended rows
+for a known member whose class is missing, or whose date is unreadable or in
+the future, are counted separately as unusable evidence. Clean records produce
+no disclosure line at all.
 
 **16. "Today"** is the calendar date in the **studio's** timezone, taken from
 the record set's declared `timezone` field, never the viewer's clock — so a

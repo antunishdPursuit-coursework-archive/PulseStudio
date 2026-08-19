@@ -246,8 +246,18 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     // Identity: the stable identifier when the export carries one, the
     // name otherwise. A blank identifier cell falls back to that row's
     // name rather than collapsing every blank into one person.
+    //
+    // The key is NAMESPACED by source ("id:" vs "name:") so an identifier
+    // whose value happens to equal somebody's name can never collide with
+    // that person. Normalization is deliberately minimal — trim and
+    // case-fold, nothing more: anything cleverer (stripping dots from an
+    // email, collapsing punctuation in a name) would merge people the
+    // studio considers distinct, which is inventing identity rather than
+    // reading it.
     const rawIdentity = identityCol === -1 ? "" : (cells[identityCol] ?? "").trim();
-    const nameKey = (rawIdentity || name).toLowerCase();
+    const nameKey = rawIdentity !== ""
+      ? `id:${rawIdentity.toLowerCase()}`
+      : `name:${name.toLowerCase()}`;
     let memberId = memberIdByName.get(nameKey);
     if (memberId === undefined) {
       memberId = `csv_m_${memberIdByName.size + 1}_${slug(name) || "member"}`;

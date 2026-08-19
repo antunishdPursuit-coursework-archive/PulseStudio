@@ -32,6 +32,16 @@ export interface FlagResult {
   flagged: FlaggedMember[];
   /** Every member examined, so screens can state "N checked" honestly. */
   checkedCount: number;
+  /** Attendance rows whose member matches nobody in the records. These
+   *  never create a member and never touch another member's history — but
+   *  they are counted, because evidence that vanished without a word is
+   *  how a quiet member goes unnoticed. */
+  unmatchedAttendanceCount: number;
+  /** Attended rows for a KNOWN member that could not be used as evidence:
+   *  the class is missing from the records, or its date is unreadable or
+   *  in the future. Stating how many members were checked is not the same
+   *  as stating what the evidence supported. */
+  unusableEvidenceCount: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -107,6 +117,27 @@ export function findQuietMembers(
     data.instructors.map((i) => [i.instructor_id, i.display_name]),
   );
 
+  // Evidence accounting, before any flagging: every attendance row is
+  // either usable, unmatched to a member, or unusable as evidence. Nothing
+  // disappears without being counted.
+  const memberIds = new Set(data.members.map((m) => m.member_id));
+  let unmatchedAttendanceCount = 0;
+  let unusableEvidenceCount = 0;
+  for (const a of data.attendance) {
+    if (!memberIds.has(a.member_id)) {
+      unmatchedAttendanceCount += 1;
+      continue;
+    }
+    if (a.attendance_status !== "attended") continue;
+    const session = sessionById.get(a.session_id);
+    if (!session) {
+      unusableEvidenceCount += 1;
+      continue;
+    }
+    const day = dayNumberFromIso(session.starts_at);
+    if (!Number.isFinite(day) || day > today) unusableEvidenceCount += 1;
+  }
+
   const flagged: FlaggedMember[] = [];
 
   for (const member of data.members) {
@@ -175,7 +206,12 @@ export function findQuietMembers(
     (a, b) => b.priorCount - a.priorCount || b.daysSince - a.daysSince,
   );
 
-  return { flagged, checkedCount: data.members.length };
+  return {
+    flagged,
+    checkedCount: data.members.length,
+    unmatchedAttendanceCount,
+    unusableEvidenceCount,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,6 +222,25 @@ export function findQuietMembers(
  *  0 flagged" — never leaving a blank where a result should be. */
 export function summaryLine(result: FlagResult, asOfLabel: string): string {
   return `${result.checkedCount} members checked, ${result.flagged.length} flagged as of ${asOfLabel}.`;
+}
+
+/** The data-quality line, or null when every record was usable. Staff can
+ *  only repair an export they are told about, so each problem is counted
+ *  and named separately — a row matching no member needs a different fix
+ *  from a row with an unreadable date. */
+export function dataQualityLine(result: FlagResult): string | null {
+  const parts: string[] = [];
+  if (result.unmatchedAttendanceCount > 0) {
+    parts.push(
+      `${result.unmatchedAttendanceCount} attendance ${result.unmatchedAttendanceCount === 1 ? "row" : "rows"} could not be matched to a member`,
+    );
+  }
+  if (result.unusableEvidenceCount > 0) {
+    parts.push(
+      `${result.unusableEvidenceCount} could not be used as evidence (the class is missing, or its date is unreadable or in the future)`,
+    );
+  }
+  return parts.length === 0 ? null : `${parts.join("; ")}.`;
 }
 
 /** First word of a display name, for the draft's greeting. */
