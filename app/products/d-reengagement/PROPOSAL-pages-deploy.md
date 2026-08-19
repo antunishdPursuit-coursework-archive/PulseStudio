@@ -1,15 +1,37 @@
-# Proposal: publish the app with GitHub Pages (team decision)
+# Publishing the app with GitHub Pages — the decision and why
 
-**From:** Rensley (Product D) · **Status:** proposed — needs team agreement,
-because adopting it means creating `.github/workflows/`, which is team-owned.
+**From:** Rensley (Product D) · **Status:** ADOPTED 2026-08-18 (Option A).
+`.github/workflows/pages.yml` now builds and publishes on every push to
+`main`. This file stays as the record of what was chosen and why, so the
+next person does not rediscover the trap the hard way.
 
-## Why
+## The problem in one line
 
-Compiled `.js` is gitignored (correctly — build artifacts cause conflicts the
-source never had), so GitHub Pages cannot serve `main` as-is. A tiny build
-workflow gives every product a real URL at
-`https://gymsley.github.io/app/...` on every push to `main`, with zero
-changes to how anyone works.
+Browsers cannot run TypeScript, GitHub Pages does not build, and our
+compiled `.js` is gitignored — so Pages serving `main` today would return a
+page that loads, asks for `main.js`, gets a 404, and sits on "Loading…"
+forever. A URL that looks deployed and does nothing is worse than no URL,
+so this has to be decided, not improvised.
+
+Verified 2026-08-18: Pages is currently OFF for this repo —
+`https://gymsley.github.io/app/` returns 404.
+
+## Two options — the team picks one
+
+**Option A — build in CI (recommended).** The workflow below runs
+`npm run build` and publishes `app/`. The repo stays source-only, nobody's
+habits change, every product goes live on every push to `main`.
+Cost: one new team-owned file, plus the owner's Settings click.
+
+**Option B — commit the compiled output.** Remove the `app/**/*.js` lines
+from `.gitignore` and Pages serves `main` directly, no CI at all.
+Cost: every pull request carries generated diffs. The usual objection —
+conflicts in files nobody wrote — is much weaker here than in a normal repo,
+because the lane law keeps each developer's compiled files inside their own
+folder; only the four `app/shared/*.js` files are common ground.
+Fastest path to a working URL if the team wants one today.
+
+Everything below describes Option A.
 
 ## The workflow (copy into `.github/workflows/pages.yml` once agreed)
 
