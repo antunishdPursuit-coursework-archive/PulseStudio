@@ -32,6 +32,13 @@ Flag a member when all of these hold, measured in studio-local calendar days:
 | `styles.css` | Violet-on-black/white styling over the shared theme tokens |
 | `tests.ts` / `tests.html` | Browser-run unit checks with a pinned reference date |
 
+## Live
+
+<https://gymsley.github.io/app/products/d-reengagement/> — published from
+`main` by `.github/workflows/pages.yml`, which runs the gate before it
+publishes, so a red gate never reaches the URL. The unit checks are live too:
+<https://gymsley.github.io/app/products/d-reengagement/tests.html>
+
 ## Run it
 
 From the repo root: `npm install && npm run build && npm run start`, then open
