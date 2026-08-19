@@ -81,8 +81,20 @@ function policyAnswer(question: string): string | null {
   return dataset.studioPolicies.find((policy) => policy.isCurrent && policy.topic === topic)?.answer ?? null;
 }
 
+function asksForPrivateMemberData(question: string): boolean {
+  return [
+    /\battend(?:ed|ance)?\b/,
+    /\bdid\s+.+\s+(?:come|visit|book|cancel)\b/,
+    /\b(?:my|their|his|her)\s+(?:account|attendance|booking|membership|reservation)\b/,
+    /\bmember(?:'s|s')?\s+(?:account|attendance|booking|history|membership|reservation)\b/,
+  ].some((pattern) => pattern.test(question));
+}
+
 function answer(question: string, records: SyntheticDataset): string {
   const normalized = question.toLowerCase().trim();
+  if (asksForPrivateMemberData(normalized)) {
+    return "I can’t provide member accounts, bookings, attendance, or visit history. Please contact Pulse Studio staff for help with private account information.";
+  }
   const policy = policyAnswer(normalized);
   if (policy) return policy;
 
