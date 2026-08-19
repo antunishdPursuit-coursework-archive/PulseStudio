@@ -5,15 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Member Booking — Pulse Studio</title>
   <link rel="stylesheet" href="../../shared/theme.css">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="product-a">
   <header class="page-head">
     <a class="back" href="../../index.html">← Pulse Studio</a>
     <h1>Product A — Member Booking App</h1>
     <span class="owner-badge">Kerrian</span>
+    <button class="theme-toggle" id="theme-toggle" type="button">Black / white</button>
   </header>
   <main>
-    <p class="status" id="status">Kerrian builds here. This page is wired to the shared theme, contract, and fixtures — see CLAUDE.md for the lane and color laws.</p>
+    <p class="status" id="status">Loading the shared studio schedule.</p>
+    <p class="error" id="error" hidden></p>
+
+    <section id="who" class="who" hidden>
+      <label for="member-select">Who is booking</label>
+      <select id="member-select">
+        <option value="">Choose your name to reserve a spot</option>
+      </select>
+    </section>
+
+    <section id="confirmation" class="confirm" hidden></section>
+
+    <section>
+      <h2>This week's classes</h2>
+      <p class="lede">The schedule is public. Spots remaining come from the shared studio. Other members' names stay hidden.</p>
+      <div id="schedule"></div>
+    </section>
+
+    <section id="mine-wrap" hidden>
+      <h2>Your reservations</h2>
+      <div id="mine"></div>
+    </section>
   </main>
   <script type="module" src="../../shared/theme-boot.js"></script>
   <script type="module" src="./main.js"></script>
