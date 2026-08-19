@@ -1,0 +1,20 @@
+# Pulse Studio — crawling rules.
+# TEAM-OWNED: the staff rules below protect member privacy sitewide.
+#
+# Member-facing pages are public. Staff-facing pages are NOT: they show
+# rosters, attendance, and cancellation-risk information, which the shared
+# data contract says must never be exposed outside the studio.
+#
+# Note for whoever reads this next: robots.txt is a REQUEST that well-behaved
+# crawlers honour. The stronger guarantee is a <meta name="robots"
+# content="noindex, nofollow"> in the page itself. The re-engagement tool has
+# one; the staff dashboard still needs one from its owner.
+
+User-agent: *
+Allow: /$
+Allow: /products/a-booking/
+Allow: /products/c-chatbot/
+Disallow: /products/b-dashboard/
+Disallow: /products/d-reengagement/
+
+Sitemap: https://gymsley.github.io/app/sitemap.xml

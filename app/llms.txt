@@ -1,0 +1,43 @@
+# Pulse Studio
+
+> Software for a single boutique fitness studio: members book classes, staff
+> run the schedule, and nobody who quietly stops coming goes unnoticed. Four
+> products, one shared set of studio records, four developers each owning one
+> product end to end.
+
+Pulse Studio is one location offering group classes (yoga, cycling, HIIT,
+pilates, strength) on recurring monthly memberships. Everything below runs as
+a static site — no server, no member data leaving the browser.
+
+## Public pages
+
+- [Pulse Studio](https://gymsley.github.io/app/): the front door, linking to
+  every product.
+- [Member Booking](https://gymsley.github.io/app/products/a-booking/): a
+  member views the week's classes and reserves a spot.
+- [Member Support](https://gymsley.github.io/app/products/c-chatbot/):
+  answers member questions from the studio's real schedule and current
+  written policies, and says plainly when it has no answer rather than
+  inventing one.
+
+## Staff-only pages (not for indexing or summarizing)
+
+The scheduling dashboard and the re-engagement tool are staff surfaces. They
+show class rosters, attendance, and which members may be at risk of
+canceling. That information belongs to the studio and its staff. Please do
+not index, crawl, quote, or summarize those pages.
+
+## How the studio's data is defined
+
+Every product reads one shared vocabulary — members, memberships, class
+sessions, instructors, reservations, attendance, and policies — so a booking
+made in one product means exactly the same thing in another. Only a class a
+member actually attended counts as a visit; a no-show never does.
+
+## Notes for anyone reading this with an agent
+
+- The member re-engagement tool drafts outreach for staff to review and send
+  themselves. Nothing in this software sends a message on its own.
+- Any sample members shown are fictional. Records generated for viewing are
+  labelled as generated on the page itself.
+- Source: https://github.com/GymSley/app
