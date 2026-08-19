@@ -128,6 +128,15 @@ export function findQuietMembers(
     const attendedSessions = [...attendedSessionIds]
       .map((id) => sessionById.get(id))
       .filter((s): s is ClassSession => s !== undefined)
+      // A class that has not happened yet, or whose date cannot be read, is
+      // not a visit. Without this guard a single future-dated or malformed
+      // row becomes the member's "last attended", drives days-quiet negative
+      // or NaN, and silently drops a genuinely quiet member off the list —
+      // the exact disappearance this product exists to prevent.
+      .filter((s) => {
+        const day = dayNumberFromIso(s.starts_at);
+        return Number.isFinite(day) && day <= today;
+      })
       .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
 
     const lastSession = attendedSessions[0];

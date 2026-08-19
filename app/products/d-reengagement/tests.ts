@@ -209,6 +209,42 @@ check("61 days quiet is NOT flagged (older is a different conversation)",
   check("usual class resolves ties toward the recent", r.flagged[0]?.usualClassType, "yoga");
 }
 
+// 6g. A class dated in the FUTURE is not a visit. Without this, one bad
+//     row becomes "last attended", days-quiet goes negative, and a genuinely
+//     quiet member silently disappears from the list.
+{
+  const fx = recordsFor([{ id: "m1", name: "Future Row", status: "active", attended: ["2026-08-01"] }]);
+  fx.class_sessions.push({
+    session_id: "s_future", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+    starts_at: "2027-01-01T09:00:00-04:00", ends_at: "2027-01-01T10:00:00-04:00",
+    capacity: 12, session_status: "completed",
+  });
+  fx.attendance.push({
+    attendance_id: "a_future", member_id: "m1", session_id: "s_future",
+    attendance_status: "attended", recorded_at: "2027-01-01T10:00:00-04:00",
+  });
+  const r = run(fx);
+  check("a future-dated class never hides a quiet member", r.flagged.length, 1);
+  check("a future-dated class is not the last visit", r.flagged[0]?.daysSince, 17);
+}
+
+// 6h. An unreadable class date is not a visit either — same disappearance
+//     risk, same guard.
+{
+  const fx = recordsFor([{ id: "m1", name: "Blank Date", status: "active", attended: ["2026-08-01"] }]);
+  fx.class_sessions.push({
+    session_id: "s_blank", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+    starts_at: "", ends_at: "", capacity: 12, session_status: "completed",
+  });
+  fx.attendance.push({
+    attendance_id: "a_blank", member_id: "m1", session_id: "s_blank",
+    attendance_status: "attended", recorded_at: "",
+  });
+  const r = run(fx);
+  check("an unreadable class date never hides a quiet member", r.flagged.length, 1);
+  check("an unreadable class date is not the last visit", r.flagged[0]?.daysSince, 17);
+}
+
 // 6f. "Today" is the studio's date, not the viewer's: 02:30 UTC on Aug 19
 //     is still Aug 18 in America/New_York.
 check("today is computed in the studio timezone",
