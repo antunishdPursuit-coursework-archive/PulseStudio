@@ -72,6 +72,15 @@ alarms staff stop trusting.
 tool must agree: `ses_008` has 0 confirmed reservations, and the only member
 whose last attended class is more than 14 days old is Maria Santos.
 
+**One thing to fix when you next touch your page (found 2026-08-18):** your
+dashboard is live at a public URL and has no
+`<meta name="robots" content="noindex, nofollow">` in its `<head>`, so a
+search engine may index a page showing member names, rosters, and attendance.
+I added `app/robots.txt` at the root, which asks crawlers to stay away from
+`/products/b-dashboard/` and `/products/d-reengagement/` — but robots.txt is
+a request, and the meta tag is the real guarantee. It is one line in your
+file, and your file is yours, so it is yours to add. Mine already has it.
+
 **THE ONE ASK:** confirm whether attendance recording will live in your
 dashboard's next increment or stays an ops flow outside both our products —
 either answer unblocks me; silence is the only thing that doesn't.

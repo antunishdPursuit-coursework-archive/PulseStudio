@@ -56,7 +56,16 @@ policies using the studio's actual current class schedule and policies.
 ### Product D: Member Re-engagement Tool
 
 Identifies members whose attendance has recently dropped off and drafts a
-personalized outreach message staff can send.
+personalized outreach message staff can send. Staff see who has gone quiet,
+the evidence for every flag (last class attended, instructor, date, and how
+often they used to come), and a ready personal note to copy or open in their
+own email app. It never sends anything — that stays a human decision. Staff
+can also check the studio's own attendance export, which is read in the
+browser and never uploaded anywhere.
+[Live](https://gymsley.github.io/app/products/d-reengagement/) ·
+[Unit checks](https://gymsley.github.io/app/products/d-reengagement/tests.html)
+· [Brief](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md) ·
+[Folder README](app/products/d-reengagement/README.md)
 
 ## Team assignments
 
@@ -67,6 +76,11 @@ personalized outreach message staff can send.
 | Product C: Member Support Chatbot | Dennis |
 | Product D: Member Re-engagement Tool | Rensley |
 
+## Live
+
+<https://gymsley.github.io/app/> — the front door, linking to all four
+products.
+
 ## How the team builds
 
 The app lives in `app/` — plain HTML, CSS, and TypeScript, no framework. Each
@@ -76,6 +90,20 @@ every developer's AI follows is [CLAUDE.md](CLAUDE.md) — read it before the
 first edit. Gate before committing: `npm run check`. Run it with
 `npm install && npm run build && npm run start`, then open
 http://localhost:4173.
+
+Every push to `main` runs the gate and, if it passes, publishes the built site
+(`.github/workflows/pages.yml`). A red gate never reaches the live URL.
+Compiled `.js` stays out of the repo on purpose — the source is the source,
+and CI does the building.
+
+## Member privacy
+
+The booking app and the support chatbot are member-facing and public. The
+staff dashboard and the re-engagement tool are **staff-only**: they show
+rosters, attendance, and cancellation risk. `app/robots.txt` keeps both out of
+search indexes and `app/sitemap.xml` lists the public pages only. A page that
+serves staff should also carry its own
+`<meta name="robots" content="noindex, nofollow">` — the stronger guarantee.
 
 ## Current phase
 
