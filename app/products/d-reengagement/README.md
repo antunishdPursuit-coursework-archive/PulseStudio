@@ -1,6 +1,8 @@
 # Member Re-engagement Tool (Product D)
 
 **Owner:** Rensley · **Lane:** this folder only · **Color:** violet
+**License:** [LICENSE.md](LICENSE.md) — publicly viewable during the Pursuit
+program with attribution required on any copy; private after the program.
 
 Staff open one page and see which active members used to come and have gone
 quiet, why each one was flagged, and a ready personal message to copy or open
