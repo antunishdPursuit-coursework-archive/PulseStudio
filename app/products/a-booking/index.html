@@ -18,11 +18,18 @@
     <p class="status" id="status">Loading the shared studio schedule.</p>
     <p class="error" id="error" hidden></p>
 
-    <section id="who" class="who" hidden>
-      <label for="member-select">Who is booking</label>
-      <select id="member-select">
-        <option value="">Choose your name to reserve a spot</option>
-      </select>
+    <section id="auth" class="auth">
+      <form id="signin-form">
+        <label for="signin-id">Membership email or full name</label>
+        <div class="signin-row">
+          <input id="signin-id" name="identity" autocomplete="username" placeholder="Name or email on your membership">
+          <button class="btn" type="submit">Sign in</button>
+        </div>
+      </form>
+      <p class="who-line" id="who-line" hidden>
+        Signed in as <strong id="who-name"></strong>
+        <button class="btn ghost" type="button" id="signout">Sign out</button>
+      </p>
     </section>
 
     <section id="confirmation" class="confirm" hidden></section>
