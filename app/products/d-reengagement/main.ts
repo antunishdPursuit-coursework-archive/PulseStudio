@@ -7,7 +7,8 @@
  * SHARED_DATA_CONTRACT.md and is not negotiable.
  */
 
-import { loadFixtures } from "./deps.js";
+import { loadFixtures, type FixtureSet } from "./deps.js";
+import { adaptAttendanceCsv } from "./csv.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   findQuietMembers,
@@ -30,6 +31,9 @@ const ruleEl = requiredElement<HTMLParagraphElement>("#rule");
 const flaggedEl = requiredElement<HTMLElement>("#flagged");
 const footerEl = requiredElement<HTMLParagraphElement>("#footer-note");
 const backEl = requiredElement<HTMLAnchorElement>("#back-link");
+const sourceEl = requiredElement<HTMLParagraphElement>("#source");
+const csvInput = requiredElement<HTMLInputElement>("#csv-input");
+const csvReset = requiredElement<HTMLButtonElement>("#csv-reset");
 
 /* Apply the brand from config so a reseller edits config.ts and one theme
  * token — never this file, never the page copy. */
@@ -148,40 +152,97 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
   return card;
 }
 
-function render(): Promise<void> {
-  return loadFixtures().then((data) => {
-    // "Today" is the studio's calendar date, not the viewer's — the fixture
-    // declares the timezone precisely so thresholds never shift per machine.
-    const today = todayDayNumber(data.timezone);
-    const result = findQuietMembers(data, today, proposedRules);
+/** Paint the page from ANY contract-shaped record set — the shared studio
+ *  records or an imported attendance file. One render path, two doors. */
+function renderRecords(data: FixtureSet, sourceNote: string): void {
+  // "Today" is the record set's declared timezone — the shared fixture
+  // states the studio's; an import uses the staff member's, since they are
+  // at the studio. Either way thresholds never shift with a viewer's zone.
+  const today = todayDayNumber(data.timezone);
+  const result = findQuietMembers(data, today, proposedRules);
 
-    const asOf = new Date().toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    statusEl.textContent = summaryLine(result, asOf);
-    ruleEl.textContent =
-      `Proposed thresholds (not yet ratified by the team): flag active members ` +
-      `whose last attended class is more than ${proposedRules.minDaysQuiet} and ` +
-      `at most ${proposedRules.maxDaysQuiet} days ago. Only attended classes ` +
-      `count — a no-show is never a visit.`;
-
-    flaggedEl.replaceChildren();
-    if (result.flagged.length === 0) {
-      const calm = document.createElement("p");
-      calm.className = "status";
-      calm.textContent =
-        "No one needs outreach right now — every active member has been in recently.";
-      flaggedEl.append(calm);
-      return;
-    }
-    result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1)));
+  const asOf = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
+
+  statusEl.textContent = summaryLine(result, asOf);
+  sourceEl.textContent = sourceNote;
+  ruleEl.textContent =
+    `Proposed thresholds (not yet ratified by the team): flag active members ` +
+    `whose last attended class is more than ${proposedRules.minDaysQuiet} and ` +
+    `at most ${proposedRules.maxDaysQuiet} days ago. Only attended classes ` +
+    `count — a no-show is never a visit.`;
+
+  flaggedEl.replaceChildren();
+  if (data.members.length === 0) {
+    // Zero members is NOT an all-clear — it means the records held nothing
+    // usable, and saying otherwise would paint an empty file as a healthy
+    // studio.
+    const none = document.createElement("p");
+    none.className = "status";
+    none.textContent =
+      "No usable member records loaded — nothing was checked.";
+    flaggedEl.append(none);
+    return;
+  }
+  if (result.flagged.length === 0) {
+    const calm = document.createElement("p");
+    calm.className = "status";
+    calm.textContent =
+      "No one needs outreach right now — every member in these records has been in recently.";
+    flaggedEl.append(calm);
+    return;
+  }
+  result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1)));
 }
 
-render().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  statusEl.textContent = `Could not load the shared records: ${message}`;
+function loadSharedRecords(): void {
+  loadFixtures()
+    .then((data) => {
+      renderRecords(data, "Data: the shared studio records.");
+      csvReset.hidden = true;
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      statusEl.textContent = `Could not load the shared records: ${message}`;
+    });
+}
+
+/* The CSV door: a staff member's own attendance export, adapted to the
+ * contract shape and run through the same engine — entirely in this
+ * browser. The file is never uploaded anywhere. */
+csvInput.addEventListener("change", () => {
+  const file = csvInput.files?.[0];
+  if (!file) return;
+  file
+    .text()
+    .then((text) => {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const imported = adaptAttendanceCsv(text, timeZone);
+      const skippedNote =
+        imported.skipped.length === 0
+          ? "0 rows skipped"
+          : `${imported.skipped.length} rows skipped: ${imported.skipped.join("; ")}`;
+      renderRecords(
+        imported.records,
+        `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
+          `Everyone in the file is treated as an active member. ` +
+          `This data never left your browser.`,
+      );
+      csvReset.hidden = false;
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      sourceEl.textContent = `Could not read that file: ${message}`;
+    })
+    .finally(() => {
+      // Allow re-selecting the same file after edits.
+      csvInput.value = "";
+    });
 });
+
+csvReset.addEventListener("click", loadSharedRecords);
+
+loadSharedRecords();

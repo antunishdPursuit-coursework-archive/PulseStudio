@@ -63,8 +63,8 @@ into a different host is two moves:
 1. **Re-point `deps.ts`** at your host's types and record source. That is the
    only code file that changes.
 2. **Feed the engine records in the contract shape.** If your system can
-   produce these, you get flags, evidence, ranked saves, drafts, and 27
-   proofs for free:
+   produce these, you get flags, evidence, ranked saves, drafts, and the
+   full proof suite for free:
 
 | This engine needs | In a booking platform (e.g. a reservation product) |
 | --- | --- |
@@ -79,6 +79,28 @@ route can call `findQuietMembers(records, todayDayNumber(tz), rules)` and
 render the result in any UI. The HTML/CSS here is a reference skin, not a
 requirement; its only tethers are the shared theme tokens, swapped when
 porting.
+
+## Use real attendance today (the CSV door)
+
+The page has a "Use your studio's attendance (CSV)" button. A staff member
+drops in their own export and the same engine runs on it — **entirely in the
+browser: the file is never uploaded anywhere**, which the page states.
+
+Accepted columns (case-insensitive, any order): a member column
+(`member`/`name`/`member name`/`customer`/`client`) and a date column
+(`date`/`class date`/`visit date`/`day` — earlier synonyms win, so a real
+`Date` column beats a weekday `Day` column) are required. Optional:
+`status` (also `attendance`/`attended`/`showed`), `class` (also
+`class type`/`service`/`type`), and `instructor` (also
+`staff`/`teacher`/`coach`). Status values: attended-like words count as
+attended, no-show-like words as no-show, an absent or empty status means
+attended (a sign-in sheet records presence), and anything unrecognized maps
+to `unknown` — which is never counted as a visit. Dates read as
+`YYYY-MM-DD` (padded or not) or `M/D/YYYY` and are checked against the real
+calendar; unreadable or impossible dates are skipped with the physical file
+line stated, never silently. A bare attendance export says nothing about
+memberships, so everyone in the file is treated as an active member — the
+page states that too.
 
 ## Laws this product lives by
 

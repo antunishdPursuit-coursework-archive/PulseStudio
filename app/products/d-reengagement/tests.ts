@@ -12,6 +12,7 @@
  */
 
 import type { FixtureSet } from "./deps.js";
+import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
   dayNumberFromIso,
@@ -263,6 +264,109 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("draft carries their usual class", text.includes("yoga"), true);
   check("draft carries the studio name from config", text.includes(brand.studioName), true);
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
+}
+
+/* ------------------------------------------------------------------ */
+/* The CSV door                                                        */
+/* ------------------------------------------------------------------ */
+
+// 13. Parsing: quoted fields, embedded commas, doubled quotes.
+{
+  const rows = parseCsv('name,note\n"Santos, Maria","said ""hi"" twice"\n');
+  check("csv parsing handles quoted commas and doubled quotes",
+    rows[1], ["Santos, Maria", 'said "hi" twice']);
+}
+
+// 14. Header mapping is case-insensitive and order-free; US dates normalize.
+{
+  const imp = adaptAttendanceCsv("Date,Member,Status\n8/1/2026,Maria Santos,attended\n", "America/New_York");
+  check("headers map case-insensitively in any order", imp.memberCount, 1);
+  check("US-style dates normalize", imp.records.class_sessions[0]?.starts_at, "2026-08-01T00:00:00");
+}
+
+// 15. A sign-in sheet with no status column means attended.
+{
+  const imp = adaptAttendanceCsv("name,date\nMaria Santos,2026-08-01\n", "America/New_York");
+  check("missing status column means attended", imp.records.attendance[0]?.attendance_status, "attended");
+}
+
+// 16. Status vocabulary maps to the contract's three values.
+check("no-show vocabulary maps to no_show", normalizeStatus("No-Show"), "no_show");
+check("unrecognized status maps to unknown, never attended", normalizeStatus("maybe?"), "unknown");
+
+// 17. End to end: an imported quiet regular is flagged with the right count,
+//     and an imported no-show never counts as a visit.
+{
+  const csvText = [
+    "name,date,status,class,instructor",
+    "Maria Santos,2026-07-28,attended,yoga,Ana Torres",
+    "Maria Santos,2026-08-01,attended,yoga,Ana Torres",
+    "Maria Santos,2026-08-13,no-show,yoga,Ana Torres",
+    "James Okafor,2026-08-16,attended,cycling,Marco Silva",
+  ].join("\n");
+  const imp = adaptAttendanceCsv(csvText, "America/New_York");
+  const r = findQuietMembers(imp.records, TODAY, proposedRules);
+  check("imported records: exactly the quiet member is flagged", r.flagged.length, 1);
+  check("imported records: days count from the real visit, not the no-show", r.flagged[0]?.daysSince, 17);
+  check("imported records: evidence counts attended classes only", r.flagged[0]?.priorCount, 2);
+}
+
+// 18. Bad rows are skipped WITH stated reasons, never silently.
+{
+  const imp = adaptAttendanceCsv("name,date\nMaria Santos,soon\n,2026-08-01\n", "America/New_York");
+  check("unreadable rows are skipped with stated reasons", imp.skipped.length, 2);
+  check("skipped rows leave zero records behind", imp.rowCount - imp.skipped.length, 0);
+}
+
+// 19. Missing required columns fail loudly and name what is missing.
+{
+  let message = "did not throw";
+  try {
+    adaptAttendanceCsv("foo,bar\n1,2\n", "America/New_York");
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  check("missing required columns are named in the error",
+    message.includes("member column") && message.includes("date column"), true);
+}
+
+// 20. Impossible calendar dates are stated skips, never guessed visits.
+//     13/1/2026 looks European; 2/30/2026 is a typo — neither may become a
+//     fabricated future date that silently un-flags a quiet member.
+{
+  const imp = adaptAttendanceCsv("name,date\nMaria Santos,13/1/2026\nJose Reyes,2/30/2026\n", "America/New_York");
+  check("impossible dates are skipped with reasons", imp.skipped.length, 2);
+  check("impossible dates import zero records", imp.memberCount, 0);
+}
+
+// 21. Identity is the name as written — non-Latin names are distinct
+//     people, never merged by a lossy ASCII slug.
+{
+  const imp = adaptAttendanceCsv("name,date\n王伟,2026-08-01\n佐藤花子,2026-08-16\n", "America/New_York");
+  check("non-Latin names stay distinct members", imp.memberCount, 2);
+  const r = findQuietMembers(imp.records, TODAY, proposedRules);
+  check("the quiet non-Latin member is flagged", r.flagged[0]?.member.display_name, "王伟");
+}
+
+// 22. Skip reasons name the PHYSICAL file line, blank lines included, so
+//     staff fixing "line 3" in their spreadsheet find the actual row.
+{
+  const imp = adaptAttendanceCsv("name,date\n\nMaria Santos,soon\n", "America/New_York");
+  check("skip reasons use the physical file line", imp.skipped[0]?.startsWith("line 3:"), true);
+}
+
+// 23. Unpadded ISO dates are unambiguous and accepted.
+{
+  const imp = adaptAttendanceCsv("name,date\nMaria Santos,2026-8-1\n", "America/New_York");
+  check("unpadded ISO dates are accepted", imp.records.class_sessions[0]?.starts_at, "2026-08-01T00:00:00");
+}
+
+// 24. Synonym priority: a "Day" column of weekday names must never shadow
+//     the real "Date" column.
+{
+  const imp = adaptAttendanceCsv("Member,Day,Date\nMaria Santos,Monday,2026-08-01\nJose Reyes,Tuesday,2026-08-02\n", "America/New_York");
+  check("a Day column never shadows the Date column", imp.skipped.length, 0);
+  check("dates read from the Date column", imp.memberCount, 2);
 }
 
 /* ------------------------------------------------------------------ */

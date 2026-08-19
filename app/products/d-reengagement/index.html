@@ -27,6 +27,12 @@
   </header>
   <main>
     <p class="status" id="status" aria-live="polite">Checking the member records…</p>
+    <section class="import" aria-label="Use your own attendance records">
+      <label class="btn btn-outline" for="csv-input">Use your studio's attendance (CSV)</label>
+      <input type="file" id="csv-input" accept=".csv,text/csv">
+      <button class="btn-ghost" id="csv-reset" type="button" hidden>Back to the shared records</button>
+      <p id="source" class="evidence" aria-live="polite"></p>
+    </section>
     <p id="rule"></p>
     <section id="flagged" aria-label="Members who may need outreach"></section>
     <p class="footer-note" id="footer-note">
