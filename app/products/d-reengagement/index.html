@@ -3,17 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Member Re-engagement — Pulse Studio</title>
+  <title>Member Re-engagement</title>
+  <meta name="description" content="Staff tool: see which members have gone quiet and send them a personal note before they cancel.">
+  <!-- Staff-only surface: never indexed. Cancellation-risk information is
+       staff-only inference and must not surface in search results. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <!-- theme-color cannot read a CSS token; a reseller updates this one hex
+       alongside the accent token (it is on the README rebrand checklist). -->
+  <meta name="theme-color" content="#8b5cf6">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Member Re-engagement">
+  <meta property="og:description" content="Staff tool: spot quiet members early and reach out with a personal note.">
+  <meta name="author" content="Rensley">
   <link rel="stylesheet" href="../../shared/theme.css">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="product-d">
   <header class="page-head">
-    <a class="back" href="../../index.html">← Pulse Studio</a>
-    <h1>Product D — Member Re-engagement Tool</h1>
+    <a class="back" id="back-link" href="../../index.html">← Home</a>
+    <h1>Member Re-engagement</h1>
     <span class="owner-badge">Rensley</span>
   </header>
   <main>
-    <p class="status" id="status">Rensley builds here. This page is wired to the shared theme, contract, and fixtures — see CLAUDE.md for the lane and color laws.</p>
+    <p class="status" id="status" aria-live="polite">Checking the member records…</p>
+    <p id="rule"></p>
+    <section id="flagged" aria-label="Members who may need outreach"></section>
+    <p class="footer-note" id="footer-note">
+      Drafts only — staff review and send every message themselves; nothing on
+      this page can send. <a href="./tests.html">Run the unit checks</a>
+    </p>
   </main>
   <script type="module" src="../../shared/theme-boot.js"></script>
   <script type="module" src="./main.js"></script>
