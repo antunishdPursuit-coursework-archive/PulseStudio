@@ -27,6 +27,11 @@
  * future sessions and the bookings pointing at them are the studio's
  * forward calendar and are expected.
  *
+ * Lifecycle rules the validator enforces: a booking is placed at or before
+ * its session starts; a canceled booking never carries an attendance
+ * outcome; an outcome is recorded at or after its session starts (future
+ * sessions carry no outcomes at all).
+ *
  * Time: dates are strict YYYY-MM-DD. Timestamps are strict
  * YYYY-MM-DDTHH:MM:SS in STUDIO-LOCAL time; the timezone is stated once in
  * the dataset meta. No per-row offsets: one studio, one zone, deterministic
@@ -174,6 +179,12 @@ export interface DeclaredViolation {
  *  peakSessionAttendance, currentPolicies, upcomingBookedSeats.
  */
 export interface SyntheticTruth {
+  /** Answer-key echo: the key can travel separately from the dataset, so
+   *  it states exactly which generation it answers for. */
+  generatorVersion: string;
+  seed: string;
+  asOfDate: string;
+  timezone: string;
   memberCohorts: Record<string, string>;
   expectedCurrentMembershipStatus: Record<string, string>;
   /** Days since last attended class as of asOfDate. Members who have never

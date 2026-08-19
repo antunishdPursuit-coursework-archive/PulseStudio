@@ -38,7 +38,8 @@ export const DEFAULT_CONFIG: SyntheticStudioConfig = {
   asOfDate: "2026-08-19",
   timezone: "America/New_York",
   memberCount: 60,
-  historyDays: 180,
+  historyDays: 365, // the specification's floor: at least twelve months
+
   mode: "clean",
 };
 

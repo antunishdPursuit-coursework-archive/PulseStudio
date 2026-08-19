@@ -324,6 +324,54 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
 }
 
 /* ------------------------------------------------------------------ */
+/* Specification alignment: defaults, echo, lifecycle, sensitive scan   */
+/* ------------------------------------------------------------------ */
+
+check("the default history covers at least twelve months",
+  DEFAULT_CONFIG.historyDays >= 365, true);
+check("the answer key states which generation it answers for",
+  [first.truth.generatorVersion, first.truth.seed, first.truth.asOfDate, first.truth.timezone],
+  [BASE.generatorVersion, BASE.seed, BASE.asOfDate, BASE.timezone]);
+
+// Each new validator check is proven able to fire on a planted defect —
+// a check that has never failed proves nothing.
+{
+  const plant = (): GeneratedStudioBundle => parseBundle(serializeBundle(first));
+
+  const late = plant();
+  const victim = late.dataset.bookings.find((b) =>
+    late.dataset.classSessions.some((x) => x.id === b.classSessionId));
+  if (victim) victim.bookedAt = "2099-01-01T00:00:00";
+  check("a booking placed after its session start is caught",
+    validateBundle(late).problems.some((pr) => pr.code === "booked-after-start"), true);
+
+  const ghosted = plant();
+  const outcome = ghosted.dataset.attendance.find((a) => a.bookingId !== null);
+  if (outcome) {
+    const booking = ghosted.dataset.bookings.find((b) => b.id === outcome.bookingId);
+    if (booking) booking.status = "canceled";
+  }
+  check("an outcome hung on a canceled booking is caught",
+    validateBundle(ghosted).problems.some((pr) => pr.code === "attendance-on-canceled-booking"), true);
+
+  const leaky = plant();
+  const card = leaky.dataset.members[0];
+  if (card) card.displayName = "Pat 4111111111111111 Doe";
+  check("a card-shaped digit run in a field VALUE is caught",
+    validateBundle(leaky).problems.some((pr) => pr.code === "sensitive-pattern"), true);
+
+  const ssnish = plant();
+  const mem = ssnish.dataset.members[1];
+  if (mem) mem.email = "user123456789@members.pulse.invalid";
+  check("an exact nine-digit run is caught",
+    validateBundle(ssnish).problems.some((pr) => pr.code === "sensitive-pattern"), true);
+}
+check("clean records trip none of the lifecycle or sensitive checks",
+  cleanReport.problems.filter((pr) =>
+    ["booked-after-start", "attendance-on-canceled-booking", "sensitive-pattern"].includes(pr.code),
+  ).length, 0);
+
+/* ------------------------------------------------------------------ */
 /* Serialization round-trip                                             */
 /* ------------------------------------------------------------------ */
 
