@@ -3,47 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Staff Scheduling — Pulse Studio</title>
-  <link rel="stylesheet" href="../../shared/theme.css">
-  <style>
-    .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .metric { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-    .metric strong { display: block; font-size: 1.8rem; color: var(--accent); }
-    .session-meta, .roster-meta { color: var(--muted); }
-    .session-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
-    .occupancy { margin: 12px 0; }
-    progress { width: min(100%, 360px); accent-color: var(--accent); }
-    .tag { display: inline-block; border: 1px solid currentColor; border-radius: 999px; font-size: .82rem; font-weight: 700; padding: 2px 9px; }
-    .tag.attention { color: #a16207; } .tag.good { color: #15803d; } .tag.full { color: #b91c1c; }
-    dialog { color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; max-width: 640px; width: calc(100% - 32px); }
-    dialog::backdrop { background: rgb(0 0 0 / .45); }
-    .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .close { background: transparent; border: 1px solid var(--line); color: var(--fg); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
-    .roster { list-style: none; padding: 0; }
-    .roster li { border-top: 1px solid var(--line); padding: 12px 0; display: grid; gap: 3px; }
-    @media (max-width: 640px) { .summary { grid-template-columns: 1fr; } .session-row { grid-template-columns: 1fr; } }
-  </style>
+  <title>Pulse Studio · Staff dashboard</title>
+  <link rel="stylesheet" href="staff-dashboard.css">
+  <style>.roster-table{width:100%;border-collapse:collapse;margin-top:18px;text-align:left}.roster-table th{color:var(--muted);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase}.roster-table th,.roster-table td{border:0;padding:10px 12px}.roster-table tbody tr:nth-child(even){background:#f4f1eb}</style>
 </head>
 <body class="product-b">
-  <header class="page-head">
-    <a class="back" href="../../index.html">← Pulse Studio</a>
-    <h1>Staff Scheduling Dashboard</h1>
-    <span class="owner-badge">Manny</span>
-  </header>
-  <main>
-    <p class="status" id="status" aria-live="polite">Loading scheduled sessions and staff records.</p>
-    <section class="summary" aria-label="Scheduling summary" id="summary"></section>
-    <section aria-labelledby="sessions-title">
-      <h2 id="sessions-title">Upcoming scheduled sessions</h2>
-      <p>Confirmed reservations count toward occupancy. Waitlisted and canceled reservations do not.</p>
-      <div id="sessions"></div>
+  <header class="topbar"><a class="brand" href="index.html">PULSE<span>STUDIO</span></a><span class="role">Staff workspace</span><a href="../a-booking/index.html">Member view ↗</a></header>
+  <main class="shell">
+    <section class="hero"><div><p class="eyebrow">Weekly operations</p><h1>Keep every room moving.</h1><p class="lede">Publish next week’s classes, watch the next three days, and give members a timely nudge before spaces disappear.</p></div><button class="primary" id="publishBtn">Publish weekly schedule</button></section>
+    <section class="stats" aria-label="Studio summary"><article><span>Next 3 days</span><strong id="upcomingCount">0</strong><small>scheduled sessions</small></article><article><span>Needs attention</span><strong id="attentionCount">0</strong><small>underbooked or filling soon</small></article><article><span>Fastest room</span><strong id="fastestRoom">—</strong><small>based on current fill rate</small></article></section>
+    <section class="grid"><div class="panel wide"><div class="panel-head"><div><p class="eyebrow">Capacity watch</p><h2>Upcoming classes</h2></div><label>View <select id="filter"><option value="all">All statuses</option><option value="attention">Needs attention</option><option value="full">Full</option></select></label></div><div id="sessions" class="sessions"></div></div>
+      <aside class="panel"><p class="eyebrow">Room demand</p><h2>Where members are booking</h2><div id="rooms" class="room-list"></div><div class="callout"><strong>Next action</strong><p id="actionText">Review the room trends before publishing.</p><button class="text-button" id="reengageBtn">Plan re-engagement ↗</button></div></aside>
     </section>
   </main>
-  <dialog id="roster-dialog" aria-labelledby="roster-title">
-    <div class="dialog-head"><h2 id="roster-title">Class roster</h2><button class="close" id="close-roster" type="button">Close</button></div>
-    <div id="roster-content"></div>
-  </dialog>
-  <script type="module" src="../../shared/theme-boot.js"></script>
-  <script type="module" src="./main.js"></script>
+  <dialog id="scheduleDialog"><form method="dialog" id="scheduleForm"><button class="close" id="closeSchedule" type="button" aria-label="Close">×</button><p class="eyebrow">Weekly schedule</p><h2>Add a class session</h2><label>Class category<input name="classType" required placeholder="e.g. Yoga"></label><label>Day and time<input name="startsAt" required type="datetime-local"></label><label>Room<input name="room" required placeholder="e.g. Loft"></label><label>Capacity<input name="capacity" required type="number" min="1" value="18"></label><button class="primary" type="submit" value="default">Add to schedule</button></form></dialog>
+  <script type="module" src="staff-dashboard.js"></script>
 </body>
 </html>
