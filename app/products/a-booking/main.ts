@@ -219,8 +219,12 @@ function pill(session: SyntheticClassSession): { text: string; className: string
   if (session.status === "canceled") return { text: "Canceled", className: "full" };
   const left = remainingSpots(session);
   if (left <= 0) return { text: "Full", className: "full" };
-  if (left <= 4) return { text: `${left} left`, className: "warn" };
-  return { text: `${left} left`, className: "ok" };
+  if (left <= 4) return { text: `${left} of ${session.capacity} left`, className: "warn" };
+  return { text: `${left} of ${session.capacity} left`, className: "ok" };
+}
+
+function remainingOnDay(day: string): number {
+  return sessionsOnDay(day).reduce((total, session) => total + remainingSpots(session), 0);
 }
 
 function tightestSession(): { session: SyntheticClassSession; left: number } | undefined {
@@ -357,14 +361,14 @@ function renderDays(): void {
   if (!days.includes(selectedDay)) {
     selectedDay = requested && days.includes(requested) ? requested : (days[0] ?? "");
   }
-  const fewest = Math.min(...days.map((day) => Math.min(...sessionsOnDay(day).map(remainingSpots))));
+  const fewest = Math.min(...days.map(remainingOnDay));
   daysEl.innerHTML = days
     .map((day) => {
       const count = sessionsOnDay(day).length;
-      const left = Math.min(...sessionsOnDay(day).map(remainingSpots));
+      const left = remainingOnDay(day);
       const active = day === selectedDay;
       const tight = left === fewest;
-      return `<button type="button" class="${active ? "active" : ""}${tight ? " tight" : ""}" data-day="${escapeHtml(day)}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(formatDayChip(day))} · ${count} · ${left} left</button>`;
+      return `<button type="button" class="${active ? "active" : ""}${tight ? " tight" : ""}" data-day="${escapeHtml(day)}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(formatDayChip(day))} · ${count} classes · ${left} spots left</button>`;
     })
     .join("");
   dayTitleEl.textContent = selectedDay ? formatDayTitle(selectedDay) : "";
