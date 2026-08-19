@@ -1,8 +1,12 @@
 name: pages
 
 # Browsers cannot run TypeScript and GitHub Pages does not build, so the
-# site is compiled here and the built app/ folder is published. This is why
-# app/**/*.js stays gitignored: the source repo holds source only.
+# site is compiled here. The gate always runs — a red gate never ships.
+# The DEPLOY leg runs only when this repo's Pages is set to deploy from
+# Actions (Settings -> Pages -> Source: GitHub Actions); otherwise the run
+# states the skip and stays green, because "this repo has not enabled
+# Actions deploys" is an environment fact, not a build failure. The
+# workflow token cannot flip that switch itself — only a repo admin can.
 on:
   push:
     branches: [main]
@@ -32,11 +36,26 @@ jobs:
       # The gate runs before anything is published — a red gate never deploys.
       - run: npm run check
       - run: npm run build
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - name: Is this repo set to deploy Pages from Actions?
+        id: pagesmode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mode=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/dev/null || echo "none")
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          if [ "$mode" != "workflow" ]; then
+            {
+              echo "### Build green — deploy skipped"
+              echo "Pages source on this repo is \`$mode\`, not GitHub Actions."
+              echo "A repo admin can enable deploys: Settings -> Pages -> Source: GitHub Actions."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.pagesmode.outputs.mode == 'workflow'
+        uses: actions/configure-pages@v5
+      - if: steps.pagesmode.outputs.mode == 'workflow'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: app
-      - id: deployment
+      - if: steps.pagesmode.outputs.mode == 'workflow'
+        id: deployment
         uses: actions/deploy-pages@v4
