@@ -8,6 +8,7 @@
 
 import type { SyntheticMode } from "./contracts.js";
 import { makeStream } from "./random.js";
+import { isStrictDate } from "./normalize.js";
 
 export const GENERATOR_VERSION = "1.0.0";
 
@@ -16,8 +17,8 @@ export interface SyntheticStudioConfig {
   seed: string;
   asOfDate: string; // strict YYYY-MM-DD
   timezone: string;
-  memberCount: number; // 1..500
-  historyDays: number; // 90..730 — boundary cohorts need >= 61 + prior window
+  memberCount: number; // 1..2000 — total customers across the whole history
+  historyDays: number; // 90..1900 — up to five years and change
   facilityCapacity?: number;
   mode: SyntheticMode;
 }
@@ -38,7 +39,6 @@ export const DEFAULT_CONFIG: SyntheticStudioConfig = {
   timezone: "America/New_York",
   memberCount: 60,
   historyDays: 180,
-  facilityCapacity: 30,
   mode: "clean",
 };
 
@@ -46,29 +46,34 @@ export const DEFAULT_CONFIG: SyntheticStudioConfig = {
 export function validateConfig(config: SyntheticStudioConfig): string[] {
   const problems: string[] = [];
   if (config.seed.trim() === "") problems.push("seed must be non-empty");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(config.asOfDate)) {
-    problems.push(`asOfDate must be strict YYYY-MM-DD, got "${config.asOfDate}"`);
+  if (!isStrictDate(config.asOfDate)) {
+    // Strict means the real calendar, not the regex: 2026-02-30 is not a date.
+    problems.push(`asOfDate must be a real calendar date, got "${config.asOfDate}"`);
   }
   if (config.timezone.trim() === "") problems.push("timezone must be non-empty");
   if (
     !Number.isInteger(config.memberCount) ||
     config.memberCount < 1 ||
-    config.memberCount > 500
+    config.memberCount > 2000
   ) {
-    problems.push(`memberCount must be an integer 1..500, got ${config.memberCount}`);
+    problems.push(`memberCount must be an integer 1..2000, got ${config.memberCount}`);
   }
   if (
     !Number.isInteger(config.historyDays) ||
     config.historyDays < 90 ||
-    config.historyDays > 730
+    config.historyDays > 1900
   ) {
-    problems.push(`historyDays must be an integer 90..730, got ${config.historyDays}`);
+    problems.push(`historyDays must be an integer 90..1900, got ${config.historyDays}`);
   }
   if (
     config.facilityCapacity !== undefined &&
-    (!Number.isInteger(config.facilityCapacity) || config.facilityCapacity < 16)
+    (!Number.isInteger(config.facilityCapacity) ||
+      config.facilityCapacity < 16 ||
+      config.facilityCapacity > 500)
   ) {
-    problems.push("facilityCapacity must be an integer >= 16 when given");
+    // The building holds at most 500 people at once — a hard physical
+    // ceiling, regardless of how many customers the history contains.
+    problems.push("facilityCapacity must be an integer 16..500 when given");
   }
   if (!["clean", "edge-cases", "scale"].includes(config.mode)) {
     problems.push(`mode must be clean | edge-cases | scale, got "${config.mode}"`);

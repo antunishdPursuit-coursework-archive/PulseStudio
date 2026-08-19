@@ -85,9 +85,13 @@ export function buildIdentities(
     used.add(displayName);
 
     // ~10% of members carry no email — a missing optional identifier is a
-    // supported, generated case. Email text derives from the OPAQUE id,
-    // never from the name, so it stays fictional and pool-independent.
-    const email = stream.chance(0.1)
+    // supported, generated case. The presence draw comes from its OWN
+    // stream: the name-drawing retry loop consumes a pool-dependent number
+    // of identity draws, and sharing a stream would let a pool substitution
+    // flip who has an email — changing more than names, which the options
+    // contract forbids. Email text derives from the OPAQUE id, never from
+    // the name, so it stays fictional and pool-independent.
+    const email = makeStream(seed, `email:${i}`).chance(0.1)
       ? null
       : normalizeEmail(`Member${String(i + 1).padStart(6, "0")}@Members.Pulse.invalid`);
 

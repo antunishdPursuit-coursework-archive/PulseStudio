@@ -60,6 +60,7 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     ...dataset.classSessions.map((r) => [r.id, "class-session"] as [string, string]),
     ...dataset.bookings.map((r) => [r.id, "booking"] as [string, string]),
     ...dataset.attendance.map((r) => [r.id, "attendance"] as [string, string]),
+    ...dataset.studioPolicies.map((r) => [r.id, "policy"] as [string, string]),
   ];
   for (const [id, kind] of idRows) {
     if (!ID_PATTERN.test(id) || !id.startsWith(`${kind}:`)) {
@@ -291,6 +292,33 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
           `${concurrent} concurrent attendees for facility capacity ${dataset.studio.facilityCapacity}`,
         );
       }
+    }
+  }
+
+  // --- studio policies: strict dates, one current per topic -------------
+  const currentByTopic = new Map<string, number>();
+  for (const pol of dataset.studioPolicies) {
+    if (!isStrictDate(pol.effectiveFrom)) add("invalid-date", pol.id, `effectiveFrom "${pol.effectiveFrom}"`);
+    if (!isStrictTimestamp(pol.updatedAt)) add("invalid-timestamp", pol.id, `updatedAt "${pol.updatedAt}"`);
+    if (pol.isCurrent) currentByTopic.set(pol.topic, (currentByTopic.get(pol.topic) ?? 0) + 1);
+  }
+  for (const [topic, count] of currentByTopic) {
+    if (count !== 1) add("policy-topic-current-count", topic, `${count} current policies for one topic`);
+  }
+
+  // --- upcoming availability truth vs a recount -------------------------
+  const upcomingBooked = new Map<string, number>();
+  for (const b of dataset.bookings) {
+    if (b.status !== "booked" || !sessionById.has(b.classSessionId)) continue;
+    upcomingBooked.set(b.classSessionId, (upcomingBooked.get(b.classSessionId) ?? 0) + 1);
+  }
+  for (const s of dataset.classSessions) {
+    if (s.status !== "scheduled" || !sessionReadable.has(s.id)) continue;
+    if (dayNumberOf(dateOfTimestamp(s.startsAt)) < asOfDay) continue;
+    const expected = truth.expectedUpcomingAvailability[s.id];
+    const actual = s.capacity - (upcomingBooked.get(s.id) ?? 0);
+    if (expected !== actual) {
+      add("truth-availability-mismatch", s.id, `truth says ${expected ?? "absent"} spots left, records say ${actual}`);
     }
   }
 

@@ -44,6 +44,13 @@ const SLOT_TIMES: readonly string[] = [
   "06:30", "08:00", "09:30", "12:00", "16:00", "17:30", "19:00", "20:30",
 ];
 
+/** Parallel rooms per time slot. One room for a boutique studio; up to six
+ *  for a big-box gym, so seat supply grows with the customer base while
+ *  concurrent occupancy stays far below the facility ceiling. */
+export function roomsPerSlot(memberCount: number): number {
+  return Math.min(6, Math.max(1, Math.ceil(memberCount / 150)));
+}
+
 export interface StudioSchedule {
   instructors: SyntheticInstructor[];
   classTypes: SyntheticClassType[];
@@ -68,6 +75,7 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
     Math.max(4, 4 + Math.floor(config.memberCount / 60)),
   );
 
+  const rooms = roomsPerSlot(config.memberCount);
   const asOfDay = dayNumberOf(config.asOfDate);
   const firstDay = asOfDay - config.historyDays;
   const lastDay = asOfDay + 14;
@@ -79,22 +87,24 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
     const date = dateOfDayNumber(day);
     const todays: SyntheticClassSession[] = [];
     for (let slot = 0; slot < slotsPerDay; slot += 1) {
-      const type = classTypes[(day + slot) % classTypes.length];
-      const instructor = instructors[(day * 2 + slot) % instructors.length];
-      if (!type || !instructor) continue;
-      n += 1;
-      // A small share of past sessions were canceled — they carry no
-      // bookings or attendance.
-      const canceled = day < asOfDay && stream.chance(0.02);
-      todays.push({
-        id: makeId("class-session", n),
-        classTypeId: type.id,
-        instructorId: instructor.id,
-        startsAt: `${date}T${SLOT_TIMES[slot] ?? "12:00"}:00`,
-        durationMinutes: type.durationMinutes,
-        capacity: type.capacity,
-        status: canceled ? "canceled" : day < asOfDay ? "completed" : "scheduled",
-      });
+      for (let room = 0; room < rooms; room += 1) {
+        const type = classTypes[(day + slot + room * 2) % classTypes.length];
+        const instructor = instructors[(day * 2 + slot + room) % instructors.length];
+        if (!type || !instructor) continue;
+        n += 1;
+        // A small share of past sessions were canceled — they carry no
+        // bookings or attendance.
+        const canceled = day < asOfDay && stream.chance(0.02);
+        todays.push({
+          id: makeId("class-session", n),
+          classTypeId: type.id,
+          instructorId: instructor.id,
+          startsAt: `${date}T${SLOT_TIMES[slot] ?? "12:00"}:00`,
+          durationMinutes: type.durationMinutes,
+          capacity: type.capacity,
+          status: canceled ? "canceled" : day < asOfDay ? "completed" : "scheduled",
+        });
+      }
     }
     sessions.push(...todays);
     sessionsByDate.set(date, todays);

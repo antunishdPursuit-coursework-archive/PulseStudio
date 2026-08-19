@@ -93,6 +93,17 @@ export interface SyntheticClassSession {
   status: "scheduled" | "completed" | "canceled";
 }
 
+export interface SyntheticPolicy {
+  id: string; // policy:000001
+  topic: string;
+  answer: string;
+  effectiveFrom: string; // YYYY-MM-DD
+  updatedAt: string; // timestamp
+  /** Exactly one current policy per topic; superseded versions stay, so
+   *  the support surface can prove it answers from CURRENT policy only. */
+  isCurrent: boolean;
+}
+
 export interface SyntheticBooking {
   id: string; // booking:000001
   memberId: string;
@@ -134,6 +145,7 @@ export interface SyntheticDataset {
   classSessions: SyntheticClassSession[];
   bookings: SyntheticBooking[];
   attendance: SyntheticAttendance[];
+  studioPolicies: SyntheticPolicy[];
 }
 
 /** A deliberately injected defect (edge-cases mode only), declared so the
@@ -152,7 +164,7 @@ export interface DeclaredViolation {
  *  expectedDashboardMetrics keys: activeMembers, pausedMembers,
  *  canceledMembers, upcomingScheduledSessions, completedSessions,
  *  totalBookings, totalAttendanceRecords, totalAttended, totalNoShows,
- *  peakSessionAttendance.
+ *  peakSessionAttendance, currentPolicies, upcomingBookedSeats.
  */
 export interface SyntheticTruth {
   memberCohorts: Record<string, string>;
@@ -164,6 +176,9 @@ export interface SyntheticTruth {
    *  derived status is active AND quiet days > 14 AND <= 60. */
   expectedReengagementEligibility: Record<string, boolean>;
   expectedDashboardMetrics: Record<string, number>;
+  /** Spots left per UPCOMING scheduled session (capacity minus active
+   *  bookings) — the booking surface's known answers. */
+  expectedUpcomingAvailability: Record<string, number>;
   declaredViolations: DeclaredViolation[];
 }
 
@@ -173,7 +188,7 @@ export interface GeneratedStudioBundle {
 }
 
 export const ID_PATTERN =
-  /^(studio|member|membership|instructor|class-type|class-session|booking|attendance):\d{6}$/;
+  /^(studio|member|membership|instructor|class-type|class-session|booking|attendance|policy):\d{6}$/;
 
 export function makeId(
   kind:
@@ -184,7 +199,8 @@ export function makeId(
     | "class-type"
     | "class-session"
     | "booking"
-    | "attendance",
+    | "attendance"
+    | "policy",
   n: number,
 ): string {
   return `${kind}:${String(n).padStart(6, "0")}`;

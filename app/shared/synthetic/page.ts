@@ -29,6 +29,7 @@ const seedEl = requiredElement<HTMLInputElement>("#seed");
 const dateEl = requiredElement<HTMLInputElement>("#asOfDate");
 const countEl = requiredElement<HTMLInputElement>("#memberCount");
 const modeEl = requiredElement<HTMLSelectElement>("#mode");
+const historyEl = requiredElement<HTMLSelectElement>("#history");
 const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 const downloadBtn = requiredElement<HTMLButtonElement>("#download");
 const downloadCsvBtn = requiredElement<HTMLButtonElement>("#download-csv");
@@ -66,6 +67,7 @@ generateBtn.addEventListener("click", () => {
     seed,
     asOfDate: dateEl.value,
     memberCount,
+    historyDays: Number(historyEl.value),
     mode: modeEl.value as SyntheticStudioConfig["mode"],
   };
   const t0 = performance.now();

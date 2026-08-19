@@ -14,7 +14,7 @@ import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn } from "./lifecycle.js";
-import { dateOfTimestamp, dayNumberOf } from "./normalize.js";
+import { dateOfTimestamp, dayNumberOf, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
 interface CheckResult {
@@ -136,7 +136,10 @@ check("clean mode declares zero violations", first.truth.declaredViolations.leng
 check("clean serialization contains no injected ghost ids",
   serializeBundle(first).includes("member:999901"), false);
 check("peak concurrent attendance respects the facility",
-  cleanReport.stats["peakConcurrentAttendance"] as number <= (BASE.facilityCapacity ?? 30), true);
+  cleanReport.stats["peakConcurrentAttendance"] as number <=
+    first.dataset.studio.facilityCapacity, true);
+check("the facility never exceeds the 500-person building ceiling",
+  first.dataset.studio.facilityCapacity <= 500, true);
 
 /* ------------------------------------------------------------------ */
 /* Product D boundary cohorts, from truth intent                        */
@@ -246,6 +249,62 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
 }
 
 /* ------------------------------------------------------------------ */
+/* Serving every product, not just re-engagement                        */
+/* ------------------------------------------------------------------ */
+
+// The booking surface (A): upcoming sessions with known spots-left answers.
+{
+  const upcoming = Object.keys(first.truth.expectedUpcomingAvailability);
+  check("upcoming sessions carry availability truth for the booking surface",
+    upcoming.length > 0, true);
+  check("every availability answer is within 0..capacity",
+    upcoming.every((id) => {
+      const s = first.dataset.classSessions.find((x) => x.id === id);
+      const left = first.truth.expectedUpcomingAvailability[id] ?? -1;
+      return s !== undefined && left >= 0 && left <= s.capacity;
+    }), true);
+}
+
+// The staff surface (B): a near-term week that actually has bookings —
+// and lapsed members booking NOTHING, the way real quiet members go.
+{
+  const booked = first.dataset.bookings.filter((b) => b.status === "booked");
+  const sessionById = new Map(first.dataset.classSessions.map((x) => [x.id, x]));
+  const asOfDay = dayNumberOf(BASE.asOfDate);
+  const upcomingBooked = booked.filter((b) => {
+    const s = sessionById.get(b.classSessionId);
+    return s !== undefined && dayNumberOf(dateOfTimestamp(s.startsAt)) >= asOfDay;
+  });
+  check("the upcoming fortnight has a real booking load",
+    upcomingBooked.length >= 10, true);
+  const lapsedIds = new Set(
+    Object.entries(first.truth.memberCohorts)
+      .filter(([, k]) =>
+        ["recently-quiet", "long-lapsed", "paused", "canceled",
+         "quiet-boundary-15", "quiet-boundary-60"].includes(k))
+      .map(([id]) => id),
+  );
+  check("lapsed, paused, and canceled members have booked nothing upcoming",
+    upcomingBooked.every((b) => !lapsedIds.has(b.memberId)), true);
+}
+
+// The support surface (C): current policies, with a superseded version so
+// answering from CURRENT policy only is provable.
+{
+  const policies = first.dataset.studioPolicies;
+  check("the studio ships current policies for the support surface",
+    policies.filter((p) => p.isCurrent).length, 5);
+  check("a superseded policy version exists to test the is-current rule",
+    policies.some((p) => !p.isCurrent && p.topic === "cancellation"), true);
+  const currentPerTopic = new Map<string, number>();
+  for (const p of policies) {
+    if (p.isCurrent) currentPerTopic.set(p.topic, (currentPerTopic.get(p.topic) ?? 0) + 1);
+  }
+  check("exactly one current policy per topic",
+    [...currentPerTopic.values()].every((n) => n === 1), true);
+}
+
+/* ------------------------------------------------------------------ */
 /* The attendance CSV export                                            */
 /* ------------------------------------------------------------------ */
 
@@ -282,6 +341,54 @@ check("serialize -> parse -> serialize is byte-identical",
 }
 
 /* ------------------------------------------------------------------ */
+/* The bands the adversarial sweep broke — pinned forever               */
+/* ------------------------------------------------------------------ */
+
+// The shortest legal history with a full singleton roster: this exact band
+// (historyDays 90-114, memberCount >= 13) crashed the generator once.
+for (const hist of [90, 100, 114]) {
+  const short = generateStudio({ ...BASE, historyDays: hist, memberCount: 60 });
+  check(`a ${hist}-day history generates and validates clean`,
+    validateBundle(short).problems.length, 0);
+}
+
+// Tiny populations in every mode: edge-cases once declared an over-capacity
+// defect it could not create below 13 members and failed itself.
+for (const n of [1, 2, 5, 12]) {
+  const tinyClean = generateStudio({ ...BASE, memberCount: n });
+  check(`a ${n}-member studio validates clean`,
+    validateBundle(tinyClean).problems.length, 0);
+  const tinyEdge = generateStudio({ ...BASE, memberCount: n, mode: "edge-cases" });
+  const tinyReport = validateBundle(tinyEdge);
+  check(`a ${n}-member edge-cases studio reconciles exactly`,
+    tinyReport.missedDeclared.length + tinyReport.undeclaredFound.length, 0);
+}
+
+// A pool that collides constantly must still change ONLY names: the email
+// draw once shared the identity stream and pool collisions flipped it.
+{
+  const tinyPool: NamePool = { first: ["Ada"], last: ["Blue"] };
+  const collided = generateStudio(BASE, { namePool: tinyPool });
+  check("a colliding pool never flips who has an email",
+    collided.dataset.members.every(
+      (m, i) => (m.email === null) === (first.dataset.members[i]?.email === null)), true);
+  check("a colliding pool never reshuffles attendance",
+    JSON.stringify(collided.dataset.attendance) === JSON.stringify(first.dataset.attendance), true);
+}
+
+// Impossible calendar dates are refused at the config gate, not discovered
+// downstream as invalid timestamps in a "clean" dataset.
+{
+  let threw = false;
+  try {
+    generateStudio({ ...BASE, asOfDate: "2026-02-30" });
+  } catch {
+    threw = true;
+  }
+  check("an impossible asOfDate is refused at the gate", threw, true);
+}
+
+/* ------------------------------------------------------------------ */
 /* Organic sizing: the studio is the size it is                         */
 /* ------------------------------------------------------------------ */
 
@@ -306,7 +413,9 @@ check("different seeds grow different studios",
 
 for (const [label, bad] of [
   ["memberCount 0", { ...BASE, memberCount: 0 }],
-  ["memberCount 501", { ...BASE, memberCount: 501 }],
+  ["memberCount 2001", { ...BASE, memberCount: 2001 }],
+  ["historyDays 1901", { ...BASE, historyDays: 1901 }],
+  ["facilityCapacity 600", { ...BASE, facilityCapacity: 600 }],
   ["historyDays 30", { ...BASE, historyDays: 30 }],
   ["a loose date", { ...BASE, asOfDate: "2026-8-1" }],
 ] as const) {
@@ -340,6 +449,60 @@ for (const [label, bad] of [
 }
 
 /* ------------------------------------------------------------------ */
+/* The flagship: 1000 customers, five years, slow days and all          */
+/* ------------------------------------------------------------------ */
+
+{
+  const t0 = performance.now();
+  const flagship = generateStudio({
+    ...BASE,
+    memberCount: 1000,
+    historyDays: 1825,
+    mode: "scale",
+  });
+  const t1 = performance.now();
+  const flagshipReport = validateBundle(flagship);
+  const t2 = performance.now();
+  check("a thousand customers over five years generate", flagship.dataset.members.length, 1000);
+  check("the five-year studio validates clean", flagshipReport.problems.length, 0);
+  check("five-year generation + validation stays under 30 seconds", t2 - t0 < 30_000, true);
+  check("arrivals spread across the years, not bunched at the end",
+    flagship.dataset.members.some((m) => dayNumberOf(m.joinedOn) < dayNumberOf(BASE.asOfDate) - 1400), true);
+  check("occupancy never approaches the 500-person ceiling",
+    (flagshipReport.stats["peakConcurrentAttendance"] as number) <= flagship.dataset.studio.facilityCapacity, true);
+  stat(`1000 members x 5 years: generation ${Math.round(t1 - t0)}ms, validation ${Math.round(t2 - t1)}ms — ` +
+    `${flagship.dataset.classSessions.length} sessions, ${flagship.dataset.bookings.length} bookings, ` +
+    `${flagship.dataset.attendance.length} attendance records, peak concurrency ` +
+    `${String(flagshipReport.stats["peakConcurrentAttendance"])} of ${flagship.dataset.studio.facilityCapacity}`);
+
+  // Slow days are visible in the records themselves: Fridays run quieter
+  // than Mondays across five years, and the year-end hush is real.
+  const sessions = new Map(flagship.dataset.classSessions.map((x) => [x.id, x]));
+  const byWeekday = [0, 0, 0, 0, 0, 0, 0];
+  let holidayDays = 0;
+  let ordinaryDays = 0;
+  const perDay = new Map<string, number>();
+  for (const a of flagship.dataset.attendance) {
+    if (a.status !== "attended") continue;
+    const sess = sessions.get(a.classSessionId);
+    if (!sess) continue;
+    const date = dateOfTimestamp(sess.startsAt);
+    byWeekday[weekdayOf(date)] = (byWeekday[weekdayOf(date)] ?? 0) + 1;
+    perDay.set(date, (perDay.get(date) ?? 0) + 1);
+  }
+  for (const [date, count] of perDay) {
+    const month = Number(date.slice(5, 7));
+    const dayOfMonth = Number(date.slice(8, 10));
+    if ((month === 12 && dayOfMonth >= 20) || (month === 1 && dayOfMonth <= 2)) holidayDays += count;
+    else ordinaryDays += count;
+  }
+  check("Fridays run quieter than Mondays, five years running",
+    (byWeekday[5] ?? 0) < (byWeekday[1] ?? 0), true);
+  check("the year-end hush exists in the records",
+    holidayDays > 0 && holidayDays / 13 < ordinaryDays / 352, true);
+}
+
+/* ------------------------------------------------------------------ */
 /* Truth independence: the engine imports no product, reads no clock,   */
 /* touches no network — proven against the shipped sources.             */
 /* ------------------------------------------------------------------ */
@@ -347,7 +510,7 @@ for (const [label, bad] of [
 const ENGINE_SOURCES = [
   "contracts.js", "config.js", "random.js", "normalize.js", "identity.js",
   "lifecycle.js", "schedule.js", "scenarios.js", "generate.js",
-  "validate.js", "serialize.js",
+  "validate.js", "serialize.js", "csv-export.js",
 ];
 const FORBIDDEN: ReadonlyArray<[string, RegExp]> = [
   ["a product import", /from\s+["'][^"']*products\//],

@@ -25,6 +25,7 @@ import {
   type SyntheticClassSession,
   type SyntheticDataset,
   type SyntheticMember,
+  type SyntheticPolicy,
   type SyntheticStudio,
   type SyntheticTruth,
 } from "./contracts.js";
@@ -36,8 +37,8 @@ import {
   dayNumberOf,
   minutesOfTimestamp,
 } from "./normalize.js";
-import { buildSchedule } from "./schedule.js";
-import { planCohorts, type CohortPlan } from "./scenarios.js";
+import { buildSchedule, roomsPerSlot } from "./schedule.js";
+import { demandFactor, planCohorts, type CohortPlan } from "./scenarios.js";
 import { buildIdentities, DEFAULT_NAME_POOL, type NamePool } from "./identity.js";
 import { activeOn, deriveStatusOn } from "./lifecycle.js";
 
@@ -65,11 +66,15 @@ export function generateStudio(
   const windowStartDay = asOfDay - config.historyDays;
 
   // 1. The studio and its facility constraint.
+  // Facility: at most 500 people fit in the building, ever. When the
+  // config does not pin a number, size it to the room count — concurrent
+  // occupancy stays far below the ceiling either way.
   const studio: SyntheticStudio = {
     id: makeId("studio", 1),
     name: "Pulse Studio",
     timezone: config.timezone,
-    facilityCapacity: config.facilityCapacity ?? 30,
+    facilityCapacity:
+      config.facilityCapacity ?? Math.max(30, roomsPerSlot(config.memberCount) * 16),
   };
 
   // 2-3. Instructors, class types, schedule.
@@ -246,9 +251,12 @@ export function generateStudio(
     const altType = schedule.classTypes.find((t) => t.id !== preferredTypeId);
     const joinDay = asOfDay - plan.joinDaysAgo;
     const stride = Math.max(2, Math.round(7 / Math.max(plan.cadencePerWeek, 0.4)));
+    // The visit cap scales with the history: five years of a loyal regular
+    // is hundreds of classes, not sixty.
+    const visitCap = Math.min(280, Math.ceil(config.historyDays * 0.16) + 20);
     let day = asOfDay - plan.anchorDaysAgo;
     let visits = 0;
-    while (visits < 60) {
+    while (visits < visitCap) {
       day -= stride + behavior.int(0, 2);
       if (day < windowStartDay || day < joinDay) break;
       const agoDays = asOfDay - day;
@@ -256,6 +264,9 @@ export function generateStudio(
         continue; // the returning cohort's silent stretch
       }
       if (!activeOn(periods, dateOfDayNumber(day))) continue; // paused/canceled span
+      // Slow days are real: the day's demand decides whether this visit
+      // happens at all. Anchors are exempt — intent stays exact.
+      if (!behavior.chance(demandFactor(config.seed, day))) continue;
       const isOlderHalf = agoDays > (plan.anchorDaysAgo + config.historyDays) / 2;
       const typeId =
         plan.switchesPreference && isOlderHalf && altType ? altType.id : preferredTypeId;
@@ -283,8 +294,10 @@ export function generateStudio(
       }
     }
     // Upcoming bookings, only while the membership is active on that day.
+    // Near-term bias: most upcoming bookings sit in the next few days, the
+    // way a real week fills — the far end of the fortnight stays thinner.
     for (let b = 0; b < plan.futureBookings; b += 1) {
-      const day = asOfDay + behavior.int(1, 10);
+      const day = asOfDay + (behavior.chance(0.7) ? behavior.int(1, 5) : behavior.int(6, 12));
       const date = dateOfDayNumber(day);
       if (!activeOn(periods, date)) continue;
       const todays = (schedule.sessionsByDate.get(date) ?? []).filter(
@@ -329,6 +342,50 @@ export function generateStudio(
     }
   }
 
+  // 9b. Studio policies — the support surface's source of truth. One
+  // current policy per topic, plus a superseded cancellation version so a
+  // consumer can prove it answers from CURRENT policy only.
+  const policyStart = dateOfDayNumber(asOfDay - 400);
+  const policyRevised = dateOfDayNumber(asOfDay - 120);
+  const POLICY_TEXTS: ReadonlyArray<[string, string]> = [
+    ["cancellation", "Cancel a reservation up to 12 hours before class starts at no charge. Later cancellations count against your monthly class allowance."],
+    ["what to bring", "Bring a water bottle and a towel. Mats and cycling shoes are provided free at the front desk."],
+    ["class levels", "All-levels classes welcome everyone. Beginner classes move slower with more instruction. Advanced classes assume at least ten prior classes."],
+    ["guest passes", "Each active member may bring one guest per month. Guests sign a waiver at the front desk before class."],
+    ["late arrival", "Doors close five minutes after a class starts. Arrive early for your first visit so the desk can set you up."],
+  ];
+  const studioPolicies: SyntheticPolicy[] = [
+    {
+      id: makeId("policy", 1),
+      topic: "cancellation",
+      answer: "Cancel a reservation up to 24 hours before class starts at no charge.",
+      effectiveFrom: policyStart,
+      updatedAt: `${policyStart}T09:00:00`,
+      isCurrent: false,
+    },
+    ...POLICY_TEXTS.map(([topic, answer], i) => ({
+      id: makeId("policy", i + 2),
+      topic,
+      answer,
+      effectiveFrom: topic === "cancellation" ? policyRevised : policyStart,
+      updatedAt: `${topic === "cancellation" ? policyRevised : policyStart}T09:00:00`,
+      isCurrent: true,
+    })),
+  ];
+
+  // Spots left per upcoming session — the booking surface's known answers.
+  const bookedBySession = new Map<string, number>();
+  for (const b of bookings) {
+    if (b.status !== "booked") continue;
+    bookedBySession.set(b.classSessionId, (bookedBySession.get(b.classSessionId) ?? 0) + 1);
+  }
+  const expectedUpcomingAvailability: Record<string, number> = {};
+  for (const s of schedule.sessions) {
+    if (s.status !== "scheduled") continue;
+    if (dayNumberOf(dateOfTimestamp(s.startsAt)) < asOfDay) continue;
+    expectedUpcomingAvailability[s.id] = s.capacity - (bookedBySession.get(s.id) ?? 0);
+  }
+
   // 10. Truth from construction intent — never from a product's engine.
   const truth: SyntheticTruth = {
     memberCohorts: {},
@@ -336,6 +393,7 @@ export function generateStudio(
     expectedQuietDays: {},
     expectedReengagementEligibility: {},
     expectedDashboardMetrics: {},
+    expectedUpcomingAvailability,
     declaredViolations: [],
   };
   for (let i = 0; i < plans.length; i += 1) {
@@ -371,6 +429,14 @@ export function generateStudio(
     totalAttended: attendedRows.length,
     totalNoShows: attendance.filter((a) => a.status === "no_show").length,
     peakSessionAttendance,
+    currentPolicies: studioPolicies.filter((p) => p.isCurrent).length,
+    upcomingBookedSeats: Object.entries(expectedUpcomingAvailability).reduce(
+      (sum, [id, left]) => {
+        const cap = schedule.sessions.find((x) => x.id === id)?.capacity ?? 0;
+        return sum + (cap - left);
+      },
+      0,
+    ),
   };
 
   const dataset: SyntheticDataset = {
@@ -390,6 +456,7 @@ export function generateStudio(
         classSessions: schedule.sessions.length,
         bookings: bookings.length,
         attendance: attendance.length,
+        studioPolicies: studioPolicies.length,
       },
       note: "Synthetic studio — every person and record is fictional.",
     },
@@ -401,6 +468,7 @@ export function generateStudio(
     classSessions: schedule.sessions,
     bookings: bookings,
     attendance,
+    studioPolicies,
   };
 
   // 12 (mode). Edge-cases: inject DECLARED defects after the clean build.
@@ -612,7 +680,10 @@ function injectEdgeCases(
     }
   }
 
-  // EC7 — a session booked past its capacity.
+  // EC7 — a session booked past its capacity. Declared ONLY when the
+  // population can actually exceed the capacity: a declaration the
+  // injection could not create would land in missedDeclared and fail the
+  // dataset's own reconciliation at small member counts.
   {
     const session = dataset.classSessions.find((s) => s.status === "completed");
     if (session) {
@@ -621,25 +692,24 @@ function injectEdgeCases(
           .filter((b) => b.classSessionId === session.id && b.status === "booked")
           .map((b) => b.memberId),
       );
+      const candidates = dataset.members.filter((m) => !bookedHere.has(m.id));
       const needed = session.capacity - bookedHere.size + 1;
-      let added = 0;
-      for (const m of dataset.members) {
-        if (added >= needed) break;
-        if (bookedHere.has(m.id)) continue;
-        dataset.bookings.push({
-          id: nextBookingId(),
-          memberId: m.id,
-          classSessionId: session.id,
-          bookedAt: session.startsAt,
-          status: "booked",
+      if (candidates.length >= needed) {
+        for (const m of candidates.slice(0, needed)) {
+          dataset.bookings.push({
+            id: nextBookingId(),
+            memberId: m.id,
+            classSessionId: session.id,
+            bookedAt: session.startsAt,
+            status: "booked",
+          });
+        }
+        declared.push({
+          code: "session-over-capacity",
+          entityId: session.id,
+          detail: `bookings exceed capacity ${session.capacity} by 1`,
         });
-        added += 1;
       }
-      declared.push({
-        code: "session-over-capacity",
-        entityId: session.id,
-        detail: `bookings exceed capacity ${session.capacity} by 1`,
-      });
     }
   }
 

@@ -1,8 +1,9 @@
 /* Serialization — bytes out, the same meaning back in. TEAM-OWNED.
  *
- * Stable, human-readable JSON. parseBundle validates shape and throws with
- * a named reason on anything malformed — a parsed bundle is structurally a
- * bundle, or you get an error, never a half-object.
+ * Stable, human-readable JSON. parseBundle checks the top-level shape —
+ * every required collection present — and throws a named reason otherwise.
+ * It does NOT retype every row; validateBundle is the deep gate, and a
+ * parsed bundle should be validated before anything trusts it.
  */
 
 import type { GeneratedStudioBundle } from "./contracts.js";
@@ -38,6 +39,7 @@ export function parseBundle(text: string): GeneratedStudioBundle {
       "classSessions",
       "bookings",
       "attendance",
+      "studioPolicies",
     ] as const) {
       if (bundle.dataset[key] === undefined) missing.push(`dataset.${key}`);
     }

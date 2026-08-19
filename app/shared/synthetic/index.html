@@ -41,7 +41,15 @@
     <section class="controls" aria-label="Generator configuration">
       <label>Seed <input id="seed" value="pulse-shared-0001"></label>
       <label>As-of date <input id="asOfDate" type="date"></label>
-      <label>Members — blank lets the studio be its own size <input id="memberCount" type="number" min="1" max="500" placeholder="organic (from seed)"></label>
+      <label>Members — blank lets the studio be its own size <input id="memberCount" type="number" min="1" max="2000" placeholder="organic (from seed)"></label>
+      <label>History
+        <select id="history">
+          <option value="180">6 months</option>
+          <option value="365">1 year</option>
+          <option value="730">2 years</option>
+          <option value="1825">5 years</option>
+        </select>
+      </label>
       <label>Mode
         <select id="mode">
           <option value="clean">clean</option>

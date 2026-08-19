@@ -14,6 +14,26 @@
 
 import type { SyntheticStudioConfig } from "./config.js";
 import { makeStream, type Stream } from "./random.js";
+import { dateOfDayNumber, weekdayOf } from "./normalize.js";
+
+/** How busy the studio naturally is on a given day, 0.05..1. Weekday
+ *  rhythm (Fridays and weekends slow), a seasonal wave (January surge,
+ *  summer dip), a holiday hush at year's end, and a little deterministic
+ *  day-to-day noise. Nobody fills a gym by declaration — attendance
+ *  breathes. */
+export function demandFactor(seed: string, day: number): number {
+  const date = dateOfDayNumber(day);
+  const WEEKDAY = [0.75, 1.0, 1.0, 0.95, 0.9, 0.7, 0.8]; // Sun..Sat
+  const month = Number(date.slice(5, 7));
+  const dayOfMonth = Number(date.slice(8, 10));
+  const approxDayOfYear = (month - 1) * 30.4 + dayOfMonth;
+  const seasonal = 1 + 0.22 * Math.cos(((approxDayOfYear - 15) / 365.25) * 2 * Math.PI);
+  const holidayHush =
+    (month === 12 && dayOfMonth >= 20) || (month === 1 && dayOfMonth <= 2) ? 0.55 : 1;
+  const noise = 0.85 + makeStream(seed, `demand:${day}`).next() * 0.3;
+  const factor = (WEEKDAY[weekdayOf(date)] ?? 1) * seasonal * holidayHush * noise;
+  return Math.max(0.05, Math.min(1, factor));
+}
 
 export type MembershipKind =
   | "steady"
@@ -151,16 +171,19 @@ function planFor(
   } else if (key === "regular") {
     base.anchorDaysAgo = stream.int(1, 12);
     base.cadencePerWeek = 2 + stream.next();
-    base.futureBookings = stream.int(0, 2);
+    base.futureBookings = stream.int(1, 3);
   } else if (key === "ordinary") {
     base.anchorDaysAgo = stream.int(2, 13);
     base.cadencePerWeek = 0.8 + stream.next() * 0.6;
-    base.futureBookings = stream.int(0, 1);
+    base.futureBookings = stream.int(0, 2);
   } else if (key === "recently-quiet") {
     base.anchorDaysAgo = stream.int(16, 55);
     base.cadencePerWeek = 1.5 + stream.next();
   } else if (key === "long-lapsed") {
-    base.anchorDaysAgo = stream.int(75, Math.min(140, config.historyDays - 40));
+    // Quiet past the 60-day window, but the range must survive the SHORTEST
+    // legal history (90 days): floor 62, ceiling never below the floor.
+    const ceiling = Math.max(62, Math.min(140, config.historyDays - 25));
+    base.anchorDaysAgo = stream.int(62, ceiling);
     base.cadencePerWeek = 1 + stream.next();
   } else if (key === "newcomer") {
     base.membershipKind = "newcomer";
@@ -176,6 +199,7 @@ function planFor(
     base.pauseLengthDays = stream.int(20, 40);
     base.anchorDaysAgo = stream.int(1, 9);
     base.cadencePerWeek = 1.5 + stream.next();
+    base.futureBookings = stream.int(1, 2);
   } else if (key === "canceled") {
     base.membershipKind = "canceled";
     base.cancelDaysAgo = stream.int(20, 70);
@@ -183,6 +207,7 @@ function planFor(
   } else if (key === "returning") {
     base.anchorDaysAgo = stream.int(1, 6);
     base.gapBand = [25, 75];
+    base.futureBookings = stream.int(1, 2);
   } else if (key === "no-show-prone") {
     base.anchorDaysAgo = stream.int(5, 20);
     base.noShowRate = 0.3;
@@ -209,10 +234,12 @@ function planFor(
   }
 
   // Join long enough before the anchor that the prior-60-day window has
-  // real history inside the membership.
+  // real history inside the membership — and spread joins across the WHOLE
+  // history, so a five-year dataset contains five years of arrivals.
   if (base.membershipKind !== "newcomer") {
     const anchor = base.anchorDaysAgo ?? 0;
-    base.joinDaysAgo = anchor + 70 + stream.int(30, 300);
+    const spread = Math.max(300, config.historyDays - anchor - 100);
+    base.joinDaysAgo = anchor + 70 + stream.int(30, spread);
   }
   return base;
 }
