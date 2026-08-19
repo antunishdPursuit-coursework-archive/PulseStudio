@@ -88,7 +88,7 @@ All inside `app/products/d-reengagement/`:
 | `main.ts` | 266 | The page: renders flags, evidence, drafts; wires the three data doors. |
 | `csv.ts` | 297 | Parses and adapts a studio's own attendance export, in-browser. |
 | `generate.ts` | 277 | Seeded studio generator (60 fictional members) so the ranking is visible. |
-| `tests.ts` / `tests.html` | 452 / 37 | 56 browser-run unit checks with a pinned reference date. |
+| `tests.ts` / `tests.html` | 488 / 37 | 60 browser-run unit checks with a pinned reference date. |
 | `styles.css` | 144 | Violet-on-black/white, built entirely on shared theme tokens. |
 | `index.html` | 48 | The page. Staff-only: carries `noindex, nofollow`. |
 | `README.md` | 133 | Folder documentation, rebrand checklist, plug-in spec. |
@@ -135,7 +135,7 @@ Three ways data gets in, all through one render path:
 Do not take these on trust — reproduce them. But they were true at the time of
 writing, checked in a real browser, not inferred from code.
 
-- **56 checks run, 56 passed, 0 failed** at
+- **60 checks run, 60 passed, 0 failed** at
   `/products/d-reengagement/tests.html`. The suite pins "today" to
   2026-08-18 so verdicts never drift with the real clock.
 - On the shared records: **5 members checked, 1 flagged** — Maria Santos, last
@@ -246,7 +246,7 @@ Be specific and be hard on it. In rough priority:
 1. **Try to break the rule.** Find an input where the flag list is wrong and
    nothing says so. Concrete input, wrong output, cite the file and line.
 2. **Attack the test suite, not just the code.** Which real bug classes would
-   pass all 56 checks today? Mutate `logic.ts` and find a change that keeps the
+   pass all 60 checks today? Mutate `logic.ts` and find a change that keeps the
    suite green — that is a missing check, and it is worth more than a style note.
 3. **Judge the ranking rule.** "Most classes in the prior 60 days" is a proxy
    for "most valuable save". Is it the right proxy for a gym? What would you
@@ -263,3 +263,212 @@ Be specific and be hard on it. In rough priority:
 When you find something, give it as: the specific observation, why it matters
 to a studio owner or to the code's correctness, and one concrete suggestion.
 If something is already right, say that plainly rather than inventing work.
+
+---
+
+# Answers to the reviewer's questions
+
+Answered by Rensley. Where an answer is a decision rather than a fact, it says
+so. Where the answer was **verified by running code**, it says that too —
+several of these were probed rather than recalled, and two of them found a real
+defect that has since been fixed (see Q20).
+
+## Purpose and reviewer
+
+**1. Who receives this.** An AI coding agent working as a senior developer,
+with Rensley reading and deciding. Write for a competent peer, not for a
+beginner and not for a committee.
+
+**2. Authority.** You may edit anything inside
+`app/products/d-reengagement/`. Everything else is read-only to you.
+
+**3. Desired output — all three, in this order:** (a) a written review with
+findings ranked by severity, (b) new or strengthened **tests** for anything you
+claim is broken, and (c) a patch for what you can fix inside the lane. A finding
+with a failing test attached is worth more than three without.
+
+**4. Time.** Depth over speed, but stop when you are repeating yourself. One
+demonstrated defect beats twenty observations.
+
+## Review priorities
+
+**5. What makes the review genuinely successful.** In order:
+a defect where the flag list is **wrong and nothing says so** — a member who
+should appear and does not, or appears with false evidence, is the failure mode
+this product exists to prevent; a **missing check** proven by mutating
+`logic.ts` and finding the suite still green; and a judgement call on whether
+the **rule and the ranking are the right ones for a gym**, which is the part no
+test can answer.
+
+**6. What matters most right now:** correctness first, then readiness for real
+studio use, then privacy. Maintainability matters but the codebase is 2,150
+lines and deliberately simple — do not trade clarity for abstraction.
+
+**7. Performance is out of scope** (60 members, client-side, nothing measurable).
+**Security is in scope but narrowly:** the data never leaves the browser, so the
+real risks are (i) staff-only inference leaking to a member-facing surface,
+(ii) anything that would send a message, and (iii) untrusted CSV content
+reaching the DOM. Note the page builds its DOM with `textContent` and
+`createElement`, never `innerHTML` — say so if you find an exception.
+
+**8. Yes — assess the outreach note and the staff workflow.** A technically
+perfect list that no owner would act on is a failed product. Read
+`draftMessage` in `config.ts` and say whether a real person would send it.
+
+## Constraints and decisions
+
+**9. The laws are challengeable in argument, fixed in code.** Argue against any
+of them with evidence — that is welcome and useful — but implement nothing that
+breaks one. Two are effectively permanent because they come from the team's
+shared contract rather than from Rensley: **draft-only** (nothing sends) and
+**staff-only** (risk inference never reaches members). The rest — thresholds,
+ranking, voice, colour, wording — are open to a good argument.
+
+**10. Yes**, add or edit any file inside the D folder, tests and docs included.
+
+**11. Yes**, read A, B, C and `app/shared/` freely for context. Never edit them.
+
+**12. Defects outside Product D** go in `REQUESTFOR-A-B-C.md` (that file is
+ours) as a note to that product's owner — not fixed, not filed elsewhere.
+
+**13. Prohibited AI attribution means all of it:** commit trailers
+(`Co-Authored-By`), "generated by/with" language anywhere, assistant names in
+code comments, docs, PR bodies, or file headers. Rensley is the sole author of
+everything in this repo.
+
+## Logic and data — verified by running the compiled code, not recalled
+
+**14. Identity.** Two different keys, deliberately:
+- **Shared records:** `member_id`, a stable id.
+- **CSV import:** the member **name as written, compared case-insensitively**.
+  Names are NOT slugged to ASCII — that bug merged 王伟 and 佐藤花子 into one
+  person and hid a quiet member behind another's visit. There is no email in
+  the CSV contract, so name is the only available key; two real people sharing
+  a name will merge, and that is a known accepted limitation worth challenging
+  if you have a better idea that does not require the studio to change its
+  export.
+
+**15. Attendance rows referencing an unknown member are silently ignored** —
+verified. The engine iterates over `members` and filters attendance to each, so
+a row whose `member_id` matches nobody is never seen and nothing reports it.
+This cannot produce a wrong flag (the ghost is not in the roster), but it is
+silent, which is against the house style. A stated count of orphaned rows would
+be a legitimate improvement.
+
+**16. "Today"** is the calendar date in the **studio's** timezone, taken from
+the record set's declared `timezone` field, never the viewer's clock — so a
+staff member checking from another timezone at 11:30pm gets the studio's
+answer. For CSV imports the browser's timezone is used, on the assumption the
+person importing is at the studio. Challenge that assumption if you think it is
+wrong.
+
+**17. Boundaries: `daysSince > 14` AND `daysSince <= 60`.** So 14 is NOT
+flagged, 15 IS, 60 IS, 61 is NOT. All four are pinned by checks, on both sides
+of both edges.
+
+**18. Malformed CSV rows: skip the row, keep the file, state every skip** —
+with the **physical file line** the staff member will see in their spreadsheet
+(blank lines counted). A file missing a required column fails loudly and names
+what is missing. Impossible dates (`2/30/2026`, a European `13/1/2026`) are
+skips, never guesses — that bug fabricated a date in 2027 and silently removed a
+member from the list.
+
+**19. Duplicates are removed by business key, not exact match:** attendance is
+deduplicated by `session_id` per member, so a second row for the same class
+counts once even with a different `attendance_id` or timestamp.
+
+**20. The edge cases, each verified by running the code:**
+- **Future-dated attendance — WAS A REAL DEFECT, now fixed.** A class dated in
+  the future became "last attended", drove days-quiet negative, and silently
+  dropped a genuinely quiet member off the list. Future classes are now
+  excluded from attendance history, with two checks that fail if it regresses.
+- **Unreadable class dates** did the same and are excluded the same way. A
+  member whose *only* record is unreadable is treated as never-attended — no
+  evidence, therefore no flag, which is the conservative direction.
+- **Blank dates in CSV** are stated skips (see 18).
+- **`memberships[]` is ignored entirely** — verified. Only
+  `members.membership_status` is read, so a conflicting membership row has no
+  effect. This is undocumented and worth a ruling: which is authoritative?
+- **Reopened memberships** have no representation at all; there is no history
+  of status changes in the contract. A member who paused and returned looks
+  identical to one who never paused.
+
+## Product validation — honest state
+
+**21.** Rensley wrote the thresholds and the voice. **The four-person team must
+ratify them**; they are labelled "proposed" in the UI, the README, and the PR
+precisely because they are not yet agreed.
+
+**22. No studio operator has reviewed the ranking rule.** "Most attended
+classes in the 60 days before going quiet" is Rensley's proxy for save value
+and it is untested against anyone who runs a gym.
+
+**23. No staff feedback of any kind.** Nobody outside the team has used the
+interface.
+
+**24. No usability or accessibility test is scheduled.** If you find
+accessibility defects, they are in scope and welcome — the page uses
+`aria-live` on its result line and a visible-label file input, but it has never
+been tested with a screen reader.
+
+**25. Production-ready means, at minimum:** the team ratifies the thresholds;
+one real studio runs its own export through the CSV door; staff send real notes
+and someone counts who returns; and the ranking rule survives contact with an
+owner who disagrees with it. Code quality is not the blocker — evidence is.
+
+## Fixture aging
+
+**26.** `app/shared/fixtures.json` has fixed 2026 dates. Around **2026-09-30**
+Maria Santos passes 60 days quiet and correctly falls outside the window, so
+the shared-records view shows **0 flagged** — the useful scenario disappears
+entirely rather than merely changing. The unit checks pin their own reference
+date and will not rot. The generated studio is built relative to today and
+never rots. **Only the shared-records view degrades.**
+
+**27.** `app/shared/fixtures.json` is **team-owned** — we cannot edit it.
+Refreshing it is a team request.
+
+**28. Yes, propose a sustainable strategy** — with the hard constraint that
+**no fake runtime "today" may be introduced**, because that was explicitly
+rejected: it makes the product lie about the current date. Options worth
+weighing include the team agreeing to date fixtures relative to a documented
+anchor, or the page defaulting to the generated studio once the shared records
+go stale. Argue for one.
+
+**29. Unanswered requests to teammates** (all in `REQUESTFOR-A-B-C.md`):
+- **Kerrian (A):** where runtime reservations are stored, and a link pattern to
+  a specific class so drafts can carry a real booking link.
+- **Manny (B):** whether attendance recording will live in his dashboard or
+  stay an ops flow outside both products. **He also needs to add
+  `noindex, nofollow` to his page**, which is live, public, and shows member
+  names and rosters.
+- **Dennis (C):** confirmation his chatbot's reads stay scoped to schedule and
+  policies, so staff-only inference can never reach a member.
+
+**Do any block release?** Only Manny's `noindex` is urgent, and it is a privacy
+issue on his page rather than a blocker for ours. The others shape the *next*
+increment (booking signals, a real booking link) but nothing in the current
+product waits on them.
+
+## Deliverable quality
+
+**30. Yes — rank by severity, with reproduction steps.** State the input and
+the wrong output. "This could be a problem" without a reproduction is noise.
+
+**31. Yes — tag every recommendation** as Product D work, a team request, a
+business decision, or intentionally out of scope. Mis-tagging lane-violating
+work as "Product D work" is the most expensive mistake you can make here.
+
+**32. Yes — a "no change needed" conclusion must say what you inspected and
+how you tested it.** A clean report with no method behind it is worth nothing,
+and "I found nothing" is a perfectly good answer when it is earned.
+
+**33. Manual mutation testing is expected.** You may introduce mutation
+tooling only if it stays inside the lane and adds no dependency to the
+team-owned `package.json` — which, realistically, means manual. Three
+hand-chosen mutations that survive are worth more than a tool's score.
+
+**34. Exclude pure visual taste.** Raise visual issues only when they
+demonstrate a law violation (backgrounds must be black or white; features carry
+the owner's colour), an accessibility problem, or a workflow failure — for
+example, evidence a staff member cannot read at a glance.
