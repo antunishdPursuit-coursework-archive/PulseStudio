@@ -1,7 +1,8 @@
 .topbar { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 3px solid var(--accent); }
 .topbar a { color: var(--muted); text-decoration: none; }
-.topbar .brand { color: var(--fg); font-size: 1.25rem; font-weight: 700; letter-spacing: 0; }
-.topbar .brand span { color: var(--accent); }
+.topbar .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; }
+.topbar .home-brand .home-arrow, .topbar .home-brand .brand-word span { color: var(--accent); }
+.topbar .home-brand:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .topbar .role { color: var(--muted); font-size: 0.85rem; }
 .topbar a:last-of-type { margin-left: auto; }
 
