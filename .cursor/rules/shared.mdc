@@ -1,0 +1,9 @@
+---
+description: Team-owned shared ground
+globs: app/shared/**,app/index.html
+alwaysApply: false
+---
+You are on TEAM-OWNED ground (`app/shared/` or the front door). Read
+`app/shared/CLAUDE.md` and obey it. Changes here need team agreement
+stated in the commit and the PR — never change shared ground silently,
+and never rename a shared identifier.
