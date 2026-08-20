@@ -175,3 +175,11 @@ a { color: var(--accent, var(--fg)); }
 .appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
 .appearance-custom:disabled { cursor: not-allowed; opacity: .55; }
 .appearance-status { margin: 9px 0 0; color: var(--muted); font-size: .76rem; }
+
+/* The branded home link every product header carries — styled ONCE here,
+   never per-page. The WORD inside renders from shared/brand.ts at runtime
+   (components/brand-header.ts, called by theme-boot); page markup holds
+   only a pre-module placeholder. */
+.home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
+.home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent, var(--fg)); }
+.home-brand:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }

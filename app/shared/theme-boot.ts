@@ -11,6 +11,12 @@
    stay chip-free (a proof page) opts out with <body data-no-session>. */
 
 import { mountSessionControl } from "./components/topbar.js";
+import { renderStudioBrand } from "./components/brand-header.js";
+
+/* Every page's branded home links render their word from shared/brand.ts
+ * — the clone seam: rename the studio in ONE file and every header
+ * follows. The markup stays each page owner's; this only fills it. */
+renderStudioBrand();
 
 const root = document.documentElement;
 const THEME_KEY = "pulse-theme";

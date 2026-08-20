@@ -12,9 +12,7 @@
 .page-head {
   box-shadow: 0 6px 30px color-mix(in srgb, var(--accent) 35%, transparent);
 }
-.page-head .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
-.page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span { color: var(--accent); }
-.page-head .home-brand:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* .home-brand styling lives ONCE in shared/theme.css now. */
 .page-head .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
 
 .status {
