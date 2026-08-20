@@ -9,7 +9,7 @@
 
 import { ID_PATTERN } from "./contracts.js";
 import type { GeneratedStudioBundle } from "./contracts.js";
-import { DEFAULT_CONFIG, organicMemberCount, type SyntheticStudioConfig } from "./config.js";
+import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
@@ -668,6 +668,60 @@ for (const file of ENGINE_SOURCES) {
   for (const [label, pattern] of FORBIDDEN) {
     check(`${file} contains no ${label}`, pattern.test(source), false);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* The upcoming-occupancy fill knob (upcomingFillTarget) — added for the */
+/* capacity dashboard: a week of classes should be able to present       */
+/* realistic mixed occupancy, deterministically, without touching any    */
+/* other consumer's output.                                              */
+/* ------------------------------------------------------------------ */
+
+{
+  const offA = generateStudio(BASE);
+  const offB = generateStudio({ ...BASE });
+  check("fill knob unset: two runs stay byte-identical (the default path is untouched)",
+    JSON.stringify(offA.dataset) === JSON.stringify(offB.dataset), true);
+
+  const onA = generateStudio({ ...BASE, upcomingFillTarget: 0.85 });
+  const onB = generateStudio({ ...BASE, upcomingFillTarget: 0.85 });
+  check("fill is deterministic: same seed and target, same studio",
+    JSON.stringify(onA.dataset) === JSON.stringify(onB.dataset), true);
+
+  const upcomingOf = (bundle: GeneratedStudioBundle) =>
+    bundle.dataset.classSessions.filter(
+      (s) => s.status === "scheduled" && s.startsAt.slice(0, 10) >= BASE.asOfDate,
+    );
+  const bookedCount = (bundle: GeneratedStudioBundle, sessionId: string) =>
+    bundle.dataset.bookings.filter(
+      (b) => b.classSessionId === sessionId && b.status === "booked",
+    ).length;
+
+  const offSeats = upcomingOf(offA).reduce((n, s) => n + bookedCount(offA, s.id), 0);
+  const onSeats = upcomingOf(onA).reduce((n, s) => n + bookedCount(onA, s.id), 0);
+  check("the fill actually fills: strictly more upcoming seats than the organic run",
+    onSeats > offSeats, true);
+
+  const occupancies = upcomingOf(onA).map((s) => bookedCount(onA, s.id) / s.capacity);
+  check("no session ever exceeds capacity", occupancies.every((o) => o <= 1), true);
+  const mean = occupancies.reduce((a, b) => a + b, 0) / Math.max(1, occupancies.length);
+  check("a 0.85 target lands a busy week (mean occupancy at least 55%)", mean >= 0.55, true);
+  check("the band varies: not every session is equally full",
+    new Set(occupancies.map((o) => Math.round(o * 20))).size > 1, true);
+
+  const pairs = onA.dataset.bookings
+    .filter((b) => b.status === "booked")
+    .map((b) => `${b.memberId}|${b.classSessionId}`);
+  check("a member holds at most one seat per session, fill included",
+    new Set(pairs).size === pairs.length, true);
+
+  check("the validator blesses a filled studio",
+    validateBundle(onA).ok, true);
+
+  check("validateConfig rejects a fill target above 1",
+    validateConfig({ ...BASE, upcomingFillTarget: 1.5 }).length > 0, true);
+  check("validateConfig accepts a fill target inside 0..1",
+    validateConfig({ ...BASE, upcomingFillTarget: 0.7 }).length, 0);
 }
 
 /* ------------------------------------------------------------------ */
