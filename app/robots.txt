@@ -25,4 +25,4 @@
 User-agent: *
 Disallow: /products/b-dashboard/
 
-Sitemap: https://gymsley.github.io/app/sitemap.xml
+Sitemap: https://antunishdpursuit.github.io/PulseStudio/sitemap.xml

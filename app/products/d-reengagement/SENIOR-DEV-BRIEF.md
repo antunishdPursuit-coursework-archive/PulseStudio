@@ -34,8 +34,8 @@ Stack: plain HTML, CSS, TypeScript. **No framework, no bundler, no server.**
 This is deliberate — do not propose React, Vite, or a build tool unless you
 can show it buys something the team actually needs.
 
-Repo: `https://github.com/GymSley/app` (public).
-Live: `https://gymsley.github.io/app/products/d-reengagement/`
+Repo: `https://github.com/antunishdPursuit/PulseStudio` (public).
+Live: `https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/`
 
 ## 2. The lane law — the constraint that shapes everything
 

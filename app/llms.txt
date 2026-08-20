@@ -11,11 +11,11 @@ a static site — no server, no member data leaving the browser.
 
 ## Public pages
 
-- [Pulse Studio](https://gymsley.github.io/app/): the front door, linking to
+- [Pulse Studio](https://antunishdpursuit.github.io/PulseStudio/): the front door, linking to
   every product.
-- [Member Booking](https://gymsley.github.io/app/products/a-booking/): a
+- [Member Booking](https://antunishdpursuit.github.io/PulseStudio/products/a-booking/): a
   member views the week's classes and reserves a spot.
-- [Member Support](https://gymsley.github.io/app/products/c-chatbot/):
+- [Member Support](https://antunishdpursuit.github.io/PulseStudio/products/c-chatbot/):
   answers member questions from the studio's real schedule and current
   written policies, and says plainly when it has no answer rather than
   inventing one.
@@ -40,4 +40,4 @@ member actually attended counts as a visit; a no-show never does.
   themselves. Nothing in this software sends a message on its own.
 - Any sample members shown are fictional. Records generated for viewing are
   labelled as generated on the page itself.
-- Source: https://github.com/GymSley/app
+- Source: https://github.com/antunishdPursuit/PulseStudio

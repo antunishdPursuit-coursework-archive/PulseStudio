@@ -36,10 +36,10 @@ Flag a member when all of these hold, measured in studio-local calendar days:
 
 ## Live
 
-<https://gymsley.github.io/app/products/d-reengagement/> — published from
+<https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/> — published from
 `main` by `.github/workflows/pages.yml`, which runs the gate before it
 publishes, so a red gate never reaches the URL. The unit checks are live too:
-<https://gymsley.github.io/app/products/d-reengagement/tests.html>
+<https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/tests.html>
 
 ## Run it
 
