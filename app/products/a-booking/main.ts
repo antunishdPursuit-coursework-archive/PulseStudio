@@ -234,9 +234,10 @@ function clearError(): void {
 function pill(session: SyntheticClassSession): { text: string; className: string } {
   if (session.status === "canceled") return { text: "Canceled", className: "full" };
   const left = remainingSpots(session);
-  if (left <= 0) return { text: "Full", className: "full" };
-  if (left <= 4) return { text: `${left} of ${session.capacity} left`, className: "warn" };
-  return { text: `${left} of ${session.capacity} left`, className: "ok" };
+  const reserved = session.capacity - left;
+  if (left <= 0) return { text: `Full · ${session.capacity} reserved`, className: "full" };
+  if (left <= 4) return { text: `${reserved} reserved · ${left} of ${session.capacity} left`, className: "warn" };
+  return { text: `${reserved} reserved · ${left} of ${session.capacity} left`, className: "ok" };
 }
 
 function remainingOnDay(day: string): number {
@@ -309,8 +310,9 @@ function spreadReservationsAcrossStudio(): { reserved: number; waitlisted: numbe
   let waitlisted = 0;
   for (const session of upcomingSessions()) {
     const left = remainingSpots(session);
-    const fillAll = left > 0 && Math.random() < 0.15;
-    const toBook = left <= 0 ? 0 : fillAll ? left : Math.floor(Math.random() * (left + 1));
+    const fillAll = left > 0 && Math.random() < 0.18;
+    const minTake = left <= 0 ? 0 : Math.min(left, Math.max(1, Math.ceil(left * 0.4)));
+    const toBook = left <= 0 ? 0 : fillAll ? left : minTake + Math.floor(Math.random() * (left - minTake + 1));
     for (let count = 0; count < toBook; count += 1) {
       const member = nextOpenMember(pool, cursor, session.id);
       if (!member) break;
@@ -608,14 +610,22 @@ signoutBtn.addEventListener("click", () => {
   render();
 });
 
-const fillRequested = new URLSearchParams(location.search).get("fill-reservations") === "1";
-if (fillRequested) {
-  const filled = spreadReservationsAcrossStudio();
+function fillParamPresent(): boolean {
+  const params = new URLSearchParams(location.search);
+  return params.get("fill-reservations") === "1" || params.has("fill-reservations=1");
+}
+
+function stripFillParam(): void {
   const url = new URL(location.href);
   url.searchParams.delete("fill-reservations");
+  url.searchParams.delete("fill-reservations=1");
   history.replaceState({}, "", url);
-  render();
+}
+
+const alreadyFilled = loadRuntimeReservations().length > 0;
+const filled = alreadyFilled ? null : spreadReservationsAcrossStudio();
+if (fillParamPresent()) stripFillParam();
+render();
+if (filled) {
   statusEl.textContent = `${filled.reserved} reservations added across upcoming classes. ${filled.waitlisted} waitlisted. ${statusEl.textContent}`;
-} else {
-  render();
 }

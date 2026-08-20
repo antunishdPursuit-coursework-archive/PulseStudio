@@ -346,22 +346,34 @@ body.home { overflow-x: hidden; }
 
 @media (prefers-reduced-motion: no-preference) {
 
-  /* the hero line draws itself once, then a bright pulse keeps running it */
+  /* the hero line draws itself once, settles dim — and then the pulse never
+     stops: the full-brightness beat sweeps the whole line on a loop, like a
+     monitor that stays on. The numbers are the path's MEASURED length
+     (getTotalLength() = 1279, read in the browser, not guessed): the first
+     version tuned the sweep to a guessed 1600, so part of every cycle swept
+     past the end of the line and the beat was the same gradient at nearly
+     the same width — invisible. Dimming the settled trace is what makes the
+     full-brightness beat readable in both themes. Anyone who prefers
+     stillness sees the finished full-brightness line and no dimming at all:
+     every rule here lives inside this motion block. */
   .home .pulse-art .trace {
-    stroke-dasharray: 1600;
-    stroke-dashoffset: 1600;
-    animation: home-pulse-draw 2.4s ease-out forwards;
+    stroke-dasharray: 1279;
+    stroke-dashoffset: 1279;
+    animation:
+      home-pulse-draw 2.4s ease-out forwards,
+      home-pulse-settle 0.9s linear 2.5s forwards;
   }
   @keyframes home-pulse-draw { to { stroke-dashoffset: 0; } }
+  @keyframes home-pulse-settle { to { opacity: 0.34; } }
   .home .pulse-art .runner {
-    stroke-dasharray: 90 1510;
-    stroke-dashoffset: 1690;
-    animation: home-pulse-run 5.2s linear 2.6s infinite;
+    stroke-dasharray: 80 1199; /* one 80px beat per 1279px period */
+    stroke-dashoffset: 1359;   /* the beat starts just before the line begins */
+    animation: home-pulse-run 3.6s linear 2.9s infinite;
   }
   @keyframes home-pulse-run {
-    0%   { stroke-dashoffset: 1690; opacity: 0; }
-    6%   { opacity: 0.95; }
-    94%  { opacity: 0.95; }
+    0%   { stroke-dashoffset: 1359; opacity: 0; }
+    5%   { opacity: 1; }
+    92%  { opacity: 1; }
     100% { stroke-dashoffset: 0; opacity: 0; }
   }
 
