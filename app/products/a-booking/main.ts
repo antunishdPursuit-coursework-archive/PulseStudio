@@ -56,8 +56,24 @@ function timestampNow(): string {
   return new Date().toISOString().slice(0, 19);
 }
 
+let reservationSeq = 0;
+
 function newReservationId(): string {
-  return `res-a-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  reservationSeq += 1;
+  return `res-a-${Date.now()}-${reservationSeq}`;
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapWith = Math.floor(Math.random() * (index + 1));
+    const current = copy[index];
+    const other = copy[swapWith];
+    if (current === undefined || other === undefined) continue;
+    copy[index] = other;
+    copy[swapWith] = current;
+  }
+  return copy;
 }
 
 const dataset: SyntheticDataset = generateStudio({
@@ -272,6 +288,54 @@ function joinWaitlist(memberId: string, session: SyntheticClassSession): Reserva
   };
   appendReservation(reservation);
   return reservation;
+}
+
+function nextOpenMember(pool: SyntheticMember[], cursor: { value: number }, sessionId: string): SyntheticMember | undefined {
+  for (let attempt = 0; attempt < pool.length; attempt += 1) {
+    const member = pool[cursor.value % pool.length];
+    cursor.value += 1;
+    if (!member) continue;
+    if (memberHoldsSpot(member.id, sessionId) || memberWaitlisted(member.id, sessionId)) continue;
+    return member;
+  }
+  return undefined;
+}
+
+/** Spread reserved and waitlisted rows from active members across upcoming classes. */
+function spreadReservationsAcrossStudio(): { reserved: number; waitlisted: number } {
+  const pool = shuffled(activeMembers());
+  const cursor = { value: 0 };
+  let reserved = 0;
+  let waitlisted = 0;
+  for (const session of upcomingSessions()) {
+    const left = remainingSpots(session);
+    const fillAll = left > 0 && Math.random() < 0.15;
+    const toBook = left <= 0 ? 0 : fillAll ? left : Math.floor(Math.random() * (left + 1));
+    for (let count = 0; count < toBook; count += 1) {
+      const member = nextOpenMember(pool, cursor, session.id);
+      if (!member) break;
+      try {
+        bookSession(member.id, session);
+        reserved += 1;
+      } catch {
+        break;
+      }
+    }
+    if (remainingSpots(session) <= 0 && Math.random() < 0.45) {
+      const queued = 1 + Math.floor(Math.random() * 2);
+      for (let count = 0; count < queued; count += 1) {
+        const member = nextOpenMember(pool, cursor, session.id);
+        if (!member) break;
+        try {
+          joinWaitlist(member.id, session);
+          waitlisted += 1;
+        } catch {
+          break;
+        }
+      }
+    }
+  }
+  return { reserved, waitlisted };
 }
 
 function promoteWaitlist(sessionId: string): void {
@@ -544,4 +608,14 @@ signoutBtn.addEventListener("click", () => {
   render();
 });
 
-render();
+const fillRequested = new URLSearchParams(location.search).get("fill-reservations") === "1";
+if (fillRequested) {
+  const filled = spreadReservationsAcrossStudio();
+  const url = new URL(location.href);
+  url.searchParams.delete("fill-reservations");
+  history.replaceState({}, "", url);
+  render();
+  statusEl.textContent = `${filled.reserved} reservations added across upcoming classes. ${filled.waitlisted} waitlisted. ${statusEl.textContent}`;
+} else {
+  render();
+}
