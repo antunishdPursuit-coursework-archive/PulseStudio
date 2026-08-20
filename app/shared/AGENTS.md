@@ -50,6 +50,13 @@ the legacy contract) is what all four products speak.
   `/^(cohort|group|expected|eligib|quiet)/i` fail (answer-label-leak), as
   do 13–19-digit or exact-9-digit runs in any string value
   (sensitive/PII patterns). Name new fields accordingly.
+- **`upcomingFillTarget` (0..1, optional) tops up upcoming sessions** to a
+  deterministic occupancy band (≈target−25%..target+15%, per-session
+  variance, capacity never exceeded, one seat per member, active members
+  only, booked the evening before the class). UNSET = byte-identical to
+  the pre-knob generator; ignored in edge-cases mode. Added for the
+  capacity dashboard; proven by the "fill knob" block in
+  `synthetic/tests.html`.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
