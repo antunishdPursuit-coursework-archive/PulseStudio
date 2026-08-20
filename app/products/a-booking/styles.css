@@ -26,22 +26,6 @@ h2 { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; colo
 }
 .days button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 
-.auth { margin: 8px 0 20px; }
-.auth label { display: block; font-weight: 600; margin-bottom: 6px; }
-.signin-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.signin-row input {
-  flex: 1;
-  min-width: 16rem;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-}
-.who-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 0; }
-.who-line[hidden] { display: none; }
-
 .session {
   display: flex;
   flex-wrap: wrap;

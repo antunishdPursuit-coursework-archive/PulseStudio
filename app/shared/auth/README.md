@@ -18,14 +18,17 @@ nothing invented.
 | File | What it is |
 | --- | --- |
 | `session.ts` | The session: read/write/clear `pulse-session` in localStorage, change listeners, the test-address rule, the staff test login |
+| `studio.ts` | The one synthetic studio the dialog lists — same generator and ids Product A books against |
 | `schema.sql` | The Postgres schema for the hosted (sold) version — same names, real passwords (hashed), server-enforced sessions |
 | `../components/topbar.ts` | The sign-in control every header shows: Sign in button → member picker dialog; signed in → name + Sign out |
 
 ## How it works in THIS build (test mode, for testing purposes)
 
 This is a static site — no server, so **no password exists here** and the
-dialog says so in the open. Sign in by picking a member from the shared
-records; the address shown is derived deterministically as
+dialog says so in the open. Sign in by picking a member from the same
+deterministic studio Product A books against (`studio.ts`); `member_id` is
+that member's synthetic id. When a generated member already has an email,
+the dialog shows it; otherwise the address is derived as
 `display_name-slug@studio.test` (`.test` is a reserved domain — those
 addresses can never be real, which keeps the public-repo law that every
 person in the fixtures is fictional; a name that slugs to nothing falls
@@ -58,10 +61,9 @@ out with `<body data-no-session>` — the three test/proof pages do.
 
 ## Per-product adoption notes (each owner's call, in their own lane)
 
-- **Kerrian / Booking** — the page keeps its own member picker today; when
-  ready, replace it by reading `currentSession()` from
-  `../../shared/auth/session.js` and drop the product-local form. One-lane
-  change, whenever suits.
+- **Kerrian / Booking** — reads `currentSession()` / `onSessionChange()`
+  and books only when `role` is `member` with a matching synthetic
+  `member_id`. The local form is gone; `pulse-session` is the only key.
 - **Manny / Scheduling** — the dashboard doesn't load `theme-boot.js` yet;
   adding that one script tag gives the page the control (and the theme
   toggle) for free.

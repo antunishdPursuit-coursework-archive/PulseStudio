@@ -29,8 +29,7 @@
    Claiming a login is "secure" on a static page would break the truth law;
    we say what it is instead. */
 
-import { loadFixtures } from "../data.js";
-import type { Member } from "../contract.js";
+import type { SyntheticMember } from "../synthetic/contracts.js";
 import {
   currentSession,
   onSessionChange,
@@ -39,6 +38,7 @@ import {
   testEmailFor,
   STAFF_TEST_LOGIN,
 } from "../auth/session.js";
+import { sharedStudioMembers } from "../auth/studio.js";
 
 const CONTROL_ID = "pulse-session-control";
 const STYLE_ID = "pulse-session-styles";
@@ -116,9 +116,9 @@ async function openDialog(): Promise<void> {
   }
   dialog.showModal();
 
-  /* Load the shared records through the one shared loader — the same
-     records every product reads. The wait and any failure are stated in
-     the dialog, never a blank panel. */
+  /* List the same synthetic studio Product A books against, so the
+     remembered member_id is a real booking identity. The wait and any
+     failure are stated in the dialog, never a blank panel. */
   const state = dialog.querySelector(".pulse-session-state");
   const rows = dialog.querySelector(".pulse-session-rows");
   if (!(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
@@ -126,12 +126,11 @@ async function openDialog(): Promise<void> {
 
   state.textContent = "Loading the member records…";
   try {
-    const fixtures = await loadFixtures();
-    const members = fixtures.members;
+    const members = sharedStudioMembers();
     state.textContent =
       members.length === 0
-        ? "0 members in the shared records — there is nobody to sign in as."
-        : `${members.length} members in the shared records. Pick who you are:`;
+        ? "0 members in the shared studio — there is nobody to sign in as."
+        : `${members.length} members in the shared studio. Pick who you are:`;
     for (const member of members) rows.appendChild(memberRow(member));
     rows.appendChild(staffRow());
   } catch (error) {
@@ -182,12 +181,12 @@ function buildDialogShell(): HTMLDialogElement {
 /* One row per member, in the records' own order. The row shows the
    contract's display_name and the derived test address, so what you click
    is exactly what gets remembered. */
-function memberRow(member: Member): HTMLButtonElement {
-  const email = testEmailFor(member.display_name, member.member_id);
-  return row(member.display_name, email, member.membership_status, () => {
+function memberRow(member: SyntheticMember): HTMLButtonElement {
+  const email = member.email ?? testEmailFor(member.displayName, member.id);
+  return row(member.displayName, email, member.currentStatusSnapshot, () => {
     signIn({
-      member_id: member.member_id,
-      display_name: member.display_name,
+      member_id: member.id,
+      display_name: member.displayName,
       email,
       role: "member",
     });

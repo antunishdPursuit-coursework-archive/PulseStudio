@@ -1,25 +1,23 @@
 /* Product A — Member Booking App. Kerrian's lane.
-   Shared studio records come from generateStudio() with DEFAULT_CONFIG,
-   the same generator Product C uses. Runtime reservations are stored in
+   Shared studio records come from sharedStudio() — the same generator and
+   member ids the top-bar sign-in lists. Runtime reservations are stored in
    localStorage under pulse-reservations-a and never written back into
-   shared fixtures. Members see only their own reservation records. */
+   shared fixtures. Members see only their own reservation records.
+   Sign-in is the shared pulse-session; this page never keeps a second key. */
 
 import type { Reservation } from "../../shared/contract.js";
-import { DEFAULT_CONFIG } from "../../shared/synthetic/config.js";
+import { currentSession, onSessionChange } from "../../shared/auth/session.js";
+import { sharedStudio } from "../../shared/auth/studio.js";
 import type {
   SyntheticBooking,
   SyntheticClassSession,
-  SyntheticDataset,
   SyntheticMember,
 } from "../../shared/synthetic/contracts.js";
-import { generateStudio } from "../../shared/synthetic/generate.js";
 import {
   latestReservation,
   loadRuntimeReservations,
   saveRuntimeReservations,
 } from "./reservations.js";
-
-const MEMBER_KEY = "pulse-booking-member-a";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -27,16 +25,8 @@ function requiredElement<T extends Element>(selector: string): T {
   return element;
 }
 
-function studioDate(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: DEFAULT_CONFIG.timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
+function timestampNow(): string {
+  return new Date().toISOString().slice(0, 19);
 }
 
 function escapeHtml(value: string): string {
@@ -50,10 +40,6 @@ function escapeHtml(value: string): string {
     };
     return replacements[character] ?? character;
   });
-}
-
-function timestampNow(): string {
-  return new Date().toISOString().slice(0, 19);
 }
 
 let reservationSeq = 0;
@@ -76,10 +62,7 @@ function shuffled<T>(items: T[]): T[] {
   return copy;
 }
 
-const dataset: SyntheticDataset = generateStudio({
-  ...DEFAULT_CONFIG,
-  asOfDate: studioDate(),
-}).dataset;
+const dataset = sharedStudio();
 
 const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]));
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
@@ -87,11 +70,6 @@ const memberById = new Map(dataset.members.map((item) => [item.id, item]));
 
 const statusEl = requiredElement<HTMLParagraphElement>("#status");
 const errorEl = requiredElement<HTMLParagraphElement>("#error");
-const signinForm = requiredElement<HTMLFormElement>("#signin-form");
-const signinInput = requiredElement<HTMLInputElement>("#signin-id");
-const whoLine = requiredElement<HTMLElement>("#who-line");
-const whoName = requiredElement<HTMLElement>("#who-name");
-const signoutBtn = requiredElement<HTMLButtonElement>("#signout");
 const confirmationEl = requiredElement<HTMLElement>("#confirmation");
 const daysEl = requiredElement<HTMLElement>("#days");
 const dayTitleEl = requiredElement<HTMLElement>("#day-title");
@@ -207,18 +185,12 @@ function activeMembers(): SyntheticMember[] {
   return dataset.members.filter((member) => member.currentStatusSnapshot === "active");
 }
 
-function signedInMemberId(): string {
-  return sessionStorage.getItem(MEMBER_KEY) ?? "";
-}
-
-function findMember(identity: string): SyntheticMember | undefined {
-  const needle = identity.trim().toLowerCase();
-  if (!needle) return undefined;
-  return activeMembers().find((member) => {
-    const email = member.email?.toLowerCase() ?? "";
-    const name = member.displayName.toLowerCase();
-    return email === needle || name === needle;
-  });
+function bookingMember(): SyntheticMember | undefined {
+  const session = currentSession();
+  if (session === null || session.role !== "member" || session.member_id === null) {
+    return undefined;
+  }
+  return memberById.get(session.member_id);
 }
 
 function showError(message: string): void {
@@ -389,12 +361,6 @@ function requestedSessionDay(): string {
   return session ? sessionDate(session) : "";
 }
 
-function renderAuth(member: SyntheticMember | undefined): void {
-  signinForm.hidden = Boolean(member);
-  whoLine.hidden = !member;
-  whoName.textContent = member?.displayName ?? "";
-}
-
 function renderConfirmation(member: SyntheticMember | undefined): void {
   if (!lastConfirmation || !member) {
     confirmationEl.hidden = true;
@@ -468,7 +434,7 @@ function renderSchedule(memberId: string): void {
       const badge = pill(session);
       let action = "";
       if (!memberId) {
-        action = `<button class="btn ghost" type="button" disabled>Sign in to book</button>`;
+        action = `<button class="btn ghost" type="button" disabled>Member sign-in required.</button>`;
       } else if (canceled) {
         action = `<button class="btn ghost" type="button" disabled>Canceled</button>`;
       } else if (held) {
@@ -567,12 +533,11 @@ function renderMine(memberId: string): void {
 }
 
 function render(): void {
-  const memberId = signedInMemberId();
-  const member = memberById.get(memberId);
+  const member = bookingMember();
+  const memberId = member?.id ?? "";
   const sessions = upcomingSessions();
   const openSpots = sessions.reduce((total, session) => total + remainingSpots(session), 0);
   const fullStudio = sessions.filter((session) => remainingSpots(session) <= 0).length;
-  renderAuth(member);
   renderConfirmation(member);
   renderDays();
   if (!selectedDay) {
@@ -582,6 +547,10 @@ function render(): void {
     const dayLabel = formatDayChip(selectedDay);
     statusEl.textContent = `${dayLabel}: ${shown} classes checked, ${fullOnDay(selectedDay)} full, ${remainingOnDay(selectedDay)} spots left. Studio-wide: ${sessions.length} scheduled classes, ${fullStudio} full, ${openSpots} spots left.`;
   }
+  const session = currentSession();
+  if (session?.role === "staff") {
+    statusEl.textContent = `Staff session signed in. Member sign-in required. ${statusEl.textContent}`;
+  }
   renderSchedule(memberId);
   renderMine(memberId);
   if (requestedSessionId) {
@@ -589,22 +558,7 @@ function render(): void {
   }
 }
 
-signinForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const member = findMember(signinInput.value);
-  if (!member) {
-    showError("No active membership matches that email or name.");
-    return;
-  }
-  sessionStorage.setItem(MEMBER_KEY, member.id);
-  signinInput.value = "";
-  lastConfirmation = null;
-  clearError();
-  render();
-});
-
-signoutBtn.addEventListener("click", () => {
-  sessionStorage.removeItem(MEMBER_KEY);
+onSessionChange(() => {
   lastConfirmation = null;
   clearError();
   render();
