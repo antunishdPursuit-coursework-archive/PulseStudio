@@ -18,6 +18,8 @@ import {
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
 import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
+import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
+import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
 import {
@@ -27,6 +29,7 @@ import {
   firstNameOf,
   summaryLine,
   todayDayNumber,
+  upcomingReservedMemberIds,
 } from "./logic.js";
 
 /* ------------------------------------------------------------------ */
@@ -636,6 +639,75 @@ check("clean records produce no data-quality line",
 /* ------------------------------------------------------------------ */
 /* Render the stated verdict                                           */
 /* ------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------------- */
+/* The live trail: the running studio as this product's records       */
+/* ---------------------------------------------------------------- */
+
+{
+  const studio = generateSharedStudio({
+    ...SYNTHETIC_DEFAULT_CONFIG,
+    seed: "d-live-proof",
+    asOfDate: "2026-08-18",
+    memberCount: 40,
+    historyDays: 120,
+    mode: "clean",
+  }).dataset;
+  const live = fixtureSetFrom(studio, []);
+  const noneCount = studio.members.filter((m) => m.currentStatusSnapshot === "none").length;
+  check("live trail: every membered person crosses the adapter",
+    live.members.length, studio.members.length - noneCount);
+  check("live trail: attendance rows cross one-for-one",
+    live.attendance.length, studio.attendance.length);
+  check("live trail: attendance statuses cross verbatim",
+    live.attendance.every((a, i) => a.attendance_status === studio.attendance[i]?.status), true);
+  check("live trail: a class resolves its real type name",
+    live.class_sessions[0] !== undefined && live.class_sessions[0].class_type !== "class", true);
+  check("live trail: booked becomes reserved, one-for-one",
+    live.reservations.filter((r) => r.reservation_status === "reserved").length,
+    studio.bookings.filter((b) => b.status === "booked").length);
+
+  const rt: Reservation = {
+    reservation_id: "res_rt1",
+    member_id: studio.members[0]?.id ?? "member:000001",
+    session_id: studio.classSessions[0]?.id ?? "class-session:000001",
+    reservation_status: "reserved",
+    reserved_at: "2026-08-17T09:00:00",
+    canceled_at: null,
+  };
+  check("live trail: the browser log appends AFTER the baseline (last row wins)",
+    fixtureSetFrom(studio, [rt]).reservations.at(-1)?.reservation_id, "res_rt1");
+  check("live trail: junk in the log reads as zero rows, never a crash",
+    parseRuntimeReservations("{broken").length, 0);
+  check("live trail: a half-row never sneaks in beside a whole one",
+    parseRuntimeReservations(JSON.stringify([{ member_id: "m" }, rt])).length, 1);
+}
+
+{
+  const TODAY_LIVE = dayNumberFromIso("2026-08-18");
+  const session = (id: string, day: string) => ({
+    session_id: id, class_type: "yoga", level: "all levels", instructor_id: "i1",
+    starts_at: `${day}T09:00:00`, ends_at: `${day}T10:00:00`, capacity: 10,
+    session_status: "scheduled" as const,
+  });
+  const res = (id: string, session_id: string, status: Reservation["reservation_status"]) => ({
+    reservation_id: id, member_id: "m1", session_id,
+    reservation_status: status, reserved_at: "2026-08-16T09:00:00", canceled_at: null,
+  });
+  const trail = (rows: Reservation[]) => ({
+    timezone: "America/New_York", note: "", members: [], memberships: [],
+    instructors: [], class_sessions: [session("s_future", "2026-08-22"), session("s_past", "2026-08-10")],
+    reservations: rows, attendance: [], studio_policies: [],
+  });
+  check("coming back: a reserved future class holds the member",
+    upcomingReservedMemberIds(trail([res("r1", "s_future", "reserved")]), TODAY_LIVE).has("m1"), true);
+  check("coming back: a cancel recorded later releases the spot (last row wins)",
+    upcomingReservedMemberIds(trail([res("r1", "s_future", "reserved"), res("r1", "s_future", "canceled")]), TODAY_LIVE).size, 0);
+  check("coming back: a waitlist spot is hope, never a hold",
+    upcomingReservedMemberIds(trail([res("r1", "s_future", "waitlisted")]), TODAY_LIVE).size, 0);
+  check("coming back: a past reservation says nothing about tomorrow",
+    upcomingReservedMemberIds(trail([res("r1", "s_past", "reserved")]), TODAY_LIVE).size, 0);
+}
 
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;

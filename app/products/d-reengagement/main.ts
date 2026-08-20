@@ -7,7 +7,8 @@
  * SHARED_DATA_CONTRACT.md and is not negotiable.
  */
 
-import { loadFixtures, type FixtureSet } from "./deps.js";
+import { sharedStudio, type FixtureSet } from "./deps.js";
+import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, proposedRules } from "./config.js";
@@ -18,6 +19,7 @@ import {
   summaryLine,
   todayDayNumber,
   type FlaggedMember,
+  upcomingReservedMemberIds,
 } from "./logic.js";
 
 /** Find a required element up front, loudly — a missing mount point is a
@@ -168,6 +170,13 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   const today = todayDayNumber(data.timezone);
   const result = findQuietMembers(data, today, proposedRules);
 
+  // A quiet member who already holds a reserved spot for a class after
+  // today is coming back on their own — stated by name and left alone,
+  // never nagged. Read from the same reservation trail Booking writes.
+  const comingBack = upcomingReservedMemberIds(data, today);
+  const alreadyReturning = result.flagged.filter((f) => comingBack.has(f.member.member_id));
+  result.flagged = result.flagged.filter((f) => !comingBack.has(f.member.member_id));
+
   const asOf = new Date().toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -178,9 +187,14 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   // what could not be judged. Reporting only the first would let unusable
   // evidence pass as a clean answer.
   const quality = dataQualityLine(result);
+  const comingLine =
+    alreadyReturning.length === 0
+      ? ""
+      : ` ${alreadyReturning.length} left alone — already booked back in: ` +
+        `${alreadyReturning.map((f) => f.member.display_name).join(", ")}.`;
   statusEl.textContent = quality
-    ? `${summaryLine(result, asOf)} ${quality}`
-    : summaryLine(result, asOf);
+    ? `${summaryLine(result, asOf)} ${quality}${comingLine}`
+    : `${summaryLine(result, asOf)}${comingLine}`;
   sourceEl.textContent = sourceNote;
   ruleEl.textContent =
     `Proposed thresholds (not yet ratified by the team): flag active members ` +
@@ -212,15 +226,22 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
 }
 
 function loadSharedRecords(): void {
-  loadFixtures()
-    .then((data) => {
-      renderRecords(data, "Data: the shared studio records.");
-      csvReset.hidden = true;
-    })
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      statusEl.textContent = `Could not load the shared records: ${message}`;
-    });
+  /* THE LIVE TRAIL: the default records are the running studio — the same
+   * cached dataset Booking books against and sign-in lists — with
+   * Booking's own reservation log merged in (last row wins). The CSV door
+   * and the generated studio remain the other two doors. */
+  try {
+    const data = fixtureSetFrom(sharedStudio(), readRuntimeReservations());
+    renderRecords(
+      data,
+      "Data: the running studio — the same records Booking writes to, " +
+        "including its live reservation log from this browser.",
+    );
+    csvReset.hidden = true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    statusEl.textContent = `Could not build the studio records: ${message}`;
+  }
 }
 
 /* The CSV door: a staff member's own attendance export, adapted to the
