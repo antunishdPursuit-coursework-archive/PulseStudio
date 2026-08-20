@@ -35,6 +35,11 @@ const dataset = generateStudio({
 
 const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]));
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
+const privateMemberNames = dataset.members.flatMap((member) => {
+  const normalized = member.displayName.toLowerCase();
+  const firstName = normalized.split(/\s+/)[0];
+  return firstName && firstName.length >= 3 ? [normalized, firstName] : [normalized];
+});
 
 function upcomingSessions(question: string): SyntheticClassSession[] {
   const className = dataset.classTypes.find((item) =>
@@ -61,8 +66,10 @@ function formatSession(session: SyntheticClassSession, includeSpaces: boolean): 
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: dataset.meta.timezone,
-  }).format(new Date(`${session.startsAt}-04:00`));
+    // Synthetic timestamps are studio-local wall times without an offset.
+    // Format them as written so daylight-saving changes cannot shift an hour.
+    timeZone: "UTC",
+  }).format(new Date(`${session.startsAt}Z`));
   const spaces = includeSpaces ? `, ${Math.max(0, session.capacity - booked)} spaces left` : "";
   return `${type?.name ?? "Class"} (${type?.level ?? "level unavailable"}) — ${when} with ${instructor?.displayName ?? "studio staff"}${spaces}`;
 }
@@ -82,9 +89,12 @@ function policyAnswer(question: string): string | null {
 }
 
 function asksForPrivateMemberData(question: string): boolean {
+  if (privateMemberNames.some((name) => question.includes(name))) return true;
   return [
     /\battend(?:ed|ance)?\b/,
+    /\bvisit(?:ed|s|ing)?\s+history\b/,
     /\bdid\s+.+\s+(?:come|visit|book|cancel)\b/,
+    /\bwhen\s+(?:was|did)\s+.+\s+(?:here|come|visit|book|cancel)\b/,
     /\b(?:my|their|his|her)\s+(?:account|attendance|booking|membership|reservation)\b/,
     /\bmember(?:'s|s')?\s+(?:account|attendance|booking|history|membership|reservation)\b/,
   ].some((pattern) => pattern.test(question));
@@ -104,7 +114,8 @@ function answer(question: string, records: SyntheticDataset): string {
     const sessions = upcomingSessions(normalized);
     if (sessions.length === 0) return "I checked the upcoming schedule, but no matching classes were found.";
     const includeSpaces = ["available", "space", "spot", "full"].some((word) => normalized.includes(word));
-    return `Here are the next ${sessions.length} matching classes:\n${sessions.map((session) => `• ${formatSession(session, includeSpaces)}`).join("\n")}`;
+    const availabilityNote = includeSpaces ? "\nPublished availability may change as members book or cancel." : "";
+    return `Here are the next ${sessions.length} matching classes:\n${sessions.map((session) => `• ${formatSession(session, includeSpaces)}`).join("\n")}${availabilityNote}`;
   }
 
   return `I can help with the schedule, availability, instructors, class levels, cancellation, what to bring, guest passes, and late arrival. For anything else, please contact ${records.studio.name} staff.`;
