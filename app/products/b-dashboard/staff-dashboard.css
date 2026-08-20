@@ -42,6 +42,7 @@ h2 { margin: 0; }
 .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr); gap: 24px; }
 .wide { min-width: 0; }
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.weekly-enrollment { color: var(--accent); font-weight: 700; margin: 8px 0 0; }
 .panel-head label, form label { color: var(--fg); display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
 select, input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
 select:hover, input:hover { border-color: var(--accent); }
