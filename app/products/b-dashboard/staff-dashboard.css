@@ -43,6 +43,14 @@ h2 { margin: 0; }
 .wide { min-width: 0; }
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .weekly-enrollment { color: var(--accent); font-weight: 700; margin: 8px 0 0; }
+.weekly-reservations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 3rem; margin-top: 12px; }
+.reservation-total { background: var(--bg); min-width: 0; padding: 4px 0; }
+.reservation-total strong, .reservation-total span { display: block; }
+.reservation-total strong { font-size: 1.15rem; }
+.reservation-total span { color: var(--muted); font-size: 0.75rem; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reservation-total.reserved strong { color: var(--accent); }
+.reservation-total.waitlisted strong { color: var(--fg); }
+.reservation-total.canceled strong { color: var(--muted); }
 .panel-head label, form label { color: var(--fg); display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
 select, input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
 select:hover, input:hover { border-color: var(--accent); }
