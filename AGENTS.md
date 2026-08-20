@@ -39,8 +39,10 @@ instead of doing it.
 
 ## The color law
 
-- Backgrounds are black or white ONLY — always `var(--bg)` from
-  `app/shared/theme.css`. Both are supported; nothing else is a background.
+- Built-in light and dark backgrounds are white and black — always use
+  `var(--bg)` from `app/shared/theme.css`. A person may select an accessible
+  custom background/text pair through the shared appearance control; no
+  gradients.
 - Every visible feature carries its developer's color: the page `<body>` has
   `class="product-a|b|c|d"` and controls use `var(--accent)` /
   `var(--accent-ink)`. Anyone looking at any screen can tell who built what.

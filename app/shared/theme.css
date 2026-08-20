@@ -1,9 +1,10 @@
 /* Pulse Studio — shared theme.
    TEAM-OWNED: change only by team agreement (see CLAUDE.md).
 
-   The two laws this file enforces:
-   1. Backgrounds are black or white only — every page uses var(--bg).
-      Light and dark are both supported; nothing else is a background.
+   The shared appearance rules this file enforces:
+   1. Built-in light and dark backgrounds are white and black. A person may
+      choose a custom background/text pair only through theme-boot's
+      accessible appearance picker; every page still uses var(--bg).
    2. Every visible feature carries its developer's color, so anyone
       looking at a screen can tell who built what:
         Kerrian  · Product A · blue
@@ -16,7 +17,7 @@
 :root {
   color-scheme: light dark;
 
-  /* the only backgrounds: white (light) / black (dark) */
+  /* built-in backgrounds: white (light) / black (dark) */
   --bg: #ffffff;
   --fg: #0a0a0a;
   --line: #d4d4d4;
@@ -43,6 +44,14 @@
   --fg: #ffffff;
   --line: #333333;
   --muted: #a3a3a3;
+}
+
+:root[data-theme="custom"] {
+  color-scheme: normal;
+  --bg: var(--custom-bg, #ffffff);
+  --fg: var(--custom-fg, #0a0a0a);
+  --line: color-mix(in srgb, var(--fg) 24%, var(--bg));
+  --muted: color-mix(in srgb, var(--fg) 68%, var(--bg));
 }
 
 * { box-sizing: border-box; }
@@ -111,12 +120,56 @@ a { color: var(--accent, var(--fg)); }
 /* status lines state what ran — a stated result, never a blank panel */
 .status { color: var(--muted); border-left: 4px solid var(--accent, var(--line)); padding-left: 12px; }
 
-.theme-toggle {
-  background: transparent;
+.appearance-control { position: relative; }
+.appearance-control summary {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 38px;
   color: var(--fg);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  list-style: none;
+}
+.appearance-control summary::-webkit-details-marker { display: none; }
+.appearance-control summary:focus-visible,
+.appearance-mode:focus-visible,
+.appearance-custom:focus-visible,
+.appearance-dial input:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
+.appearance-panel {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 250px;
+  padding: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--fg) 18%, transparent);
+}
+.appearance-heading { margin: 0 0 10px; font-weight: 700; }
+.appearance-modes, .appearance-dials { display: flex; gap: 8px; }
+.appearance-modes { margin-bottom: 12px; }
+.appearance-mode, .appearance-custom {
+  min-height: 36px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
   font: inherit;
   cursor: pointer;
 }
+.appearance-mode { width: 42px; font-size: 1.1rem; }
+.appearance-mode:disabled { color: var(--accent, var(--fg)); border-color: var(--accent, var(--line)); cursor: default; opacity: 1; }
+.appearance-dials { margin-bottom: 10px; }
+.appearance-dial { display: grid; gap: 4px; flex: 1; color: var(--muted); font-size: .8rem; font-weight: 600; }
+.appearance-dial input { width: 100%; height: 34px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
+.appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
+.appearance-custom:disabled { cursor: not-allowed; opacity: .55; }
+.appearance-status { margin: 9px 0 0; color: var(--muted); font-size: .76rem; }

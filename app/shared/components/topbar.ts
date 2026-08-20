@@ -5,11 +5,10 @@
    page's own header — what was missing everywhere was the person).
 
    HOW IT REACHES EVERY ROUTE WITHOUT TOUCHING ANY LANE: theme-boot.ts —
-   which every page except the staff dashboard already loads — calls
+   which every application page loads — calls
    mountSessionControl() with the page's existing header. So Booking,
    Support, Re-engagement, and the front door all grow the same control
-   with zero edits inside a product folder (the lane law holds). The staff
-   dashboard joins the day its owner adds the one theme-boot script tag.
+   with zero edits inside a product folder (the lane law holds).
 
    WHY THE STYLES ARE INJECTED FROM HERE: product pages never load the
    front door's stylesheet, and editing a product's stylesheet would cross
@@ -20,8 +19,8 @@
    on a product's page the control carries THAT builder's color for free
    (the page's body class sets --accent), and on the front door, which
    belongs to no single builder, it falls back to neutral foreground.
-   Backgrounds stay var(--bg); the dialog's backdrop is black at partial
-   opacity — black is one of the two lawful grounds, nothing tinted.
+   Backgrounds stay var(--bg); the dialog's backdrop uses the foreground at
+   partial opacity so it stays legible with the selected appearance.
 
    TEST MODE, STATED IN THE OPEN: the dialog says it is a test sign-in,
    for testing purposes, with no password — and where the real password
@@ -45,8 +44,8 @@ const DIALOG_ID = "pulse-session-dialog";
 
 /* Mount the control into a page's existing header. Idempotent — a second
    call on the same page does nothing, so theme-boot can call it blindly.
-   If the header also holds the theme toggle, the control slots in before
-   it so the toggle keeps its familiar end-of-row seat. */
+   If the header also holds the appearance control, the session control slots
+   in before it so the control keeps its familiar end-of-row seat. */
 export function mountSessionControl(host: Element): void {
   if (document.getElementById(CONTROL_ID)) return;
   injectStylesOnce();
@@ -55,8 +54,8 @@ export function mountSessionControl(host: Element): void {
   root.id = CONTROL_ID;
   root.className = "pulse-session";
 
-  const toggle = host.querySelector(".theme-toggle");
-  if (toggle !== null) host.insertBefore(root, toggle);
+  const appearance = host.querySelector(".appearance-control");
+  if (appearance !== null) host.insertBefore(root, appearance);
   else host.appendChild(root);
 
   render(root);
@@ -270,7 +269,7 @@ function injectStylesOnce(): void {
   padding: 22px;
   width: min(30rem, calc(100vw - 3rem));
 }
-.pulse-session-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.pulse-session-dialog::backdrop { background: color-mix(in srgb, var(--fg) 60%, transparent); }
 .pulse-session-dialog h2 { margin: 0 0 8px; font-size: 1.15rem; }
 .pulse-session-intro { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
 .pulse-session-state { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; }

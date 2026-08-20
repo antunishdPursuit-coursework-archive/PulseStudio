@@ -13,7 +13,7 @@ the legacy contract) is what all four products speak.
 
 | Area | What it is |
 | --- | --- |
-| `theme.css` + `theme-boot.ts` | The color law as code: `--bg` black/white only, four developer accents scoped by `body.product-a\|b\|c\|d`; the boot persists `pulse-theme` AND auto-mounts the session chip into any `.topnav`/`.page-head` (opt out: `<body data-no-session>`) |
+| `theme.css` + `theme-boot.ts` | The appearance rules as code: built-in `--bg` light/dark stays white/black, an accessible custom background/text pair is allowed, and four developer accents are scoped by `body.product-a\|b\|c\|d`; the boot persists theme preferences AND auto-mounts the session chip into any `.topnav`/`.page-head`/`.topbar` (opt out: `<body data-no-session>`) |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, 27 browser checks in `auth/tests.html`), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `components/topbar.ts` | The sign-in control: idempotent mount, self-injected styles, paints with `var(--accent)` so it wears each product's color |
@@ -61,16 +61,16 @@ the legacy contract) is what all four products speak.
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
   any new injection.
-- **The chip mounts by header class**: renaming `.topnav`/`.page-head`
-  in a product silently removes sign-in from that page.
+- **The chip mounts by header class**: renaming `.topnav`, `.page-head`,
+  or `.topbar` in a product silently removes sign-in from that page.
 - Shared infrastructure pages carry NO product color — black, white, and
   neutrals only; only product pages set `product-a|b|c|d`.
 
 ## Storage keys owned here
 
-`pulse-session` (the ONE session key — hostile-input rules apply) and
-`pulse-theme`. `pulse-reservations-a` belongs to Product A and is data,
-not identity.
+`pulse-session` (the ONE session key — hostile-input rules apply),
+`pulse-theme`, and `pulse-theme-custom` (the saved custom background/text
+pair). `pulse-reservations-a` belongs to Product A and is data, not identity.
 
 ## Gate
 

@@ -3,7 +3,7 @@
 .topbar .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; }
 .topbar .home-brand .home-arrow, .topbar .home-brand .brand-word span { color: var(--accent); }
 .topbar .home-brand:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.topbar .role { color: var(--muted); font-size: 0.85rem; }
+.topbar .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
 .topbar a:last-of-type { margin-left: auto; }
 
 .shell { padding: 24px; max-width: 960px; margin: 0 auto; }
