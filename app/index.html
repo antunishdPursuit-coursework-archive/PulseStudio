@@ -10,17 +10,18 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Pulse Studio">
   <meta property="og:description" content="Four products, one studio: booking, scheduling, member support, and member re-engagement.">
-  <meta property="og:url" content="https://gymsley.github.io/app/">
+  <meta property="og:url" content="https://antunishdpursuit.github.io/PulseStudio/">
   <meta name="twitter:card" content="summary">
-  <link rel="canonical" href="https://gymsley.github.io/app/">
+  <link rel="canonical" href="https://antunishdpursuit.github.io/PulseStudio/">
   <link rel="stylesheet" href="./shared/theme.css">
+  <link rel="stylesheet" href="./shared/home.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "ExerciseGym",
     "name": "Pulse Studio",
     "description": "A single-location boutique fitness studio offering group classes on monthly memberships.",
-    "url": "https://gymsley.github.io/app/",
+    "url": "https://antunishdpursuit.github.io/PulseStudio/",
     "amenityFeature": [
       { "@type": "LocationFeatureSpecification", "name": "Yoga", "value": true },
       { "@type": "LocationFeatureSpecification", "name": "Cycling", "value": true },
@@ -29,34 +30,178 @@
   }
   </script>
 </head>
-<body>
-  <header class="page-head">
-    <h1>Pulse Studio</h1>
+<body class="home">
+  <header class="topnav">
+    <a class="brand" href="./">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="currentColor"
+              stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Pulse Studio
+    </a>
+    <nav class="nav-links" aria-label="Products">
+      <a href="#booking">Booking</a>
+      <a href="#schedule">Schedule</a>
+      <a href="#support">Support</a>
+      <a href="#reengagement">Re-engagement</a>
+    </nav>
     <button class="theme-toggle" id="theme-toggle" type="button">Black / white</button>
   </header>
+
   <main>
-    <p class="status">One studio, four products, four developers — each product folder belongs to one person, and every feature carries its developer's color.</p>
+    <section class="hero" aria-label="Pulse Studio">
+      <p class="eyebrow">One studio · four products · four builders</p>
+      <h1>
+        <span class="clause clause-a">Book the class.</span>
+        <span class="clause clause-b">Run the week.</span>
+        <span class="clause clause-c">Answer every question.</span>
+        <span class="clause clause-d">Notice who's gone quiet.</span>
+      </h1>
+      <p class="lede">Software for one boutique fitness studio: members book classes, staff
+      run the schedule, and nobody who quietly stops coming goes unnoticed.</p>
+      <div class="cta-row">
+        <a class="btn btn-lg product-a" href="./products/a-booking/">Book a class</a>
+        <a class="btn-ghost-lg" href="#products">Meet the four products</a>
+      </div>
+      <!-- one pulse line through all four builders' colors -->
+      <svg class="pulse-art" viewBox="0 0 960 120" fill="none" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="pulse-grad" x1="0" y1="0" x2="960" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0"    stop-color="var(--kerrian, #3b82f6)"/>
+            <stop offset="0.35" stop-color="var(--manny, #f59e0b)"/>
+            <stop offset="0.65" stop-color="var(--dennis, #10b981)"/>
+            <stop offset="1"    stop-color="var(--rensley, #8b5cf6)"/>
+          </linearGradient>
+        </defs>
+        <path d="M0 70 H150 l22-34 26 62 24-42 18 14 H370 l20-52 30 76 22-38 16 14 H610 l18-26 24 44 20-56 22 34 H840 l16-20 20 20 H960"
+              stroke="url(#pulse-grad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </section>
 
-    <a class="card product-a" href="./products/a-booking/index.html" style="display:block; text-decoration:none; color:inherit;">
-      <h2>Product A — Member Booking App <span class="owner-badge">Kerrian</span></h2>
-      <p>Members see the week's schedule and reserve a spot.</p>
-    </a>
+    <section class="truths" aria-label="How this software behaves">
+      <div><strong>Static site, no server</strong><span>Every page runs in the browser; records never leave it.</span></div>
+      <div><strong>One shared vocabulary</strong><span>All four products read the same data contract, so a booking means one thing.</span></div>
+      <div><strong>Nothing sends itself</strong><span>Outreach is drafted for staff to review and send — never sent automatically.</span></div>
+      <div><strong>Staff pages stay private</strong><span>Rosters and attendance are kept out of search indexes by design.</span></div>
+    </section>
 
-    <a class="card product-b" href="./products/b-dashboard/index.html" style="display:block; text-decoration:none; color:inherit;">
-      <h2>Product B — Staff Scheduling Dashboard <span class="owner-badge">Manny</span></h2>
-      <p>Staff see rosters, capacity, and underbooked classes.</p>
-    </a>
+    <div class="products-head" id="products">
+      <h2>Four products, one front desk</h2>
+      <p>Each product is owned end to end by one developer, and every screen carries its
+      builder's color — anyone looking at the studio's software can tell who built what.</p>
+    </div>
 
-    <a class="card product-c" href="./products/c-chatbot/index.html" style="display:block; text-decoration:none; color:inherit;">
-      <h2>Product C — Member Support Chatbot <span class="owner-badge">Dennis</span></h2>
-      <p>Members get answers from the studio's real schedule and policies.</p>
-    </a>
+    <section class="home-product product-a" id="booking" aria-label="Product A — Member Booking App">
+      <div class="home-copy">
+        <span class="chip">Product A · Kerrian</span>
+        <h3>Member Booking</h3>
+        <p class="lede">Members see the week's schedule and reserve a spot in seconds.</p>
+        <ul class="feature-list">
+          <li>The public schedule, day by day, with space remaining per class</li>
+          <li>Sign in with the email or name on the membership — no password to invent</li>
+          <li>Other members' names stay hidden; a reservation shows only your own</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/a-booking/">Open Member Booking</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-week">
+          <i class="on"></i><i></i><i class="half"></i><i class="on"></i><i></i><i class="on"></i><i class="half"></i>
+          <i></i><i class="on"></i><i class="on"></i><i class="half"></i><i class="on"></i><i></i><i class="on"></i>
+          <i class="half"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="half"></i><i></i>
+        </div>
+      </div>
+    </section>
 
-    <a class="card product-d" href="./products/d-reengagement/index.html" style="display:block; text-decoration:none; color:inherit;">
-      <h2>Product D — Member Re-engagement Tool <span class="owner-badge">Rensley</span></h2>
-      <p>Staff see which members went quiet and get a draft message to send.</p>
-    </a>
+    <section class="home-product product-b flip" id="schedule" aria-label="Product B — Staff Scheduling Dashboard">
+      <div class="home-copy">
+        <span class="chip">Product B · Manny</span>
+        <h3>Staff Scheduling</h3>
+        <p class="lede">Staff publish the week and watch capacity move as members book.</p>
+        <ul class="feature-list">
+          <li>The next three days at a glance: scheduled sessions and fill rates</li>
+          <li>Underbooked and filling-fast classes flagged as needing attention</li>
+          <li>A where-members-are-booking panel, so the schedule follows demand</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/b-dashboard/">Open Staff Scheduling</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-meters">
+          <i style="--w: 88%"></i>
+          <i style="--w: 34%"></i>
+          <i style="--w: 71%"></i>
+          <i style="--w: 52%"></i>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-product product-c" id="support" aria-label="Product C — Member Support Chatbot">
+      <div class="home-copy">
+        <span class="chip">Product C · Dennis</span>
+        <h3>Member Support</h3>
+        <p class="lede">Members ask about classes, levels, instructors, and policies — and get
+        answers from the studio's real schedule.</p>
+        <ul class="feature-list">
+          <li>Answers come from the studio's actual schedule and written policies</li>
+          <li>When it has no answer, it says so plainly instead of inventing one</li>
+          <li>Open all day, every day, right on the studio's site</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/c-chatbot/">Open Member Support</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-chat">
+          <i></i><i class="reply"></i><i></i><i class="reply"></i>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-product product-d flip" id="reengagement" aria-label="Product D — Member Re-engagement Tool">
+      <div class="home-copy">
+        <span class="chip">Product D · Rensley</span>
+        <h3>Member Re-engagement</h3>
+        <p class="lede">Staff see which active members used to come and have gone quiet — with
+        the evidence — and get a personal draft to review and send themselves.</p>
+        <ul class="feature-list">
+          <li>Flags members quiet for more than 14 days, ranked by who's most worth saving</li>
+          <li>Every flag shows its evidence: last visit, usual class, usual instructor</li>
+          <li>Works on the studio's own attendance export, entirely in the browser</li>
+          <li>Drafts only — a person reads, decides, and sends every message</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/d-reengagement/">Open Member Re-engagement</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-quiet">
+          <div class="beats"><i></i><i></i><i></i><i class="fade1"></i><i class="fade2"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+          <div class="flagline"></div>
+          <div class="beats"><i></i><i class="fade1"></i><i></i><i></i><i class="fade2"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+          <div class="flagline"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="vocab" aria-label="How the four products hold together">
+      <h2>One vocabulary, four lanes</h2>
+      <p>Every product reads the same shared records — members, memberships, class sessions,
+      reservations, attendance — through one data contract. Only a class a member actually
+      attended counts as a visit; a no-show never does. Each product folder belongs to one
+      developer, and their color follows their work everywhere.</p>
+      <div class="builders">
+        <a class="product-a" href="./products/a-booking/"><strong>Kerrian</strong><span>Product A · Member Booking</span></a>
+        <a class="product-b" href="./products/b-dashboard/"><strong>Manny</strong><span>Product B · Staff Scheduling</span></a>
+        <a class="product-c" href="./products/c-chatbot/"><strong>Dennis</strong><span>Product C · Member Support</span></a>
+        <a class="product-d" href="./products/d-reengagement/"><strong>Rensley</strong><span>Product D · Member Re-engagement</span></a>
+      </div>
+    </section>
   </main>
+
+  <footer>
+    <span class="foot-brand">Pulse Studio</span>
+    <a href="./products/a-booking/">Booking</a>
+    <a href="./products/b-dashboard/">Scheduling</a>
+    <a href="./products/c-chatbot/">Support</a>
+    <a href="./products/d-reengagement/">Re-engagement</a>
+    <a href="https://github.com/antunishdPursuit/PulseStudio">Source</a>
+  </footer>
+
   <script type="module" src="./shared/theme-boot.js"></script>
 </body>
 </html>
