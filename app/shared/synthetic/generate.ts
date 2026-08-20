@@ -416,6 +416,10 @@ export function generateStudio(
 
   // 10. Truth from construction intent — never from a product's engine.
   const truth: SyntheticTruth = {
+    generatorVersion: config.generatorVersion,
+    seed: config.seed,
+    asOfDate: config.asOfDate,
+    timezone: config.timezone,
     memberCohorts: {},
     expectedCurrentMembershipStatus: {},
     expectedQuietDays: {},

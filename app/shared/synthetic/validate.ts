@@ -478,6 +478,51 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     scanStrings(dataset, "dataset");
   }
 
+  // --- booking lifecycle order ------------------------------------------
+  // A booking is placed at or before its session starts (identical strict
+  // timestamp formats make lexicographic comparison exact), and a canceled
+  // booking never carries an attendance outcome.
+  const bookingById = new Map(dataset.bookings.map((b) => [b.id, b]));
+  for (const b of dataset.bookings) {
+    const session = sessionById.get(b.classSessionId);
+    if (!session || !sessionReadable.has(session.id)) continue;
+    if (!isStrictTimestamp(b.bookedAt)) continue; // reported above
+    if (b.bookedAt > session.startsAt) {
+      add("booked-after-start", b.id, `booked ${b.bookedAt}, session started ${session.startsAt}`);
+    }
+  }
+  for (const a of dataset.attendance) {
+    if (a.bookingId === null) continue;
+    const booking = bookingById.get(a.bookingId);
+    if (booking && booking.status === "canceled") {
+      add("attendance-on-canceled-booking", a.id, `outcome recorded against canceled ${booking.id}`);
+    }
+  }
+
+  // --- sensitive data: scan DECODED field values, not serialized text ----
+  // Credential-shaped digit runs (13-19 digits, or an exact 9-digit run)
+  // must not exist in any string field. Serialized-text scanning can be
+  // fooled by adjacent fields and formatting; values cannot.
+  const scanValue = (owner: string, value: unknown): void => {
+    if (typeof value !== "string") return;
+    if (/\d{13,19}/.test(value) || /(?<!\d)\d{9}(?!\d)/.test(value)) {
+      add("sensitive-pattern", owner, `credential-shaped digit run in "${value.slice(0, 40)}"`);
+    }
+  };
+  const scanRecord = (record: Record<string, unknown>): void => {
+    const id = typeof record["id"] === "string" ? (record["id"] as string) : dataset.studio.id;
+    for (const value of Object.values(record)) scanValue(id, value);
+  };
+  scanRecord(dataset.studio as unknown as Record<string, unknown>);
+  for (const r of dataset.members) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.memberships) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.instructors) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.classTypes) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.classSessions) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.bookings) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.attendance) scanRecord(r as unknown as Record<string, unknown>);
+  for (const r of dataset.studioPolicies) scanRecord(r as unknown as Record<string, unknown>);
+
   // --- reconcile with declared violations ------------------------------
   const keyOf = (x: { code: string; entityId: string }): string =>
     `${x.code}|${x.entityId}`;
