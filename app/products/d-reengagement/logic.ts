@@ -10,7 +10,7 @@
  * members this product exists to catch.
  */
 
-import type { ClassSession, FixtureSet, Member } from "./deps.js";
+import type { ClassSession, FixtureSet, Member, Reservation } from "./deps.js";
 import type { QuietRules } from "./config.js";
 
 /** One flagged member with the evidence for why — no flag without evidence. */
@@ -246,4 +246,27 @@ export function dataQualityLine(result: FlagResult): string | null {
 /** First word of a display name, for the draft's greeting. */
 export function firstNameOf(displayName: string): string {
   return displayName.split(" ")[0] ?? displayName;
+}
+
+/** Member ids holding an ACTIVE reserved spot for a class dated after
+ *  "today". Read append-only: the LAST row per (member, session) wins —
+ *  the same reading Booking itself uses — so a cancel recorded after a
+ *  booking releases the spot here too. Waitlisted is hope, not a held
+ *  spot, and never counts. A quiet member in this set is already coming
+ *  back on their own: they are stated and left alone, never nagged. */
+export function upcomingReservedMemberIds(data: FixtureSet, today: number): Set<string> {
+  const latest = new Map<string, Reservation>();
+  for (const r of data.reservations) {
+    latest.set(`${r.member_id}|${r.session_id}`, r);
+  }
+  const sessionDay = new Map(
+    data.class_sessions.map((s) => [s.session_id, dayNumberFromIso(s.starts_at)]),
+  );
+  const ids = new Set<string>();
+  for (const r of latest.values()) {
+    if (r.reservation_status !== "reserved") continue;
+    const day = sessionDay.get(r.session_id);
+    if (day !== undefined && day > today) ids.add(r.member_id);
+  }
+  return ids;
 }

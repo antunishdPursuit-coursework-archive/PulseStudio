@@ -134,10 +134,12 @@
           <line x1="410" y1="66" x2="460" y2="66"/>
           <text class="lbl todo" x="435" y="56" text-anchor="middle">not yet</text>
         </g>
-        <!-- C -> D : TODO. D reads fixtures and CSV exports, not the live trail. -->
-        <g class="edge todo">
+        <!-- C -> D : DONE. D's default records are the running studio with
+             Booking's live reservation log merged in (last row wins). -->
+        <g class="edge done">
           <line x1="630" y1="66" x2="680" y2="66"/>
-          <text class="lbl todo" x="655" y="56" text-anchor="middle">not yet</text>
+          <line class="runner" x1="630" y1="66" x2="680" y2="66" stroke-dasharray="26 234"/>
+          <text class="lbl done" x="655" y="56" text-anchor="middle">live</text>
         </g>
 
         <!-- the shared rail feeds every product: all DONE -->
@@ -169,6 +171,7 @@
           <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, 27 checks deep.</li>
           <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file — a clone renames the studio in four files total.</li>
           <li><strong>The occupancy engine:</strong> the generator can fill a week to a realistic mix on demand — deterministic, capacity-safe, proven by 160 checks.</li>
+          <li><strong><span class="chip d">D</span> reads the live trail:</strong> re-engagement's default records are the running studio plus Booking's own reservation log — and a quiet member already booked back in is stated by name and left alone, never nagged.</li>
         </ul>
       </section>
       <section class="off">
@@ -176,7 +179,6 @@
         <ul>
           <li><strong><span class="chip b">B</span> turns the fill on:</strong> Capacity Watch hasn't adopted the engine's occupancy knob yet — one config line in Manny's lane.</li>
           <li><strong><span class="chip c">C</span> sees live bookings:</strong> spaces-left answers come from the day's schedule, not the live reservation log — Dennis's lane.</li>
-          <li><strong><span class="chip d">D</span> reads the live trail:</strong> re-engagement walks fixtures and CSV exports today, not the running studio's own log — Rensley's lane.</li>
           <li><strong><span class="chip b">B</span> publishes for real:</strong> staged weekly schedules vanish on reload, so <span class="chip a">A</span> can never book a class staff just published — Manny's lane.</li>
         </ul>
       </section>

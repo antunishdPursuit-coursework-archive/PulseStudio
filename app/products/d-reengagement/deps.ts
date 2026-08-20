@@ -22,6 +22,14 @@ export { loadFixtures } from "../../shared/data.js";
  * line at its own name. */
 export { STUDIO_NAME } from "../../shared/brand.js";
 
+/* The RUNNING studio — the same cached dataset Booking books against and
+ * the top-bar sign-in lists (shared/auth/studio.ts). This product's
+ * default records are built FROM it (see live-studio.ts), so
+ * re-engagement reads the same trail the rest of the studio writes.
+ * A standalone port re-points these two lines. */
+export { sharedStudio } from "../../shared/auth/studio.js";
+export type { SyntheticDataset } from "../../shared/synthetic/contracts.js";
+
 /* The shared synthetic studio engine (team-owned, contract PROPOSED). Used
  * by this product's proof suite to walk a generated studio's attendance
  * export through the CSV door and reconcile the flags against the engine's

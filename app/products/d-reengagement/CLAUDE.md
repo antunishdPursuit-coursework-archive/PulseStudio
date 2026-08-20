@@ -22,6 +22,17 @@ Therefore: **every git command carries `-C /Users/Rensley/Desktop/pulseStudio/Pu
   `REQUESTFOR-A-B-C.md` as a note to that owner.
 - Outside imports flow through `deps.ts` only — it is the portability seam.
 
+## The live trail (2026-08-20)
+
+The page's DEFAULT records are the RUNNING studio: `live-studio.ts` builds
+a contract `FixtureSet` from `sharedStudio()` (the same cached dataset
+Booking books against and sign-in lists) and merges in Booking's published
+reservation log — localStorage `pulse-reservations-a`, read defensively,
+NEVER imported from A's code. Last row wins, exactly as Booking reads its
+own log. `upcomingReservedMemberIds()` (logic.ts) then keeps a quiet member
+who already booked back in OUT of the outreach list, stated by name. The
+CSV door and the generated studio remain the other two doors, unchanged.
+
 ## Repo laws
 
 - The words "demo", "example", and "mock" appear NOWHERE — code, comments,
