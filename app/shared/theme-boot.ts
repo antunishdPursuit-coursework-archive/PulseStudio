@@ -166,7 +166,10 @@ function makeEditor(label: string, state: Hsl): { field: HTMLElement; editor: Co
   hue.max = "359";
   hue.value = String(Math.round(state.hue));
   hue.setAttribute("aria-label", `${label} hue`);
-  field.append(heading, canvas, hue);
+  const note = document.createElement("p");
+  note.className = "appearance-editor-note";
+  note.textContent = `${label}: solid-color areas are acceptable.`;
+  field.append(heading, canvas, hue, note);
   return { field, editor: { canvas, hue, value, state } };
 }
 

@@ -170,6 +170,7 @@ a { color: var(--accent, var(--fg)); }
 .appearance-color-value { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem; font-weight: 600; }
 .appearance-color-field { display: block; width: 100%; height: 104px; border: 2px solid var(--accent, var(--line)); border-radius: 7px; cursor: crosshair; }
 .appearance-hue { width: 100%; height: 12px; margin-top: 9px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
+.appearance-editor-note { margin: 6px 0 0; color: var(--muted); font-size: .74rem; }
 .appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
 .appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
 .appearance-custom:disabled { cursor: not-allowed; opacity: .55; }
