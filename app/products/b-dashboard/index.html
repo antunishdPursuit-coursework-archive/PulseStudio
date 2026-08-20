@@ -16,7 +16,7 @@
       <aside class="panel"><p class="eyebrow">Room demand</p><h2>Where members are booking</h2><div id="rooms" class="room-list"></div><div class="callout"><strong>Next action</strong><p id="actionText">Review the room trends before publishing.</p><button class="text-button" id="reengageBtn">Plan re-engagement ↗</button></div></aside>
     </section>
   </main>
-  <dialog id="scheduleDialog"><form method="dialog" id="scheduleForm"><button class="close" id="closeSchedule" type="button" aria-label="Close">×</button><p class="eyebrow">Weekly schedule</p><h2>Add a class session</h2><label>Class category<input name="classType" required placeholder="e.g. Yoga"></label><label>Day and time<input name="startsAt" required type="datetime-local"></label><label>Room<input name="room" required placeholder="e.g. Loft"></label><label>Capacity<input name="capacity" required type="number" min="1" value="18"></label><button class="primary" type="submit" value="default">Add to schedule</button></form></dialog>
+  <dialog id="scheduleDialog"><form method="dialog" id="scheduleForm"><button class="close" id="closeSchedule" type="button" aria-label="Close">×</button><p class="eyebrow">Weekly schedule</p><h2>Add a class session</h2><label>Class category<select id="classType" name="classType" required></select></label><label>Day and time<input name="startsAt" required type="datetime-local"></label><label>Room<input name="room" required placeholder="e.g. Loft"></label><label>Capacity<input name="capacity" required type="number" min="1" value="18"></label><button class="primary" type="submit" value="default">Add to schedule</button></form></dialog>
   <script type="module" src="staff-dashboard.js"></script>
 </body>
 </html>
