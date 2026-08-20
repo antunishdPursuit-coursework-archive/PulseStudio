@@ -15,6 +15,7 @@
 .page-head .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
 .page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span { color: var(--accent); }
 .page-head .home-brand:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.page-head .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
 
 .status {
   font-size: 1.05rem;
