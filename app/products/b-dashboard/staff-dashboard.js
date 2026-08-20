@@ -8,7 +8,7 @@ const memberById=new Map(dataset.members.map(member=>[member.id,member]));
 const instructorById=new Map(dataset.instructors.map(instructor=>[instructor.id,instructor]));
 const typeById=new Map(dataset.classTypes.map(type=>[type.id,type]));
 const attendanceByBooking=new Map(dataset.attendance.filter(record=>record.bookingId).map(record=>[record.bookingId,record.status]));
-const endDate='2026-08-21';
+const rangeEndDate=new Date(`${syntheticConfig.asOfDate}T00:00:00Z`);rangeEndDate.setUTCDate(rangeEndDate.getUTCDate()+6);const endDate=rangeEndDate.toISOString().slice(0,10);
 const sessions=dataset.classSessions.filter(session=>session.status==='scheduled'&&session.startsAt.slice(0,10)>=syntheticConfig.asOfDate&&session.startsAt.slice(0,10)<=endDate).map(session=>{const classType=typeById.get(session.classTypeId);const bookings=dataset.bookings.filter(booking=>booking.classSessionId===session.id);return{id:session.id,type:classType?.name??'Class',level:classType?.level??'All levels',time:new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',timeZone:dataset.meta.timezone}).format(new Date(session.startsAt)),room:'Studio',instructor:instructorById.get(session.instructorId)?.displayName??'Staff assigned',capacity:session.capacity,roster:bookings.map(booking=>({display_name:memberById.get(booking.memberId)?.displayName??booking.memberId,reservation_status:booking.status==='booked'?'reserved':'canceled',attendance_status:attendanceByBooking.get(booking.id)??'unknown'}))};});
 const confirmedCount=session=>session.roster.filter(member=>member.reservation_status==='reserved').length;
 const occupancy=session=>Math.round(confirmedCount(session)/session.capacity*100);
