@@ -13,7 +13,8 @@ the legacy contract) is what all four products speak.
 | `theme.css` + `theme-boot.ts` | The appearance rules as code: built-in `--bg` light/dark stays white/black, an accessible custom background/text pair is allowed, and four developer accents are scoped by `body.product-a\|b\|c\|d`; the boot persists theme preferences AND auto-mounts the session chip into any `.topnav`/`.page-head`/`.topbar` (opt out: `<body data-no-session>`) |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, 27 browser checks in `auth/tests.html`), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
-| `components/topbar.ts` | The sign-in control: idempotent mount, self-injected styles, paints with `var(--accent)` so it wears each product's color |
+| `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
+| `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control) — each documented in `components/README.md` |
 | `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, ~130 browser checks in `synthetic/tests.html` |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
 

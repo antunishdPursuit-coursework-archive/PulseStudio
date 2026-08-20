@@ -16,6 +16,12 @@
 
 export { loadFixtures } from "../../shared/data.js";
 
+/* The studio's identity — the shared clone seam. This product's brand
+ * (config.ts) sources its studioName from here, so renaming the studio is
+ * ONE shared file (app/shared/brand.ts); a standalone port re-points this
+ * line at its own name. */
+export { STUDIO_NAME } from "../../shared/brand.js";
+
 /* The shared synthetic studio engine (team-owned, contract PROPOSED). Used
  * by this product's proof suite to walk a generated studio's attendance
  * export through the CSV door and reconcile the flags against the engine's

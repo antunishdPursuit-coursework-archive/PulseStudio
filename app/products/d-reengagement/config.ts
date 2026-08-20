@@ -15,8 +15,14 @@ export interface StudioBrand {
   studioEmail: string;
 }
 
+import { STUDIO_NAME } from "./deps.js";
+
 export const brand: StudioBrand = {
-  studioName: "Pulse Studio",
+  /* Sourced from the shared clone seam (app/shared/brand.ts) through
+   * deps.ts — the studio renames in ONE file and drafts, titles, and
+   * headers all follow. Override with a literal here only when this
+   * product ships standalone under its own name. */
+  studioName: STUDIO_NAME,
   studioEmail: "pulse@githat.io",
 };
 
