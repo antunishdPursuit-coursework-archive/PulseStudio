@@ -31,12 +31,11 @@
 
 import type { SyntheticMember } from "../synthetic/contracts.js";
 import {
-  currentSession,
-  onSessionChange,
-  signIn,
-  signOut,
-  testEmailFor,
-  STAFF_TEST_LOGIN,
+  FRONT_DESK,
+  clearPulseSession,
+  readPulseSession,
+  subscribeToPulseSession,
+  writePulseSession,
 } from "../auth/session.js";
 import { sharedStudioMembers } from "../auth/studio.js";
 
@@ -61,7 +60,7 @@ export function mountSessionControl(host: Element): void {
   else host.appendChild(root);
 
   render(root);
-  onSessionChange(() => render(root));
+  subscribeToPulseSession(() => render(root));
 }
 
 /* The control has exactly two states, and both state who you are — a
@@ -69,7 +68,10 @@ export function mountSessionControl(host: Element): void {
    shows the member's display_name (with a
    staff tag when the login is staff) and a Sign out. */
 function render(root: HTMLElement): void {
-  const session = currentSession();
+  /* readPulseSession() also handles recovery: a malformed, legacy, or
+     stale value reads as null (and is cleaned up), so this render can
+     never show a person who no longer exists. */
+  const session = readPulseSession();
   root.textContent = "";
 
   if (session === null) {
@@ -89,10 +91,11 @@ function render(root: HTMLElement): void {
   dot.setAttribute("aria-hidden", "true");
   who.appendChild(dot);
   who.appendChild(document.createTextNode(session.display_name));
-  if (session.role === "staff") {
+  if (session.actor_type === "staff") {
+    /* actor type AND role, readable at a glance */
     const tag = document.createElement("em");
     tag.className = "pulse-session-role";
-    tag.textContent = "staff";
+    tag.textContent = "staff · front desk";
     who.appendChild(tag);
   }
 
@@ -100,7 +103,7 @@ function render(root: HTMLElement): void {
   out.type = "button";
   out.className = "pulse-session-signout";
   out.textContent = "Sign out";
-  out.addEventListener("click", () => signOut());
+  out.addEventListener("click", () => clearPulseSession());
 
   root.appendChild(who);
   root.appendChild(out);
@@ -178,33 +181,33 @@ function buildDialogShell(): HTMLDialogElement {
   return dialog;
 }
 
-/* One row per member, in the records' own order. The row shows the
-   contract's display_name and the derived test address, so what you click
-   is exactly what gets remembered. */
+/* One row per member, in the studio's own order. The row shows the
+   display name, the immutable member id, and the membership status — the
+   id IS the identity that gets remembered, so it is shown, not hidden.
+   No email appears: v1 stores none, derives none, and manufactures none. */
 function memberRow(member: SyntheticMember): HTMLButtonElement {
-  const email = member.email ?? testEmailFor(member.displayName, member.id);
-  return row(member.displayName, email, member.currentStatusSnapshot, () => {
-    signIn({
+  return row(member.displayName, member.id, member.currentStatusSnapshot, () => {
+    writePulseSession({
+      version: 1,
+      actor_type: "member",
       member_id: member.id,
       display_name: member.displayName,
-      email,
-      role: "member",
     });
   });
 }
 
 function staffRow(): HTMLButtonElement {
   return row(
-    STAFF_TEST_LOGIN.display_name,
-    STAFF_TEST_LOGIN.email,
-    "staff",
-    () => { signIn(STAFF_TEST_LOGIN); },
+    FRONT_DESK.display_name,
+    FRONT_DESK.actor_type === "staff" ? FRONT_DESK.staff_id : "",
+    "staff · front desk",
+    () => { writePulseSession(FRONT_DESK); },
   );
 }
 
 function row(
   name: string,
-  email: string,
+  identity: string,
   note: string,
   choose: () => void,
 ): HTMLButtonElement {
@@ -215,7 +218,7 @@ function row(
   const strong = document.createElement("strong");
   strong.textContent = name;
   const address = document.createElement("span");
-  address.textContent = email;
+  address.textContent = identity;
   const tag = document.createElement("em");
   tag.textContent = note;
 

@@ -32,9 +32,12 @@ create table members (
 );
 
 -- logins is where "how does anyone have the login" lives: one row per
--- person who may sign in. The email IS the identity (the identity law), so
--- it is the primary key. member_id is null for staff who are not members —
--- the same shape session.ts's STAFF_TEST_LOGIN carries in test mode.
+-- person who may sign in. The AUTHORITATIVE identity is member_id (the
+-- immutable shared member id) — email here is the login credential and
+-- contact address, unique so it can locate exactly one login, never a
+-- replacement for the member id. member_id is null for staff who are not
+-- members — the same split session.ts's v1 contract carries in test mode
+-- (actor_type "staff" with a staff_id, no membership invented).
 create table logins (
   email         citext primary key,
   member_id     text references members (member_id),
