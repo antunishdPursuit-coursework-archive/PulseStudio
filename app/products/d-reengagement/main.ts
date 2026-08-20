@@ -38,10 +38,9 @@ const csvInput = requiredElement<HTMLInputElement>("#csv-input");
 const csvReset = requiredElement<HTMLButtonElement>("#csv-reset");
 const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 
-/* Apply the brand from config so a reseller edits config.ts and one theme
- * token — never this file, never the page copy. */
+/* Apply the configurable studio identity to document and accessible copy. */
 document.title = `Member Re-engagement — ${brand.studioName}`;
-backEl.textContent = `← ${brand.studioName}`;
+backEl.setAttribute("aria-label", `Return to ${brand.studioName} home`);
 footerEl.textContent =
   `Drafts only — staff review and send every message themselves; nothing on ` +
   `this page can send. Studio record copy: ${brand.studioEmail} · `;
