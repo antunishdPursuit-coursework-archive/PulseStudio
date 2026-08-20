@@ -138,7 +138,7 @@ a { color: var(--accent, var(--fg)); }
 .appearance-control summary:focus-visible,
 .appearance-mode:focus-visible,
 .appearance-custom:focus-visible,
-.appearance-dial input:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
+.appearance-hue:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
 .appearance-panel {
   position: absolute;
   z-index: 20;
@@ -153,7 +153,6 @@ a { color: var(--accent, var(--fg)); }
   box-shadow: 0 12px 30px color-mix(in srgb, var(--fg) 18%, transparent);
 }
 .appearance-heading { margin: 0 0 10px; font-weight: 700; }
-.appearance-modes, .appearance-dials { display: flex; gap: 8px; }
 .appearance-modes { margin-bottom: 12px; }
 .appearance-mode, .appearance-custom {
   min-height: 36px;
@@ -166,9 +165,11 @@ a { color: var(--accent, var(--fg)); }
 }
 .appearance-mode { width: 42px; font-size: 1.1rem; }
 .appearance-mode:disabled { color: var(--accent, var(--fg)); border-color: var(--accent, var(--line)); cursor: default; opacity: 1; }
-.appearance-dials { margin-bottom: 10px; }
-.appearance-dial { display: grid; gap: 4px; flex: 1; color: var(--muted); font-size: .8rem; font-weight: 600; }
-.appearance-dial input { width: 100%; height: 34px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.appearance-editor { margin: 0 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.appearance-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: .8rem; }
+.appearance-color-value { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem; font-weight: 600; }
+.appearance-color-field { display: block; width: 100%; height: 104px; border: 2px solid var(--accent, var(--line)); border-radius: 7px; cursor: crosshair; }
+.appearance-hue { width: 100%; height: 12px; margin-top: 9px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
 .appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
 .appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
 .appearance-custom:disabled { cursor: not-allowed; opacity: .55; }

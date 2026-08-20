@@ -90,16 +90,119 @@ function modeButton(theme: "light" | "dark", icon: string, label: string): HTMLB
   return button;
 }
 
-function colorDial(label: string, value: string): { field: HTMLLabelElement; input: HTMLInputElement } {
-  const field = document.createElement("label");
-  field.className = "appearance-dial";
-  field.append(document.createTextNode(label));
-  const input = document.createElement("input");
-  input.type = "color";
-  input.value = value;
-  input.setAttribute("aria-label", label);
-  field.appendChild(input);
-  return { field, input };
+type Hsl = { hue: number; saturation: number; lightness: number };
+
+type ColorEditor = {
+  canvas: HTMLCanvasElement;
+  hue: HTMLInputElement;
+  value: HTMLElement;
+  state: Hsl;
+};
+
+function hslToHex({ hue, saturation, lightness }: Hsl): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const secondary = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const match = l - chroma / 2;
+  const channels =
+    hue < 60 ? [chroma, secondary, 0] : hue < 120 ? [secondary, chroma, 0] :
+    hue < 180 ? [0, chroma, secondary] : hue < 240 ? [0, secondary, chroma] :
+    hue < 300 ? [secondary, 0, chroma] : [chroma, 0, secondary];
+  return `#${channels.map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function hexToHsl(hex: string): Hsl {
+  const channels = hex.slice(1).match(/.{2}/g)?.map((part) => Number.parseInt(part, 16) / 255);
+  const red = channels?.[0] ?? 1;
+  const green = channels?.[1] ?? 1;
+  const blue = channels?.[2] ?? 1;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const delta = maximum - minimum;
+  const lightness = (maximum + minimum) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  let hue = 0;
+  if (delta !== 0) {
+    if (maximum === red) hue = 60 * (((green - blue) / delta) % 6);
+    else if (maximum === green) hue = 60 * ((blue - red) / delta + 2);
+    else hue = 60 * ((red - green) / delta + 4);
+  }
+  return { hue: (hue + 360) % 360, saturation: saturation * 100, lightness: lightness * 100 };
+}
+
+function nearestReadable(candidate: Hsl, other: string): Hsl {
+  if (contrast(hslToHex(candidate), other) >= 4.5) return candidate;
+  for (let step = 1; step <= 100; step += 1) {
+    for (const lightness of [candidate.lightness - step, candidate.lightness + step]) {
+      if (lightness < 0 || lightness > 100) continue;
+      const adjusted = { ...candidate, lightness };
+      if (contrast(hslToHex(adjusted), other) >= 4.5) return adjusted;
+    }
+  }
+  return candidate;
+}
+
+function makeEditor(label: string, state: Hsl): { field: HTMLElement; editor: ColorEditor } {
+  const field = document.createElement("section");
+  field.className = "appearance-editor";
+  const heading = document.createElement("div");
+  heading.className = "appearance-editor-heading";
+  const title = document.createElement("strong");
+  title.textContent = label;
+  const value = document.createElement("span");
+  value.className = "appearance-color-value";
+  heading.append(title, value);
+  const canvas = document.createElement("canvas");
+  canvas.className = "appearance-color-field";
+  canvas.width = 220;
+  canvas.height = 104;
+  canvas.setAttribute("role", "application");
+  canvas.setAttribute("aria-label", `${label} saturation and brightness field`);
+  const hue = document.createElement("input");
+  hue.className = "appearance-hue";
+  hue.type = "range";
+  hue.min = "0";
+  hue.max = "359";
+  hue.value = String(Math.round(state.hue));
+  hue.setAttribute("aria-label", `${label} hue`);
+  field.append(heading, canvas, hue);
+  return { field, editor: { canvas, hue, value, state } };
+}
+
+function drawEditor(editor: ColorEditor, other: string): void {
+  const context = editor.canvas.getContext("2d");
+  if (context === null) return;
+  const pixels = context.createImageData(editor.canvas.width, editor.canvas.height);
+  for (let y = 0; y < editor.canvas.height; y += 1) {
+    for (let x = 0; x < editor.canvas.width; x += 1) {
+      const candidate = {
+        hue: editor.state.hue,
+        saturation: (x / (editor.canvas.width - 1)) * 100,
+        lightness: 100 - (y / (editor.canvas.height - 1)) * 100,
+      };
+      const value = hslToHex(candidate).slice(1).match(/.{2}/g);
+      const index = (y * editor.canvas.width + x) * 4;
+      const readable = contrast(hslToHex(candidate), other) >= 4.5;
+      const stripe = (x + y) % 12 < 4;
+      const dim = readable ? 1 : stripe ? 0.38 : 0.56;
+      pixels.data[index] = Math.round(Number.parseInt(value?.[0] ?? "00", 16) * dim);
+      pixels.data[index + 1] = Math.round(Number.parseInt(value?.[1] ?? "00", 16) * dim);
+      pixels.data[index + 2] = Math.round(Number.parseInt(value?.[2] ?? "00", 16) * dim);
+      pixels.data[index + 3] = 255;
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  const x = (editor.state.saturation / 100) * editor.canvas.width;
+  const y = (1 - editor.state.lightness / 100) * editor.canvas.height;
+  context.beginPath();
+  context.arc(x, y, 7, 0, Math.PI * 2);
+  context.lineWidth = 3;
+  context.strokeStyle = "#ffffff";
+  context.shadowColor = "#000000";
+  context.shadowBlur = 2;
+  context.stroke();
+  context.shadowBlur = 0;
 }
 
 function mountAppearanceControl(): void {
@@ -127,11 +230,8 @@ function mountAppearanceControl(): void {
   modes.append(light, dark);
 
   const colors = customColors();
-  const background = colorDial("Background", colors.background);
-  const text = colorDial("Text", colors.text);
-  const dials = document.createElement("div");
-  dials.className = "appearance-dials";
-  dials.append(background.field, text.field);
+  const background = makeEditor("Background", hexToHsl(colors.background));
+  const text = makeEditor("Text", hexToHsl(colors.text));
   const useCustom = document.createElement("button");
   useCustom.type = "button";
   useCustom.className = "appearance-custom";
@@ -144,29 +244,55 @@ function mountAppearanceControl(): void {
     const theme = root.dataset.theme as Theme | undefined;
     light.disabled = theme === "light";
     dark.disabled = theme === "dark";
-    const ratio = contrast(background.input.value, text.input.value);
-    useCustom.disabled = ratio < 4.5;
+    const backgroundValue = hslToHex(background.editor.state);
+    const textValue = hslToHex(text.editor.state);
+    const ratio = contrast(backgroundValue, textValue);
+    background.editor.value.textContent = backgroundValue;
+    text.editor.value.textContent = textValue;
+    background.editor.hue.value = String(Math.round(background.editor.state.hue));
+    text.editor.hue.value = String(Math.round(text.editor.state.hue));
+    drawEditor(background.editor, textValue);
+    drawEditor(text.editor, backgroundValue);
+    useCustom.disabled = false;
     status.textContent =
-      ratio < 4.5
-        ? `Choose a more readable pair (${ratio.toFixed(1)}:1 contrast; 4.5:1 required).`
-        : theme === "custom"
+      theme === "custom"
           ? `Custom colors active (${ratio.toFixed(1)}:1 contrast).`
-          : `Custom colors ready (${ratio.toFixed(1)}:1 contrast).`;
+          : `Bright areas are available (${ratio.toFixed(1)}:1 contrast).`;
   }
 
   light.addEventListener("click", () => { applyTheme("light"); refresh(); });
   dark.addEventListener("click", () => { applyTheme("dark"); refresh(); });
   useCustom.addEventListener("click", () => {
-    const selected = { background: background.input.value, text: text.input.value };
+    const selected = { background: hslToHex(background.editor.state), text: hslToHex(text.editor.state) };
     if (contrast(selected.background, selected.text) < 4.5) return;
     localStorage.setItem(CUSTOM_KEY, JSON.stringify(selected));
     applyTheme("custom", selected);
     refresh();
   });
-  background.input.addEventListener("input", refresh);
-  text.input.addEventListener("input", refresh);
+  function bindEditor(editor: ColorEditor, other: () => string): void {
+    editor.canvas.addEventListener("pointerdown", (event) => {
+      const box = editor.canvas.getBoundingClientRect();
+      const candidate = {
+        hue: editor.state.hue,
+        saturation: Math.max(0, Math.min(100, ((event.clientX - box.left) / box.width) * 100)),
+        lightness: Math.max(0, Math.min(100, 100 - ((event.clientY - box.top) / box.height) * 100)),
+      };
+      if (contrast(hslToHex(candidate), other()) < 4.5) {
+        status.textContent = "That area is unavailable because it would reduce readability below 4.5:1.";
+        return;
+      }
+      editor.state = candidate;
+      refresh();
+    });
+    editor.hue.addEventListener("input", () => {
+      editor.state = nearestReadable({ ...editor.state, hue: Number(editor.hue.value) }, other());
+      refresh();
+    });
+  }
+  bindEditor(background.editor, () => hslToHex(text.editor.state));
+  bindEditor(text.editor, () => hslToHex(background.editor.state));
 
-  panel.append(heading, modes, dials, useCustom, status);
+  panel.append(heading, modes, background.field, text.field, useCustom, status);
   details.appendChild(panel);
   host.appendChild(details);
   refresh();
