@@ -1,0 +1,93 @@
+.lede { color: var(--muted); max-width: 40rem; margin: 0 0 16px; }
+h2 { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 28px 0 8px; }
+.day-title { font-size: 1.15rem; margin: 8px 0 12px; }
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.days button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.days button.tight:not(.active) { border-color: var(--accent); }
+.days button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.days button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.auth { margin: 8px 0 20px; }
+.auth label { display: block; font-weight: 600; margin-bottom: 6px; }
+.signin-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.signin-row input {
+  flex: 1;
+  min-width: 16rem;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.who-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 0; }
+
+.session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.session h3 { margin: 0; font-size: 1.05rem; }
+.session .meta { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; }
+.session-actions { display: flex; align-items: center; gap: 10px; }
+
+.pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.pill.ok { color: var(--accent); border-color: var(--accent); }
+.pill.warn { color: var(--fg); }
+.pill.full { color: var(--muted); }
+
+.btn:disabled { filter: grayscale(0.4); opacity: 0.55; cursor: not-allowed; }
+.btn.ghost {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+.btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.confirm {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 12px 0 20px;
+}
+.confirm strong { display: block; }
+
+.card.highlight { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.error {
+  color: var(--fg);
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+}
+
+#schedule:empty::before,
+#mine:empty::before { color: var(--muted); }

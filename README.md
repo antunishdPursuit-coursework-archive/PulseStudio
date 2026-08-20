@@ -43,8 +43,11 @@ Each teammate builds one product:
 Lets a member view the week's class schedule and reserve a spot in a specific
 class.
 
-Open [member-booking.html](member-booking.html) in a browser. Demo member:
-`alex@pulse.demo` / `member123`. Demo staff: `staff@pulse.demo` / `staff123`.
+Open [app/products/a-booking/](app/products/a-booking/index.html) from the
+front door. The public calendar and remaining-spot counts read the shared
+studio; members pick their name to reserve. Runtime reservations are stored
+in the browser under `pulse-reservations-a` and never written into shared
+fixtures. A session can be preselected with `?session=<session_id>`.
 
 ### Product B: Staff Scheduling Dashboard
 
