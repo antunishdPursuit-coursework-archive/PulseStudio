@@ -370,6 +370,59 @@ export function generateStudio(
     }
   }
 
+  // Phase C½ — the optional upcoming-occupancy fill (upcomingFillTarget).
+  // After the organic near-term bookings above, top each upcoming
+  // scheduled session up toward a deterministic occupancy band around the
+  // configured target, so a capacity surface presents a realistically
+  // mixed week instead of a mostly-vacant one. Discipline:
+  //   - OFF by default: with the knob unset this block never runs and the
+  //     output stays byte-identical to the pre-knob generator.
+  //   - Deterministic: every draw comes from a session-named stream.
+  //   - Truthful: it runs BEFORE the truth computation, so
+  //     expectedUpcomingAvailability counts these seats like any others;
+  //     capacity is never exceeded, a member holds at most one seat per
+  //     session, and only members active on the session's date are seated.
+  //   - Never in edge-cases mode, whose population reconciles exactly.
+  if (config.upcomingFillTarget !== undefined && config.mode !== "edge-cases") {
+    const targetPct = Math.round(config.upcomingFillTarget * 100);
+    for (const session of schedule.sessions) {
+      if (session.status !== "scheduled") continue;
+      const sessionDate = dateOfTimestamp(session.startsAt);
+      const sessionDay = dayNumberOf(sessionDate);
+      if (sessionDay < asOfDay) continue;
+      // Seats are booked the EVENING BEFORE the class (18:00 the prior
+      // day) — always strictly before any start time, so a same-day
+      // morning class never records a booking placed after it began
+      // (the validator's booking-after-session law).
+      const bookedAt = `${dateOfDayNumber(sessionDay - 1)}T18:00:00`;
+      const fill = makeStream(config.seed, `upcoming-fill:${session.id}`);
+      // A band, not a constant: some sessions land Underbooked, some run
+      // Full, the way a real week looks.
+      const wantedPct = fill.int(Math.max(0, targetPct - 25), Math.min(100, targetPct + 15));
+      const wantedSeats = Math.round((session.capacity * wantedPct) / 100);
+      const startOffset = fill.int(0, Math.max(0, identities.length - 1));
+      for (let i = 0; i < identities.length; i += 1) {
+        if ((seatsUsed.get(session.id) ?? 0) >= wantedSeats) break;
+        if (!sessionSeatFree(session)) break;
+        // Deterministic rotation from a stream-picked start, so the same
+        // few early members don't fill every class.
+        const identity = identities[(startOffset + i) % identities.length];
+        if (!identity) continue;
+        if (bookedSessions.has(`${identity.id}|${session.id}`)) continue;
+        if (!activeOn(periodsByMember.get(identity.id) ?? [], sessionDate)) continue;
+        seatsUsed.set(session.id, (seatsUsed.get(session.id) ?? 0) + 1);
+        bookedSessions.add(`${identity.id}|${session.id}`);
+        bookings.push({
+          id: nextBookingId(),
+          memberId: identity.id,
+          classSessionId: session.id,
+          bookedAt,
+          status: "booked",
+        });
+      }
+    }
+  }
+
   // 9b. Studio policies — the support surface's source of truth. One
   // current policy per topic, plus a superseded cancellation version so a
   // consumer can prove it answers from CURRENT policy only.

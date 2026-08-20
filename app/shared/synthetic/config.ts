@@ -21,6 +21,17 @@ export interface SyntheticStudioConfig {
   historyDays: number; // 90..1900 — up to five years and change
   facilityCapacity?: number;
   mode: SyntheticMode;
+  /** Optional 0..1. When set, upcoming scheduled sessions are topped up
+   *  toward a deterministic occupancy band around this target (roughly
+   *  target−25% .. target+15% of capacity, varied per session so some
+   *  classes stay Underbooked and some run Full), never past capacity,
+   *  members seated at most once per session, only while active. UNSET
+   *  means the organic near-term-biased behavior, byte-identical to the
+   *  generator before this knob existed. Ignored in edge-cases mode,
+   *  whose population must reconcile exactly. Added for the capacity
+   *  dashboard, which presents a week of classes and wants it to look
+   *  like a real one. */
+  upcomingFillTarget?: number;
 }
 
 /** The studio's own size, derived deterministically from the seed. In the
@@ -52,6 +63,17 @@ export function validateConfig(config: SyntheticStudioConfig): string[] {
     problems.push(`asOfDate must be a real calendar date, got "${config.asOfDate}"`);
   }
   if (config.timezone.trim() === "") problems.push("timezone must be non-empty");
+  if (
+    config.upcomingFillTarget !== undefined &&
+    (typeof config.upcomingFillTarget !== "number" ||
+      !Number.isFinite(config.upcomingFillTarget) ||
+      config.upcomingFillTarget < 0 ||
+      config.upcomingFillTarget > 1)
+  ) {
+    problems.push(
+      `upcomingFillTarget must be a number 0..1 when set, got ${String(config.upcomingFillTarget)}`,
+    );
+  }
   if (
     !Number.isInteger(config.memberCount) ||
     config.memberCount < 1 ||
