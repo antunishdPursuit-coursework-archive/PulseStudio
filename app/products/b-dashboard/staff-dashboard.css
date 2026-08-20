@@ -45,6 +45,9 @@ h2 { margin: 0; }
 .weekly-enrollment { color: var(--accent); font-weight: 700; margin: 8px 0 0; }
 .weekly-reservations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 3rem; margin-top: 12px; }
 .reservation-total { background: var(--bg); min-width: 0; padding: 4px 0; }
+.reservation-total.reserved { color: inherit; text-decoration: none; }
+.reservation-total.reserved strong, .reservation-total.reserved span { text-decoration: underline; text-underline-offset: 3px; }
+.reservation-total.reserved:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .reservation-total strong, .reservation-total span { display: block; }
 .reservation-total strong { font-size: 1.15rem; }
 .reservation-total span { color: var(--muted); font-size: 0.75rem; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -77,6 +80,8 @@ option { background: var(--bg); color: var(--fg); }
 .roster-table th { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .roster-table th, .roster-table td { border: 0; padding: 10px 12px; }
 .roster-table td { color: var(--fg); }
+.roster-back-link { color: var(--accent); display: inline-block; font-weight: 600; margin-bottom: 10px; text-underline-offset: 3px; }
+.roster-back-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
 dialog { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: none; padding: 0; }
 dialog::backdrop { background: var(--bg); opacity: 0.75; }
