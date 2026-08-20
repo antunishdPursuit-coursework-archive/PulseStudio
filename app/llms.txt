@@ -38,6 +38,11 @@ member actually attended counts as a visit; a no-show never does.
 
 - The member re-engagement tool drafts outreach for staff to review and send
   themselves. Nothing in this software sends a message on its own.
+- The sign-in on this site is a TEST session, for testing purposes: no
+  password, remembered only in the visitor's own browser, and every
+  signable member is fictional (their @studio.test addresses cannot be
+  real). The hosted version verifies real passwords against Postgres —
+  the schema ships in app/shared/auth/schema.sql.
 - Any sample members shown are fictional. Records generated for viewing are
   labelled as generated on the page itself.
 - Source: https://github.com/antunishdPursuit/PulseStudio
