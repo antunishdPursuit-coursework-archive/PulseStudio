@@ -28,6 +28,7 @@ h2 { margin: 0; }
 .panel-head label, form label { color: var(--fg); display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
 select, input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
 select:hover, input:hover { border-color: var(--accent); }
+.sessions { max-height: min(42rem, 70vh); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
 
 .session { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(8rem, 1fr) minmax(4rem, .7fr) minmax(7rem, .8fr); gap: 14px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .session:last-child { border-bottom: 0; }
