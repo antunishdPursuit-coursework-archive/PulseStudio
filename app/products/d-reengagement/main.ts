@@ -38,9 +38,28 @@ const csvInput = requiredElement<HTMLInputElement>("#csv-input");
 const csvReset = requiredElement<HTMLButtonElement>("#csv-reset");
 const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 
-/* Apply the configurable studio identity to document and accessible copy. */
+/* Apply the configurable studio identity to document and accessible copy.
+ * THE RESELLER LAW, restored: the header's brand WORD renders from
+ * config.ts at runtime — a rebrand edits config.ts and one theme token,
+ * never this file and never the page markup. The branded-header VISUAL
+ * (arrow + two-tone word, first word in the foreground, the rest in the
+ * product accent) is the team's look and stays exactly as designed; only
+ * the word's source of truth moved back to config. The static text in
+ * index.html is a pre-module placeholder, replaced here on load. */
 document.title = `Member Re-engagement — ${brand.studioName}`;
 backEl.setAttribute("aria-label", `Return to ${brand.studioName} home`);
+{
+  const brandWord = backEl.querySelector(".brand-word");
+  if (brandWord !== null) {
+    const words = brand.studioName.trim().split(/\s+/);
+    brandWord.textContent = (words[0] ?? "").toUpperCase();
+    if (words.length > 1) {
+      const rest = document.createElement("span");
+      rest.textContent = words.slice(1).join(" ").toUpperCase();
+      brandWord.append(rest);
+    }
+  }
+}
 footerEl.textContent =
   `Drafts only — staff review and send every message themselves; nothing on ` +
   `this page can send. Studio record copy: ${brand.studioEmail} · `;
