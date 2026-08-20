@@ -52,6 +52,7 @@ h2 { margin: 0; }
 .reservation-total.waitlisted strong { color: var(--fg); }
 .reservation-total.canceled strong { color: var(--muted); }
 .panel-head label, form label { color: var(--fg); display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+.panel-head label small, form label small { color: var(--muted); font-size: 0.75rem; font-weight: 400; }
 select, input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
 select:hover, input:hover { border-color: var(--accent); }
 option { background: var(--bg); color: var(--fg); }
