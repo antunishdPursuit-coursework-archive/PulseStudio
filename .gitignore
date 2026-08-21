@@ -24,3 +24,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Per-developer AI tool settings. The team's rules are tracked (CLAUDE.md,
+# AGENTS.md, .cursor/rules), but which MCP servers you personally enable is
+# yours and should never land in a shared commit.
+.claude/settings.local.json
