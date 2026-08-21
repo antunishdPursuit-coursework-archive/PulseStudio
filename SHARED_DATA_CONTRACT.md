@@ -51,7 +51,7 @@ Represents the member's recurring membership record.
 | `plan_name` | string | Membership plan or tier |
 | `status` | enum | `active`, `paused`, `canceled`, or `expired` |
 | `started_on` | date | Membership start date |
-| `renews_on` | date | Next renewal date, if active |
+| `renews_on` | date/null | Next renewal date; null when the membership is not active |
 | `canceled_on` | date/null | Cancellation date, if canceled |
 
 ### Class session
@@ -159,7 +159,7 @@ Each owner should add answers below before implementation:
 
 | Owner | Product | Required fields | Fields created/updated | Open questions |
 | --- | --- | --- | --- | --- |
-| Kerrian | Product A | `member`, `class_session` public fields, remaining spots | `reservation` (`reserved` / `canceled`) | Demo login stands in for auth; availability counts are public |
+| Kerrian | Product A | `member`, `class_session` public fields, remaining spots | `reservation` (`reserved` / `canceled`) | A test persona stands in for auth; availability counts are public |
 | Manny | Product B | TBD | TBD | TBD |
 | Dennis | Product C | TBD | TBD | TBD |
 | Rensley | Product D | `member.member_id/display_name/membership_status`, `membership.status/renews_on`, `reservation.member_id/session_id/reservation_status`, `attendance.member_id/session_id/attendance_status/recorded_at`, `class_session.class_type/instructor_id`, `instructor.display_name` | None shared — product-local draft messages only, never sent automatically | Ratify 14/60-day drop-off thresholds; what does a missing attendance record mean for a reserved session; names vs. anonymized IDs on staff screens |

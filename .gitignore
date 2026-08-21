@@ -15,10 +15,11 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Local configuration and secrets
+# Local configuration and secrets. Every env file is ignored with no
+# exceptions: the un-ignore line that used to sit here named a file this
+# repo has never contained, and its name broke the language law.
 .env
 .env.*
-!.env.example
 
 # Operating-system and editor files
 .DS_Store
