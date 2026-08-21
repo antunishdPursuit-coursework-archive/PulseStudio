@@ -50,7 +50,8 @@ const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 document.title = `Member Re-engagement — ${brand.studioName}`;
 footerEl.textContent =
   `Drafts only — staff review and send every message themselves; nothing on ` +
-  `this page can send. Studio record copy: ${brand.studioEmail} · `;
+  `this page can send. ` +
+  (brand.studioEmail === null ? "" : `Studio record copy: ${brand.studioEmail} · `);
 {
   const testsLink = document.createElement("a");
   testsLink.href = "./tests.html";
@@ -91,10 +92,12 @@ function mailtoHref(f: FlaggedMember, draft: string): string {
   const subject = `We miss you at ${brand.studioName}, ${firstNameOf(f.member.display_name)}!`;
   // RFC 6068 wants CRLF line breaks in a mailto body; some clients collapse
   // bare %0A. Only the URL gets CRLF — screen and clipboard stay LF.
+  const bcc =
+    brand.studioEmail === null ? "" : `bcc=${encodeURIComponent(brand.studioEmail)}&`;
   return (
     "mailto:?" +
-    `bcc=${encodeURIComponent(brand.studioEmail)}` +
-    `&subject=${encodeURIComponent(subject)}` +
+    bcc +
+    `subject=${encodeURIComponent(subject)}` +
     `&body=${encodeURIComponent(draft.replace(/\n/g, "\r\n"))}`
   );
 }

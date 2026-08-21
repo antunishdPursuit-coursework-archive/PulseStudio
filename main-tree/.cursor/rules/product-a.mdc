@@ -1,8 +1,0 @@
----
-description: Kerrian's lane — Member Booking
-globs: app/products/a-booking/**
-alwaysApply: false
----
-You are in Kerrian's lane (Product A — Member Booking, blue). Read
-`app/products/a-booking/CLAUDE.md` and obey it. Never edit b-dashboard,
-c-chatbot, d-reengagement, or team-owned files without stated agreement.

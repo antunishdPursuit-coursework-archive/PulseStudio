@@ -126,9 +126,14 @@ jointly held.
 
 ## The studio mailbox (affects everyone)
 
-`pulse@githat.io` is live: inbound mail forwards to the owner, and the studio
-can send from it. My outreach flow BCCs it so the studio keeps a record of
-every note staff send. Nothing in this repo sends mail — that stays human.
+The studio's record mailbox is configuration, and for this studio it is
+deliberately UNSET (`studioEmail: null` in `config.ts`). A studio that keeps
+a shared mailbox puts its own address there; the footer names it and every
+draft BCCs it, so the studio keeps a copy of what staff sent. With no
+address set, the page simply does not mention one — naming a mailbox nobody
+reads would be worse than naming none.
+
+Either way, nothing in this repo sends mail. That stays human.
 
 ## If you disagree with anything here
 

@@ -10,9 +10,16 @@
 export interface StudioBrand {
   /** The studio's public name, used in drafts and page copy. */
   studioName: string;
-  /** The studio's outreach mailbox. Drafts BCC it so the studio keeps a
-   *  record of what staff sent — the tool itself never sends anything. */
-  studioEmail: string;
+  /** The studio's own outreach mailbox, or null when it has none.
+   *
+   *  When set, a draft opened in a staff member's email app BCCs it, so
+   *  the studio keeps its own record of what went out — the tool still
+   *  never sends anything itself.
+   *
+   *  NULL IS A REAL ANSWER, not a placeholder to fill in: a studio without
+   *  a shared mailbox gets a page that simply does not mention one. Naming
+   *  an address nobody reads would be worse than naming none. */
+  studioEmail: string | null;
   /** The studio's public web address, used in draft links so a member can
    *  book, ask, or browse straight from the note. Ends with a slash. */
   studioUrl: string;
@@ -26,7 +33,10 @@ export const brand: StudioBrand = {
    * headers all follow. Override with a literal here only when this
    * product ships standalone under its own name. */
   studioName: STUDIO_NAME,
-  studioEmail: "pulse@githat.io",
+  /* Unset for this studio: it keeps no shared record mailbox, so the page
+     claims none. A studio that has one puts it here and the footer and the
+     draft BCC follow — the only edit needed. */
+  studioEmail: null,
   studioUrl: "https://antunishdpursuit.github.io/PulseStudio/",
 };
 
