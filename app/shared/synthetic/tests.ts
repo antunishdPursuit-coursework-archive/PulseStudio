@@ -12,6 +12,7 @@ import type { GeneratedStudioBundle } from "./contracts.js";
 import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
+import { attendanceCsv, csvField } from "./csv-export.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn } from "./lifecycle.js";
 import { dateOfTimestamp, dayNumberOf, weekdayOf } from "./normalize.js";
@@ -506,6 +507,45 @@ for (const n of [1, 2, 5, 12]) {
   const report = validateBundle(doctored);
   check("an answer label leaked onto a record is caught",
     report.problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+/* A CSV CELL THAT STARTS WITH = + - @ IS A FORMULA, NOT A NAME.
+ *
+ * Quoting solves CSV structure and nothing about what a spreadsheet does
+ * with the text afterwards. Excel, LibreOffice and Sheets all evaluate a
+ * cell beginning with those characters, so a member called
+ * =HYPERLINK("http://...","Your refund") in an export becomes a clickable
+ * lure the moment somebody opens the file — and this is a studio's own
+ * member list, exported and mailed around. Every CSV this repo writes goes
+ * through csvField, so it is proven here once. */
+{
+  const lure = '=HYPERLINK("http://not-a-real-host.invalid","Your refund")';
+  check("a formula cell is defused with a leading apostrophe",
+    csvField(lure).startsWith("\"'="), true);
+  check("a plus-leading cell is defused", csvField("+1234567890"), "'+1234567890");
+  check("an at-leading cell is defused", csvField("@SUM(A1:A9)"), "'@SUM(A1:A9)");
+  check("a minus-leading cell is defused", csvField("-5"), "'-5");
+  check("a tab-leading cell is defused — a tab can carry into the next cell",
+    csvField("\tTabbed"), "'\tTabbed");
+
+  check("an ordinary name is untouched", csvField("Maria Santos"), "Maria Santos");
+  check("a non-Latin name is untouched", csvField("王伟"), "王伟");
+  check("a name with an apostrophe INSIDE it is not a formula",
+    csvField("O'Brien"), "O'Brien");
+  check("a comma still quotes the field", csvField("Santos, Maria"), '"Santos, Maria"');
+  check("a quote is still doubled", csvField('Say "hi"'), '"Say ""hi"""');
+  check("a newline still quotes the field", csvField("two\nlines"), '"two\nlines"');
+  check("an empty cell stays empty", csvField(""), "");
+}
+
+/* The export a studio actually gets must carry the defusal end to end. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const victim = doctored.dataset.members[0];
+  if (victim) victim.displayName = "=1+1";
+  const csv = attendanceCsv(doctored.dataset);
+  check("no line of a real export starts a cell with a bare formula",
+    csv.split("\n").some((line) => /(^|,)[=+@]/.test(line)), false);
 }
 
 /* THE LEAK THAT IS NOT ON RECORD ZERO. The scan above used to read only

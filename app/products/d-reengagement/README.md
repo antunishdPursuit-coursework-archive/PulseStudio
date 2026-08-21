@@ -63,7 +63,11 @@ judged against the records. Who came back (and how many days after the
 note), who stayed quiet, and which ledger entries these records cannot
 judge — stated on the page, with a local CSV export that carries EVERY note
 taken, the unjudgeable ones included and labelled as such. A log that
-quietly drops rows is worse than no log, because it reads as complete. The members who came
+quietly drops rows is worse than no log, because it reads as complete. Every
+cell in that file is written so a spreadsheet reads it as TEXT: a member
+whose name begins with `=`, `+`, `-` or `@` would otherwise arrive as a
+formula and run when the file is opened, and member names can come straight
+from a studio's own imported export. The members who came
 back are listed as exactly that: *worth a hello at the front desk* — the
 save is finished by a person, not a metric.
 

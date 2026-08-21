@@ -47,6 +47,10 @@ export type { SyntheticDataset } from "../../shared/synthetic/contracts.js";
  * code never depends on a product. */
 export { generateStudio } from "../../shared/synthetic/generate.js";
 export { attendanceCsv } from "../../shared/synthetic/csv-export.js";
+/* One CSV cell-writer for the repo, so the formula-injection defusal is
+ * implemented and tested once rather than repeated wherever a file is
+ * written. A standalone port re-points this line. */
+export { csvField } from "../../shared/synthetic/csv-export.js";
 export { DEFAULT_CONFIG as SYNTHETIC_DEFAULT_CONFIG } from "../../shared/synthetic/config.js";
 export type {
   Attendance,

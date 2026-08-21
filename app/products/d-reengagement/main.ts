@@ -10,7 +10,7 @@
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { GENERIC_CLASS_TYPE, adaptAttendanceCsv } from "./csv.js";
-import { onSessionChange, readPulseSession } from "./deps.js";
+import { csvField, onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
@@ -475,8 +475,12 @@ function renderOutcomes(data: FixtureSet, today: number): void {
   logBtn.type = "button";
   logBtn.textContent = "Download the outreach log (stays on this device)";
   logBtn.addEventListener("click", () => {
-    const quote = (text: string): string =>
-      /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    /* csvField (through deps.ts) quotes for CSV structure AND defuses a
+     * cell a spreadsheet would otherwise run. Member names here can come
+     * straight from a studio's own imported export, so a name beginning
+     * with = + - or @ reaches this file as a formula unless something
+     * stops it. One implementation, tested once, in the shared exporter. */
+    const quote = csvField;
     const lines = ["member,member id,channel,note taken,result,days to return"];
     for (const o of results.outcomes) {
       lines.push(

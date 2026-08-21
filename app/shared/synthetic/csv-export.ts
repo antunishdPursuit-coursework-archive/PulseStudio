@@ -15,9 +15,29 @@
 import type { SyntheticDataset } from "./contracts.js";
 import { dateOfTimestamp, isStrictTimestamp } from "./normalize.js";
 
-/** Quote a field only when it needs it (commas, quotes, line breaks). */
-function csvField(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+/* A CELL THAT STARTS WITH = + - @ IS A FORMULA, NOT A NAME.
+ *
+ * Quoting solves CSV STRUCTURE — commas, quotes, newlines — and does
+ * nothing about what a spreadsheet does with the text afterwards. Excel,
+ * LibreOffice and Sheets all evaluate a cell beginning with =, +, - or @,
+ * so a person called `=HYPERLINK("http://a-studio.invalid","Your refund")` in an export
+ * becomes a clickable lure the moment somebody opens the file, and
+ * `=cmd|'/c calc'!A1` is the older, worse version of the same trick. The
+ * file never has to be malicious to matter: this is a studio's own member
+ * list, exported, mailed around, and opened by whoever needs it.
+ *
+ * The fix is the standard one: a leading apostrophe, which every
+ * spreadsheet strips on display and treats as "this is text". It changes
+ * the bytes for the handful of names that begin with those characters, and
+ * that is the trade — a name shown correctly beats a formula run silently.
+ * TAB and CR are included because both can carry a cell into the next one. */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/** Quote a field when the format needs it, and defuse it when a spreadsheet
+ *  would otherwise run it. */
+export function csvField(value: string): string {
+  const defused = FORMULA_LEAD.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(defused) ? `"${defused.replaceAll('"', '""')}"` : defused;
 }
 
 const STATUS_WORDS: Record<string, string> = {
