@@ -58,6 +58,27 @@ export const proposedRules: QuietRules = {
   priorWindowDays: 60,
 };
 
+/** The outreach discipline's policy — the studio's recorded consent
+ *  posture, not the tool's opinion. `enabled` is the studio's opt-in:
+ *  false means flags and evidence still render but no draft is ever
+ *  offered. The consent window caps how old a silence may be before the
+ *  tool refuses to draft at all. Once-per-lapse is the never-nag rule:
+ *  one note per lapse, re-armed only when the member returns and lapses
+ *  again. */
+export interface OutreachPolicy {
+  enabled: boolean;
+  consentWindowDays: number;
+  oncePerLapse: boolean;
+}
+
+export const outreachPolicy: OutreachPolicy = {
+  /* This studio's recorded yes. A clone that has not asked its members
+     ships with false and the workflow stays off. */
+  enabled: true,
+  consentWindowDays: 730,
+  oncePerLapse: true,
+};
+
 /** Everything the draft voice needs — facts in, message out. */
 export interface DraftFacts {
   firstName: string;
@@ -65,6 +86,10 @@ export interface DraftFacts {
   usualClassType: string;
   usualInstructorFirstName: string;
   studioName: string;
+  /** A concrete upcoming class matching their pattern ("on Thursday at
+   *  9:00 AM"), or null when the records hold no upcoming schedule. A
+   *  specific invitation beats "sometime" — but only when it is real. */
+  suggestedInvite: string | null;
 }
 
 /** The outreach voice. Warm and personal, no marketing tone — a note one
@@ -72,12 +97,19 @@ export interface DraftFacts {
  *  the voice. Every value is filled from real records before render;
  *  the unit checks prove no unfilled placeholder can reach a screen. */
 export function draftMessage(f: DraftFacts): string {
+  /* The invitation names a REAL class when the schedule holds one — a
+   * specific "yes" is easier to say than a vague one — and falls back to
+   * the open offer rather than inventing a session that does not exist. */
+  const invite =
+    f.suggestedInvite !== null
+      ? `${f.usualInstructorFirstName} teaches ${f.usualClassType} ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
+      : `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`;
   /* The note always hands the member their three ways back — book a spot,
    * ask a question, or just look at what's new — so replying is never the
    * only door. The links come from config (the reseller seam). */
   return [
     `Hi ${f.firstName} — it's been ${f.daysSince} days since your last ${f.usualClassType} class, and we've missed seeing you.`,
-    `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`,
+    invite,
     `Or come back your own way:\n· Book a class: ${brand.studioUrl}products/a-booking/\n· Ask us anything: ${brand.studioUrl}products/c-chatbot/\n· See what's new this week: ${brand.studioUrl}`,
     `— ${f.studioName}`,
   ].join("\n\n");
