@@ -57,6 +57,11 @@ instead of doing it.
   `app/shared/storytold.html` — the one page that tells the builders'
   story. If copy would only matter to someone evaluating the project, it
   belongs on storytold, not on a customer screen.
+- Signing in on the front door may LAND a person on their own home —
+  a member on booking, staff on the dashboard — because nobody signs in to
+  keep reading the front page. Landing is not gating: it happens only on
+  the act of signing in, only in the tab where it happened, never on page
+  load or sign-out, and every route stays reachable by link and by URL.
 - Surfaces may ADAPT to the signed-in actor (`actor_type`: member or
   staff) — different emphasis, different words — but never hide or block a
   route: the browser session is convenience, not access control, and

@@ -265,6 +265,26 @@ check("a cross-tab storage event reaches subscribers", () => {
     : "the staff session did not survive the event";
 });
 
+check("a same-tab change reports origin this-tab", () => {
+  fresh();
+  const seen: string[] = [];
+  const stop = subscribeToPulseSession((_s, origin) => seen.push(origin));
+  writePulseSession(FRONT_DESK);
+  clearPulseSession();
+  stop();
+  return eq(seen, ["this-tab", "this-tab"]);
+});
+
+check("a cross-tab storage event reports origin other-tab", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  const seen: string[] = [];
+  const stop = subscribeToPulseSession((_s, origin) => seen.push(origin));
+  window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+  stop();
+  return eq(seen, ["other-tab"]);
+});
+
 /* ---------- the sign-in flow (auth owns the decisions) ---------- */
 
 check("the flow lists the running studio plus exactly one staff actor", () => {
