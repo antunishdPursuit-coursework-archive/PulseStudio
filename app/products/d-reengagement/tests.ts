@@ -334,6 +334,37 @@ check("a full timestamp still reads its date part",
   check("an impossible date is not spelled out", longDate("2026-02-30"), "2026-02-30");
 }
 
+/* THE LEAP RULE IS NOW OURS, so it has to be the full one. The validity
+ * check stopped building a Date and reads month lengths instead, which
+ * means the Gregorian rule is hand-written here: divisible by four, except
+ * centuries, except every fourth century. The four-year shortcut is right
+ * until 2100 and would ship a bug nobody alive today would see fail — the
+ * worst kind to leave in. */
+check("2024 is a leap year (divisible by 4)", Number.isFinite(dayNumberFromIso("2024-02-29")), true);
+check("2023 is not (not divisible by 4)", Number.isFinite(dayNumberFromIso("2023-02-29")), false);
+check("2000 IS a leap year (divisible by 400)", Number.isFinite(dayNumberFromIso("2000-02-29")), true);
+check("1900 is NOT (century, not divisible by 400)", Number.isFinite(dayNumberFromIso("1900-02-29")), false);
+check("2100 is NOT — the shortcut rule would say it is",
+  Number.isFinite(dayNumberFromIso("2100-02-29")), false);
+check("2400 IS (divisible by 400)", Number.isFinite(dayNumberFromIso("2400-02-29")), true);
+check("February never has 30 days in any year",
+  Number.isFinite(dayNumberFromIso("2024-02-30")), false);
+
+/* Every month's real length, both sides of the boundary. */
+{
+  const lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const wrong = lengths.filter((len, i) => {
+    const mm = String(i + 1).padStart(2, "0");
+    const lastIsReal = Number.isFinite(dayNumberFromIso(`2026-${mm}-${String(len).padStart(2, "0")}`));
+    const overIsNot = !Number.isFinite(dayNumberFromIso(`2026-${mm}-${String(len + 1).padStart(2, "0")}`));
+    return !(lastIsReal && overIsNot);
+  });
+  check("every month ends exactly where the calendar says", wrong.length, 0);
+}
+check("a day number still counts from the epoch", dayNumberFromIso("1970-01-01"), 0);
+check("...and one day later is one more", dayNumberFromIso("1970-01-02"), 1);
+check("...and dates before it go negative", dayNumberFromIso("1969-12-31"), -1);
+
 check("today is computed in the studio timezone",
   todayDayNumber("America/New_York", new Date(Date.UTC(2026, 7, 19, 2, 30))),
   dayNumberFromIso("2026-08-18"));
