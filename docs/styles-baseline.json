@@ -1,0 +1,83 @@
+{
+  "note": "Style duplication that already existed when the styling gate landed (2026-08-20). These are ALLOWED so nobody is blocked by yesterday. Everything NEW fails the gate. This list only ever SHRINKS: delete your copy in your own lane, then delete its line here. See docs/styling.md.",
+  "allowed": [
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand",
+      "file": "app/products/a-booking/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span",
+      "file": "app/products/a-booking/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand:focus-visible",
+      "file": "app/products/a-booking/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .role",
+      "file": "app/products/a-booking/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".topbar .role",
+      "file": "app/products/b-dashboard/staff-dashboard.css",
+      "owner": "Manny"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand",
+      "file": "app/products/c-chatbot/styles.css",
+      "owner": "Dennis"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span",
+      "file": "app/products/c-chatbot/styles.css",
+      "owner": "Dennis"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .home-brand:focus-visible",
+      "file": "app/products/c-chatbot/styles.css",
+      "owner": "Dennis"
+    },
+    {
+      "kind": "touches-shared-component",
+      "selector": ".page-head .role",
+      "file": "app/products/c-chatbot/styles.css",
+      "owner": "Dennis"
+    },
+    {
+      "kind": "belongs-in-shared",
+      "selector": ".page-head .home-brand",
+      "file": "app/products/a-booking/styles.css + app/products/c-chatbot/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "belongs-in-shared",
+      "selector": ".page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span",
+      "file": "app/products/a-booking/styles.css + app/products/c-chatbot/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "belongs-in-shared",
+      "selector": ".page-head .home-brand:focus-visible",
+      "file": "app/products/a-booking/styles.css + app/products/c-chatbot/styles.css",
+      "owner": "Kerrian"
+    },
+    {
+      "kind": "belongs-in-shared",
+      "selector": ".session h3",
+      "file": "app/products/a-booking/styles.css + app/products/b-dashboard/staff-dashboard.css",
+      "owner": "Kerrian"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+# docs — how this team works
+
+Process documents for the people building Pulse Studio. These sit OUTSIDE
+`app/` on purpose: `app/` is the studio's product and is what deploys;
+`docs/` is how we build it and ships to nobody.
+
+| Document | What it settles |
+| --- | --- |
+| [styling.md](./styling.md) | Where every style lives (shared vs your folder), why we do not use Sass, when a comment is required — enforced by `scripts/check-styles.mjs` at the gate |
+| [styles-baseline.json](./styles-baseline.json) | The style duplication that existed the day the gate landed, with the owner who can delete each one. This list only shrinks. |
+
+**The rules themselves live elsewhere, on purpose:** `CLAUDE.md` at the repo
+root is the working agreement every AI and developer reads first, and
+`app/shared/CLAUDE.md` covers shared ground. A process doc explains HOW to
+follow a law; it never becomes a second copy of the law.
+
+## The standard every document here is held to
+
+Borrowed from harder projects, and each one is here because ignoring it
+cost somebody a day:
+
+- **A rule nobody can check is a wish.** If a doc states a rule, something
+  should be able to fail when the rule is broken — a gate, a test, a
+  script. `styling.md` has `scripts/check-styles.mjs`.
+- **Prove the check can fail.** A check that only ever passes is
+  indistinguishable from a broken one. Every gate here carries a
+  self-test that plants a known-bad case (`--self-test`), and was run
+  against a real planted fault before it shipped.
+- **A stated negative beats an absence.** "0 new duplicates in 4
+  stylesheets" is a result; a silent pass is not.
+- **Never write a count you cannot keep true.** Numbers in prose go stale;
+  where a number matters, say where to read it live.
+- **Say the limits out loud.** Every gate here documents what it does NOT
+  catch. A checker that oversells itself is worse than none.
