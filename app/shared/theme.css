@@ -10,25 +10,18 @@
    and upgrades when the file lands — text is never invisible. */
 
 @font-face {
-  font-family: "Barlow Condensed";
+  font-family: "Anton";
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400; /* Anton ships one weight — it is already the heavy one */
   font-display: swap;
-  src: url("./fonts/barlow-condensed-700.woff2") format("woff2");
+  src: url("./fonts/anton-400.woff2") format("woff2");
 }
 @font-face {
-  font-family: "Barlow Condensed";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("./fonts/barlow-condensed-800.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Inter";
+  font-family: "Epilogue";
   font-style: normal;
   font-weight: 400 700; /* one variable file covers the whole range */
   font-display: swap;
-  src: url("./fonts/inter-variable.woff2") format("woff2");
+  src: url("./fonts/epilogue-variable.woff2") format("woff2");
 }
 
 /* Pulse Studio — shared theme.
@@ -66,8 +59,8 @@
      is downloaded from anywhere, which keeps this site's promise that
      nothing about a visitor leaves their browser, and keeps the page fast
      on a phone in a locker room. */
-  --font-display: "Barlow Condensed", "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Anton", "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Epilogue", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* one color per developer */
   --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
@@ -120,25 +113,49 @@ a { color: var(--accent, var(--fg)); }
    who is trying to read a cancellation policy is how a page loses them. */
 h1, h2, h3, .display, .page-head .role, .brand {
   font-family: var(--font-display);
-  font-weight: 800;
-  /* A condensed face is already tight; pulling it in further would close
-     the counters. Slightly OPEN tracking keeps uppercase legible. */
-  letter-spacing: 0.005em;
+  /* Anton has exactly one weight. Asking for 700/800 makes the browser
+     SYNTHESISE a bold — smeared, heavier, wrong. Ask for what exists. */
+  font-weight: 400;
+  /* The luxury end of this category sets big uppercase TIGHT (Equinox runs
+     -0.02em at 64px). Anton is already condensed, so a small negative is
+     enough to make it feel set rather than typed. */
+  letter-spacing: -0.01em;
   text-transform: uppercase;
-  line-height: 1.02;
+  line-height: 1.0;
 }
-h1 { letter-spacing: 0; }
 
 /* The small line above a headline — the studio's own label for what is
    coming. Used on every surface, so it lives here now instead of being
    re-invented per page. */
 .eyebrow {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 0.8rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* ---------- photography ----------
+   Four pictures, four photographers, four rooms. One grade here makes them
+   one studio: a little desaturated so no stray colour fights the builder
+   accents, contrast lifted so dark rooms stay dark instead of grey.
+   Change it once and every picture on the site follows.
+
+   Note on the colour law: these are IMAGES — content in the page — not
+   page backgrounds. Every surface underneath is still var(--bg). */
+.studio-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.55) contrast(1.12) brightness(0.92);
+}
+.photo-frame {
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
 }
 
 /* developer scoping — the color law in one class */
@@ -155,9 +172,9 @@ h1 { letter-spacing: 0; }
   border-radius: 8px;
   padding: 11px 20px;
   font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
 }
