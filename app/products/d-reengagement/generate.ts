@@ -18,6 +18,7 @@
  * are loaded — a generated studio must never be mistaken for a real one.
  */
 
+import { brand } from "./config.js";
 import type {
   Attendance,
   ClassSession,
@@ -138,7 +139,13 @@ function isoFromDay(day: number): string {
 export function generateStudio(
   seed: number,
   todayIso: string,
-  timeZone = "America/New_York",
+  /* Defaulted from the brand seam, not from a literal. It read
+   * "America/New_York" until 2026-08-21, which happened to equal
+   * brand.timeZone and so looked correct — but main.ts calls this without
+   * the argument, so a studio that changed its time zone in config.ts
+   * would have kept New York hours in the generated door alone, agreeing
+   * with itself everywhere else. */
+  timeZone = brand.timeZone,
 ): GeneratedStudio {
   const random = makeRandom(seed);
   const today = dayNumber(todayIso);

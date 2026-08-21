@@ -2525,6 +2525,36 @@ check("clean records produce no data-quality line",
     result.flagged.map((f) => f.daysSince).sort((a, b) => a - b).join(","), "15,60");
 }
 
+/* THE BRAND SEAM IS A PROMISE THIS PRODUCT MAKES OUT LOUD.
+ *
+ * The README says every studio-specific value lives in config.ts and
+ * nothing else needs an edit. generate.ts broke that quietly: its
+ * timeZone parameter defaulted to a literal "America/New_York", and
+ * main.ts calls it WITHOUT the argument. A studio that changed its time
+ * zone would have had the generated door alone keep New York hours while
+ * agreeing with itself everywhere else.
+ *
+ * STATED LIMIT, because the first version of this block oversold itself:
+ * while brand.timeZone IS "America/New_York", a check comparing the two
+ * cannot tell a value sourced from the seam from a literal that happens to
+ * match. Reinstating the bug left all of these green, which is how the
+ * problem was found. The first check below is kept anyway — not because it
+ * discriminates today, but because it starts discriminating the moment a
+ * studio rebrands, which is the only moment the bug can cost anything. The
+ * third check of the first version was deleted: it asserted that two equal
+ * strings were equal, and dressed a tautology up as a proof. */
+{
+  const studio = generateStudio(20260818, "2026-08-18");
+  check("the generated studio's time zone agrees with the brand seam",
+    studio.records.timezone, brand.timeZone);
+  check("an explicit time zone still wins, for a host that knows better",
+    generateStudio(20260818, "2026-08-18", "Europe/Lisbon").records.timezone,
+    "Europe/Lisbon");
+  check("...and it really is used, not merely accepted and ignored",
+    generateStudio(20260818, "2026-08-18", "Europe/Lisbon").records.timezone ===
+      generateStudio(20260818, "2026-08-18").records.timezone, false);
+}
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 

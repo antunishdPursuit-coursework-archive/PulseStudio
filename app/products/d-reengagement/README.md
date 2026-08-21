@@ -123,12 +123,24 @@ http://localhost:4173/products/d-reengagement/ — the unit checks live at
 This product is built to be rebranded without touching its logic. The
 complete checklist — nothing else needs an edit:
 
-1. `config.ts` — new studio name, mailbox, voice, and (if ratified
-   differently) thresholds. The page title, back link, and footer all read
-   from this file at runtime.
-2. The shared theme's accent token for this product — one color change
+1. **The studio name lives in `app/shared/brand.ts`, not here.** `config.ts`
+   sources it through `deps.ts`, so renaming the studio is one line in that
+   shared file and the page title, the back link's label, the header word
+   and every draft follow at runtime.
+
+   This item used to say "`config.ts` — new studio name", and following it
+   literally leaves the page disagreeing with itself: the shared header
+   component reads `STUDIO_NAME` from `brand.ts` DIRECTLY, so overriding
+   the name here changes the title and the drafts while the word in the
+   header keeps the old one. Override here only when this product ships
+   standalone under its own name, and then expect to replace the shared
+   header too.
+2. `config.ts` — mailbox, studio URL, time zone, the outreach voice, and
+   (if ratified differently) the thresholds. Every studio-specific value
+   that is NOT the name lives here and nowhere else.
+3. The shared theme's accent token for this product — one color change
    recolors every control, glow, and pill on the page.
-3. The `theme-color` meta tag in `index.html` — the one hex a meta tag
+4. The `theme-color` meta tag in `index.html` — the one hex a meta tag
    cannot read from a CSS token; set it to the new accent.
 
 The rule, the evidence, and the checks carry over as-is: the unit checks
