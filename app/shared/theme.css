@@ -183,3 +183,9 @@ a { color: var(--accent, var(--fg)); }
 .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
 .home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent, var(--fg)); }
 .home-brand:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
+
+/* The label naming what a page IS, sitting beside the brand in the same
+   header ("Book a class", "Member Re-engagement"). Every product header
+   shows one, so it is styled ONCE here — a copy pasted into a product's
+   own stylesheet is the drift this file exists to prevent. */
+.page-head .role { color: var(--accent, var(--fg)); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
