@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Are we ready to present?</title>
+  <meta name="description" content="The team's presentation-readiness board: the verdict, the one-picture diagram, the five-minute demo path, the proofs, and what is still open — kept honest by hand.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./theme.css">
+  <style>
+    /* Status colors, semantic and page-local, same convention as
+       storytold.html: green = proven, red = open. Builder accents keep
+       meaning who built what. */
+    :root { --done: #10b981; --todo: #ef4444; }
+    main { max-width: 880px; }
+
+    .verdict { border: 2px solid var(--done); border-radius: 14px; padding: 18px 20px; margin-top: 24px; }
+    .verdict h2 { margin: 0 0 6px; font-size: 1.25rem; }
+    .verdict p { margin: 0; color: var(--muted); }
+
+    .chip { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 0.8rem; font-weight: 700; }
+    .chip.a { background: var(--kerrian); color: var(--kerrian-ink); }
+    .chip.b { background: var(--manny); color: var(--manny-ink); }
+    .chip.c { background: var(--dennis); color: var(--dennis-ink); }
+    .chip.d { background: var(--rensley); color: var(--rensley-ink); }
+
+    h2.sect { margin: 34px 0 10px; font-size: 1.15rem; }
+
+    /* the three-box diagram */
+    .diagram { border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; }
+    .diagram svg { display: block; width: 100%; height: auto; min-width: 560px; }
+    .diagram .box rect { fill: var(--bg); stroke: var(--fg); stroke-width: 2; rx: 10; }
+    .diagram .box.mid rect { stroke: var(--rensley); stroke-width: 2.5; }
+    .diagram text { font: 600 13px system-ui, sans-serif; fill: var(--fg); }
+    .diagram .small { font-weight: 400; font-size: 11.5px; fill: var(--muted); }
+    .diagram .arrow { stroke: var(--fg); stroke-width: 2; marker-end: url(#head); }
+    .diagram .alabel { font-weight: 400; font-size: 11px; fill: var(--muted); }
+    .trace { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 0; color: var(--muted); font-size: 0.95rem; }
+    .trace strong { color: var(--fg); }
+    .trace .to { color: var(--muted); }
+
+    .say { border-left: 4px solid var(--rensley); padding-left: 14px; margin-top: 16px; }
+    .say p { margin: 6px 0; }
+
+    ol.demo { padding-left: 20px; }
+    ol.demo li { margin: 9px 0; color: var(--muted); }
+    ol.demo li strong { color: var(--fg); }
+
+    .proofs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 700px) { .proofs { grid-template-columns: 1fr; } }
+    .proofs a { display: block; border: 1px solid var(--done); border-radius: 12px; padding: 12px 14px; color: var(--fg); text-decoration: none; }
+    .proofs a strong { display: block; color: var(--done); }
+    .proofs a span { color: var(--muted); font-size: 0.88rem; }
+
+    ul.open { list-style: none; padding: 0; }
+    ul.open li { position: relative; margin: 8px 0; padding-left: 22px; color: var(--muted); }
+    ul.open li::before { content: ""; position: absolute; left: 2px; top: 0.5em; width: 10px; height: 10px; border-radius: 50%; background: var(--todo); }
+    ul.open li strong { color: var(--fg); }
+
+    .kit { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 8px; }
+    .kit a { color: var(--fg); }
+    .note { color: var(--muted); font-size: 0.9rem; margin-top: 22px; }
+  </style>
+</head>
+<body data-no-session>
+  <header class="page-head">
+    <a class="back" href="../index.html">← Home</a>
+    <h1>Are we ready to present?</h1>
+  </header>
+  <main>
+    <div class="verdict">
+      <h2>Presentable today — not finished, and this page says which is which.</h2>
+      <p>The five-minute demo below is proven end to end on the live site as of
+      August 20, 2026. What is still open is listed in red with its owner —
+      presenting the red as red is the discipline, not a weakness. One demo
+      note while the Dashboard still runs its own studio: book from the
+      Dashboard's own week (step 4) so the meter you point at is the class
+      you booked.</p>
+    </div>
+
+    <h2 class="sect">The one picture (say it pointing, one sentence per box)</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 860 190">
+        <defs>
+          <marker id="head" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0 0 L6 3 L0 6 z" fill="var(--fg)"/>
+          </marker>
+        </defs>
+        <g class="box">
+          <rect x="10" y="40" width="240" height="86"/>
+          <text x="130" y="70" text-anchor="middle">A member's taps and visits</text>
+          <text x="130" y="90" text-anchor="middle" class="small">booked · canceled · asked · attended —</text>
+          <text x="130" y="106" text-anchor="middle" class="small">recorded in their own browser</text>
+        </g>
+        <g class="box mid">
+          <rect x="310" y="40" width="240" height="86"/>
+          <text x="430" y="70" text-anchor="middle">Keeps every tap and visit</text>
+          <text x="430" y="88" text-anchor="middle">in one trail, and works out</text>
+          <text x="430" y="106" text-anchor="middle">what to do next</text>
+        </g>
+        <g class="box">
+          <rect x="610" y="40" width="240" height="86"/>
+          <text x="730" y="70" text-anchor="middle">The week filled, questions</text>
+          <text x="730" y="88" text-anchor="middle">answered, and today's short</text>
+          <text x="730" y="106" text-anchor="middle">reach-out list, drafts ready</text>
+        </g>
+        <line class="arrow" x1="250" y1="83" x2="304" y2="83"/>
+        <text class="alabel" x="277" y="72" text-anchor="middle">one tap, one row</text>
+        <line class="arrow" x1="550" y1="83" x2="604" y2="83"/>
+        <text class="alabel" x="577" y="72" text-anchor="middle">read live, never sent</text>
+      </svg>
+      <p class="trace"><strong>60 members</strong> <span class="to">→</span>
+        <strong>10 gone quiet</strong> <span class="to">→</span>
+        <strong>1 already booked back in</strong> <span class="to">→</span>
+        <strong>9 drafts for staff to send</strong>
+        <span class="to">— every drop is a decision the middle box made, measured today.</span></p>
+    </div>
+    <div class="say">
+      <p><strong>1.</strong> Everything starts as one member's tap or visit, recorded once, in their own browser.</p>
+      <p><strong>2.</strong> The studio keeps all of it in one trail and works out what to do next.</p>
+      <p><strong>3.</strong> Staff get the week filled, members get straight answers, and the quiet get a personal draft a person sends.</p>
+    </div>
+
+    <h2 class="sect">The five-minute demo path (each step verified live)</h2>
+    <ol class="demo">
+      <li><strong>Open the front door.</strong> It speaks to a member — book, ask, and "never go unnoticed" — and the pulse line beats.</li>
+      <li><strong>Sign in from the top bar</strong> as a member: the front door greets them by name and takes them straight to their classes; the same persona follows every page.</li>
+      <li><strong>Book a class</strong> <span class="chip a">Booking</span> — Today first, spots left live, "Your classes" on top.</li>
+      <li><strong>Open the Dashboard</strong> <span class="chip b">Dashboard</span> — the class just booked counts on its meter, the same minute.</li>
+      <li><strong>Ask the assistant</strong> <span class="chip c">Support</span> a schedule question — answered from today's real schedule, refusals stated.</li>
+      <li><strong>Sign in as Front Desk and open Re-engagement</strong> <span class="chip d">Re-engage</span> — the quiet ranked with evidence; a member who booked back in is named and left alone; copy the draft.</li>
+      <li><strong>Close on the story:</strong> <a href="./storytold.html">storytold</a> — the five beats and the map where every finished hand-off literally fires.</li>
+    </ol>
+
+    <h2 class="sect">The proofs (open them live, read the verdict line)</h2>
+    <div class="proofs">
+      <a href="./auth/tests.html"><strong>27 / 27</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
+      <a href="../products/d-reengagement/tests.html"><strong>92 / 92</strong>Re-engagement — rules, CSV door, live trail, coming-back<span></span></a>
+      <a href="./synthetic/tests.html"><strong>160 / 160</strong>Studio engine — determinism, truth key, fill knob, scale<span></span></a>
+    </div>
+
+    <h2 class="sect">Still open (red is red — say it in the room)</h2>
+    <ul class="open">
+      <li><strong><span class="chip b">B</span> converges onto the shared studio</strong> — the Dashboard reads Booking's live log, but still generates its own studio (its own seed, frozen at Aug 19), so a member's real reservation can be rejected or pinned to a different class. One config line. Owner: Manny (round-two instructions sent, code included).</li>
+      <li><strong><span class="chip a">A</span> polish round</strong> — member-voice header, Today/Tomorrow chips, your-classes-first, the winter-wrong -04:00. Owner: Kerrian (round-two instructions sent, code included).</li>
+      <li><strong>Two law ratifications</strong> — the appearance amendment and the audience law await the four builders' explicit yes on their PRs.</li>
+      <li><strong><span class="chip b">B</span> housekeeping</strong> — the stale second page and dead module still deploy; scheduled for deletion in Manny's round two.</li>
+    </ul>
+
+    <h2 class="sect">The presentation kit</h2>
+    <div class="kit">
+      <a href="../index.html">The live front door</a>
+      <a href="./storytold.html">Storytold — the story and the firing map</a>
+      <a href="./README.md">The shared folder index</a>
+      <a href="https://github.com/antunishdPursuit/PulseStudio">Source</a>
+    </div>
+
+    <p class="note">Kept honest by hand, like storytold: when an open item closes,
+    move it out of the red list in THIS file and state it in the commit. If the
+    verdict ever claims more than the proofs show, fix the verdict, not the
+    proofs.</p>
+  </main>
+  <script type="module" src="./theme-boot.js"></script>
+</body>
+</html>

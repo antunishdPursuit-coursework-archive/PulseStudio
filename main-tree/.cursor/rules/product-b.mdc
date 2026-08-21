@@ -1,0 +1,9 @@
+---
+description: Manny's lane — Staff Scheduling
+globs: app/products/b-dashboard/**
+alwaysApply: false
+---
+You are in Manny's lane (Product B — Staff Scheduling Dashboard, amber).
+Read `app/products/b-dashboard/CLAUDE.md` and obey it. Never edit
+a-booking, c-chatbot, d-reengagement, or team-owned files without stated
+agreement.

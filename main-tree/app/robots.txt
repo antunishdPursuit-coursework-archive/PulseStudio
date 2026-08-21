@@ -1,0 +1,28 @@
+# Pulse Studio — crawling rules.
+# TEAM-OWNED: these rules protect member privacy sitewide.
+#
+# Member-facing pages are public. Staff-facing pages are NOT: they show
+# rosters, attendance, and cancellation-risk information, which the shared
+# data contract says must never leave the studio.
+#
+# THE TRAP THIS FILE AVOIDS — worth reading before editing it:
+# "Disallow" blocks CRAWLING, not indexing. A disallowed page can still be
+# listed from links pointing at it, and worse: a crawler that is not allowed
+# to fetch a page can never SEE that page's noindex tag. So disallowing a
+# page that carries noindex actively prevents the noindex from working.
+#
+# Therefore:
+#   - The re-engagement tool carries <meta name="robots" content="noindex,
+#     nofollow">. It is deliberately CRAWLABLE so that tag gets read and
+#     honoured — that is the guaranteed way to stay out of an index.
+#   - The staff dashboard has no such tag yet, so blocking the crawl is the
+#     only protection its roster content has. When its owner adds the meta
+#     tag, DELETE its Disallow line below so the tag can do the stronger job.
+#
+# Neither of these is a security control. A staff page holding real member
+# data belongs behind a sign-in, not behind a politeness request.
+
+User-agent: *
+Disallow: /products/b-dashboard/
+
+Sitemap: https://antunishdpursuit.github.io/PulseStudio/sitemap.xml

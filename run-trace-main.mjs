@@ -1,0 +1,16 @@
+const A = "/private/tmp/claude-502/-Users-Rensley-Desktop-claude-fleet/c29fe360-1f82-4c72-998a-d0c880479f0e/scratchpad/d-brand-fix/main-tree/app/";
+globalThis.localStorage = { getItem:()=>null, setItem:()=>{}, removeItem:()=>{} };
+const { sharedStudio } = await import(A+"shared/auth/studio.js");
+const { fixtureSetFrom } = await import(A+"products/d-reengagement/live-studio.js");
+const { findQuietMembers, todayDayNumber, upcomingReservedMemberIds } = await import(A+"products/d-reengagement/logic.js");
+const { proposedRules } = await import(A+"products/d-reengagement/config.js");
+const ds = sharedStudio();
+const data = fixtureSetFrom(ds, []);
+const today = todayDayNumber(data.timezone);
+const res = findQuietMembers(data, today, proposedRules);
+const coming = upcomingReservedMemberIds(data, today);
+const back = res.flagged.filter(f=>coming.has(f.member.member_id));
+console.log("dataset members:", ds.members.length, "| contract members:", data.members.length);
+console.log("flagged:", res.flagged.length, "| already booked back in:", back.length, "| drafts:", res.flagged.length - back.length);
+console.log("names back:", back.map(f=>f.member.display_name));
+console.log("unmatched:", res.unmatchedAttendanceCount, "unusable:", res.unusableEvidenceCount);

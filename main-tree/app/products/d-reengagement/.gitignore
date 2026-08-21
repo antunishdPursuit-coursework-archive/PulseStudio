@@ -1,0 +1,5 @@
+# The reviewer bundle is a generated copy of files already tracked in git.
+# Committing it would put a second, silently-drifting copy of the source in
+# the repo — the same problem as committing build output. Regenerate with
+# `sh bundle.sh`; it stamps the commit it was built from.
+product-d-sources.md

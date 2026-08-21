@@ -61,7 +61,7 @@ commit;
 
 -- Seeding a staff login (run by the studio owner, never committed):
 --   insert into logins (email, member_id, password_hash, role)
---   values ('frontdesk@example-studio.com', null,
+--   values ('frontdesk@your-studio.com', null,
 --           crypt('their-chosen-password', gen_salt('bf')), 'staff');
 --
 -- Verifying a password at sign-in (the whole check is one comparison —

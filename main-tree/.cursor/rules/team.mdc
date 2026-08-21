@@ -1,0 +1,14 @@
+---
+description: Pulse Studio team laws — always on
+alwaysApply: true
+---
+Before your first edit, identify your developer — Kerrian (A/booking),
+Manny (B/dashboard), Dennis (C/chatbot), or Rensley (D/re-engagement) —
+and work only in their lane. Read the repo root `CLAUDE.md` (or its mirror
+`AGENTS.md`) and the brief inside the folder you are editing, and obey
+both. Non-negotiables: edit only your own product folder; `app/shared/`
+and root files are team-owned and change only with stated agreement; the
+words "demo", "example", and "mock" appear nowhere; no AI attribution or
+co-author trailers anywhere; backgrounds are black or white only and every
+feature carries its developer's color; run `npm run check` before every
+commit and never commit red.

@@ -10,7 +10,7 @@ location, one shared record set**. Product D reads `member`, `membership`,
 nothing shared, and drafts outreach that staff send themselves. Verify any
 claim I make from this folder: open
 `/products/d-reengagement/tests.html` — it states
-"27 checks run, 27 passed, 0 failed" — and the page itself states
+"92 checks run, 92 passed, 0 failed" — and the page itself states
 "5 members checked, 1 flagged as of <today>".
 
 ---

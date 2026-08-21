@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse Studio — book classes, ask anything, stay seen</title>
+  <meta name="description" content="Group fitness classes on one simple membership. Book your spot in seconds, get straight answers about the schedule, and if life pulls you away for a while, a real person notices.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pulse Studio">
+  <meta property="og:description" content="Group classes on one simple membership — book in seconds, ask anything, and be missed when you're gone.">
+  <meta property="og:url" content="https://antunishdpursuit.github.io/PulseStudio/">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://antunishdpursuit.github.io/PulseStudio/">
+  <link rel="stylesheet" href="./shared/theme.css">
+  <link rel="stylesheet" href="./shared/home.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ExerciseGym",
+    "name": "Pulse Studio",
+    "description": "A single-location boutique fitness studio offering group classes on monthly memberships.",
+    "url": "https://antunishdpursuit.github.io/PulseStudio/",
+    "amenityFeature": [
+      { "@type": "LocationFeatureSpecification", "name": "Yoga", "value": true },
+      { "@type": "LocationFeatureSpecification", "name": "Cycling", "value": true },
+      { "@type": "LocationFeatureSpecification", "name": "HIIT", "value": true }
+    ]
+  }
+  </script>
+</head>
+<body class="home">
+  <header class="topnav">
+    <a class="brand" href="./">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="currentColor"
+              stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span data-studio-name>Pulse Studio</span>
+    </a>
+    <nav class="nav-links" aria-label="This studio">
+      <a href="#booking">Book a class</a>
+      <a href="#support">Ask us</a>
+      <a href="#staff">Staff tools</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- THE AUDIENCE LAW: this page speaks to the studio's member. The
+         builders' story lives where it belongs: shared/storytold.html. -->
+    <section class="hero" aria-label="Pulse Studio">
+      <p class="eyebrow">Group classes · yoga, cycling, HIIT, pilates, strength</p>
+      <h1>
+        <span class="clause clause-a">Book your spot.</span>
+        <span class="clause clause-b">Catch every class.</span>
+        <span class="clause clause-c">Ask us anything.</span>
+        <span class="clause clause-d">Never go unnoticed.</span>
+      </h1>
+      <p class="lede">One simple membership, one studio that pays attention: book in
+      seconds, get straight answers about the schedule, and if life pulls you away
+      for a few weeks, a real person notices and reaches out.</p>
+      <p class="member-hello" id="member-hello" aria-live="polite"></p>
+      <div class="cta-row">
+        <a class="btn btn-lg product-a" href="./products/a-booking/">Book a class</a>
+        <a class="btn-ghost-lg" href="./products/c-chatbot/">Ask a question</a>
+      </div>
+      <!-- one pulse line through all four colors -->
+      <svg class="pulse-art" viewBox="0 0 960 120" fill="none" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="pulse-grad" x1="0" y1="0" x2="960" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0"    stop-color="var(--kerrian, #3b82f6)"/>
+            <stop offset="0.35" stop-color="var(--manny, #f59e0b)"/>
+            <stop offset="0.65" stop-color="var(--dennis, #10b981)"/>
+            <stop offset="1"    stop-color="var(--rensley, #8b5cf6)"/>
+          </linearGradient>
+        </defs>
+        <path class="trace" d="M0 70 H150 l22-34 26 62 24-42 18 14 H370 l20-52 30 76 22-38 16 14 H610 l18-26 24 44 20-56 22 34 H840 l16-20 20 20 H960"
+              stroke="url(#pulse-grad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- a brighter pulse that keeps running the same line -->
+        <path class="runner" d="M0 70 H150 l22-34 26 62 24-42 18 14 H370 l20-52 30 76 22-38 16 14 H610 l18-26 24 44 20-56 22 34 H840 l16-20 20 20 H960"
+              stroke="url(#pulse-grad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </section>
+
+    <section class="truths" aria-label="How this studio treats you">
+      <div><strong>Your data stays yours</strong><span>Booking and sign-in run in your browser; your records never leave it.</span></div>
+      <div><strong>A person, not a machine</strong><span>Any note from the studio is written, reviewed, and sent by real staff.</span></div>
+      <div><strong>Straight answers</strong><span>Questions are answered from the current schedule and written policies — and we say so when we can't.</span></div>
+      <div><strong>Fair cancellation</strong><span>Cancel up to 12 hours before class at no charge.</span></div>
+    </section>
+
+    <div class="products-head" id="members">
+      <h2>For members</h2>
+      <p>Everything you need between classes — no app to install, no account
+      password to invent.</p>
+    </div>
+
+    <section class="home-product product-a" id="booking" aria-label="Book a class">
+      <div class="home-copy">
+        <span class="chip">Booking</span>
+        <h3>Book a class in seconds</h3>
+        <p class="lede">The week's schedule, live spots left, and your reservations in one place.</p>
+        <ul class="feature-list">
+          <li>See every class this week, day by day, with spaces remaining</li>
+          <li>Sign in with the email or name on your membership — no password</li>
+          <li>Your reservations show only to you; other members' names stay hidden</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/a-booking/">Book a class</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-week">
+          <i class="on"></i><i></i><i class="half"></i><i class="on"></i><i></i><i class="on"></i><i class="half"></i>
+          <i></i><i class="on"></i><i class="on"></i><i class="half"></i><i class="on"></i><i></i><i class="on"></i>
+          <i class="half"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="half"></i><i></i>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-product product-c flip" id="support" aria-label="Ask us anything">
+      <div class="home-copy">
+        <span class="chip">Support</span>
+        <h3>Ask us anything, any hour</h3>
+        <p class="lede">Classes, levels, instructors, policies — answered from what's actually true today.</p>
+        <ul class="feature-list">
+          <li>Answers come from the current schedule and the studio's written policies</li>
+          <li>When there's no good answer, we say so instead of inventing one</li>
+          <li>Your questions stay in your browser, like everything else here</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/c-chatbot/">Ask a question</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-chat">
+          <i></i><i class="reply"></i><i></i><i class="reply"></i>
+        </div>
+      </div>
+    </section>
+
+    <div class="products-head staff-head" id="staff">
+      <h2>For the studio team</h2>
+      <p class="staff-note" id="staff-note">Staff only — sign in as Front Desk from the top bar.</p>
+    </div>
+
+    <section class="home-product product-b" id="schedule" aria-label="Staff: the Dashboard">
+      <div class="home-copy">
+        <span class="chip">The Dashboard · staff</span>
+        <h3>Watch the week fill</h3>
+        <p class="lede">Every class's fill rate as members book, with the ones needing attention flagged.</p>
+        <ul class="feature-list">
+          <li>The week at a glance: sessions, reservations, and spots left</li>
+          <li>Underbooked and filling-fast classes called out by name</li>
+          <li>Live: a member's booking moves these meters the same minute</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/b-dashboard/">Open the Dashboard</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-meters">
+          <i style="--w: 88%"></i>
+          <i style="--w: 34%"></i>
+          <i style="--w: 71%"></i>
+          <i style="--w: 52%"></i>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-product product-d flip" id="reengagement" aria-label="Staff: Member Re-engagement">
+      <div class="home-copy">
+        <span class="chip">Re-engagement · staff</span>
+        <h3>Notice who's gone quiet</h3>
+        <p class="lede">Members who used to come and stopped, ranked by who's most worth reaching first — with the evidence and a draft ready.</p>
+        <ul class="feature-list">
+          <li>Quiet more than 14 days, with last visit, usual class, and instructor shown</li>
+          <li>A member already booked back in is stated by name and left alone</li>
+          <li>Drafts only — a person reads, decides, and sends every message</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/d-reengagement/">Open Re-engagement</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-quiet">
+          <div class="beats"><i></i><i></i><i></i><i class="fade1"></i><i class="fade2"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+          <div class="flagline"></div>
+          <div class="beats"><i></i><i class="fade1"></i><i></i><i></i><i class="fade2"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+          <div class="flagline"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span class="foot-brand" data-studio-name>Pulse Studio</span>
+    <a href="./products/a-booking/">Book a class</a>
+    <a href="./products/c-chatbot/">Ask us</a>
+    <a href="#staff">Staff tools</a>
+    <a href="./shared/storytold.html">How this studio's software flows</a>
+    <a href="https://github.com/antunishdPursuit/PulseStudio">Source</a>
+  </footer>
+
+  <script type="module" src="./shared/theme-boot.js"></script>
+  <script type="module" src="./shared/home.js"></script>
+</body>
+</html>

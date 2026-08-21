@@ -478,4 +478,4 @@ hand-chosen mutations that survive are worth more than a tool's score.
 **34. Exclude pure visual taste.** Raise visual issues only when they
 demonstrate a law violation (backgrounds must be black or white; features carry
 the owner's colour), an accessibility problem, or a workflow failure — for
-example, evidence a staff member cannot read at a glance.
+instance, evidence a staff member cannot read at a glance.

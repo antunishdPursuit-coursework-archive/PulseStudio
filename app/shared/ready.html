@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Are we ready to present?</title>
-  <meta name="description" content="The team's presentation-readiness board: the verdict, the one-picture diagram, the five-minute demo path, the proofs, and what is still open — kept honest by hand.">
+  <meta name="description" content="The team's presentation-readiness board: the verdict, the one-picture diagram, the five-minute walkthrough, the proofs, and what is still open — kept honest by hand.">
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
@@ -44,9 +44,9 @@
     .say { border-left: 4px solid var(--rensley); padding-left: 14px; margin-top: 16px; }
     .say p { margin: 6px 0; }
 
-    ol.demo { padding-left: 20px; }
-    ol.demo li { margin: 9px 0; color: var(--muted); }
-    ol.demo li strong { color: var(--fg); }
+    ol.walk { padding-left: 20px; }
+    ol.walk li { margin: 9px 0; color: var(--muted); }
+    ol.walk li strong { color: var(--fg); }
 
     .proofs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     @media (max-width: 700px) { .proofs { grid-template-columns: 1fr; } }
@@ -72,12 +72,14 @@
   <main>
     <div class="verdict">
       <h2>Presentable today — not finished, and this page says which is which.</h2>
-      <p>The five-minute demo below is proven end to end on the live site as of
-      August 20, 2026. What is still open is listed in red with its owner —
-      presenting the red as red is the discipline, not a weakness. One demo
-      note while the Dashboard still runs its own studio: book from the
-      Dashboard's own week (step 4) so the meter you point at is the class
-      you booked.</p>
+      <p>Every step of the walkthrough below runs on the live site today —
+      with ONE exception, called out in red inside the walkthrough itself and
+      again below: a member's booking cannot reach the Dashboard's meters,
+      because the Dashboard still builds its own studio. An adversarial audit
+      on August 20, 2026 caught that this page had claimed otherwise; the
+      claim is gone and the gap is stated. Presenting the red as red is the
+      discipline — and if the verdict ever claims more than the proofs show,
+      the verdict is what gets fixed.</p>
     </div>
 
     <h2 class="sect">The one picture (say it pointing, one sentence per box)</h2>
@@ -123,12 +125,12 @@
       <p><strong>3.</strong> Staff get the week filled, members get straight answers, and the quiet get a personal draft a person sends.</p>
     </div>
 
-    <h2 class="sect">The five-minute demo path (each step verified live)</h2>
-    <ol class="demo">
+    <h2 class="sect">The five-minute walkthrough</h2>
+    <ol class="walk">
       <li><strong>Open the front door.</strong> It speaks to a member — book, ask, and "never go unnoticed" — and the pulse line beats.</li>
       <li><strong>Sign in from the top bar</strong> as a member: the front door greets them by name and takes them straight to their classes; the same persona follows every page.</li>
-      <li><strong>Book a class</strong> <span class="chip a">Booking</span> — Today first, spots left live, "Your classes" on top.</li>
-      <li><strong>Open the Dashboard</strong> <span class="chip b">Dashboard</span> — the class just booked counts on its meter, the same minute.</li>
+      <li><strong>Book a class</strong> <span class="chip a">Booking</span> — the week day by day, spots left, and a confirmation naming the class, time, and instructor. Your reservations appear under the schedule with a cancel on each.</li>
+      <li><strong>Open the Dashboard</strong> <span class="chip b">Dashboard</span> — the week's fill rates and the classes needing attention. <strong>Say the gap out loud here:</strong> this board still builds its own studio, so the booking from step 3 is not on it yet — one config line away, and the honest thing to show.</li>
       <li><strong>Ask the assistant</strong> <span class="chip c">Support</span> a schedule question — answered from today's real schedule, refusals stated.</li>
       <li><strong>Sign in as Front Desk and open Re-engagement</strong> <span class="chip d">Re-engage</span> — the quiet ranked with evidence; a member who booked back in is named and left alone; copy the draft.</li>
       <li><strong>Close on the story:</strong> <a href="./storytold.html">storytold</a> — the five beats and the map where every finished hand-off literally fires.</li>
@@ -136,13 +138,18 @@
 
     <h2 class="sect">The proofs (open them live, read the verdict line)</h2>
     <div class="proofs">
-      <a href="./auth/tests.html"><strong>27 / 27</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
+      <a href="./auth/tests.html"><strong>32 / 32</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
       <a href="../products/d-reengagement/tests.html"><strong>92 / 92</strong>Re-engagement — rules, CSV door, live trail, coming-back<span></span></a>
       <a href="./synthetic/tests.html"><strong>160 / 160</strong>Studio engine — determinism, truth key, fill knob, scale<span></span></a>
     </div>
 
     <h2 class="sect">Still open (red is red — say it in the room)</h2>
     <ul class="open">
+      <li><strong>A booking never reaches the Dashboard's meters</strong> — the
+      Dashboard reads Booking's log but generates its own studio, so the class
+      ids never match and every row is rejected. Measured on August 20, 2026:
+      zero shared class ids out of 75. This is the one hand-off on the story
+      map that is red. Owner: Manny — one config line.</li>
       <li><strong><span class="chip b">B</span> converges onto the shared studio</strong> — the Dashboard reads Booking's live log, but still generates its own studio (its own seed, frozen at Aug 19), so a member's real reservation can be rejected or pinned to a different class. One config line. Owner: Manny (round-two instructions sent, code included).</li>
       <li><strong><span class="chip a">A</span> polish round</strong> — member-voice header, Today/Tomorrow chips, your-classes-first, the winter-wrong -04:00. Owner: Kerrian (round-two instructions sent, code included).</li>
       <li><strong>Two law ratifications</strong> — the appearance amendment and the audience law await the four builders' explicit yes on their PRs.</li>

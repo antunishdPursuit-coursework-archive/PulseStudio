@@ -1,0 +1,102 @@
+.topbar { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 3px solid var(--accent); }
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
+.topbar a:last-of-type { margin-left: auto; }
+
+.shell { padding: 24px; max-width: 960px; margin: 0 auto; }
+.hero { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+.eyebrow, h2 { color: var(--muted); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.eyebrow { margin: 0 0 8px; }
+h1 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 700; }
+h2 { margin: 0; }
+.lede { color: var(--muted); max-width: 40rem; margin: 0; }
+
+.current-week-row { display: flex; justify-content: flex-end; margin-top: 20px; }
+.current-week-link { background: var(--bg); color: var(--accent); border: 0; padding: 4px 0; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.current-week-link:hover { color: var(--fg); }
+.current-week-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.current-week-link:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+.week-picker { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: stretch; gap: 10px; margin-top: 8px; }
+.week-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.week-option, .week-arrow { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+.week-option:hover, .week-arrow:hover { border-color: var(--accent); color: var(--accent); }
+.week-option:focus-visible, .week-arrow:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.week-option.selected { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+.week-arrow:disabled { cursor: not-allowed; opacity: 0.45; }
+.publish-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; }
+.publish-row p { color: var(--muted); margin: 0; }
+
+.primary, .text-button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+.primary:hover, .text-button:hover { filter: brightness(1.08); }
+.primary:disabled { cursor: not-allowed; opacity: 0.45; }
+.primary:focus-visible, .text-button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.text-button { margin-top: 10px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 28px 0 24px; }
+.stats article, .panel { border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 10px; padding: 16px 20px; background: var(--bg); }
+.stats span, .stats small { display: block; color: var(--muted); }
+.stats strong { display: block; color: var(--accent); font-size: 1.8rem; margin: 4px 0; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr); gap: 24px; }
+.wide { min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.weekly-enrollment { color: var(--accent); font-weight: 700; margin: 8px 0 0; }
+.weekly-reservations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 3rem; margin-top: 12px; }
+.reservation-total { background: var(--bg); min-width: 0; padding: 4px 0; }
+.reservation-total.reserved { color: inherit; text-decoration: none; }
+.reservation-total.reserved strong, .reservation-total.reserved span { text-decoration: underline; text-underline-offset: 3px; }
+.reservation-total.reserved:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.reservation-total strong, .reservation-total span { display: block; }
+.reservation-total strong { font-size: 1.15rem; }
+.reservation-total span { color: var(--muted); font-size: 0.75rem; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reservation-total.reserved strong { color: var(--accent); }
+.reservation-total.waitlisted strong { color: var(--fg); }
+.reservation-total.canceled strong { color: var(--muted); }
+.panel-head label, form label { color: var(--fg); display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+.panel-head label small, form label small { color: var(--muted); font-size: 0.75rem; font-weight: 400; }
+select, input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
+select:hover, input:hover { border-color: var(--accent); }
+option { background: var(--bg); color: var(--fg); }
+.sessions { display: grid; gap: 12px; max-height: min(42rem, 70vh); overflow-y: auto; overscroll-behavior: contain; padding: 12px 8px 4px 2px; scrollbar-color: var(--accent) var(--bg); }
+
+.session { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(8rem, 1fr) minmax(4rem, .7fr) minmax(7rem, .8fr); gap: 14px; align-items: center; padding: 16px 20px; border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 10px; background: var(--bg); }
+.session h3 { margin: 0; font-size: 1.05rem; }
+.session small { color: var(--muted); }
+.session strong { color: var(--fg); }
+.session .text-button { padding: 8px 14px; }
+.meter, .room-bar { height: 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.meter i, .room-bar i { display: block; height: 100%; background: var(--accent); }
+.meter i.warn, .meter i.full { background: var(--accent); }
+.status, .status.warn, .status.full { display: inline-block; background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; padding: 4px 9px; text-transform: uppercase; }
+.room { margin: 16px 0; }
+.room-line { display: flex; justify-content: space-between; gap: 12px; }
+.room-line span { color: var(--muted); }
+.callout { background: var(--bg); border: 1px solid var(--accent); border-radius: 10px; padding: 14px 16px; margin-top: 20px; }
+.callout p { color: var(--muted); line-height: 1.5; }
+
+.roster-table { width: 100%; border-collapse: collapse; margin-top: 18px; text-align: left; }
+.roster-table th { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.roster-table th, .roster-table td { border: 0; padding: 10px 12px; }
+.roster-table td { color: var(--fg); }
+.roster-back-link { color: var(--accent); display: inline-block; font-weight: 600; margin-bottom: 10px; text-underline-offset: 3px; }
+.roster-back-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+dialog { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: none; padding: 0; }
+dialog::backdrop { background: var(--bg); opacity: 0.75; }
+form { display: grid; gap: 14px; width: min(90vw, 760px); padding: 28px; }
+.dialog-week, .schedule-status { color: var(--muted); margin: 0; }
+.schedule-draft { border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 10px; padding: 14px 16px; }
+.draft-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.draft-head h3 { margin: 0; }
+.draft-head span { color: var(--accent); font-weight: 700; }
+.draft-table-wrap { overflow-x: auto; }
+.draft-table { width: 100%; border-collapse: collapse; text-align: left; }
+.draft-table th { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.draft-table th, .draft-table td { padding: 9px 10px; white-space: nowrap; }
+.draft-table tbody tr + tr { border-top: 1px solid var(--line); }
+.draft-empty { color: var(--muted); margin: 0; }
+.confirm-schedule { justify-self: end; }
+.close { background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--fg); cursor: pointer; font-size: 1.2rem; padding: 3px 9px; position: absolute; right: 14px; top: 10px; }
+.close:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 800px) { .topbar { flex-wrap: wrap; } .topbar a:last-of-type { margin-left: 0; } .week-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .publish-row { align-items: stretch; flex-direction: column; } .stats, .grid { grid-template-columns: 1fr; } .session { grid-template-columns: 1fr 1fr; } .session .fill { grid-column: 1 / -1; } }
