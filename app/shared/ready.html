@@ -137,6 +137,9 @@
     </ol>
 
     <h2 class="sect">The proofs (open them live, read the verdict line)</h2>
+    <p class="note">All three also run on every push: <code>npm run check</code>
+    runs them headlessly and the build fails on a single red check. Before
+    2026-08-21 they ran only when somebody opened these pages.</p>
     <div class="proofs">
       <a href="./auth/tests.html"><strong>32 / 32</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
       <a href="../products/d-reengagement/tests.html"><strong>92 / 92</strong>Re-engagement — rules, CSV door, live trail, coming-back<span></span></a>
@@ -152,8 +155,28 @@
       map that is red. Owner: Manny — one config line.</li>
       <li><strong><span class="chip b">B</span> converges onto the shared studio</strong> — the Dashboard reads Booking's live log, but still generates its own studio (its own seed, frozen at Aug 19), so a member's real reservation can be rejected or pinned to a different class. One config line. Owner: Manny (round-two instructions sent, code included).</li>
       <li><strong><span class="chip a">A</span> polish round</strong> — member-voice header, Today/Tomorrow chips, your-classes-first, the winter-wrong -04:00. Owner: Kerrian (round-two instructions sent, code included).</li>
+      <li><strong>Eight dead files still sit in the repo root</strong> — the
+      site we had before Pages switched to publishing <code>app/</code>. All
+      unreachable: root <code>index.html</code> is shadowed by
+      <code>app/index.html</code>, the other seven return 404. Six are Manny's,
+      one Kerrian's, one the team lead's, so none could be removed from Product
+      D's lane. The asks are written per owner in
+      <code>docs/REQUESTFOR-A-B-C.md</code>.</li>
+      <li><strong>The deploy boundary is a setting, not a fact</strong> —
+      GitHub's legacy builder still records the repo root as its Pages source
+      underneath the Actions deploy. If anyone flips Settings → Pages → Source
+      back, those eight dead files become the live site and <code>app/</code>
+      demotes to a subfolder. Nothing in the code prevents it; worth knowing
+      before anyone touches that screen.</li>
       <li><strong>Two law ratifications</strong> — the appearance amendment and the audience law await the four builders' explicit yes on their PRs.</li>
-      <li><strong><span class="chip b">B</span> housekeeping</strong> — the stale second page and dead module still deploy; scheduled for deletion in Manny's round two.</li>
+      <li><strong><span class="chip b">B</span> housekeeping</strong> — the
+      stale second page is not just deployed, it answers:
+      <code>products/b-dashboard/staff-dashboard.html</code> returned
+      <strong>HTTP 200</strong> on August 21, 2026. Same folder,
+      <code>staff-dashboard.js</code> is the only hand-written
+      <code>.js</code> tracked under <code>app/</code>, which the repo ignores
+      as build output — delete and re-add it and <code>git add</code> refuses
+      silently, with no gate failure. Owner: Manny, round two.</li>
     </ul>
 
     <h2 class="sect">The presentation kit</h2>
