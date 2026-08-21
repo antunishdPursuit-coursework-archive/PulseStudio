@@ -1,7 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Public pages only. Staff surfaces (the scheduling dashboard and the
-     re-engagement tool) are deliberately absent: they show member rosters,
-     attendance, and cancellation risk, which never belong in a search index. -->
+<!-- Public pages only, and the omissions are deliberate rather than
+     accidental — checked page by page on 2026-08-21 against which files
+     actually carry a robots meta tag.
+
+     ABSENT ON PURPOSE, all carrying <meta name="robots" content="noindex">:
+     the re-engagement tool and its checks, the session-contract checks, the
+     synthetic studio generator and its checks, and the readiness board.
+     They are left crawlable so that tag is read and honoured, which is the
+     only guaranteed way to stay out of an index.
+
+     ABSENT AND SHOULD NOT BE: the staff scheduling dashboard and its
+     second page carry NO robots tag at all, so nothing keeps their roster
+     and attendance content out of an index. Listing them here would make
+     that worse, so they stay out — but leaving them out is not protection.
+     The fix is one meta tag in their owner's lane; see
+     docs/REQUESTFOR-A-B-C.md.
+
+     storytold.html was missing from this file until 2026-08-21. It is
+     public, carries no noindex, and is linked from the front door's
+     footer — so it was indexable and simply unlisted. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://antunishdpursuit.github.io/PulseStudio/</loc>
@@ -17,5 +34,10 @@
     <loc>https://antunishdpursuit.github.io/PulseStudio/products/c-chatbot/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>
