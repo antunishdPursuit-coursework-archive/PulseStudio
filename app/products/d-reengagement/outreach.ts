@@ -318,6 +318,64 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
  * config.ts is explicitly the file a reseller rewrites, and a longer voice,
  * a longer studio name, or longer links all push the same number up with
  * nothing to notice. 1800 leaves room under the lowest known ceiling. */
+/* HOW MANY OF THE FLAGGED CAN ACTUALLY BE WRITTEN TO.
+ *
+ * The summary says "N members checked, M flagged". It has never said how
+ * many of those M a staff member can do anything about, because the count
+ * comes from the quiet rule and the blocking comes from the outreach
+ * policy, and the two never met. In the common case they agree and the
+ * distinction is invisible. In a studio that has suppressed most of its
+ * quiet members it reads "10 flagged" over ten cards that all say do not
+ * contact, and a person scrolls looking for work that is not there.
+ *
+ * The truth law already asks for exactly this shape — "5 members checked,
+ * 1 flagged ... 1 could not be used as evidence" — so this is the same
+ * sentence pattern applied to the half that was missing, not a new idea. */
+export interface OutreachAvailability {
+  ready: number;
+  suppressed: number;
+  alreadyReached: number;
+  outsideConsent: number;
+  disabled: number;
+}
+
+export function outreachAvailability(
+  flagged: readonly FlaggedMember[],
+  policy: OutreachPolicy,
+  ledger: readonly OutreachRecord[],
+  suppressions: readonly SuppressionRecord[],
+): OutreachAvailability {
+  const counts: OutreachAvailability = {
+    ready: 0, suppressed: 0, alreadyReached: 0, outsideConsent: 0, disabled: 0,
+  };
+  for (const f of flagged) {
+    counts[outreachStateFor(f, policy, ledger, suppressions).kind] += 1;
+  }
+  return counts;
+}
+
+/**
+ * The sentence, or "" when every flagged member can be written to — in
+ * which case the summary already told the whole truth and a second
+ * sentence saying "0 blocked" would be noise.
+ */
+export function availabilityLine(counts: OutreachAvailability): string {
+  const blocked =
+    counts.suppressed + counts.alreadyReached + counts.outsideConsent + counts.disabled;
+  if (blocked === 0) return "";
+  const total = blocked + counts.ready;
+  /* Every reason that applies is named. A single number would say the
+   * drafts are missing without saying why, which is the kind of half
+   * answer this product exists to avoid. */
+  const reasons = [
+    counts.suppressed > 0 ? `${counts.suppressed} do not contact` : "",
+    counts.alreadyReached > 0 ? `${counts.alreadyReached} already reached this lapse` : "",
+    counts.outsideConsent > 0 ? `${counts.outsideConsent} outside the consent window` : "",
+    counts.disabled > 0 ? `${counts.disabled} while outreach is switched off` : "",
+  ].filter((r) => r !== "");
+  return `No draft offered for ${blocked} of ${total} — ${reasons.join(", ")}.`;
+}
+
 /* WHICH RULE SPOKE, IN A SENTENCE.
  *
  * Five outcomes, four of which stop a draft being offered. It lived as a

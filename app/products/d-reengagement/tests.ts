@@ -26,7 +26,9 @@ import {
   MAILTO_SAFE_LENGTH,
   forgetOutreach,
   keepOutreachRecords,
+  availabilityLine,
   mailtoHref,
+  outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
@@ -2358,6 +2360,63 @@ check("clean records produce no data-quality line",
       .map((kind) => workflowStateLine(
         { kind, since: "x", days: 1, channel: "email", takenAt: "x" } as never, outreachPolicy))
       .every((line) => line.length > 20), true);
+}
+
+/* WHAT THE SUMMARY NEVER SAID: how many of the flagged can be written to.
+ * The flag count comes from the quiet rule, the blocking comes from the
+ * outreach policy, and until now the two never met in a sentence. */
+{
+  const none = { ready: 3, suppressed: 0, alreadyReached: 0, outsideConsent: 0, disabled: 0 };
+  check("when every flagged member can be written to, the line says nothing",
+    availabilityLine(none), "");
+  check("...because '0 blocked' is noise, not a stated negative",
+    availabilityLine({ ...none, ready: 0 }), "");
+
+  check("one suppressed member is named as such",
+    availabilityLine({ ready: 4, suppressed: 1, alreadyReached: 0, outsideConsent: 0, disabled: 0 }),
+    "No draft offered for 1 of 5 — 1 do not contact.");
+  check("every reason that applies is named, not just the count",
+    availabilityLine({ ready: 1, suppressed: 2, alreadyReached: 3, outsideConsent: 1, disabled: 0 }),
+    "No draft offered for 6 of 7 — 2 do not contact, 3 already reached this lapse, 1 outside the consent window.");
+  check("the switched-off case reads as a studio setting, not a member's choice",
+    availabilityLine({ ready: 0, suppressed: 0, alreadyReached: 0, outsideConsent: 0, disabled: 2 }),
+    "No draft offered for 2 of 2 — 2 while outreach is switched off.");
+
+  /* The case that prompted this: every flagged member blocked. The old
+   * summary said "N flagged" over N cards that all refused a draft. */
+  const allBlocked = availabilityLine({ ready: 0, suppressed: 3, alreadyReached: 0, outsideConsent: 0, disabled: 0 });
+  check("when nobody can be written to, the page says so out loud",
+    allBlocked, "No draft offered for 3 of 3 — 3 do not contact.");
+  check("...and never reads as though there is work waiting",
+    allBlocked.includes("0 of"), false);
+}
+
+/* The counting itself, from real records rather than hand-built totals. */
+{
+  const sheet = [
+    "Member,Date",
+    "Maria Delgado,2026-06-27", "Maria Delgado,2026-07-11", "Maria Delgado,2026-07-25",
+    "Jonah Ford,2026-06-20", "Jonah Ford,2026-07-04", "Jonah Ford,2026-07-18",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(sheet, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const flagged = findQuietMembers(imported.records, today, proposedRules).flagged;
+  check("two quiet members are flagged from the sheet", flagged.length, 2);
+
+  const clean = outreachAvailability(flagged, outreachPolicy, [], []);
+  check("with an empty ledger every one of them is ready", clean.ready, flagged.length);
+  check("...so the line stays silent", availabilityLine(clean), "");
+
+  const first = flagged[0];
+  if (first) {
+    const suppressed = outreachAvailability(flagged, outreachPolicy, [], [
+      { memberId: first.member.member_id, suppressedOn: "2026-08-01" },
+    ]);
+    check("suppressing one moves exactly one out of ready", suppressed.ready, flagged.length - 1);
+    check("...and it is counted as do-not-contact", suppressed.suppressed, 1);
+    check("...and the sentence names it",
+      availabilityLine(suppressed).includes("1 do not contact"), true);
+  }
 }
 
 const passed = results.filter((r) => r.passed).length;

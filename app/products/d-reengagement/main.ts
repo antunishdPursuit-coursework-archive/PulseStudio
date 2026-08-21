@@ -35,7 +35,9 @@ import {
 import {
   forgetOutreach,
   keepOutreachRecords,
+  availabilityLine,
   mailtoHref,
+  outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
@@ -564,10 +566,24 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
               : `${f.member.display_name} (returns ${longDate(date)})`;
           })
           .join(", ")}.`;
+  /* How many of the flagged can actually be written to. Silent when every
+   * one of them can, because "0 blocked" is noise. */
+  const availability = availabilityLine(
+    outreachAvailability(result.flagged, outreachPolicy, ledger, suppressions),
+  );
+  /* dataQualityLine returns string | null, and a plain `!== ""` filter does
+   * not narrow that — null survived it, joined as an empty segment, and put
+   * a double space in the sentence. Typed predicate, so the compiler holds
+   * the shape instead of the next reader having to. */
+  const statusParts: readonly (string | null)[] = [
+    summaryLine(result, asOf),
+    quality,
+    availability,
+  ];
   statusEl.textContent =
-    (quality
-      ? `${summaryLine(result, asOf)} ${quality}${comingLine}`
-      : `${summaryLine(result, asOf)}${comingLine}`) + storageWarning;
+    statusParts
+      .filter((part): part is string => part !== null && part.trim() !== "")
+      .join(" ") + comingLine + storageWarning;
   sourceEl.textContent = sourceNote;
   ruleEl.textContent =
     `Proposed thresholds (not yet ratified by the team): flag active members ` +
