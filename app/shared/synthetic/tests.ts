@@ -322,14 +322,62 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
       /,(attended|no-show|unknown),/.test(l)), true);
   check("the CSV export is deterministic",
     attendanceCsv(second.dataset) === csv, true);
+
+  /* THE ORDER IS A PROPERTY OF THE ROWS, NOT OF THE INPUT.
+   *
+   * The determinism check above regenerates the same config twice, so a
+   * fault in the sort mutates both sides equally and it passes anyway.
+   * Mutation found exactly that: one changed comparison in the comparator
+   * reordered real rows and produced different bytes, with every check
+   * here still green.
+   *
+   * The comparator sorted by date then member id and returned 0 for
+   * anything still equal — but a member CAN attend two classes in one
+   * day. Those pairs were left in whatever order the attendance list
+   * happened to hold, deterministic only because Array.prototype.sort is
+   * specified stable. This engine's brief promises byte-for-byte
+   * reproducibility, which is a stronger claim than sort stability makes.
+   *
+   * Feeding the same records in REVERSED order tells the two apart: a
+   * total order gives identical bytes, a partial one does not.
+   *
+   * It uses DEFAULT_CONFIG rather than BASE, and that is not incidental.
+   * Whether a member attends twice in one day is seed-dependent and rare —
+   * BASE produces none at any size tried, the shared studio's own config
+   * produces a handful — so the check asserts the tie EXISTS before
+   * relying on it. Without that first line the other two would pass
+   * vacuously, which is how this was caught: they did. */
+  const tieBundle = generateStudio(DEFAULT_CONFIG);
+  const tieCsv = attendanceCsv(tieBundle.dataset);
+  const sessionDay = new Map(
+    tieBundle.dataset.classSessions.map((c) => [c.id, c.startsAt.slice(0, 10)]),
+  );
+  const perMemberDay = new Map<string, number>();
+  for (const a of tieBundle.dataset.attendance) {
+    const key = `${a.memberId}|${sessionDay.get(a.classSessionId) ?? ""}`;
+    perMemberDay.set(key, (perMemberDay.get(key) ?? 0) + 1);
+  }
+  check("the shared studio really does contain a member attending twice in a day",
+    [...perMemberDay.values()].some((n) => n > 1), true);
+
+  const reversed = {
+    ...tieBundle.dataset,
+    attendance: [...tieBundle.dataset.attendance].reverse(),
+  };
+  check("...so the export must not depend on the order the rows arrive in",
+    attendanceCsv(reversed) === tieCsv, true);
+
+  const tieDates = tieCsv.trim().split("\n").slice(1).map((l) => l.split(",")[2] ?? "");
+  check("...while still reading oldest-first, the order it has always had",
+    tieDates.every((d, i) => i === 0 || (tieDates[i - 1] ?? "") <= d), true);
 }
 
 /* ------------------------------------------------------------------ */
 /* Specification alignment: defaults, echo, lifecycle, sensitive scan   */
 /* ------------------------------------------------------------------ */
-
 check("the default history covers at least twelve months",
   DEFAULT_CONFIG.historyDays >= 365, true);
+
 check("the answer key states which generation it answers for",
   [first.truth.generatorVersion, first.truth.seed, first.truth.asOfDate, first.truth.timezone],
   [BASE.generatorVersion, BASE.seed, BASE.asOfDate, BASE.timezone]);

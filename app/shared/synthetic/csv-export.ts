@@ -70,9 +70,35 @@ export function attendanceCsv(dataset: SyntheticDataset): string {
       instructorById.get(session.instructorId) ?? "",
     ]);
   }
-  rows.sort((x, y) =>
-    x[2] === y[2] ? (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0) : x[2] < y[2] ? -1 : 1,
-  );
+  /* A TOTAL ORDER, not a partial one.
+   *
+   * This sorted by date then member id and returned 0 for anything still
+   * equal — but a member can attend two classes on the same day, and in a
+   * 300-member year that happens. Those pairs were left in whatever order
+   * the attendance list happened to hold, which is deterministic only
+   * because Array.prototype.sort is specified stable and the input is
+   * itself sorted. The brief promises this export is byte-for-byte
+   * reproducible; resting that on sort stability is a weaker promise than
+   * the one being made, and nothing here noticed when a mutation reordered
+   * exactly those rows.
+   *
+   * Comparing every column in turn makes the order a property of the
+   * ROWS, so the same records produce the same bytes whatever order they
+   * arrive in. */
+  /* Date, then member id — the order this export has always had — and then
+   * every remaining column, so nothing is left tied. The columns are
+   * [member id, name, date, status, class, instructor], hence 2 and 0
+   * first. Getting this wrong reorders a studio's whole export silently,
+   * which is what the first attempt at this fix did. */
+  const ORDER = [2, 0, 1, 3, 4, 5] as const;
+  rows.sort((x, y) => {
+    for (const i of ORDER) {
+      const a = x[i] ?? "";
+      const b = y[i] ?? "";
+      if (a !== b) return a < b ? -1 : 1;
+    }
+    return 0;
+  });
 
   const lines = ["member id,member,date,status,class,instructor"];
   for (const row of rows) lines.push(row.map(csvField).join(","));
