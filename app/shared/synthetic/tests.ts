@@ -375,6 +375,57 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
 /* ------------------------------------------------------------------ */
 /* Specification alignment: defaults, echo, lifecycle, sensitive scan   */
 /* ------------------------------------------------------------------ */
+/* NOBODY IS IN TWO PLACES AT ONCE — and the exception that proves it.
+ *
+ * generate.ts refuses to record an ATTENDED class that overlaps one the
+ * member already attended that day. That invariant was never checked, and
+ * it is the kind that reads as obviously true right up until a scheduling
+ * change makes it quietly false.
+ *
+ * The second check is the more important one. The guard is applied ONLY
+ * when the outcome is attended (`outcome !== "attended" || !overlapsAttended(...)`),
+ * so a booked-but-not-attended record MAY overlap — which is realistic: a
+ * member books two things at noon and shows up to one. Without stating
+ * that, somebody strengthens the first check to "no member has two
+ * overlapping records at all", it fails on real generated data, and the
+ * fix looks like loosening a safety rule instead of restoring a
+ * deliberate one. */
+{
+  const wide = generateStudio({ ...DEFAULT_CONFIG, memberCount: 300, historyDays: 365 });
+  const sessionById = new Map(wide.dataset.classSessions.map((c) => [c.id, c]));
+  const minutesOf = (t: string): number =>
+    Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16));
+
+  const countOverlaps = (onlyAttended: boolean): number => {
+    const slots = new Map<string, Array<[number, number]>>();
+    let overlaps = 0;
+    for (const a of wide.dataset.attendance) {
+      if (onlyAttended && a.status !== "attended") continue;
+      const session = sessionById.get(a.classSessionId);
+      if (session === undefined) continue;
+      const start = minutesOf(session.startsAt);
+      const end = start + session.durationMinutes;
+      const key = `${a.memberId}|${session.startsAt.slice(0, 10)}`;
+      const taken = slots.get(key) ?? [];
+      for (const [from, to] of taken) if (start < to && end > from) overlaps += 1;
+      taken.push([start, end]);
+      slots.set(key, taken);
+    }
+    return overlaps;
+  };
+
+  /* STATED LIMIT, measured rather than assumed: disabling overlapsAttended
+   * in the compiled generator leaves this at 0 too. Something upstream
+   * already stops a member being offered two classes in one slot, so this
+   * check is a regression guard on the DATA and is NOT evidence that the
+   * guard works. Said plainly because a passing check that cannot fail
+   * reads exactly like one that can. */
+  check("no member is recorded as attending two classes at once",
+    countOverlaps(true), 0);
+  check("...while a booked-but-unattended class MAY overlap one they did attend, on purpose",
+    countOverlaps(false) > 0, true);
+}
+
 check("the default history covers at least twelve months",
   DEFAULT_CONFIG.historyDays >= 365, true);
 

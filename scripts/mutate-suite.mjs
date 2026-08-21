@@ -60,6 +60,15 @@ const SUITE_BY_PREFIX = [
   ["app/shared/auth/", "auth"],
   ["app/products/d-reengagement/", "reengagement"],
 ];
+/* A sample, for a module too large to sweep whole. --stride=4 tries every
+ * fourth site (1 in 4). It is deterministic — every Nth, never random — so the same
+ * command surveys the same mutations and two runs are comparable. A
+ * sampled run says so in its output, because "82% caught" from a quarter
+ * of the sites is a different claim from the same number over all of
+ * them. */
+const strideArg = process.argv.find((a) => a.startsWith("--stride="));
+const STRIDE = strideArg === undefined ? 1 : Math.max(1, Number(strideArg.slice("--stride=".length)) || 1);
+
 const explicit = process.argv.find((a) => a.startsWith("--suite="));
 const suiteFor = (rel) => {
   if (explicit) return explicit.slice("--suite=".length);
@@ -135,10 +144,22 @@ for (const rel of TARGETS) {
   const survivors = [];
   let applied = 0;
 
+  /* Collect every site first, then walk them with the stride, so the
+   * sample spreads across the whole file rather than exhausting the first
+   * operator and stopping. */
+  const allSites = [];
+  for (const [from, to] of SWAPS) {
+    for (const at of sites(original, from)) {
+      if (original.startsWith(to, at) && to.length >= from.length) continue;
+      allSites.push([from, to, at]);
+    }
+  }
+  allSites.sort((a, b) => a[2] - b[2]);
+  const chosen = allSites.filter((_, i) => i % STRIDE === 0);
+
   try {
-    for (const [from, to] of SWAPS) {
-      for (const at of sites(original, from)) {
-        if (original.startsWith(to, at) && to.length >= from.length) continue;
+    {
+      for (const [from, to, at] of chosen) {
         const mutated = original.slice(0, at) + to + original.slice(at + from.length);
         if (mutated === original) continue;
         writeFileSync(path, mutated);
@@ -166,6 +187,11 @@ for (const rel of TARGETS) {
   console.log(
     `mutate-suite: ${applied} single-token mutations — ${caught} caught, ${survivors.length} survived (${pct}% caught).`,
   );
+  if (STRIDE > 1) {
+    console.log(
+      `mutate-suite: SAMPLED — 1 site in ${STRIDE} of ${allSites.length}. The percentage covers what was tried, not the module.`,
+    );
+  }
   console.log(
     "mutate-suite: a survivor is a way this module could be wrong that no check would notice. Some are equivalent and uncatchable — read them, do not chase the number.",
   );

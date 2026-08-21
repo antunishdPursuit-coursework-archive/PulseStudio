@@ -94,6 +94,18 @@ the legacy contract) is what all four products speak.
   check-in distributions (a morning peak and a bigger evening peak). It is
   a 2024 SNAPSHOT and nothing about it is live: the engine forbids network
   calls and clock reads, and no surface may claim otherwise.
+- **`overlapsAttended` in `generate.ts` is currently redundant**, in the
+  same way the comment-only block in `writePulseSession` is. It refuses to
+  record an attended class overlapping one the member already attended
+  that day — and disabling it in the compiled generator produces zero
+  overlaps anyway, because something upstream already stops a member being
+  offered two classes in one slot. Keep it (a scheduling change could make
+  it load-bearing again), but do not read the passing invariant check in
+  `synthetic/tests.ts` as proof that it works. Note also that the guard
+  applies ONLY to attended outcomes: a booked-but-unattended record MAY
+  overlap one the member attended, which is deliberate and realistic, and
+  there is a check pinning that so nobody "strengthens" the invariant into
+  something false.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
