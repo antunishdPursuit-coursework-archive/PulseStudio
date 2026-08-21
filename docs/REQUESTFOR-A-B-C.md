@@ -177,6 +177,54 @@ Nothing under `app/` references any of them, and the gate cannot see them.
 
 None of the above was touched by me — every file is in someone else's lane.
 
+## Manny — the staff dashboard has no crawler protection at all (2026-08-21)
+
+This one is a privacy exposure, not a tidiness note, so it is first.
+
+`app/robots.txt` carried this claim: *"The staff dashboard has no such tag
+yet, so blocking the crawl is the only protection its roster content has."*
+Both halves turned out to be wrong, and the second one badly.
+
+1. **The Disallow line matched nothing.** It read
+   `Disallow: /products/b-dashboard/`, with no `/PulseStudio/` prefix. This
+   site is served under `/PulseStudio/`, so that pattern matches no URL
+   that exists. Corrected.
+2. **No crawler was reading the file anyway.** This is a GitHub Pages
+   PROJECT page, so the robots.txt a crawler fetches is
+   `https://antunishdpursuit.github.io/robots.txt` — the root of the USER
+   site, in a different repository. Ours is served at
+   `/PulseStudio/robots.txt` and is never requested.
+
+So the dashboard's roster and attendance content has had no protection of
+any kind. Verified just now — neither file carries a robots meta tag:
+
+```
+grep -c noindex app/products/b-dashboard/index.html          # 0
+grep -c noindex app/products/b-dashboard/staff-dashboard.html # 0
+```
+
+The re-engagement tool has carried one from the start, which is why it is
+deliberately left crawlable: a crawler that is allowed to fetch the page
+reads the tag and honours it, and that is the only guaranteed way to stay
+out of an index. Blocking the crawl instead would stop the tag being read.
+
+**The ask — one line, in your lane:**
+
+```html
+<meta name="robots" content="noindex, nofollow">
+```
+
+in the `<head>` of both `app/products/b-dashboard/index.html` and
+`app/products/b-dashboard/staff-dashboard.html`. When it is in, the
+`Disallow` line in `app/robots.txt` should be deleted in the same commit so
+the tag can do the stronger job — the file explains why.
+
+Neither of these is a security control. A staff page holding real member
+data belongs behind a sign-in, not behind a politeness request; the meta tag
+is the stopgap, not the answer.
+
+I corrected `app/robots.txt` (team-owned) and touched nothing in your folder.
+
 ## Your accent colour is not readable on the light theme (2026-08-21)
 
 Measured, not guessed — `node scripts/check-contrast.mjs` prints these live:
