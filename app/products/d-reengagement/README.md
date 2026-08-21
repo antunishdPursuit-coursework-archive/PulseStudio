@@ -149,13 +149,24 @@ into a different host is two moves:
 
 The engine itself (`logic.ts`) is framework-free and clock-free — a server
 route can call `findQuietMembers(records, todayDayNumber(tz), rules)` and
-render the result in any UI. It runs in one pass over the records
-(O(members + attendance)), and the whole rule-plus-cards path — the work one
-click costs, because the page re-renders after every action a staff member
-takes — measures 10ms at 60 members, 394ms at 1000, and about 1.2s at 2000
-members against 170,000 attendance rows and 163,000 reservations. The HTML/CSS here is a reference skin, not a
-requirement; its only tethers are the shared theme tokens, swapped when
-porting.
+render the result in any UI. It holds up at studio scale by SHAPE rather than by luck: every step is one
+pass over the records, so the rule is O(members + attendance) and the
+per-card work is bounded by that member's own history, not the studio's.
+That matters because the page re-runs everything after each action a staff
+member takes.
+
+No timings are quoted here on purpose. This paragraph used to end in three,
+and they were already wrong within a day — measured again on a machine whose
+load average had reached 92 on eight cores, the same page read two and a
+half times slower, which says nothing about this code and everything about
+what else was running. A wall-clock number in prose cannot be kept true, and
+the repo already learned this once when the synthetic suite's thirty-second
+budget went red twice on a busy machine. To measure it on YOUR machine,
+generate a studio at the size you care about and time
+`findQuietMembers` plus one pass over the flagged cards.
+
+The HTML/CSS here is a reference skin, not a requirement; its only tethers
+are the shared theme tokens, swapped when porting.
 
 ## Use real attendance today (the CSV door)
 
