@@ -13,6 +13,25 @@ Every rule that uses the display face asks for `font-weight: 400`, which is
 already the heavy one. If a heading ever looks blurry or too fat, something
 asked for a weight Anton does not have.
 
+## The decision, so it is not re-argued
+
+**Anton is the display face on purpose — ratified by the owner on
+2026-08-21.** It is the standard face of this category: walk through the
+sites of independent gyms and boutique studios and you meet it constantly,
+which is exactly the argument for it. A member landing here should know
+what kind of business this is before reading a word, and category fluency
+beats novelty for a studio trying to fill classes.
+
+The trade-off was weighed and accepted: Anton is *common*, and the luxury
+end of the category (Equinox and similar) goes the other way — a quieter
+custom sans at mid weight, letting photography carry the page. If this
+studio ever repositions that way, the change is one token
+(`--font-display` in `theme.css`) plus a font file, and the argument for it
+belongs in this section rather than in a silent commit.
+
+Anything that reads as "let us modernise the font" without a positioning
+reason is churn. This paragraph exists to stop it.
+
 ## Why the files live in this repo instead of a font CDN
 
 A `<link>` to a font service makes every visitor's browser call a third
