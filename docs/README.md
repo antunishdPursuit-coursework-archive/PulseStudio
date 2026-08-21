@@ -56,6 +56,7 @@ cost somebody a day:
   | The shared fixture still demonstrates what it claims to | the product briefs' acceptance checks | `scripts/check-fixtures.mjs` (the one place that reads the real clock, on purpose — it prints the countdown every run) |
   | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
   | Nobody edits another developer's folder | root `CLAUDE.md` (the lane law) | `scripts/check-lanes.mjs` (reads only what this branch adds to `origin/main`, skips merges, and counts team-owned changes it cannot judge) |
+  | No secrets and no keys in a public repo | root `CLAUDE.md` (the git law) | `scripts/check-secrets.mjs` (current file contents only — it cannot see history, and says so) |
   | Copy speaks to its user, never about the project | root `CLAUDE.md` (the audience law) | `scripts/check-audience.mjs` (reads static copy on consumer pages; the storytold page and the readiness board are named exemptions with reasons, in [audience-baseline.json](./audience-baseline.json)) |
   | Nothing under `app/` is private | root `CLAUDE.md` (the filing law) | `scripts/check-published.mjs` (fails on a NEW file under `app/` that the website would never ask for; the ones already there are in [published-baseline.json](./published-baseline.json)) |
 
