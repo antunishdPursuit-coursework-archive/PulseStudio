@@ -91,14 +91,23 @@ function clearStored(key: string): void {
 /** True when this browser will remember anything at all. Checked once so the
  *  page can state the limit beside the result instead of pretending. */
 function storageWorks(): boolean {
+  /* THE WRITE IS THE QUESTION; the cleanup is not. Wrapping both in one try
+   * meant a store that accepted the write and refused the delete reported
+   * "this browser is not saving site data" — the opposite of what had just
+   * happened. The probe key is transient and namespaced; if it is ever left
+   * behind, nothing reads it. */
+  const probe = "pulse-storage-probe";
   try {
-    const probe = "pulse-storage-probe";
     localStorage.setItem(probe, "1");
-    localStorage.removeItem(probe);
-    return true;
   } catch {
     return false;
   }
+  try {
+    localStorage.removeItem(probe);
+  } catch {
+    // Left behind, and harmless: nothing in this repo reads that key.
+  }
+  return true;
 }
 
 function loadList<T>(key: string, keep: (rows: unknown) => KeptRows<T>): T[] {

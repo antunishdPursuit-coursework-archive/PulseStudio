@@ -36,6 +36,15 @@ own log. `upcomingReservedMemberIds()` (logic.ts) then keeps a quiet member
 who already booked back in OUT of the outreach list, stated by name. The
 CSV door and the generated studio remain the other two doors, unchanged.
 
+## Storage keys this product writes
+
+`pulse-outreach-ledger` (notes taken, once per lapse), `pulse-suppressions`
+(do-not-contact), and `pulse-storage-probe` — transient, written and deleted
+in one breath to find out whether this browser saves site data at all.
+Nothing reads the probe, and the shared session listener wakes only for
+`pulse-session`, so it never reaches another tab. `pulse-reservations-a` is
+Product A's and is READ ONLY here.
+
 ## Repo laws
 
 - The words "demo", "example", and "mock" appear NOWHERE — code, comments,

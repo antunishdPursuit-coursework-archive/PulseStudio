@@ -380,6 +380,27 @@ check("...and signing out in a write-refusing browser really does sign out", () 
   return eq(got, null);
 });
 
+/* A store that ACCEPTS writes and refuses deletes is not a store that
+ * refuses writes. The probe used to wrap both in one try, so this reported
+ * "nothing can be saved" about a store that had just saved something. */
+const writesButNeverDeletes = {
+  values: new Map<string, string>(),
+  getItem(key: string): string | null { return this.values.get(key) ?? null; },
+  setItem(key: string, value: string): void { this.values.set(key, String(value)); },
+  removeItem(): void { throw new Error("delete refused"); },
+};
+
+check("a store that writes but refuses deletes still round-trips a session", () => {
+  fresh();
+  setStorageForChecks(writesButNeverDeletes);
+  writesButNeverDeletes.values.clear();
+  writePulseSession(FRONT_DESK);
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the session was lost by a store that had just accepted it";
+  return eq(got.actor_type, "staff");
+});
+
 check("an empty WORKING store still means nobody is signed in", () => {
   fresh();
   const got = readPulseSession();

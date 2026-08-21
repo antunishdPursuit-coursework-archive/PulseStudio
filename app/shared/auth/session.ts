@@ -102,14 +102,22 @@ function storage(): StorageLike {
  * something. This probe is the difference between "nobody is signed in"
  * and "this browser will not remember that somebody is". */
 function storageAcceptsWrites(): boolean {
+  /* The WRITE is the question; the cleanup is not. One try around both would
+   * make a store that accepted the write and refused the delete report that
+   * it accepts nothing, which is the opposite of what just happened. */
+  const probe = `${SESSION_KEY}-probe`;
   try {
-    const probe = `${SESSION_KEY}-probe`;
     storage().setItem(probe, "1");
-    storage().removeItem(probe);
-    return true;
   } catch {
     return false;
   }
+  try {
+    storage().removeItem(probe);
+  } catch {
+    // Left behind, and harmless: nothing reads that key, and the storage
+    // listener below only wakes for SESSION_KEY itself.
+  }
+  return true;
 }
 
 /* When storage is unavailable, the last deliberate choice lives here so
