@@ -131,3 +131,40 @@ window.addEventListener("pageshow", (event) => {
   previous = readPulseSession();
   applyView(previous);
 });
+
+/* ---------- scroll reveal (the Pudding touch) ----------
+ * Below-the-fold sections ease in as the reader reaches them. Fail-open by
+ * construction: the hiding class goes on the BODY only here, only after
+ * confirming the observer exists and the reader is fine with motion — so
+ * with JS off, an old browser, or reduced motion, every section is simply
+ * visible, exactly as before this existed. Sections already on screen at
+ * load reveal immediately (no flash of hidden content). */
+{
+  const wantsMotion = window.matchMedia(
+    "(prefers-reduced-motion: no-preference)",
+  ).matches;
+  const sections = Array.from(
+    document.querySelectorAll<HTMLElement>(".home-product, .products-head, .truths"),
+  );
+  if (wantsMotion && sections.length > 0 && "IntersectionObserver" in window) {
+    document.body.classList.add("reveal-ready");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("revealed");
+          observer.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.05 },
+    );
+    for (const section of sections) observer.observe(section);
+    // The safety net that makes "fail open" true rather than claimed: if
+    // the observer never delivers (a prerendered tab, a bfcache restore,
+    // anything that pauses rendering), everything reveals anyway. Motion
+    // is an accent here, never a gate on the content.
+    window.setTimeout(() => {
+      for (const section of sections) section.classList.add("revealed");
+    }, 1600);
+  }
+}

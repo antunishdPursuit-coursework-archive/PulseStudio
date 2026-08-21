@@ -141,7 +141,9 @@ body.home { overflow-x: hidden; }
 .home .btn-ghost-lg:hover, .home .btn-ghost-lg:focus-visible { border-color: var(--fg); }
 
 /* the pulse line — one stroke through all four colors */
-.home .pulse-art { margin: 46px auto 0; display: block; width: 100%; max-width: 960px; height: auto; }
+/* Tucked closer under the photo (was 46px): the line reads as the photo's
+   heartbeat, and the hero stops 20px sooner. */
+.home .pulse-art { margin: 26px auto 0; display: block; width: 100%; max-width: 960px; height: auto; }
 
 /* ---------- truth strip ---------- */
 
@@ -463,11 +465,14 @@ body[data-view="staff"] .staff-note { color: var(--fg); font-weight: 600; }
 /* The hero's room: wide and short, so the headline still leads and the
    photograph confirms it rather than competing. */
 .home .hero-photo {
-  margin: 34px 0 0;
-  /* Matches the file (1600x660) so the picture is shown, not re-cropped
-     by the browser — the crop was chosen once, at download. */
-  aspect-ratio: 1600 / 660;
+  margin: 30px 0 0;
+  /* A touch wider than the file's 1600x660 (so slightly shorter): the img
+     cover-crops a sliver from top and bottom of a photo that is pure
+     atmosphere — measured, this returns ~56px of the hero's height and
+     keeps everything above the fold at 1280x800. */
+  aspect-ratio: 1600 / 560;
 }
+.home .hero-photo img { width: 100%; height: 100%; object-fit: cover; }
 @media (max-width: 700px) { .home .hero-photo { aspect-ratio: 16 / 10; } }
 
 /* A section's photograph sits above its abstract panel: the real room
@@ -477,3 +482,19 @@ body[data-view="staff"] .staff-note { color: var(--fg); font-weight: 600; }
   aspect-ratio: 3 / 2;
 }
 .home .home-panel { display: block; }
+
+
+/* ---------- scroll reveal (the Pudding touch) ----------
+   Sections below the fold ease up 14px as they enter. The .reveal class is
+   added ONLY by home.js after checking prefers-reduced-motion — with JS off
+   or motion reduced, nothing is ever hidden, because a page that needs a
+   script to become visible is a page that can fail closed. */
+.home .reveal-ready :is(.home-product, .products-head, .truths) {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.home .reveal-ready :is(.home-product, .products-head, .truths).revealed {
+  opacity: 1;
+  transform: none;
+}
