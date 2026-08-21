@@ -1236,6 +1236,86 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     imported.splitIdentities.length, 0);
 }
 
+/* ACCEPTANCE CHECK 7, WHICH NOTHING PROVED UNTIL NOW.
+ *
+ * The product brief lists seven acceptance checks. Six had cover somewhere
+ * in this file. The seventh — "The tool changes no shared record: fixtures
+ * are byte-identical after a run" — was stated in the brief, restated in
+ * the README as a law this product lives by, and asserted by nobody. A
+ * read-only guarantee that nothing checks is a hope, and this one is the
+ * whole reason the other three products can trust this one to look at
+ * their records.
+ *
+ * So: snapshot the records, run everything the page runs over them, and
+ * compare byte for byte. Deep-freezing as well, so a mutation throws
+ * rather than merely showing up in the diff. */
+{
+  const data = generateStudio(20260818, "2026-08-18").records;
+  const before = JSON.stringify(data);
+
+  const deepFreeze = (value: unknown): void => {
+    if (typeof value !== "object" || value === null || Object.isFrozen(value)) return;
+    Object.freeze(value);
+    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v);
+  };
+  deepFreeze(data);
+
+  /* THE FREEZE HAS TO REPORT, NOT CRASH. Frozen records make a mutation
+   * throw at the line that did it, which is the most useful place to learn
+   * about one — but an escaping throw takes the whole suite down, and a
+   * suite that DID NOT RUN tells nobody which guarantee broke. Caught here
+   * so the answer is a named red check either way. Verified by planting a
+   * data.attendance.sort() inside findQuietMembers: without this, the suite
+   * did not run at all. */
+  let mutationError = "";
+  let findQuietMembersCount = 0;
+  const run = (): void => {
+  // Everything the page does to a record set, in the order it does it.
+  const today = todayDayNumber(data.timezone);
+  const result = findQuietMembers(data, today, proposedRules);
+  findQuietMembersCount = result.flagged.length;
+  attendanceCoverage(data, today, proposedRules);
+  coverageWarning(attendanceCoverage(data, today, proposedRules), result, proposedRules);
+  upcomingReservedMemberIds(data, today);
+  upcomingReservedNextClassDates(data, today);
+  dataQualityLine(result);
+  summaryLine(result, "August 18, 2026");
+  nobodyFlaggedLine(result, proposedRules, 0);
+  for (const f of result.flagged) {
+    recentBookingActivity(f.member.member_id, data, dayNumberFromIso(f.lastSession.starts_at), today);
+    const session = suggestedSession(f, data, today);
+    if (session) {
+      remainingSpots(session, data);
+      inviteWording(session);
+    }
+    lapseKeyOf(f);
+    outreachStateFor(f, outreachPolicy, [], []);
+  }
+  outreachResults(
+    result.flagged.slice(0, 5).map((f) => ({
+      memberId: f.member.member_id, lapseKey: lapseKeyOf(f),
+      takenAt: "2026-08-12", channel: "copy" as const,
+    })),
+    data, today,
+  );
+
+  };
+  let flaggedCount = 0;
+  try {
+    run();
+  } catch (error) {
+    mutationError = error instanceof Error ? error.message : String(error);
+  }
+  flaggedCount = findQuietMembersCount;
+
+  check("nothing tried to write to a shared record", mutationError, "");
+  check("the tool changed no shared record — byte-identical after a whole run",
+    JSON.stringify(data), before);
+  check("...over a record set worth running (members)", data.members.length >= 50, true);
+  check("...and worth running (attendance rows)", data.attendance.length >= 200, true);
+  check("...and it actually found somebody, so the run was real", flaggedCount > 0, true);
+}
+
 /* AN INVISIBLE CHARACTER SPLITS A MEMBER IN TWO, AND NOBODY CAN SEE IT.
  *
  * A zero-width space makes "Bob" and "Bo<ZWSP>b" render identically and

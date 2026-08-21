@@ -651,8 +651,21 @@ function loadSharedRecords(): void {
     const data = fixtureSetFrom(sharedStudio(), readRuntimeReservations());
     renderRecords(
       data,
-      "Data: the running studio — the same records Booking writes to, " +
-        "including its live reservation log from this browser.",
+      /* THE PEOPLE ON THIS PAGE ARE FICTIONAL, AND IT HAS TO SAY SO.
+       *
+       * "The running studio" is true and was the whole line: these are the
+       * same records Booking books against and sign-in lists. What it left
+       * out is that sharedStudio() BUILDS them — generateStudio() with the
+       * calendar day as its seed — so the ten named people a staff member
+       * reads here, with attendance histories and personal notes drafted
+       * about them, are invented. Nothing said so on the door every visitor
+       * arrives through. The generated-studio door has always said it, and
+       * llms.txt promises it site-wide; the default view was the one place
+       * the promise was not kept, on a public URL. */
+      `Data: the running studio — the same records Booking writes to, ` +
+        `including its live reservation log from this browser. Every member ` +
+        `here is fictional: this studio's people are generated, seeded by ` +
+        `today's date, so everyone opening this page today sees the same ones.`,
     );
     csvReset.hidden = true;
   } catch (error) {
