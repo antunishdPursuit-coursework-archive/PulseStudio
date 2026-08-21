@@ -176,12 +176,28 @@ export function attendanceFreshness(data) {
   return { newest, daysOld: today - day(newest) };
 }
 
-/* A recent attendee stops being recent after this many days. Product D's
- * proposed rule flags at 14, so the fixture has to hold a visit newer than
- * that for its near-miss to mean anything; the ceiling here is deliberately
- * looser, because this gate should announce a real problem rather than
- * bicker about one product's threshold. */
+/* TWO HORIZONS, AND ONLY THE FAR ONE FAILS THE BUILD.
+ *
+ * At 14 days the fixture's deliberate near-miss is gone: no member in it
+ * attended recently enough to prove the rule can say no. That is worth
+ * announcing on every run, and it is NOT worth stopping four developers
+ * from deploying. Checked what actually breaks at that point: only the
+ * staff dashboard reads this file at run time and it renders a schedule,
+ * which ages fine; Product D's default door reads the running studio, not
+ * this; and every unit suite pins its own reference date. Nothing breaks.
+ * The fixture just stops illustrating one case.
+ *
+ * At 60 days it can no longer demonstrate a flag AT ALL — every member is
+ * past the far end of the rule, so the file cannot show the product doing
+ * its job in either direction. That is a fixture that has stopped being a
+ * fixture, and it fails.
+ *
+ * The first version of this failed at 14 and would have taken the site's
+ * deploy down eight days after it landed, over shared data I had decided
+ * was not mine to change unilaterally. Setting a deadline for other people
+ * and enforcing it with their build is not a gate, it is a hostage. */
 const FRESH_ENOUGH_DAYS = 14;
+const USELESS_AFTER_DAYS = 60;
 
 /** Every problem in one pass. Returns [] for a clean fixture. */
 export function validateFixtures(data, unions) {
@@ -371,6 +387,20 @@ function selfTest() {
     ["one day past the limit is stale", withVisitDaysAgo(FRESH_ENOUGH_DAYS + 1), FRESH_ENOUGH_DAYS + 1, true],
     ["a year old is stale", withVisitDaysAgo(365), 365, true],
   ];
+  /* The two horizons are not the same line, and only the far one fails. */
+  const fails = (n) => n > USELESS_AFTER_DAYS;
+  const failCases = [
+    ["a stale fixture does NOT fail the build", FRESH_ENOUGH_DAYS + 1, false],
+    ["nor does one at the far limit", USELESS_AFTER_DAYS, false],
+    ["one day past the far limit does", USELESS_AFTER_DAYS + 1, true],
+    ["and a year old certainly does", 365, true],
+  ];
+  for (const [label, days, wantFail] of failCases) {
+    if (fails(days) !== wantFail) {
+      failedFreshness += 1;
+      console.error(`  self-test MISS — ${label}: wanted fail=${wantFail} at ${days} days, got ${fails(days)}`);
+    }
+  }
   for (const [label, data, wantDays, wantStale] of freshCases) {
     const f = attendanceFreshness(data);
     const stale = f.daysOld !== null && f.daysOld > FRESH_ENOUGH_DAYS;
@@ -407,7 +437,7 @@ function selfTest() {
       console.error(`  self-test MISS — ${label}: wanted ${wantCode ?? "a clean pass"}, got [${problems.map((p) => p.code).join(", ") || "nothing"}]`);
     }
   }
-  const total = planted.length + freshCases.length + 2;
+  const total = planted.length + freshCases.length + failCases.length + 2;
   console.log(`self-test: ${total} planted fixtures, ${total - failed} behaved, ${failed} did not.`);
   console.log(
     failed === 0
@@ -466,15 +496,17 @@ if (!IS_COMMAND) {
     console.log(
       `check-fixtures: newest attended class is ${freshness.newest}, ${freshness.daysOld} days ago — ` +
         (freshness.daysOld > FRESH_ENOUGH_DAYS
-          ? `PAST the ${FRESH_ENOUGH_DAYS}-day mark, so this fixture can no longer show a recent attendee.`
-          : `${FRESH_ENOUGH_DAYS - freshness.daysOld} days of usable life left (goes stale ${expires}).`),
+          ? `PAST the ${FRESH_ENOUGH_DAYS}-day mark, so it can no longer show a recent attendee. ` +
+            `It stops demonstrating anything at all, and fails this gate, at ${USELESS_AFTER_DAYS} days.`
+          : `${FRESH_ENOUGH_DAYS - freshness.daysOld} days before it stops showing a recent attendee ` +
+            `(${expires}); ${USELESS_AFTER_DAYS - freshness.daysOld} before it fails this gate.`),
     );
   }
-  if (freshness.daysOld !== null && freshness.daysOld > FRESH_ENOUGH_DAYS) {
+  if (freshness.daysOld !== null && freshness.daysOld > USELESS_AFTER_DAYS) {
     console.error(
-      `check-fixtures: the shared fixture has aged out. Its newest attended class is ${freshness.daysOld} days ` +
-        `old, so every member in it now reads as long-quiet and the deliberate near-miss the product briefs ` +
-        `require — a member who attended RECENTLY and must NOT be flagged — no longer exists.`,
+      `check-fixtures: the shared fixture has stopped being a fixture. Its newest attended class is ` +
+        `${freshness.daysOld} days old — past the far end of the drop-off rule — so every member in it now ` +
+        `reads as too-long-quiet and the file can no longer demonstrate a flag in either direction.`,
     );
     console.error(
       "check-fixtures: roll the dates in app/shared/fixtures.json forward (team-owned; state the agreement). " +

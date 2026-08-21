@@ -133,8 +133,9 @@ jointly held.
 
 ## Everyone — the shared fixture goes stale on 2026-08-29 (2026-08-21)
 
-Dated, so nobody meets it by surprise: **eight days from now the gate will
-go red on `app/shared/fixtures.json`,** and it will be right to.
+Dated, so nobody meets it by surprise — and deliberately NOT a deadline on
+your build. In eight days this fixture stops demonstrating one thing it was
+built for. The gate says so on every run and keeps passing.
 
 The dates in that file are fixed and the calendar is not. Its newest attended
 class is 2026-08-15. Once that passes fourteen days, every member in the
@@ -154,9 +155,24 @@ check-fixtures: newest attended class is 2026-08-15, 6 days ago —
 ```
 
 **The ask — a team decision, not a lane one:** roll the fixture's dates
-forward before the 29th, or agree a different answer. Rolling forward is a
+forward when it suits, or agree a different answer. Rolling forward is a
 team-owned data change and it changes what the staff dashboard shows live,
 which is why I have not done it unilaterally.
+
+**What the gate actually does, and what changed my mind.** The first version
+failed at fourteen days, which would have stopped the site deploying eight
+days after it landed — over shared data I had just decided was not mine to
+change. Setting a deadline for three other people and enforcing it with
+their build is not a gate, it is a hostage. So I checked what actually
+breaks at fourteen days: only the staff dashboard reads this file at run
+time and it renders a schedule, which ages fine; Product D's default door
+reads the running studio; every unit suite pins its own date. Nothing
+breaks. The fixture just stops illustrating one case.
+
+It now REPORTS from fourteen days and FAILS at sixty — the point where every
+member is past the far end of the rule and the file cannot demonstrate a
+flag in either direction. That is a fixture that has stopped being a
+fixture. Roughly eight weeks of notice, and the countdown is on every run.
 
 The one answer to rule out is hardcoding a fake "today" inside a product.
 The pinned suites are the thing that must not move; a product that invents
