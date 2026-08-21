@@ -93,6 +93,45 @@
     .muscles li { margin: 7px 0; color: var(--muted); }
     .muscles li strong { color: var(--fg); }
     .note { color: var(--muted); font-size: 0.9rem; margin-top: 18px; }
+
+    /* THE SCROLLY (the Pudding pattern, hand-rolled — zero libraries):
+       on wide screens the story's five beats scroll on the left while the
+       map stays put on the right and REACTS — each beat dims the parts of
+       the picture it is not talking about. IntersectionObserver drives one
+       data-beat attribute; everything else is CSS. With JS off, nothing
+       observes, data-beat stays 5, and the page is exactly the old page. */
+    @media (min-width: 900px) {
+      main { max-width: 1160px; }
+      .scrolly { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 34px; align-items: start; }
+      .map-stick { position: sticky; top: 20px; }
+      .map { margin-top: 26px; }
+      /* Steps get room only when the observer is live — a no-JS reader
+         keeps the compact list instead of scrolling through empty air. */
+      .scrolly.live .beats li { min-height: 44vh; display: flex; flex-direction: column; justify-content: center; padding-top: 0; padding-bottom: 0; }
+      .scrolly.live .beats li::before { top: 50%; transform: translateY(-2.4em); }
+      .scrolly.live .beats li:last-child { min-height: 30vh; }
+    }
+    .map-cue { color: var(--muted); font-size: 0.8rem; margin: 8px 2px 0; display: none; }
+    .scrolly.live .map-cue { display: block; }
+
+    /* the active beat reads at full strength; its neighbours wait */
+    .scrolly.live .beats li { transition: opacity 0.35s ease; }
+    .scrolly.live .beats li:not(.active) { opacity: 0.35; }
+
+    /* what each beat does to the map — dim, never recolor (status colors
+       keep their meaning; opacity is the only knob the story turns) */
+    .map g { transition: opacity 0.45s ease; }
+    /* Beat 1 — Dana at the front desk: her board is the one lit box. */
+    .scrolly[data-beat="1"] .map :is(.n-a, .n-c, .n-d, .n-shared, .edge) { opacity: 0.16; }
+    /* Beat 2 — the problem: the tools exist, the roads between them don't. */
+    .scrolly[data-beat="2"] .map .edge { opacity: 0.07; }
+    /* Beat 3 — the value: the flows that move her morning, lit; the rest waits. */
+    .scrolly[data-beat="3"] .map :is(.e-ab, .r-b) { opacity: 0.2; }
+    .scrolly[data-beat="3"] .map .n-b { opacity: 0.45; }
+    /* Beats 4 + 5 — the whole system, true status: nothing dimmed. */
+    @media (prefers-reduced-motion: reduce) {
+      .map g, .scrolly.live .beats li { transition: none; }
+    }
   </style>
 </head>
 <body data-no-session>
@@ -103,6 +142,7 @@
   <main>
     <!-- The five beats. One sentence each, the product waits until Beat 4,
          and Beat 5 points at the map below — the thing that visibly fires. -->
+    <div class="scrolly" id="scrolly" data-beat="5">
     <ol class="beats">
       <li data-beat="Role">Dana runs the front desk of a 60-member boutique fitness studio, and every morning she needs two answers before the 9am rush — which classes will fill today, and which members have quietly stopped coming.</li>
       <li data-beat="Problem">She can't answer either from one screen, because every booking, roster, member question, and absence is recorded in a different tool that never hands its records to the next one.</li>
@@ -112,31 +152,32 @@
     </ol>
 
     <!-- The map. Status lives on each edge's class: done | todo. -->
+    <div class="map-stick">
     <div class="map" role="img" aria-label="The data flow: shared records feed all four products, and A's booking log feeds Support and Re-engagement. One road is not built yet: the Dashboard reads the log but generates its own studio, so it rejects every booking Booking writes.">
       <svg viewBox="0 0 860 250">
         <!-- the shared rail -->
-        <g class="node">
+        <g class="node n-shared">
           <rect x="330" y="196" width="200" height="42" style="stroke: var(--line)"/>
           <text x="430" y="214" text-anchor="middle">shared</text>
           <text x="430" y="229" text-anchor="middle" class="sub">one studio · one session · one brand</text>
         </g>
         <!-- product nodes, each in its builder's color -->
-        <g class="node">
+        <g class="node n-a">
           <rect x="20"  y="40" width="170" height="52" style="stroke: var(--kerrian)"/>
           <text x="105" y="62" text-anchor="middle">A · Booking</text>
           <text x="105" y="79" text-anchor="middle" class="sub">members reserve spots</text>
         </g>
-        <g class="node">
+        <g class="node n-b">
           <rect x="240" y="40" width="170" height="52" style="stroke: var(--manny)"/>
           <text x="325" y="62" text-anchor="middle">B · Dashboard</text>
           <text x="325" y="79" text-anchor="middle" class="sub">staff run the week</text>
         </g>
-        <g class="node">
+        <g class="node n-c">
           <rect x="460" y="40" width="170" height="52" style="stroke: var(--dennis)"/>
           <text x="545" y="62" text-anchor="middle">C · Support</text>
           <text x="545" y="79" text-anchor="middle" class="sub">members ask, it answers</text>
         </g>
-        <g class="node">
+        <g class="node n-d">
           <rect x="680" y="40" width="170" height="52" style="stroke: var(--rensley)"/>
           <text x="765" y="62" text-anchor="middle">D · Re-engage</text>
           <text x="765" y="79" text-anchor="middle" class="sub">the quiet get a draft</text>
@@ -146,43 +187,46 @@
         <!-- A -> B : NOT YET. The Dashboard reads the log, but generates its
              OWN studio, so every session id Booking writes is rejected —
              measured: zero overlap between the two studios' class ids. -->
-        <g class="edge todo">
+        <g class="edge todo e-ab">
           <line x1="190" y1="66" x2="240" y2="66"/>
           <text class="lbl todo" x="215" y="56" text-anchor="middle">not yet</text>
         </g>
         <!-- B -> C : DONE. C's spaces-left answers read A's live reservation log. -->
-        <g class="edge done">
+        <g class="edge done e-bc">
           <line x1="410" y1="66" x2="460" y2="66"/>
           <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 234"/>
           <text class="lbl done" x="435" y="56" text-anchor="middle">live</text>
         </g>
         <!-- A -> D : DONE. Re-engagement reads the running studio with A's
              live reservation log merged in (last row wins). -->
-        <g class="edge done">
+        <g class="edge done e-ad">
           <path d="M150 92 C 300 168, 620 168, 750 92"/>
           <path class="runner" d="M150 92 C 300 168, 620 168, 750 92" stroke-dasharray="26 234"/>
           <text class="lbl done" x="450" y="150" text-anchor="middle">the live trail</text>
         </g>
 
         <!-- the shared rail feeds every product: all DONE -->
-        <g class="edge done">
+        <g class="edge done r-a">
           <path d="M370 196 C 320 160, 140 150, 105 92"/>
           <path class="runner" d="M370 196 C 320 160, 140 150, 105 92" stroke-dasharray="26 234"/>
         </g>
-        <g class="edge done">
+        <g class="edge done r-b">
           <path d="M405 196 C 390 160, 340 140, 325 92"/>
           <path class="runner" d="M405 196 C 390 160, 340 140, 325 92" stroke-dasharray="26 234"/>
         </g>
-        <g class="edge done">
+        <g class="edge done r-c">
           <path d="M455 196 C 470 160, 530 140, 545 92"/>
           <path class="runner" d="M455 196 C 470 160, 530 140, 545 92" stroke-dasharray="26 234"/>
         </g>
-        <g class="edge done">
+        <g class="edge done r-d">
           <path d="M490 196 C 540 160, 720 150, 765 92"/>
           <path class="runner" d="M490 196 C 540 160, 720 150, 765 92" stroke-dasharray="26 234"/>
         </g>
       </svg>
     </div>
+    <p class="map-cue" aria-hidden="true">The map reacts as the story scrolls — beat by beat.</p>
+    </div>
+    </div><!-- /scrolly -->
 
     <section class="how" aria-label="How to read this picture">
       <h2>How to read this picture</h2>
@@ -242,5 +286,6 @@
     here are status marks only; the four builder colors keep meaning who built what.</p>
   </main>
   <script type="module" src="./theme-boot.js"></script>
+  <script type="module" src="./storytold.js"></script>
 </body>
 </html>
