@@ -178,9 +178,18 @@ export function assistantAuthorHits(text) {
 /* ---------- the self-test ---------- */
 
 function selfTest() {
+  /* THE GATE SCANS ITSELF, so the two planted cases that must contain a
+   * banned word UNQUOTED are assembled from fragments rather than written
+   * out. Writing them plainly would make this file fail its own check, and
+   * the alternative — teaching the gate to skip the file that defines it —
+   * would carve an exemption that anyone could then use. The assembled
+   * string is byte-identical to the real violation it stands for, so the
+   * detector is proven against exactly the text it has to catch. */
+  const bannedDemo = `D${"emo"}`;
+  const bannedExample = `ex${"ample"}`;
   const planted = [
-    { label: "loose banned word fails", input: "Demo login stands in for auth", fn: bannedWordHits, want: true },
-    { label: "gitignore-style banned word fails", input: "!.env.example", fn: bannedWordHits, want: true },
+    { label: "loose banned word fails", input: `${bannedDemo} login stands in for auth`, fn: bannedWordHits, want: true },
+    { label: "gitignore-style banned word fails", input: `!.env.${bannedExample}`, fn: bannedWordHits, want: true },
     { label: "quoted mention passes", input: 'the words "demo", "example", and "mock" appear nowhere', fn: bannedWordHits, want: false },
     { label: "backticked mention passes", input: "no `example` may ship", fn: bannedWordHits, want: false },
     { label: "demonstrate is a different word", input: "these demonstrate the rule", fn: bannedWordHits, want: false },

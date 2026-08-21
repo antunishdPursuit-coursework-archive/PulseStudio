@@ -29,6 +29,21 @@ cost somebody a day:
 - **A rule nobody can check is a wish.** If a doc states a rule, something
   should be able to fail when the rule is broken — a gate, a test, a
   script. `styling.md` has `scripts/check-styles.mjs`.
+
+  Three of the repo's laws now have one, and the reason the last two were
+  added is the standard proving itself: the language law and the
+  no-attribution law were stated in six files each and enforced by nobody,
+  so `npm run check` printed 314 checks and 0 failures while the root data
+  contract used a banned word on line 162.
+
+  | Law | Stated in | Enforced by |
+  | --- | --- | --- |
+  | Where styles live | [styling.md](./styling.md) | `scripts/check-styles.mjs` |
+  | The words we do not use, and no AI as a contributor | root `CLAUDE.md` | `scripts/check-language.mjs` |
+  | The shared vocabulary the records must speak | root `SHARED_DATA_CONTRACT.md` | `scripts/check-fixtures.mjs` |
+
+  Each runs inside `npm run check`, each carries `--self-test`, and each
+  states the counts it actually reached rather than passing in silence.
 - **Prove the check can fail.** A check that only ever passes is
   indistinguishable from a broken one. Every gate here carries a
   self-test that plants a known-bad case (`--self-test`), and was run
