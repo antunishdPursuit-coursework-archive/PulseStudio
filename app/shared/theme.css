@@ -341,7 +341,12 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .appearance-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: .8rem; }
 .appearance-color-value { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem; font-weight: 600; }
 .appearance-color-field { display: block; width: 100%; height: 104px; border: 2px solid var(--accent, var(--line)); border-radius: 7px; cursor: crosshair; }
-.appearance-hue { width: 100%; height: 12px; margin-top: 9px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
+/* 24px tall, not 12. WCAG 2.2 asks for a 24x24 minimum target (2.5.8),
+   and the exception for a control the browser sizes itself does not apply
+   once a stylesheet sets the height — which this line did. The track still
+   draws thin because a native range centres it in the box; what grew is
+   the area a finger or a shaky hand can actually land on. */
+.appearance-hue { width: 100%; height: 24px; margin-top: 5px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
 .appearance-editor-note { margin: 6px 0 0; color: var(--muted); font-size: .74rem; }
 .appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
 .appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
