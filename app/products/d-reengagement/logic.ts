@@ -528,16 +528,29 @@ function seatsTakenBySession(data: FixtureSet): Map<string, number> {
   if (cached !== undefined) return cached;
   /* Last row wins per (member, session) — the same reading Booking uses for
    * its own log — so a cancellation frees the seat and a member listed
-   * twice holds one. Built in one pass over the reservations. */
-  const latestStatus = new Map<string, string>();
+   * twice holds one. Built in one pass over the reservations.
+   *
+   * NESTED, NOT A JOINED STRING KEY. The first version keyed one flat Map
+   * on `${session_id}|${member_id}` and recovered the session by slicing at
+   * the last pipe. That is correct exactly as long as no member id ever
+   * contains a pipe — true of all three doors today (member:000001,
+   * csv_m_1_maria, gen20260821_m_1) and true only by luck. An id format is
+   * not this function's to depend on, and a Map of Maps needs no parsing
+   * back at all. */
+  const latestBySession = new Map<string, Map<string, string>>();
   for (const r of data.reservations) {
-    latestStatus.set(`${r.session_id}|${r.member_id}`, r.reservation_status);
+    let forSession = latestBySession.get(r.session_id);
+    if (forSession === undefined) {
+      forSession = new Map<string, string>();
+      latestBySession.set(r.session_id, forSession);
+    }
+    forSession.set(r.member_id, r.reservation_status);
   }
   const taken = new Map<string, number>();
-  for (const [key, status] of latestStatus) {
-    if (status !== "reserved") continue;
-    const sessionId = key.slice(0, key.lastIndexOf("|"));
-    taken.set(sessionId, (taken.get(sessionId) ?? 0) + 1);
+  for (const [sessionId, byMember] of latestBySession) {
+    let held = 0;
+    for (const status of byMember.values()) if (status === "reserved") held += 1;
+    if (held > 0) taken.set(sessionId, held);
   }
   seatsTakenCache.set(data.reservations, taken);
   return taken;

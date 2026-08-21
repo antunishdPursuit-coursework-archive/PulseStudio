@@ -829,6 +829,27 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
       reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
   ];
   check("a member counted twice still holds one seat", remainingSpots(future, fx), 1);
+
+  /* AN ID FORMAT IS NOT THIS FUNCTION'S TO DEPEND ON. The seat counts were
+   * first keyed on `${session}|${member}` in one flat map and recovered the
+   * session by slicing at the last pipe — correct exactly as long as no
+   * member id ever contains a pipe, which is true of all three doors today
+   * and true only by luck. */
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "a|b", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+  ];
+  check("a member id containing a pipe still holds exactly one seat",
+    remainingSpots(future, fx), 1);
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "a|b", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+    { reservation_id: "r2", member_id: "a|b", session_id: "s-future",
+      reservation_status: "canceled" as const, reserved_at: "2026-08-20T09:00:00",
+      canceled_at: "2026-08-21T08:00:00" },
+  ];
+  check("...and frees it on cancellation, like any other member",
+    remainingSpots(future, fx), 2);
 }
 
 /* WHAT THE RECORDS DO NOT SAY. A sign-in sheet is a name and a date: it does
