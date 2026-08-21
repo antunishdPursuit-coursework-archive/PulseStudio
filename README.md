@@ -1,5 +1,10 @@
 # Pulse Studio
 
+> **In development.** Start here: **[Are we ready to present?](https://antunishdpursuit.github.io/PulseStudio/shared/ready.html)**
+> · [Storytold — how the records flow](https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html)
+> · [The live site](https://antunishdpursuit.github.io/PulseStudio/)
+
+
 ## Project 4: Membership Studio
 
 Pulse Studio is a single-location boutique fitness studio offering group

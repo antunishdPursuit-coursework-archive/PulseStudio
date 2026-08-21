@@ -17,6 +17,7 @@ import {
   writePulseSession,
   type PulseSession,
 } from "./session.js";
+import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudioMembers } from "./studio.js";
 
 type Check = { name: string; run: () => string | true };
@@ -262,6 +263,33 @@ check("a cross-tab storage event reaches subscribers", () => {
   return heard.value !== null && heard.value.actor_type === "staff"
     ? true
     : "the staff session did not survive the event";
+});
+
+/* ---------- the sign-in flow (auth owns the decisions) ---------- */
+
+check("the flow lists the running studio plus exactly one staff actor", () => {
+  const { members, staff } = signInChoices();
+  if (members.length !== sharedStudioMembers().length) return "member list drifted";
+  return eq(staff, FRONT_DESK);
+});
+
+check("signInAsMember writes exactly the v1 member record", () => {
+  fresh();
+  const member = sharedStudioMembers()[0];
+  if (member === undefined) return "no members to test with";
+  signInAsMember(member);
+  return eq(readPulseSession(), {
+    version: 1,
+    actor_type: "member",
+    member_id: member.id,
+    display_name: member.displayName,
+  });
+});
+
+check("signInAsFrontDesk writes exactly the staff record", () => {
+  fresh();
+  signInAsFrontDesk();
+  return eq(readPulseSession(), FRONT_DESK);
 });
 
 /* ---------- storage that is broken or missing ---------- */
