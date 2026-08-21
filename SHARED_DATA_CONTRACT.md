@@ -145,7 +145,21 @@ product creates, and unresolved questions during the team review.
 | Member Booking App | Kerrian | `member`, `membership`, `class_session` | `reservation` |
 | Staff Scheduling Dashboard | Manny | `class_session`, `instructor`, `reservation` | Product-specific flags only |
 | Member Support Chatbot | Dennis | `class_session`, `studio_policy` | No shared records in MVP |
-| Member Re-engagement Tool | Rensley | `member`, `membership`, `reservation`, `attendance` | Draft outreach only; no automatic sending |
+| Member Re-engagement Tool | Rensley | `member`, `membership`, `reservation`, `attendance`, `class_session`, `instructor` | Draft outreach only; no automatic sending |
+
+**Rensley corrected his own row on 2026-08-21** and left the other three
+alone. `class_session` and `instructor` were always being read and were
+never declared: attendance records carry a `session_id`, not a class, so
+the only way to say "Last attended: yoga with Ana on July 25" — the line a
+staff member judges a flag by — is to resolve the session and then its
+instructor. Reading them was correct; the row was wrong.
+
+An audit the same day compared every product's real reads against this
+table. **The data law itself holds** — no member-facing surface touches
+staff-only information, and Product C actively defends the line: it builds
+a list of member names for the sole purpose of REFUSING questions that
+mention one. **This table does not.** Three other rows are out of date, and
+each is its owner's to correct — see `docs/REQUESTFOR-A-B-C.md`.
 
 ## Definitions the team must agree on
 

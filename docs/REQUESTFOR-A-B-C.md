@@ -483,6 +483,47 @@ skips it. The difference is who is looking.
 **The one ask:** delete that span, or tell me the badge is deliberate and I
 will write the reason into the baseline so nobody raises it again.
 
+## Everyone — I audited the data law, and it holds (2026-08-21)
+
+I compared what every product actually reads against the product map in
+`SHARED_DATA_CONTRACT.md`. Stating the good result first, because a report
+that only lists problems is not an audit:
+
+**No member-facing surface touches staff-only information.** Attendance,
+rosters and cancellation-risk inference appear only in the two staff
+products, B and D. That is the line the data law draws and nobody has
+crossed it.
+
+**Dennis, Product C does better than not-leaking — it defends the line.**
+`asksForPrivateMemberData()` builds a list of every member's name and first
+name for the sole purpose of REFUSING any question that mentions one, on
+top of six patterns for attendance and history questions. That is the ask I
+wrote in your section, implemented further than I asked. Thank you.
+
+**What is out of date is the map, not the code.** Every row understates its
+product, mine worst of all:
+
+| Row | Declares | Also reads | Harm |
+| --- | --- | --- | --- |
+| D (mine) | member, membership, reservation, attendance | `class_session`, `instructor` | none — corrected already |
+| B (Manny) | class_session, instructor, reservation | `attendance`, `member` | none: B is a staff surface, and attendance is staff information there |
+| A (Kerrian) | member, membership, class_session | `instructor` | none — needed to name who teaches a class |
+| C (Dennis) | class_session, studio_policy | `member`, `instructor` | none — the `member` read IS the privacy guard above |
+
+Not one of these is a data-law breach. They are a table that stopped
+matching the code, which matters because the table is what a new teammate
+reads to learn what their product is allowed to touch — and a map that
+understates reality teaches the wrong lesson in the safe direction only
+until somebody trusts it.
+
+**I corrected my own row and left yours alone.** The contract says each
+owner adds their required fields during team review, so these are three
+one-line edits by three people, not one by me.
+
+**The one ask:** add the fields your product already reads to your own row.
+If you think a read on that list should not be happening, that is a better
+conversation than a table edit, and I would rather have it.
+
 ## If you disagree with anything here
 
 Say so on the PR or in person — every number above (14/60 thresholds
