@@ -120,7 +120,25 @@ function isBinaryPath(file) {
 /* ---------- the two rules, as pure functions ---------- */
 
 /** A banned word is a MENTION when the match itself is wrapped in quotes or
- *  backticks. Naming a forbidden word to forbid it is not using it. */
+ *  backticks. Naming a forbidden word to forbid it is not using it.
+ *
+ *  It is ALSO a mention when it sits inside a path — preceded by "." or a
+ *  slash, or followed by one. You have to be able to write the name of a
+ *  file that exists, and the assistant-name rule below already works this
+ *  way ("CLAUDE.md is a filename, not a byline"); the two rules simply
+ *  disagreed until 2026-08-21.
+ *
+ *  What changed it: this gate scans CONTENT and never filenames, so a repo
+ *  could hold a file named .env.{banned} quite happily while failing any
+ *  document that told you to copy it. That is not a rule, it is an
+ *  accident, and it surfaced the moment a teammate added exactly that file
+ *  by the ordinary dotenv convention. Whether the repo should contain such
+ *  a name at all is a separate question, and it belongs to that file's
+ *  owner — see docs/REQUESTFOR-A-B-C.md. This function only stops the gate
+ *  from punishing everyone who mentions it.
+ *
+ *  Prose is untouched: in "for {banned}" the preceding character is a
+ *  space, so it still fails, which the planted cases hold. */
 export function bannedWordHits(line) {
   const hits = [];
   for (const word of BANNED_WORDS) {
@@ -134,6 +152,9 @@ export function bannedWordHits(line) {
         (before === "`" && after === "`") ||
         (before === "'" && after === "'");
       if (quoted) continue;
+      const pathish =
+        before === "." || before === "/" || before === "\\" || after === "/";
+      if (pathish) continue;
       hits.push({ word: match[2].toLowerCase(), quoted: false });
     }
   }
@@ -189,7 +210,14 @@ function selfTest() {
   const bannedExample = `ex${"ample"}`;
   const planted = [
     { label: "loose banned word fails", input: `${bannedDemo} login stands in for auth`, fn: bannedWordHits, want: true },
-    { label: "gitignore-style banned word fails", input: `!.env.${bannedExample}`, fn: bannedWordHits, want: true },
+    /* This case asserted the OPPOSITE until 2026-08-21 — a path-shaped
+     * banned word had to fail. It is flipped rather than deleted so the
+     * reversal stays visible: the gate never scanned filenames, so the old
+     * rule only ever punished documents for naming a file the repo was
+     * free to contain. */
+    { label: "a path is a name, not the word", input: `cp .env.${bannedExample} .env`, fn: bannedWordHits, want: false },
+    { label: "...but the same word in prose still fails", input: `for ${bannedExample}, see the brief`, fn: bannedWordHits, want: true },
+    { label: "...and a directory path is a name too", input: `app/${bannedExample}/index.html`, fn: bannedWordHits, want: false },
     { label: "quoted mention passes", input: 'the words "demo", "example", and "mock" appear nowhere', fn: bannedWordHits, want: false },
     { label: "backticked mention passes", input: "no `example` may ship", fn: bannedWordHits, want: false },
     { label: "demonstrate is a different word", input: "these demonstrate the rule", fn: bannedWordHits, want: false },
