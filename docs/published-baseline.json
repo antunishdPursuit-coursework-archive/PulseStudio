@@ -1,0 +1,110 @@
+{
+  "note": "Files under app/ that are published at a public URL but are not the website. app/ IS the site: the Pages workflow publishes it with path: app. Everything here was already published the day scripts/check-published.mjs landed (2026-08-21). This list is meant to SHRINK — when an owner moves a file to docs/, drop its line. Anything not on this list fails the gate.",
+  "allowed": [
+    {
+      "file": "app/products/a-booking/AGENTS.md",
+      "owner": "Kerrian",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/a-booking/CLAUDE.md",
+      "owner": "Kerrian",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/b-dashboard/AGENTS.md",
+      "owner": "Manny",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/b-dashboard/CLAUDE.md",
+      "owner": "Manny",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/c-chatbot/AGENTS.md",
+      "owner": "Dennis",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/c-chatbot/CLAUDE.md",
+      "owner": "Dennis",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/.gitignore",
+      "owner": "Rensley",
+      "why": "a build artifact rule, harmless to serve and meaningless to a reader"
+    },
+    {
+      "file": "app/products/d-reengagement/AGENTS.md",
+      "owner": "Rensley",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/CLAUDE.md",
+      "owner": "Rensley",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/LICENSE.md",
+      "owner": "Rensley",
+      "why": "the licence, which is meant to be readable at a URL"
+    },
+    {
+      "file": "app/products/d-reengagement/README.md",
+      "owner": "Rensley",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/AGENTS.md",
+      "owner": "the team",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/shared/CLAUDE.md",
+      "owner": "the team",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/shared/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/auth/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/auth/schema.sql",
+      "owner": "the team",
+      "why": "a design document for a database nothing runs yet; published only because it sits beside the auth code it describes"
+    },
+    {
+      "file": "app/shared/components/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/fonts/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/photos/CREDITS.md",
+      "owner": "the team",
+      "why": "photo attribution, which is a licence obligation and belongs in public"
+    },
+    {
+      "file": "app/shared/synthetic/CALIBRATION.md",
+      "owner": "the team",
+      "why": "where the engine's rhythms come from; published so a claim about real-world data can be checked by anyone reading it"
+    },
+    {
+      "file": "app/shared/synthetic/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    }
+  ]
+}

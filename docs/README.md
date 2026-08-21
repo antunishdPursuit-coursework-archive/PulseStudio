@@ -8,6 +8,7 @@ Process documents for the people building Pulse Studio. These sit OUTSIDE
 | --- | --- |
 | [styling.md](./styling.md) | Where every style lives (shared vs your folder), why we do not use Sass, when a comment is required — enforced by `scripts/check-styles.mjs` at the gate |
 | [styles-baseline.json](./styles-baseline.json) | The style duplication that existed the day the gate landed, with the owner who can delete each one. This list only shrinks. |
+| [published-baseline.json](./published-baseline.json) | Everything `app/` serves at a public URL that is not the website, with the owner of each and why it is allowed to sit there. This list only shrinks. |
 | [contrast-baseline.json](./contrast-baseline.json) | The accent colours that were below WCAG AA the day `check-contrast.mjs` landed, with the owner who can clear each one. A developer's colour is theirs, so nobody else clears these. This list only shrinks. |
 | [member-support-haiku.md](./member-support-haiku.md) | How Product C runs with Haiku locally, plus the marked member-safe guidance the local server reads on every question |
 | [REQUESTFOR-A-B-C.md](./REQUESTFOR-A-B-C.md) | What Product D needs from A, B and C, and what D gives back — one section per teammate, each ending in ONE ask |
@@ -54,6 +55,7 @@ cost somebody a day:
   | The shared fixture still demonstrates what it claims to | the product briefs' acceptance checks | `scripts/check-fixtures.mjs` (the one place that reads the real clock, on purpose — it prints the countdown every run) |
   | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
   | Nobody edits another developer's folder | root `CLAUDE.md` (the lane law) | `scripts/check-lanes.mjs` (reads only what this branch adds to `origin/main`, skips merges, and counts team-owned changes it cannot judge) |
+  | Nothing under `app/` is private | root `CLAUDE.md` (the filing law) | `scripts/check-published.mjs` (fails on a NEW file under `app/` that the website would never ask for; the ones already there are in [published-baseline.json](./published-baseline.json)) |
 
   Each runs inside `npm run check`, each carries `--self-test`, and each
   states the counts it actually reached rather than passing in silence.
