@@ -338,6 +338,54 @@ check("a throwing storage keeps the page usable: the choice still holds in-memor
   return eq(got.actor_type, "staff");
 });
 
+/* THE REAL PRIVATE-MODE SHAPE: reads work, writes are refused. Storage that
+ * throws on everything is the obvious case and was already covered; this is
+ * the one several browsers actually implement, and it used to sign a person
+ * out the instant they signed in. */
+const readOnlyStorage = {
+  getItem(): string | null { return null; },
+  setItem(): void { throw new Error("storage is full or blocked"); },
+  removeItem(): void { /* accepted, nothing kept */ },
+};
+
+check("a store that reads fine but refuses writes still holds the sign-in", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the sign-in was thrown away by the first read after it";
+  return eq(got.actor_type, "staff");
+});
+
+check("...and holds it across repeated reads, not just the first", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  readPulseSession();
+  readPulseSession();
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the session survived one read and then vanished";
+  return eq(got.actor_type, "staff");
+});
+
+check("...and signing out in a write-refusing browser really does sign out", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  clearPulseSession();
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  return eq(got, null);
+});
+
+check("an empty WORKING store still means nobody is signed in", () => {
+  fresh();
+  const got = readPulseSession();
+  return eq(got, null);
+});
+
 check("clearing with a throwing storage still signs the page out", () => {
   fresh();
   setStorageForChecks(throwingStorage);

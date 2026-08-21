@@ -86,6 +86,32 @@ function storage(): StorageLike {
   return storageOverride ?? localStorage;
 }
 
+/* WILL THIS BROWSER ACTUALLY KEEP WHAT WE WRITE?
+ *
+ * The interesting failure is not storage that throws on everything — that
+ * one is obvious and already handled. It is storage that READS fine and
+ * REFUSES WRITES, which is what several browsers do for a blocked or
+ * private context, and it produced a sign-in that reverted the instant it
+ * happened: writePulseSession caught the refused write and kept the choice
+ * in memory exactly as designed, and then the very next readPulseSession
+ * saw an empty store, concluded nobody was signed in, and threw the memory
+ * away. The in-memory fallback this contract documents could never survive
+ * one read.
+ *
+ * So an empty store is only authoritative when the store would have KEPT
+ * something. This probe is the difference between "nobody is signed in"
+ * and "this browser will not remember that somebody is". */
+function storageAcceptsWrites(): boolean {
+  try {
+    const probe = `${SESSION_KEY}-probe`;
+    storage().setItem(probe, "1");
+    storage().removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /* When storage is unavailable, the last deliberate choice lives here so
    the CURRENT page keeps working; it will not survive navigation, and
    that is stated behavior, not a bug. */
@@ -155,6 +181,13 @@ export function readPulseSession(): PulseSession | null {
     return memorySession; // storage is unreachable — serve the page's own memory
   }
   if (raw === null) {
+    /* Empty store. Believe it only if this browser would have kept a
+     * write; otherwise the emptiness is the browser's refusal, not the
+     * person's sign-out, and the page's own memory is the better answer.
+     * A genuine sign-out — here or in another tab — clears memorySession
+     * through clearPulseSession() or the storage event, so this cannot
+     * resurrect a session somebody actually ended. */
+    if (memorySession !== null && !storageAcceptsWrites()) return memorySession;
     memorySession = null;
     return null;
   }
