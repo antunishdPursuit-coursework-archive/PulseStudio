@@ -21,6 +21,7 @@ import {
   recentBookingActivity,
   suggestedSession,
   summaryLine,
+  nobodyFlaggedLine,
   todayDayNumber,
   todayIsoInZone,
   longDate,
@@ -514,10 +515,14 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     return;
   }
   if (result.flagged.length === 0) {
+    /* NOT AN ALL-CLEAR BY DEFAULT. This used to read "every member in these
+     * records has been in recently", which is true for one of the four ways
+     * a studio reaches zero flagged and flatly false for the studio where
+     * everybody left three months ago — the case staff would most want to
+     * know about. The line now states which of them happened. */
     const calm = document.createElement("p");
     calm.className = "status";
-    calm.textContent =
-      "No one needs outreach right now — every member in these records has been in recently.";
+    calm.textContent = nobodyFlaggedLine(result, proposedRules) ?? "";
     flaggedEl.append(calm);
     return;
   }

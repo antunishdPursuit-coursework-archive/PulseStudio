@@ -56,13 +56,30 @@ export interface CsvRow {
  *  Handles quoted fields, embedded commas, doubled quotes, and embedded
  *  newlines inside quotes. All-blank rows are dropped from the result but
  *  still advance the line count, so stated line numbers stay true. */
-export function parseCsvRows(text: string): CsvRow[] {
+export interface CsvParse {
+  rows: CsvRow[];
+  /* THE FILE LINE WHERE A QUOTE OPENED AND NEVER CLOSED, or null.
+   *
+   * An odd number of quote characters is one of the commonest defects in a
+   * real export, and it is silent: once the parser is inside a quote,
+   * every remaining comma and newline is ordinary text, so the whole rest
+   * of the file collapses into a single field of a single row. Before this
+   * was tracked, a staff member could import five hundred rows, have three
+   * hundred of them disappear into one cell, and read "0 rows skipped" —
+   * a clean answer built on evidence the tool never saw. Nothing about the
+   * salvaged rows is trustworthy after that point, so the line is reported
+   * and the page states it. */
+  unterminatedQuoteAtLine: number | null;
+}
+
+export function parseCsvRowsDetailed(text: string): CsvParse {
   const rows: CsvRow[] = [];
   let field = "";
   let row: string[] = [];
   let inQuotes = false;
   let line = 1;
   let rowLine = 1;
+  let quoteOpenedAtLine = 0;
   const endRow = (): void => {
     row.push(field);
     field = "";
@@ -88,6 +105,7 @@ export function parseCsvRows(text: string): CsvRow[] {
       }
     } else if (ch === '"') {
       inQuotes = true;
+      quoteOpenedAtLine = line;
     } else if (ch === ",") {
       row.push(field);
       field = "";
@@ -101,10 +119,16 @@ export function parseCsvRows(text: string): CsvRow[] {
     }
   }
   endRow();
-  return rows;
+  return { rows, unterminatedQuoteAtLine: inQuotes ? quoteOpenedAtLine : null };
 }
 
 /** Rows only, for callers that do not need line numbers. */
+/** Rows only, for callers that have already handled the structural report
+ *  or are parsing text they produced themselves. */
+export function parseCsvRows(text: string): CsvRow[] {
+  return parseCsvRowsDetailed(text).rows;
+}
+
 export function parseCsv(text: string): string[][] {
   return parseCsvRows(text).map((r) => r.cells);
 }
@@ -200,7 +224,7 @@ function slug(value: string): string {
  *  loud, named error when the required columns are missing; collects
  *  per-row skips (bad dates, empty names) with stated file lines. */
 export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
-  const rows = parseCsvRows(text);
+  const { rows, unterminatedQuoteAtLine } = parseCsvRowsDetailed(text);
   const headerRow = rows[0];
   if (!headerRow) throw new Error("The file is empty — no header row found.");
   const headers = headerRow.cells.map((h) => h.trim());
@@ -227,6 +251,14 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const instructorIdByName = new Map<string, string>();
   const attendance: Attendance[] = [];
   const skipped: string[] = [];
+
+  /* Said FIRST, because it explains every other number on the page. */
+  if (unterminatedQuoteAtLine !== null) {
+    skipped.push(
+      `line ${unterminatedQuoteAtLine}: a quote opens here and never closes, so everything after it ` +
+        `was read as one cell. Rows below this line were not read at all — fix the quote and import again.`,
+    );
+  }
 
   for (let r = 1; r < rows.length; r += 1) {
     const { cells, line } = rows[r] ?? { cells: [], line: 0 };

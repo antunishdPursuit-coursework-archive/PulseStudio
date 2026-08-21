@@ -17,7 +17,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
+import { adaptAttendanceCsv, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
@@ -37,6 +37,7 @@ import {
   dataQualityLine,
   dayNumberFromIso,
   findQuietMembers,
+  nobodyFlaggedLine,
   firstNameOf,
   inviteWording,
   recentBookingActivity,
@@ -332,6 +333,52 @@ check("today is computed in the studio timezone",
   dayNumberFromIso("2026-08-18"));
 
 // 7-9. The excluded conversations.
+/* "0 FLAGGED" IS FOUR SITUATIONS WEARING ONE NUMBER, and only one of them
+ * is good news. The page used to read all four as "every member has been in
+ * recently" — flatly false for the studio where everybody left months ago,
+ * which is the one staff would most want to hear about. */
+{
+  const allGone = recordsFor([
+    { id: "m1", name: "Long Gone", status: "active", attended: ["2026-04-01"] },
+    { id: "m2", name: "Also Gone", status: "active", attended: ["2026-03-15"] },
+  ]);
+  const r = findQuietMembers(allGone, TODAY, proposedRules);
+  check("a studio where everyone left flags nobody", r.flagged.length, 0);
+  check("...and says they were quiet too long, never that they were in recently",
+    nobodyFlaggedLine(r, proposedRules)?.includes("quiet longer than 60 days"), true);
+  check("...and never claims anyone has been in recently",
+    nobodyFlaggedLine(r, proposedRules)?.includes("been in within"), false);
+  check("the count of those past the window is stated", r.quietLongerThanWindowCount, 2);
+}
+{
+  const allRecent = recordsFor([
+    { id: "m1", name: "Was In Monday", status: "active", attended: ["2026-08-18"] },
+  ]);
+  const r = findQuietMembers(allRecent, TODAY, proposedRules);
+  check("a genuinely healthy studio still gets the good news",
+    nobodyFlaggedLine(r, proposedRules)?.includes("been in within the last 14 days"), true);
+}
+{
+  const noneActive = recordsFor([
+    { id: "m1", name: "Paused Person", status: "paused", attended: ["2026-07-01"] },
+  ]);
+  const r = findQuietMembers(noneActive, TODAY, proposedRules);
+  check("a records set with no active members says exactly that",
+    nobodyFlaggedLine(r, proposedRules)?.includes("all 1 are paused, canceled or expired"), true);
+  check("inactive members are counted, not silently skipped", r.notActiveCount, 1);
+}
+{
+  const newcomer = recordsFor([{ id: "m1", name: "Brand New", status: "active", attended: [] }]);
+  const r = findQuietMembers(newcomer, TODAY, proposedRules);
+  check("a never-attended member is named as onboarding, not re-engagement",
+    nobodyFlaggedLine(r, proposedRules)?.includes("never attended"), true);
+  check("never-attended members are counted", r.neverAttendedCount, 1);
+}
+check("when somebody IS flagged there is nothing to explain",
+  nobodyFlaggedLine(
+    findQuietMembers(recordsFor([{ id: "m1", name: "Quiet One", status: "active", attended: ["2026-08-01"] }]), TODAY, proposedRules),
+    proposedRules), null);
+
 check("paused member is NOT flagged",
   run(recordsFor([{ id: "m1", name: "Paused Person", status: "paused", attended: ["2026-07-29"] }])).flagged.length, 0);
 check("canceled member is NOT flagged",
@@ -600,6 +647,29 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   const rows = parseCsv('name,note\n"Santos, Maria","said ""hi"" twice"\n');
   check("csv parsing handles quoted commas and doubled quotes",
     rows[1], ["Santos, Maria", 'said "hi" twice']);
+}
+
+/* AN UNTERMINATED QUOTE IS THE SILENT ONE. An odd number of quote marks is
+ * a commonplace defect in a real export, and once the parser is inside a
+ * quote every later comma and newline is ordinary text — the rest of the
+ * file collapses into one cell of one row and simply stops existing. The
+ * page used to report "0 rows skipped" over the wreckage. */
+{
+  const good = "member,date\nMaria Santos,2026-08-01\nJames Okafor,2026-08-02\n";
+  const broken = 'member,date\nMaria Santos,2026-08-01\n"James Okafor,2026-08-02\nPriya Patel,2026-08-03\n';
+  check("a well-formed file reports no structural defect",
+    parseCsvRowsDetailed(good).unterminatedQuoteAtLine, null);
+  check("an unterminated quote is reported with the line it opened on",
+    parseCsvRowsDetailed(broken).unterminatedQuoteAtLine, 3);
+  check("the rows below an unterminated quote really do vanish — that is the harm",
+    parseCsvRowsDetailed(broken).rows.length < parseCsvRowsDetailed(good.replace("James", "X")).rows.length + 1, true);
+  const adapted = adaptAttendanceCsv(broken, "America/New_York");
+  check("the import states the defect instead of reporting a clean read",
+    adapted.skipped.some((n) => n.includes("never closes")), true);
+  check("the defect is stated first, before any per-row skip",
+    adapted.skipped[0]?.includes("never closes"), true);
+  check("a clean file states no such defect",
+    adaptAttendanceCsv(good, "America/New_York").skipped.some((n) => n.includes("never closes")), false);
 }
 
 // 14. Header mapping is case-insensitive and order-free; US dates normalize.

@@ -42,6 +42,21 @@ export interface FlagResult {
    *  in the future. Stating how many members were checked is not the same
    *  as stating what the evidence supported. */
   unusableEvidenceCount: number;
+  /* WHY NOBODY WAS FLAGGED — the three reasons a member can be passed
+   * over, counted separately. "0 flagged" is not one fact, it is four
+   * different situations wearing the same number, and only one of them is
+   * good news. The page used to read all four as "everyone has been in
+   * recently", which is exactly wrong for the studio where every member
+   * left three months ago. */
+  /** Active members whose last visit is older than the rule's window. Not
+   *  a re-engagement note any more — a pause-or-cancel conversation. */
+  quietLongerThanWindowCount: number;
+  /** Active members with no usable attendance at all: onboarding, not
+   *  re-engagement. */
+  neverAttendedCount: number;
+  /** Members who are paused, canceled or expired — different
+   *  conversations, deliberately out of this rule. */
+  notActiveCount: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,9 +201,15 @@ export function findQuietMembers(
   }
 
   const flagged: FlaggedMember[] = [];
+  let quietLongerThanWindowCount = 0;
+  let neverAttendedCount = 0;
+  let notActiveCount = 0;
 
   for (const member of data.members) {
-    if (member.membership_status !== "active") continue;
+    if (member.membership_status !== "active") {
+      notActiveCount += 1;
+      continue;
+    }
 
     // Every class they truly attended, most recent first. Deduplicated by
     // session — a data-entry duplicate must never inflate the evidence or
@@ -218,13 +239,18 @@ export function findQuietMembers(
       .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
 
     const lastSession = attendedSessions[0];
-    if (!lastSession) continue; // never attended — onboarding, not ours
+    if (!lastSession) {
+      neverAttendedCount += 1; // onboarding, not ours
+      continue;
+    }
 
     const lastDay = dayNumberFromIso(lastSession.starts_at);
     const daysSince = today - lastDay;
-    if (daysSince <= rules.minDaysQuiet || daysSince > rules.maxDaysQuiet) {
+    if (daysSince > rules.maxDaysQuiet) {
+      quietLongerThanWindowCount += 1;
       continue;
     }
+    if (daysSince <= rules.minDaysQuiet) continue; // in recently — the good case
 
     // How they used to show up, in the window before they went quiet.
     const priorSessions = attendedSessions.filter(
@@ -258,7 +284,43 @@ export function findQuietMembers(
     checkedCount: data.members.length,
     unmatchedAttendanceCount,
     unusableEvidenceCount,
+    quietLongerThanWindowCount,
+    neverAttendedCount,
+    notActiveCount,
   };
+}
+
+/** Why nobody was flagged, in the studio's own terms. "0 flagged" is four
+ *  different situations wearing one number, and only one of them is good
+ *  news: the page must never read the studio where everybody left three
+ *  months ago as the studio where everybody came in last week.
+ *
+ *  Returns null when somebody WAS flagged — there is nothing to explain. */
+export function nobodyFlaggedLine(result: FlagResult, rules: QuietRules): string | null {
+  if (result.flagged.length > 0) return null;
+  const active = result.checkedCount - result.notActiveCount;
+  if (result.checkedCount === 0) return "No usable member records loaded — nothing was checked.";
+  if (active === 0) {
+    return `No active members in these records: all ${result.checkedCount} are paused, canceled or expired — different conversations from this one.`;
+  }
+  const reasons: string[] = [];
+  if (result.quietLongerThanWindowCount > 0) {
+    reasons.push(
+      `${result.quietLongerThanWindowCount} ${result.quietLongerThanWindowCount === 1 ? "has" : "have"} been quiet longer than ${rules.maxDaysQuiet} days — past a note, and worth a pause-or-cancel conversation instead`,
+    );
+  }
+  if (result.neverAttendedCount > 0) {
+    reasons.push(
+      `${result.neverAttendedCount} ${result.neverAttendedCount === 1 ? "has" : "have"} never attended a class — that is onboarding, not re-engagement`,
+    );
+  }
+  const inRecently =
+    active - result.quietLongerThanWindowCount - result.neverAttendedCount;
+  if (inRecently > 0) {
+    reasons.push(`${inRecently} ${inRecently === 1 ? "has" : "have"} been in within the last ${rules.minDaysQuiet} days`);
+  }
+  const head = `${active} active member${active === 1 ? "" : "s"} checked, 0 flagged.`;
+  return reasons.length === 0 ? head : `${head} Of those, ${reasons.join("; ")}.`;
 }
 
 /* ------------------------------------------------------------------ */
