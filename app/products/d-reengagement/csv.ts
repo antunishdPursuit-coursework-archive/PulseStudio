@@ -26,6 +26,8 @@
  */
 
 import type { Attendance, ClassSession, FixtureSet, Member } from "./deps.js";
+import { GENERIC_CLASS_TYPE } from "./config.js";
+export { GENERIC_CLASS_TYPE };
 
 export interface CsvImport {
   records: FixtureSet;
@@ -179,13 +181,6 @@ const HEADER_NAMES = {
   classType: ["class", "class type", "service", "type"],
   instructor: ["instructor", "staff", "teacher", "coach"],
 } as const;
-
-/* What a class is called when the export never said. A sign-in sheet is a
- * name and a date; it does not know what the person came to. The value has
- * to be SOMETHING because the contract's class_type is a string, so it is
- * this, and the draft voice maps it back to "unknown" rather than putting
- * it in a sentence. */
-export const GENERIC_CLASS_TYPE = "class";
 
 /** Find a column by synonym PRIORITY, not header position: a file with
  *  both a "Day" column (weekday names) and a "Date" column must read the

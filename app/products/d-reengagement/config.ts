@@ -47,6 +47,24 @@ export const brand: StudioBrand = {
   timeZone: "America/New_York",
 };
 
+/* WHAT A CLASS IS CALLED WHEN THE RECORDS NEVER SAID.
+ *
+ * A sign-in sheet is a name and a date; it does not know what the person
+ * came to. The value has to be SOMETHING, because the contract's class_type
+ * is a string and not nullable — so it is this, and the draft assembly maps
+ * it back to "unknown" rather than letting it reach a sentence. Left in a
+ * sentence it reads "your last class class", which is what it did on the
+ * supported sign-in-sheet path until this branch.
+ *
+ * It lives here rather than in csv.ts because it is vocabulary, and because
+ * both the door that writes it and the voice that must never print it need
+ * to agree on one spelling. */
+export const GENERIC_CLASS_TYPE = "class";
+
+/* The placeholder for an instructor the records do not name. Same rule:
+ * the draft maps it to unknown rather than writing "The team teaches". */
+export const GENERIC_INSTRUCTOR = "the team";
+
 /** The quiet-member rule, PROPOSED — the team has not ratified these
  *  numbers yet (see PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md). They live in
  *  config so ratifying different numbers is a one-line change. */

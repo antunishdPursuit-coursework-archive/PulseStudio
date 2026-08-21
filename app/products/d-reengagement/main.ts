@@ -9,7 +9,7 @@
 
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
-import { GENERIC_CLASS_TYPE, adaptAttendanceCsv, importProvenance } from "./csv.js";
+import { adaptAttendanceCsv, importProvenance } from "./csv.js";
 import { csvField, onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
@@ -17,10 +17,9 @@ import {
   dataQualityLine,
   dayNumberFromIso,
   findQuietMembers,
+  draftTextFor,
   firstNameOf,
-  inviteWording,
   recentBookingActivity,
-  suggestedSession,
   summaryLine,
   attendanceCoverage,
   coverageWarning,
@@ -214,31 +213,10 @@ function evidenceDate(iso: string): string {
 }
 
 function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): string {
-  // The concrete invitation: a real upcoming class matching their pattern,
-  // or null — the voice falls back to the open offer, never an invented one.
-  const session = suggestedSession(f, data, today);
-  // The "the team" fallback (used when an instructor record is missing) must
-  // not go through firstNameOf — "the" is not a name.
-  /* The records use two placeholders for "the data does not say": "the
-   * team" for a missing instructor and GENERIC_CLASS_TYPE for a class the
-   * export never named. They are handed to the voice as null, because a
-   * placeholder that reaches a sentence becomes "your last class class". */
-  const instructorFirst =
-    f.usualInstructorName === "the team" || f.usualInstructorName === ""
-      ? null
-      : firstNameOf(f.usualInstructorName);
-  const classType =
-    f.usualClassType === GENERIC_CLASS_TYPE || f.usualClassType === ""
-      ? null
-      : f.usualClassType;
-  return draftMessage({
-    firstName: firstNameOf(f.member.display_name),
-    daysSince: f.daysSince,
-    usualClassType: classType,
-    usualInstructorFirstName: instructorFirst,
-    studioName: brand.studioName,
-    suggestedInvite: session === null ? null : inviteWording(session),
-  });
+  /* The placeholder-to-null mapping this used to hold inline now lives in
+   * logic.ts as draftFactsFor, because nothing here can be checked: this
+   * module touches the DOM at import, so a headless suite cannot load it. */
+  return draftTextFor(f, data, today, brand.studioName);
 }
 
 /** A mailto: link opens the STAFF member's own mail client with the draft

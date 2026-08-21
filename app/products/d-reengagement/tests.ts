@@ -21,7 +21,7 @@ import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, 
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
-import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
   MAILTO_SAFE_LENGTH,
   forgetOutreach,
@@ -45,6 +45,8 @@ import {
   findQuietMembers,
   nobodyFlaggedLine,
   firstNameOf,
+  draftFactsFor,
+  draftTextFor,
   inviteWording,
   recentBookingActivity,
   remainingSpots,
@@ -2134,6 +2136,82 @@ check("clean records produce no data-quality line",
   check("booking activity never shrinks quiet days — only attendance is a visit",
     run(withRes([{ id: "r1", status: "reserved", at: "2026-08-10T12:00:00" }])).flagged[0]?.daysSince,
     21);
+}
+
+/* FROM THE FILE TO THE SENTENCE — the placeholders, checked where they are
+ * actually made.
+ *
+ * The block above hands draftMessage a null class by hand, so it proves the
+ * VOICE copes. It cannot prove the IMPORT produces null, and that is the
+ * half that broke: the mapping lived inside a click handler in main.ts,
+ * which touches the DOM at import and so can never be loaded here. These
+ * start from the plainest supported file there is — a sign-in sheet, two
+ * columns, a name and a date, no class and no instructor anywhere in it —
+ * and walk the real path to the words a staff member would read. */
+{
+  const signInSheetFile = [
+    "Member,Date",
+    "Maria Delgado,2026-06-27",
+    "Maria Delgado,2026-07-11",
+    "Maria Delgado,2026-07-25",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(signInSheetFile, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const flagged = findQuietMembers(imported.records, today, proposedRules).flagged;
+
+  check("a sign-in sheet with no class column still flags its quiet member",
+    flagged.length, 1);
+  const only = flagged[0];
+  if (only) {
+    check("...and the records carry the placeholder, because the field cannot be null",
+      only.usualClassType, GENERIC_CLASS_TYPE);
+    check("...and the instructor placeholder too",
+      only.usualInstructorName, GENERIC_INSTRUCTOR);
+
+    const facts = draftFactsFor(only, imported.records, today, brand.studioName);
+    check("the draft turns the class placeholder back into 'we do not know'",
+      facts.usualClassType, null);
+    check("...and the instructor placeholder too",
+      facts.usualInstructorFirstName, null);
+    check("...while keeping the one thing the file DID say",
+      facts.firstName, "Maria");
+
+    const note = draftTextFor(only, imported.records, today, brand.studioName);
+    check("so the note never says 'class class' to a real member",
+      note.includes("class class"), false);
+    /* Case-insensitive and both tenses on purpose: the placeholder's first
+     * name is "the", and it lands MID-sentence in lower case, so an anchored
+     * capital-T pattern here passed happily while the bug was live. */
+    check("...and never credits 'the' with teaching anything",
+      /\bthe (still )?teaches\b/i.test(note), false);
+    check("...and never prints the instructor placeholder either",
+      note.toLowerCase().includes("the team"), false);
+    check("...and still counts the days from the file's own last date",
+      note.includes("27 days"), true);
+  }
+}
+
+/* THE OTHER DIRECTION — a real placeholder must not be confused with a real
+ * class. If the mapping ever widened to "drop anything short", a studio
+ * that genuinely runs a class called "class" would lose it. */
+{
+  const fullExport = [
+    "Member,Date,Class,Instructor",
+    "Maria Delgado,2026-06-27,yoga,Ana Reyes",
+    "Maria Delgado,2026-07-11,yoga,Ana Reyes",
+    "Maria Delgado,2026-07-25,yoga,Ana Reyes",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(fullExport, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  if (only) {
+    const facts = draftFactsFor(only, imported.records, today, brand.studioName);
+    check("a named class survives the mapping untouched", facts.usualClassType, "yoga");
+    check("...and the instructor arrives as a first name, not a full one",
+      facts.usualInstructorFirstName, "Ana");
+    const note = draftTextFor(only, imported.records, today, brand.studioName);
+    check("...so the note names both", note.includes("Ana") && note.includes("yoga"), true);
+  }
 }
 
 const passed = results.filter((r) => r.passed).length;

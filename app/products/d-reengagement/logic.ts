@@ -11,7 +11,8 @@
  */
 
 import type { ClassSession, FixtureSet, Member, Reservation } from "./deps.js";
-import type { QuietRules } from "./config.js";
+import type { DraftFacts, QuietRules } from "./config.js";
+import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, draftMessage } from "./config.js";
 
 /** One flagged member with the evidence for why — no flag without evidence. */
 export interface FlaggedMember {
@@ -296,11 +297,11 @@ export function findQuietMembers(
       member,
       lastSession,
       lastInstructorName:
-        instructorById.get(lastSession.instructor_id) ?? "the team",
+        instructorById.get(lastSession.instructor_id) ?? GENERIC_INSTRUCTOR,
       daysSince,
       priorCount: priorSessions.length,
       usualClassType,
-      usualInstructorName: usualInstructorName || "the team",
+      usualInstructorName: usualInstructorName || GENERIC_INSTRUCTOR,
     });
   }
 
@@ -608,6 +609,53 @@ export function inviteWording(session: ClassSession): string {
 /** First word of a display name, for the draft's greeting. */
 export function firstNameOf(displayName: string): string {
   return displayName.split(" ")[0] ?? displayName;
+}
+
+/* WHAT THE RECORDS DO NOT SAY, TURNED INTO WHAT THE VOICE CAN SAY.
+ *
+ * Two placeholders exist because the contract's fields are not nullable:
+ * GENERIC_INSTRUCTOR when no instructor record matched, GENERIC_CLASS_TYPE
+ * when the import never had a class column at all — which is every
+ * sign-in sheet, the plainest supported file there is.
+ *
+ * This is the ONE place they turn back into null. It matters that it is a
+ * function and not four lines inside a click handler: the voice's own
+ * checks pass nulls in by hand, so they prove draftMessage COPES with a
+ * missing class, and would all still pass if this mapping were deleted and
+ * "your last class class" went back into a note addressed to a member. The
+ * checks that cover this function start from a flagged member instead, so
+ * they fail if the placeholder ever reaches the sentence again. */
+export function draftFactsFor(
+  f: FlaggedMember,
+  data: FixtureSet,
+  today: number,
+  studioName: string,
+): DraftFacts {
+  const session = suggestedSession(f, data, today);
+  /* firstNameOf must not run on the instructor placeholder: "the" is not a
+   * name, and "The still teaches yoga" is how that reads once printed. */
+  const known = (value: string, placeholder: string): boolean =>
+    value !== placeholder && value.trim() !== "";
+  return {
+    firstName: firstNameOf(f.member.display_name),
+    daysSince: f.daysSince,
+    usualClassType: known(f.usualClassType, GENERIC_CLASS_TYPE) ? f.usualClassType : null,
+    usualInstructorFirstName: known(f.usualInstructorName, GENERIC_INSTRUCTOR)
+      ? firstNameOf(f.usualInstructorName)
+      : null,
+    studioName,
+    suggestedInvite: session === null ? null : inviteWording(session),
+  };
+}
+
+/** The note a staff member reads before deciding to send it. */
+export function draftTextFor(
+  f: FlaggedMember,
+  data: FixtureSet,
+  today: number,
+  studioName: string,
+): string {
+  return draftMessage(draftFactsFor(f, data, today, studioName));
 }
 
 /** Member ids holding an ACTIVE reserved spot for a class dated after
