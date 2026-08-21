@@ -92,7 +92,10 @@ body.home { overflow-x: hidden; }
   /* Big, and tight enough that the four promises stack like a wall of
      text in a studio rather than four separate sentences. */
   font-size: clamp(1.9rem, 5.5vw, 4rem);
-  line-height: 1.02;
+  /* Anton has a tall x-height and almost no descender, so a 1.0 leading
+     that suits most faces makes its lines touch — and the colour bar under
+     one promise lands on the cap of the next. This is the room it needs. */
+  line-height: 1.16;
   max-width: none;
 }
 /* each clause is underlined in its builder's color — the text itself stays
@@ -105,7 +108,7 @@ body.home { overflow-x: hidden; }
   background-image: linear-gradient(var(--clause), var(--clause));
   background-repeat: no-repeat;
   background-size: max(100%, 0px) 0.1em;
-  background-position: 0 99%;
+  background-position: 0 96%;
 }
 .home .hero h1 .clause-a { --clause: var(--kerrian); }
 .home .hero h1 .clause-b { --clause: var(--manny); }
@@ -454,3 +457,23 @@ body.home { overflow-x: hidden; }
 .home .staff-head { margin-top: 84px; }
 .home .staff-head .staff-note { color: var(--muted); max-width: 60ch; margin: 0; }
 body[data-view="staff"] .staff-note { color: var(--fg); font-weight: 600; }
+
+/* ---------- photography on the front door ---------- */
+
+/* The hero's room: wide and short, so the headline still leads and the
+   photograph confirms it rather than competing. */
+.home .hero-photo {
+  margin: 34px 0 0;
+  /* Matches the file (1600x660) so the picture is shown, not re-cropped
+     by the browser — the crop was chosen once, at download. */
+  aspect-ratio: 1600 / 660;
+}
+@media (max-width: 700px) { .home .hero-photo { aspect-ratio: 16 / 10; } }
+
+/* A section's photograph sits above its abstract panel: the real room
+   first, then the shape that explains what the product does with it. */
+.home .section-photo {
+  margin: 0 0 14px;
+  aspect-ratio: 3 / 2;
+}
+.home .home-panel { display: block; }

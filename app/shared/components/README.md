@@ -16,6 +16,9 @@
    `.home-brand` ruleset all headers use — style it here, never per-page).
 3. **`app/favicon.svg`** — the mark (`logo.ts` carries the same path for
    in-page use).
+3b. **`app/shared/photos/`** — the studio's own pictures, and
+   `app/shared/fonts/` if the new studio has its own faces. Both fold into
+   one instruction: replace the files, keep the licence files honest.
 4. **`app/index.html`** — the front door's title, meta description, and
    theme-color: values a `<meta>` tag cannot read at runtime.
 
