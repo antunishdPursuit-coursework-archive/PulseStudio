@@ -481,6 +481,49 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
     text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
 }
 
+/* WHAT THE RECORDS DO NOT SAY. A sign-in sheet is a name and a date: it does
+ * not know what the person came to or who taught it. Those arrived as the
+ * placeholders "class" and "the team" and were dropped straight into the
+ * sentence, so the SUPPORTED sign-in-sheet import produced "your last class
+ * class" in a note a staff member was about to send to a real member. These
+ * check every combination reads like a person wrote it. */
+{
+  const base = { firstName: "Maria", daysSince: 20, studioName: brand.studioName };
+  const signInSheet = draftMessage({
+    ...base, usualClassType: null, usualInstructorFirstName: null, suggestedInvite: null,
+  });
+  check("an unknown class never doubles the word",
+    signInSheet.includes("class class"), false);
+  check("...and the note still says how long it has been",
+    signInSheet.includes("20 days since your last class"), true);
+  check("...and never names an instructor the records do not have",
+    signInSheet.includes("the team") || signInSheet.includes("The team"), false);
+  check("...and still offers a spot", signInSheet.includes("spot with your name on it"), true);
+  check("...with no unfilled placeholder", /[{}$]/.test(signInSheet), false);
+
+  const noInstructor = draftMessage({
+    ...base, usualClassType: "yoga", usualInstructorFirstName: null, suggestedInvite: null,
+  });
+  check("a known class with no instructor still names the class",
+    noInstructor.includes("your last yoga class"), true);
+  check("...without inventing a teacher for it",
+    noInstructor.includes("teaches"), false);
+
+  const unknownClassRealSession = draftMessage({
+    ...base, usualClassType: null, usualInstructorFirstName: null,
+    suggestedInvite: "on Thursday at 9:00 AM",
+  });
+  check("a real upcoming class is still offered when the past class is unknown",
+    unknownClassRealSession.includes("There's a class on Thursday at 9:00 AM"), true);
+
+  const everything = draftMessage({
+    ...base, usualClassType: "yoga", usualInstructorFirstName: "Kim",
+    suggestedInvite: "on Thursday at 9:00 AM",
+  });
+  check("the fully-known note is unchanged",
+    everything.includes("Kim teaches yoga on Thursday at 9:00 AM"), true);
+}
+
 /* ------------------------------------------------------------------ */
 /* The outreach discipline: once per lapse, suppression, consent, opt-in */
 /* ------------------------------------------------------------------ */

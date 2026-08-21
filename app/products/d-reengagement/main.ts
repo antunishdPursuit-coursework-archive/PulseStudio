@@ -9,7 +9,7 @@
 
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
-import { adaptAttendanceCsv } from "./csv.js";
+import { GENERIC_CLASS_TYPE, adaptAttendanceCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
@@ -204,14 +204,22 @@ function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): stri
   const session = suggestedSession(f, data, today);
   // The "the team" fallback (used when an instructor record is missing) must
   // not go through firstNameOf — "the" is not a name.
+  /* The records use two placeholders for "the data does not say": "the
+   * team" for a missing instructor and GENERIC_CLASS_TYPE for a class the
+   * export never named. They are handed to the voice as null, because a
+   * placeholder that reaches a sentence becomes "your last class class". */
   const instructorFirst =
-    f.usualInstructorName === "the team"
-      ? "The team"
+    f.usualInstructorName === "the team" || f.usualInstructorName === ""
+      ? null
       : firstNameOf(f.usualInstructorName);
+  const classType =
+    f.usualClassType === GENERIC_CLASS_TYPE || f.usualClassType === ""
+      ? null
+      : f.usualClassType;
   return draftMessage({
     firstName: firstNameOf(f.member.display_name),
     daysSince: f.daysSince,
-    usualClassType: f.usualClassType,
+    usualClassType: classType,
     usualInstructorFirstName: instructorFirst,
     studioName: brand.studioName,
     suggestedInvite: session === null ? null : inviteWording(session),

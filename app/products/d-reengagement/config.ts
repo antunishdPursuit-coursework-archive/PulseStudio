@@ -90,8 +90,16 @@ export const outreachPolicy: OutreachPolicy = {
 export interface DraftFacts {
   firstName: string;
   daysSince: number;
-  usualClassType: string;
-  usualInstructorFirstName: string;
+  /* NULL IS A REAL ANSWER HERE, and it is the common one on the CSV door.
+   * A sign-in sheet is a name and a date: it says a person came in, not
+   * what they came to or who taught it. Those used to arrive as the
+   * placeholder strings "class" and "the team", which the voice dropped
+   * straight into its sentences — so the supported sign-in-sheet import
+   * produced "your last class class" and "The team still teaches class
+   * every week" in a note a staff member was about to send to a real
+   * member. Unknown is now unknown, and the voice has words for it. */
+  usualClassType: string | null;
+  usualInstructorFirstName: string | null;
   studioName: string;
   /** A concrete upcoming class matching their pattern ("on Thursday at
    *  9:00 AM"), or null when the records hold no upcoming schedule. A
@@ -107,15 +115,29 @@ export function draftMessage(f: DraftFacts): string {
   /* The invitation names a REAL class when the schedule holds one — a
    * specific "yes" is easier to say than a vague one — and falls back to
    * the open offer rather than inventing a session that does not exist. */
-  const invite =
-    f.suggestedInvite !== null
+  const named = f.usualClassType !== null;
+  const taught = f.usualInstructorFirstName !== null;
+  let invite: string;
+  if (f.suggestedInvite !== null) {
+    invite = named && taught
       ? `${f.usualInstructorFirstName} teaches ${f.usualClassType} ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
-      : `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`;
+      : named
+        ? `There's a ${f.usualClassType} class ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
+        : `There's a class ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`;
+  } else if (named && taught) {
+    invite = `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`;
+  } else if (named) {
+    invite = `We still run ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`;
+  } else {
+    invite = `There's still a spot with your name on it whenever you're ready. Want us to hold one for you? Just reply and it's done.`;
+  }
   /* The note always hands the member their three ways back — book a spot,
    * ask a question, or just look at what's new — so replying is never the
    * only door. The links come from config (the reseller seam). */
   return [
-    `Hi ${f.firstName} — it's been ${f.daysSince} days since your last ${f.usualClassType} class, and we've missed seeing you.`,
+    named
+      ? `Hi ${f.firstName} — it's been ${f.daysSince} days since your last ${f.usualClassType} class, and we've missed seeing you.`
+      : `Hi ${f.firstName} — it's been ${f.daysSince} days since your last class, and we've missed seeing you.`,
     invite,
     `Or come back your own way:\n· Book a class: ${brand.studioUrl}products/a-booking/\n· Ask us anything: ${brand.studioUrl}products/c-chatbot/\n· See what's new this week: ${brand.studioUrl}`,
     `— ${f.studioName}`,

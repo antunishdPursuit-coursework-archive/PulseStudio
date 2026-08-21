@@ -160,6 +160,13 @@ const HEADER_NAMES = {
   instructor: ["instructor", "staff", "teacher", "coach"],
 } as const;
 
+/* What a class is called when the export never said. A sign-in sheet is a
+ * name and a date; it does not know what the person came to. The value has
+ * to be SOMETHING because the contract's class_type is a string, so it is
+ * this, and the draft voice maps it back to "unknown" rather than putting
+ * it in a sentence. */
+export const GENERIC_CLASS_TYPE = "class";
+
 /** Find a column by synonym PRIORITY, not header position: a file with
  *  both a "Day" column (weekday names) and a "Date" column must read the
  *  real dates, so earlier synonyms in the list win over later ones. */
@@ -344,7 +351,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       skipped.push(`line ${line}: unreadable or impossible date "${(cells[dateCol] ?? "").trim()}" (use YYYY-MM-DD or M/D/YYYY)`);
       continue;
     }
-    const classType = classCol === -1 ? "class" : (cells[classCol] ?? "").trim() || "class";
+    const classType = classCol === -1 ? GENERIC_CLASS_TYPE : (cells[classCol] ?? "").trim() || GENERIC_CLASS_TYPE;
     const instructorName = instructorCol === -1 ? "" : (cells[instructorCol] ?? "").trim();
 
     // Identity: the stable identifier when the export carries one, the
