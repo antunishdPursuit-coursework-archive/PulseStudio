@@ -94,8 +94,11 @@ instead of doing it.
 
 ## The git law
 
-- Gate before every commit: `npm run check` must pass (and `npm run build`
-  must succeed if you touched TypeScript).
+- Gate before every commit: `npm run check` must pass. It compiles every
+  `.ts`, checks for style drift, and runs all 284 unit checks from the three
+  suites (synthetic engine, session contract, re-engagement) headlessly — the
+  same checks the `tests.html` pages show in a browser. It prints the count it
+  actually ran, never a silent pass.
 - One branch per product change, plain commit messages anyone can read.
   Merge to `main` through a PR using the template.
 - The AI is NEVER a contributor: no Claude or AI names, no `Co-Authored-By`,
@@ -103,6 +106,36 @@ instead of doing it.
   else. Work is authored by the developer alone.
 - This repo is PUBLIC: no secrets, no keys, no real member data. Every person
   in the fixtures is fictional.
+
+## The filing law (where a new file goes)
+
+Four directories, and one question decides between them. Ask it before you
+create a file, not after:
+
+| Ask | Then it goes in | Because |
+| --- | --- | --- |
+| Would a browser ever request this at a URL? | `app/` | `app/` **is** the website. The Pages workflow publishes it with `path: app`, so every file under it gets a public address. |
+| Does a human or CI run it, and it never ships? | `scripts/` | Tooling. Plain `.mjs`, path derived from `import.meta.url` so anyone can run it from a clean clone. |
+| Does a teammate read it before writing code, and it ships to nobody? | `docs/` | Process and internal notes. See `docs/README.md`. |
+| Does somebody who just cloned this and knows nothing need it in the first 30 seconds? | the root | The contract: `README.md`, `CLAUDE.md`, `package.json`, `tsconfig.json`, the product briefs. |
+
+**If the answer to all four is no, delete it — do not file it.** That is the
+part that keeps a root clean. A file kept "just in case" is a file the next
+person has to evaluate.
+
+Two consequences that have already cost us something:
+
+- **Nothing under `app/` is private.** Two of Product D's internal documents
+  sat in a product folder and were being served at a public URL until
+  2026-08-21. If it is not for a member of the studio, it does not go in
+  `app/`.
+- **A path from your machine is not tooling.** Eleven scratch runners lived
+  in the repo root hardcoding one developer's home directory, so no teammate
+  could run any of them. A script nobody else can run belongs nowhere.
+
+Depth inside `app/` is also a URL, not an organising choice: `robots.txt`,
+`sitemap.xml` and `favicon.svg` sit at the top of `app/` because crawlers
+look for them there. Do not tidy them into a subfolder.
 
 ## Running the app
 

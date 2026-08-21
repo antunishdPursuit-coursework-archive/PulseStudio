@@ -22,7 +22,7 @@ Therefore: **every git command carries `-C /Users/Rensley/Desktop/pulseStudio/Pu
   commit and the PR.
 - `a-booking/`, `b-dashboard/`, `c-chatbot/` are other people's work.
   Never edit them for any reason; defects found there go in
-  `REQUESTFOR-A-B-C.md` as a note to that owner.
+  `docs/REQUESTFOR-A-B-C.md` as a note to that owner.
 - Outside imports flow through `deps.ts` only — it is the portability seam.
 
 ## The live trail (2026-08-20)
