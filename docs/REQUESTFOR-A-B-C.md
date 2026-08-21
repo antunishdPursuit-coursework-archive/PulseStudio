@@ -136,93 +136,46 @@ reads would be worse than naming none.
 
 Either way, nothing in this repo sends mail. That stays human.
 
-## The repo root: eight files that are not mine to delete (2026-08-21)
+## The repo root — eight files, three owners (2026-08-21)
 
-I cleaned the repo root and stopped at the files I do not own. Everything
-below is measured, not guessed — the HTTP codes are from fetching the live
-site on 2026-08-21.
+Eight files at the repo root are the site we had before Pages switched to
+publishing `app/`. They are unreachable now: `app/` is the site root, so root
+`index.html` is shadowed by `app/index.html` and the other seven return 404.
+Nothing under `app/` references any of them, and the gate cannot see them.
 
-**The short version:** eight files at the repo ROOT are the site we had
-*before* Pages switched to publishing `app/`. They are unreachable now.
-`.github/workflows/pages.yml` uploads with `path: app`, so `app/` is the
-website root — root `index.html` is shadowed by `app/index.html` at every
-URL, and the rest simply 404.
-
-| File | Live URL | Author |
+| Files | Owner | State |
 | --- | --- | --- |
-| `member-dashboard.html` / `.css` / `.js` | 404 | Manny |
-| `staff-dashboard.html` / `.css` / `.js` | 404 | Manny |
-| `member-booking.html` | 404 | Kerrian |
-| `index.html` | shadowed by `app/index.html` | team lead |
+| `member-dashboard.{html,css,js}` · `staff-dashboard.{html,css,js}` | Manny | 404 · hardcoded `#f4f1eb` and hardcoded records, so they break the color and data laws |
+| `member-booking.html` | Kerrian | 404 · clean; a deliberate forwarder that worked when it was written |
+| `index.html` | team lead | shadowed · reaches two of four products |
 
-They form a closed island: root `index.html` links to the two dashboards,
-`member-booking.html` is a 398-byte redirect stub pointing into `app/`, and
-nothing under `app/` references any of them. The gate cannot see them
-either — `tsconfig.json` compiles only `app/**/*.ts`, and `check-styles.mjs`
-reads only the four lane stylesheets.
+**The asks — one each, none urgent:**
 
-### Why this is worth five minutes rather than zero
+- **Manny** — retire the six. Worth a look first: root `staff-dashboard.js`
+  models three rooms with a ranked demand panel; the live dashboard hardcodes
+  `"Studio"`. Reviving it needs a `room` field on the shared session, so it is
+  a conversation, not a copy-paste. Git keeps the code either way.
+- **Kerrian** — retire `member-booking.html` whenever it suits, or keep it.
+  Correcting myself: an earlier draft called it broken debris. It is neither.
+  `06aa064` cut 547 lines to a 12-line forwarder on purpose, and it worked at
+  the time — the root was still being served. Unreachable now, not broken, and
+  the only one of the eight with no law violation. Lowest priority here.
+- **Team lead** — root `index.html` is yours, not a lane owner's.
 
-Two of the team's own laws are broken inside these files — hardcoded
-`#f4f1eb` backgrounds against the color law, and hardcoded records against
-the data law. Nobody is served by them, but they are the first thing a new
-contributor sees when they open the repo root, and patterns get copied from
-whatever is nearest.
+**Two things that matter more than the root:**
 
-There is also a live trapdoor. GitHub's legacy `pages-build-deployment`
-builder still exists on this repo and still records `source: {branch: main,
-path: "/"}` underneath the Actions deploy. If anyone ever flips Settings →
-Pages → Source back to branch-deploy, these eight files become the live
-site again and `app/` demotes to a subfolder. The boundary that makes them
-harmless is a **setting**, not a fact about the code.
+1. `app/products/b-dashboard/staff-dashboard.html` returns **HTTP 200**. The
+   page `b-dashboard/CLAUDE.md` already calls stale is public right now.
+   Manny's to retire. Same folder: `staff-dashboard.js` is the only tracked
+   `.js` under `app/`, which the repo ignores as build output — it survives
+   only because ignore rules skip already-tracked files. Delete and re-add it
+   and `git add` refuses silently, with no gate failure.
+2. **The boundary is a setting.** GitHub's legacy builder still records
+   `source: {branch: main, path: "/"}` under the Actions deploy. Flip
+   Settings → Pages → Source back and those eight files are the live site
+   again. That is the real argument for retiring them.
 
-### The asks
-
-- **Manny:** retire root `member-dashboard.*` and `staff-dashboard.*`. One
-  thing worth a look before you do — root `staff-dashboard.js` models three
-  rooms with a ranked room-demand panel, and the live dashboard hardcodes
-  the single string `"Studio"`. Git history keeps the code either way;
-  reviving that panel would need a `room` field on the shared synthetic
-  session, which is shared ground, so it is a conversation not a copy-paste.
-- **Kerrian:** root `member-booking.html` — **lowest priority of the eight,
-  and I owe you a correction here.** An earlier draft of this note called it
-  debris with a broken target. Both halves were wrong. `06aa064` shows you
-  cut a 547-line booking app down to a 12-line forwarder on purpose — commit
-  body: *"The root booking page now sends people to the lane"* — and at 14:11
-  that day the site was still served from the repo root, so it was a working
-  forward when you wrote it. Its target `app/products/a-booking/index.html`
-  exists and the href resolves correctly from the root. It is **unreachable
-  under the current Pages setting, not broken.** It is also the only one of
-  the eight with no duplicated logic and no color- or data-law violation —
-  and under the trapdoor above it is the one file that would still forward
-  the old booking URL into your lane. Retire it whenever suits you, or keep
-  it; nothing here argues for urgency. Separately, and unrelated: the retired
-  root `member-dashboard.html` had a class-category filter (Yoga / Cycling /
-  HIIT) and `a-booking` filters by day only. That may be a deliberate scope
-  call — it is yours to make, I just did not want it to disappear silently.
-- **Team lead:** root `index.html` is yours, not a lane owner's. It reaches
-  two of the four products and links to two stale pages.
-
-### One that matters more, and is inside the published site
-
-`app/products/b-dashboard/staff-dashboard.html` returns **HTTP 200**. It is
-live right now. `app/products/b-dashboard/CLAUDE.md` already documents it as
-a stale sibling with color-law violations and says the stale pair is Manny's
-to retire — so this is not a new finding, only a newly measured one. The
-difference from the root files is the whole point: those are dead and
-invisible; this one is dead and **public**.
-
-Also in that folder: `staff-dashboard.js` is the only hand-written `.js`
-tracked under `app/`, and the repo ignores `app/**/*.js` as build output. It
-survives only because ignore rules do not apply to files already tracked. If
-it is ever deleted and re-added, `git add` will silently refuse it and the
-page loses its script with no gate failure. Worth either renaming it to
-`.ts` so the compiler owns it, or adding a `!` negation line to `.gitignore`
-so its tracked status is deliberate.
-
-**Nothing above was touched by me** — every one of these files belongs to
-someone else's lane, and the lane law is the reason this is a note instead
-of a commit.
+None of the above was touched by me — every file is in someone else's lane.
 
 ## If you disagree with anything here
 
