@@ -131,6 +131,54 @@ jointly held.
 
 ---
 
+## Everyone — I changed shared ground, and here is what I checked (2026-08-21)
+
+No ask in this one. It is a notice, because `app/shared/` moved under your
+products and you should hear it from me rather than find it.
+
+**What changed and why**, each stated in its own commit and each because
+something was measurably wrong:
+
+- `theme.css` — the four developer accents are all below WCAG AA as text on
+  the light theme. **Your hexes are untouched.** Violet is fixed by adding a
+  companion token, and every shared rule now reads
+  `var(--accent-strong, var(--accent))`, which falls back to exactly what
+  you had. Also: `font-synthesis-weight: none`, because Anton ships one
+  weight and the front door was asking for 800 and 900, so browsers were
+  smearing the glyphs.
+- `theme-boot.ts` — it touched localStorage unguarded. A browser with site
+  data blocked throws on the ACCESS, so that module aborted and every page
+  in the studio lost its sign-in chip and appearance control at once. Also,
+  a custom background no longer erases the accent it was never measured
+  against.
+- `auth/session.ts` — a store that reads fine and refuses writes signed
+  people out the instant they signed in. The documented in-memory fallback
+  could not survive one read.
+- `synthetic/` — the answer-key leak scan read one record per collection;
+  the credential scan ran twice under two codes so an edge-case declaration
+  could never balance; `unsorted-collection` covered five of eight
+  collections while the brief promised all of them.
+- `ready.html`, `storytold.html`, `SHARED_DATA_CONTRACT.md`, `robots.txt`,
+  `sitemap.xml`, `llms.txt` — contrast, stale counts, an undocumented
+  envelope field, and a robots file that could not work on this deploy.
+
+**What I verified afterwards, in a browser, on your pages:**
+
+| | accent | `--accent-strong` | chip | appearance | console |
+| --- | --- | --- | --- | --- | --- |
+| A · booking | `#3b82f6` | undefined → falls back | yes | yes | clean |
+| B · dashboard | `#f59e0b` | undefined → falls back | yes | yes | clean |
+| C · chatbot | `#10b981` | undefined → falls back | yes | yes | clean |
+
+All three render their own content. And because Product A consumes the
+compatibility view, I exercised it directly: signed in as a member gives
+`{role: "member", member_id: "member:000001"}`, as staff gives
+`{role: "staff", member_id: null}`, signed out gives `null`. Unchanged.
+
+If anything looks different on your product and you think one of these did
+it, say so and I will fix it or revert it — shared ground is not mine, and
+"it passed the gate" is not the same as "it is right for your page".
+
 ## Everyone — the shared fixture goes stale on 2026-08-29 (2026-08-21)
 
 Dated, so nobody meets it by surprise — and deliberately NOT a deadline on
