@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pulse Studio — class booking, scheduling, and member care</title>
-  <meta name="description" content="Software for one boutique fitness studio: members book classes, staff run the schedule, and nobody who quietly stops coming goes unnoticed.">
+  <title>Pulse Studio — book classes, ask anything, stay seen</title>
+  <meta name="description" content="Group fitness classes on one simple membership. Book your spot in seconds, get straight answers about the schedule, and if life pulls you away for a while, a real person notices.">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Pulse Studio">
-  <meta property="og:description" content="Four products, one studio: booking, scheduling, member support, and member re-engagement.">
+  <meta property="og:description" content="Group classes on one simple membership — book in seconds, ask anything, and be missed when you're gone.">
   <meta property="og:url" content="https://antunishdpursuit.github.io/PulseStudio/">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://antunishdpursuit.github.io/PulseStudio/">
@@ -39,30 +39,33 @@
       </svg>
       <span data-studio-name>Pulse Studio</span>
     </a>
-    <nav class="nav-links" aria-label="Products">
-      <a href="./products/a-booking/">Booking</a>
-      <a href="./products/b-dashboard/">Dashboard</a>
-      <a href="./products/c-chatbot/">Support</a>
-      <a href="./products/d-reengagement/">Re-engagement</a>
+    <nav class="nav-links" aria-label="This studio">
+      <a href="#booking">Book a class</a>
+      <a href="#support">Ask us</a>
+      <a href="#staff">Staff tools</a>
     </nav>
   </header>
 
   <main>
+    <!-- THE AUDIENCE LAW: this page speaks to the studio's member. The
+         builders' story lives where it belongs: shared/storytold.html. -->
     <section class="hero" aria-label="Pulse Studio">
-      <p class="eyebrow">One studio · four products · four builders</p>
+      <p class="eyebrow">Group classes · yoga, cycling, HIIT, pilates, strength</p>
       <h1>
-        <span class="clause clause-a">Book the class.</span>
-        <span class="clause clause-b">Run the week.</span>
-        <span class="clause clause-c">Answer every question.</span>
-        <span class="clause clause-d">Notice who's gone quiet.</span>
+        <span class="clause clause-a">Book your spot.</span>
+        <span class="clause clause-b">Catch every class.</span>
+        <span class="clause clause-c">Ask us anything.</span>
+        <span class="clause clause-d">Never go unnoticed.</span>
       </h1>
-      <p class="lede">Software for one boutique fitness studio: members book classes, staff
-      run the schedule, and nobody who quietly stops coming goes unnoticed.</p>
+      <p class="lede">One simple membership, one studio that pays attention: book in
+      seconds, get straight answers about the schedule, and if life pulls you away
+      for a few weeks, a real person notices and reaches out.</p>
+      <p class="member-hello" id="member-hello" aria-live="polite"></p>
       <div class="cta-row">
         <a class="btn btn-lg product-a" href="./products/a-booking/">Book a class</a>
-        <a class="btn-ghost-lg" href="#products">Meet the four products</a>
+        <a class="btn-ghost-lg" href="./products/c-chatbot/">Ask a question</a>
       </div>
-      <!-- one pulse line through all four builders' colors -->
+      <!-- one pulse line through all four colors -->
       <svg class="pulse-art" viewBox="0 0 960 120" fill="none" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="pulse-grad" x1="0" y1="0" x2="960" y2="0" gradientUnits="userSpaceOnUse">
@@ -80,30 +83,30 @@
       </svg>
     </section>
 
-    <section class="truths" aria-label="How this software behaves">
-      <div><strong>Static site, no server</strong><span>Every page runs in the browser; records never leave it.</span></div>
-      <div><strong>One shared vocabulary</strong><span>All four products read the same data contract, so a booking means one thing.</span></div>
-      <div><strong>Nothing sends itself</strong><span>Outreach is drafted for staff to review and send — never sent automatically.</span></div>
-      <div><strong>Staff pages stay private</strong><span>Rosters and attendance are kept out of search indexes by design.</span></div>
+    <section class="truths" aria-label="How this studio treats you">
+      <div><strong>Your data stays yours</strong><span>Booking and sign-in run in your browser; your records never leave it.</span></div>
+      <div><strong>A person, not a machine</strong><span>Any note from the studio is written, reviewed, and sent by real staff.</span></div>
+      <div><strong>Straight answers</strong><span>Questions are answered from the current schedule and written policies — and we say so when we can't.</span></div>
+      <div><strong>Fair cancellation</strong><span>Cancel up to 12 hours before class at no charge.</span></div>
     </section>
 
-    <div class="products-head" id="products">
-      <h2>Four products, one front desk</h2>
-      <p>Each product is owned end to end by one developer, and every screen carries its
-      builder's color — anyone looking at the studio's software can tell who built what.</p>
+    <div class="products-head" id="members">
+      <h2>For members</h2>
+      <p>Everything you need between classes — no app to install, no account
+      password to invent.</p>
     </div>
 
-    <section class="home-product product-a" id="booking" aria-label="Product A — Member Booking App">
+    <section class="home-product product-a" id="booking" aria-label="Book a class">
       <div class="home-copy">
-        <span class="chip">Product A · Kerrian</span>
-        <h3>Member Booking</h3>
-        <p class="lede">Members see the week's schedule and reserve a spot in seconds.</p>
+        <span class="chip">Booking</span>
+        <h3>Book a class in seconds</h3>
+        <p class="lede">The week's schedule, live spots left, and your reservations in one place.</p>
         <ul class="feature-list">
-          <li>The public schedule, day by day, with space remaining per class</li>
-          <li>Sign in with the email or name on the membership — no password to invent</li>
-          <li>Other members' names stay hidden; a reservation shows only your own</li>
+          <li>See every class this week, day by day, with spaces remaining</li>
+          <li>Sign in with the email or name on your membership — no password</li>
+          <li>Your reservations show only to you; other members' names stay hidden</li>
         </ul>
-        <a class="btn btn-lg" href="./products/a-booking/">Open Member Booking</a>
+        <a class="btn btn-lg" href="./products/a-booking/">Book a class</a>
       </div>
       <div class="home-panel" aria-hidden="true">
         <div class="panel-week">
@@ -114,17 +117,41 @@
       </div>
     </section>
 
-    <section class="home-product product-b flip" id="schedule" aria-label="Product B — Staff Scheduling Dashboard">
+    <section class="home-product product-c flip" id="support" aria-label="Ask us anything">
       <div class="home-copy">
-        <span class="chip">Product B · Manny</span>
-        <h3>Staff Scheduling</h3>
-        <p class="lede">Staff publish the week and watch capacity move as members book.</p>
+        <span class="chip">Support</span>
+        <h3>Ask us anything, any hour</h3>
+        <p class="lede">Classes, levels, instructors, policies — answered from what's actually true today.</p>
         <ul class="feature-list">
-          <li>The next three days at a glance: scheduled sessions and fill rates</li>
-          <li>Underbooked and filling-fast classes flagged as needing attention</li>
-          <li>A where-members-are-booking panel, so the schedule follows demand</li>
+          <li>Answers come from the current schedule and the studio's written policies</li>
+          <li>When there's no good answer, we say so instead of inventing one</li>
+          <li>Your questions stay in your browser, like everything else here</li>
         </ul>
-        <a class="btn btn-lg" href="./products/b-dashboard/">Open Staff Scheduling</a>
+        <a class="btn btn-lg" href="./products/c-chatbot/">Ask a question</a>
+      </div>
+      <div class="home-panel" aria-hidden="true">
+        <div class="panel-chat">
+          <i></i><i class="reply"></i><i></i><i class="reply"></i>
+        </div>
+      </div>
+    </section>
+
+    <div class="products-head staff-head" id="staff">
+      <h2>For the studio team</h2>
+      <p class="staff-note" id="staff-note">Staff only — sign in as Front Desk from the top bar.</p>
+    </div>
+
+    <section class="home-product product-b" id="schedule" aria-label="Staff: Capacity Watch">
+      <div class="home-copy">
+        <span class="chip">Capacity Watch · staff</span>
+        <h3>Watch the week fill</h3>
+        <p class="lede">Every class's fill rate as members book, with the ones needing attention flagged.</p>
+        <ul class="feature-list">
+          <li>The week at a glance: sessions, reservations, and spots left</li>
+          <li>Underbooked and filling-fast classes called out by name</li>
+          <li>Live: a member's booking moves these meters the same minute</li>
+        </ul>
+        <a class="btn btn-lg" href="./products/b-dashboard/">Open Capacity Watch</a>
       </div>
       <div class="home-panel" aria-hidden="true">
         <div class="panel-meters">
@@ -136,39 +163,17 @@
       </div>
     </section>
 
-    <section class="home-product product-c" id="support" aria-label="Product C — Member Support Chatbot">
+    <section class="home-product product-d flip" id="reengagement" aria-label="Staff: Member Re-engagement">
       <div class="home-copy">
-        <span class="chip">Product C · Dennis</span>
-        <h3>Member Support</h3>
-        <p class="lede">Members ask about classes, levels, instructors, and policies — and get
-        answers from the studio's real schedule.</p>
+        <span class="chip">Re-engagement · staff</span>
+        <h3>Notice who's gone quiet</h3>
+        <p class="lede">Members who used to come and stopped, ranked by who's most worth reaching first — with the evidence and a draft ready.</p>
         <ul class="feature-list">
-          <li>Answers come from the studio's actual schedule and written policies</li>
-          <li>When it has no answer, it says so plainly instead of inventing one</li>
-          <li>Open all day, every day, right on the studio's site</li>
-        </ul>
-        <a class="btn btn-lg" href="./products/c-chatbot/">Open Member Support</a>
-      </div>
-      <div class="home-panel" aria-hidden="true">
-        <div class="panel-chat">
-          <i></i><i class="reply"></i><i></i><i class="reply"></i>
-        </div>
-      </div>
-    </section>
-
-    <section class="home-product product-d flip" id="reengagement" aria-label="Product D — Member Re-engagement Tool">
-      <div class="home-copy">
-        <span class="chip">Product D · Rensley</span>
-        <h3>Member Re-engagement</h3>
-        <p class="lede">Staff see which active members used to come and have gone quiet — with
-        the evidence — and get a personal draft to review and send themselves.</p>
-        <ul class="feature-list">
-          <li>Flags members quiet for more than 14 days, ranked by who's most worth saving</li>
-          <li>Every flag shows its evidence: last visit, usual class, usual instructor</li>
-          <li>Works on the studio's own attendance export, entirely in the browser</li>
+          <li>Quiet more than 14 days, with last visit, usual class, and instructor shown</li>
+          <li>A member already booked back in is stated by name and left alone</li>
           <li>Drafts only — a person reads, decides, and sends every message</li>
         </ul>
-        <a class="btn btn-lg" href="./products/d-reengagement/">Open Member Re-engagement</a>
+        <a class="btn btn-lg" href="./products/d-reengagement/">Open Re-engagement</a>
       </div>
       <div class="home-panel" aria-hidden="true">
         <div class="panel-quiet">
@@ -179,31 +184,18 @@
         </div>
       </div>
     </section>
-
-    <section class="vocab" aria-label="How the four products hold together">
-      <h2>One vocabulary, four lanes</h2>
-      <p>Every product reads the same shared records — members, memberships, class sessions,
-      reservations, attendance — through one data contract. Only a class a member actually
-      attended counts as a visit; a no-show never does. Each product folder belongs to one
-      developer, and their color follows their work everywhere.</p>
-      <div class="builders">
-        <a class="product-a" href="./products/a-booking/"><strong>Kerrian</strong><span>Product A · Member Booking</span></a>
-        <a class="product-b" href="./products/b-dashboard/"><strong>Manny</strong><span>Product B · Staff Scheduling</span></a>
-        <a class="product-c" href="./products/c-chatbot/"><strong>Dennis</strong><span>Product C · Member Support</span></a>
-        <a class="product-d" href="./products/d-reengagement/"><strong>Rensley</strong><span>Product D · Member Re-engagement</span></a>
-      </div>
-    </section>
   </main>
 
   <footer>
-    <span class="foot-brand">Pulse Studio</span>
-    <a href="./products/a-booking/">Booking</a>
-    <a href="./products/b-dashboard/">Scheduling</a>
-    <a href="./products/c-chatbot/">Support</a>
-    <a href="./products/d-reengagement/">Re-engagement</a>
+    <span class="foot-brand" data-studio-name>Pulse Studio</span>
+    <a href="./products/a-booking/">Book a class</a>
+    <a href="./products/c-chatbot/">Ask us</a>
+    <a href="#staff">Staff tools</a>
+    <a href="./shared/storytold.html">How this studio's software flows</a>
     <a href="https://github.com/antunishdPursuit/PulseStudio">Source</a>
   </footer>
 
   <script type="module" src="./shared/theme-boot.js"></script>
+  <script type="module" src="./shared/home.js"></script>
 </body>
 </html>

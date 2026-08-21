@@ -48,6 +48,23 @@ instead of doing it.
   `var(--accent-ink)`. Anyone looking at any screen can tell who built what.
 - Never restyle another developer's color or add a fifth.
 
+## The audience law
+
+- Every consumer-facing surface speaks TO its user — a member or a staff
+  person — never ABOUT the project. Product letters, builder names, and
+  build-process talk stay OFF customer-visible copy. Authorship is carried
+  by the builder's COLOR (the color law), by each folder's brief, and by
+  `app/shared/storytold.html` — the one page that tells the builders'
+  story. If copy would only matter to someone evaluating the project, it
+  belongs on storytold, not on a customer screen.
+- Surfaces may ADAPT to the signed-in actor (`actor_type`: member or
+  staff) — different emphasis, different words — but never hide or block a
+  route: the browser session is convenience, not access control, and
+  pretending otherwise would break the truth law.
+- Staff surfaces say "staff" plainly. Member surfaces never show another
+  member's data. The front door leads with members; staff tools sit behind
+  a clearly named door.
+
 ## The data law
 
 - `SHARED_DATA_CONTRACT.md` is the vocabulary. `app/shared/contract.ts` is
