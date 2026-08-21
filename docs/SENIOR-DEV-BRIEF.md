@@ -282,13 +282,41 @@ These cost real time. They are the most valuable part of this brief.
 ## 9. How to run, gate, and commit
 
 ```
-npm install
-npm run check      # tsc --noEmit — must pass before any commit
-npm run build      # tsc — emits .js beside each .ts
+npm ci             # what CI runs; npm install is fine locally
+npm run check      # the gate — must pass before any commit
+npm run build      # tsc — emits the .js the browser runs
 npm run start      # serves app/ at http://localhost:4173
 ```
 
 Then `http://localhost:4173/products/d-reengagement/` and its `tests.html`.
+
+**`npm run check` is not `tsc --noEmit`,** which this page used to say. It is
+`tsc` — which EMITS — followed by four gates and the three suites:
+
+| | what it fails on |
+| --- | --- |
+| `tsc` | a type error, and it writes the `.js` the next step runs |
+| `check-styles.mjs` | a product restyling something the shared theme owns |
+| `check-contrast.mjs` | a NEW colour pairing below WCAG AA |
+| `check-language.mjs` | a banned word in use, or an assistant credited |
+| `check-fixtures.mjs` | a broken shared record, or one that has aged out |
+| `run-suites.mjs` | any of the three browser suites, run headlessly |
+
+Each gate carries `--self-test`, which plants known-bad input and proves it
+still catches it — run one if you ever doubt a green.
+
+That distinction is not pedantry. Verifying a fix with `tsc --noEmit`
+compiles nothing, so the suites re-run the PREVIOUS build and report a clean
+pass over code you just changed. It happened on this branch, to a fix that
+had been deliberately reverted to see the checks go red; they stayed green
+and said nothing. **A check proved against stale build output proves
+nothing.**
+
+Verified from a clean clone on 2026-08-21, not from a working tree with
+artefacts lying around: clone, `npm ci`, `npm run check` green, `npm run
+build`, `npm run start`, and every page — front door, the tool, all three
+proof suites, storytold and ready — served and rendered. The reviewer bundle
+builds there too.
 
 - **Compiled `.js` is gitignored on purpose.** Source is source; CI builds.
   `.github/workflows/pages.yml` runs the gate and only publishes if it passes,
