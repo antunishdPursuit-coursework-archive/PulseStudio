@@ -143,6 +143,46 @@ const SHAPE = {
   },
 };
 
+/* HOW LONG THIS FIXTURE STAYS USEFUL, which is a different question from
+ * whether it is valid.
+ *
+ * The dates in fixtures.json are fixed and the real calendar is not, so the
+ * records age out from under whoever reads them. Product D's brief requires
+ * this fixture to contain a deliberate near-miss — a member who attended
+ * RECENTLY and must therefore NOT be flagged — and that member stops being
+ * recent on a specific morning with nothing to announce it. Measured when
+ * this landed: the near-miss held until 2026-08-31, and by mid-October the
+ * newest attendance was old enough that no product could show a recent
+ * anything.
+ *
+ * Nothing was watching that. The unit suites are pinned to a reference date
+ * so they cannot rot — correct, and it means they cannot warn either. This
+ * is the one place that reads the real clock on purpose. */
+export function attendanceFreshness(data) {
+  const sessionDate = new Map(
+    (Array.isArray(data.class_sessions) ? data.class_sessions : [])
+      .map((s) => [s?.session_id, String(s?.starts_at ?? "").slice(0, 10)]),
+  );
+  let newest = null;
+  for (const a of Array.isArray(data.attendance) ? data.attendance : []) {
+    if (a?.attendance_status !== "attended") continue;
+    const date = sessionDate.get(a.session_id);
+    if (date === undefined || !isDateOnly(date)) continue;
+    if (newest === null || date > newest) newest = date;
+  }
+  if (newest === null) return { newest: null, daysOld: null };
+  const day = (iso) => Date.UTC(...iso.split("-").map((n, i) => (i === 1 ? Number(n) - 1 : Number(n)))) / 86_400_000;
+  const today = Math.floor(Date.now() / 86_400_000);
+  return { newest, daysOld: today - day(newest) };
+}
+
+/* A recent attendee stops being recent after this many days. Product D's
+ * proposed rule flags at 14, so the fixture has to hold a visit newer than
+ * that for its near-miss to mean anything; the ceiling here is deliberately
+ * looser, because this gate should announce a real problem rather than
+ * bicker about one product's threshold. */
+const FRESH_ENOUGH_DAYS = 14;
+
 /** Every problem in one pass. Returns [] for a clean fixture. */
 export function validateFixtures(data, unions) {
   const problems = [];
@@ -292,6 +332,7 @@ function clean() {
 }
 
 function selfTest() {
+  let failedFreshness = 0;
   const unions = readUnions(readFileSync(join(ROOT, CONTRACT), "utf8"));
   const bend = (fn) => { const d = clean(); fn(d); return d; };
   const planted = [
@@ -313,7 +354,51 @@ function selfTest() {
     ["a capacity of zero is caught", bend((d) => { d.class_sessions[0].capacity = 0; }), "impossible-capacity"],
   ];
 
-  let failed = 0;
+  /* THE FRESHNESS TRIPWIRE, both sides. It reads the real clock on purpose,
+   * so the planted fixtures are dated relative to today rather than pinned —
+   * a fixed date here would be the very rot this measures. */
+  const isoDaysAgo = (n) =>
+    new Date((Math.floor(Date.now() / 86_400_000) - n) * 86_400_000).toISOString().slice(0, 10);
+  const withVisitDaysAgo = (n) => {
+    const d = clean();
+    d.class_sessions[0].starts_at = `${isoDaysAgo(n)}T09:00:00-04:00`;
+    d.class_sessions[0].ends_at = `${isoDaysAgo(n)}T10:00:00-04:00`;
+    return d;
+  };
+  const freshCases = [
+    ["a visit today is fresh", withVisitDaysAgo(0), 0, false],
+    ["a visit at the limit is still fresh", withVisitDaysAgo(FRESH_ENOUGH_DAYS), FRESH_ENOUGH_DAYS, false],
+    ["one day past the limit is stale", withVisitDaysAgo(FRESH_ENOUGH_DAYS + 1), FRESH_ENOUGH_DAYS + 1, true],
+    ["a year old is stale", withVisitDaysAgo(365), 365, true],
+  ];
+  for (const [label, data, wantDays, wantStale] of freshCases) {
+    const f = attendanceFreshness(data);
+    const stale = f.daysOld !== null && f.daysOld > FRESH_ENOUGH_DAYS;
+    if (f.daysOld !== wantDays || stale !== wantStale) {
+      failedFreshness += 1;
+      console.error(`  self-test MISS — ${label}: wanted ${wantDays} days / stale=${wantStale}, got ${f.daysOld} / ${stale}`);
+    }
+  }
+  {
+    const none = clean();
+    none.attendance = [];
+    const f = attendanceFreshness(none);
+    if (f.newest !== null || f.daysOld !== null) {
+      failedFreshness += 1;
+      console.error("  self-test MISS — a fixture with no attendance should report null, not a date");
+    }
+  }
+  {
+    // A no_show is not a visit and must not make the fixture look fresh.
+    const noShowOnly = withVisitDaysAgo(0);
+    noShowOnly.attendance[0].attendance_status = "no_show";
+    if (attendanceFreshness(noShowOnly).newest !== null) {
+      failedFreshness += 1;
+      console.error("  self-test MISS — a no_show counted as a recent visit");
+    }
+  }
+
+  let failed = failedFreshness;
   for (const [label, data, wantCode] of planted) {
     const problems = validateFixtures(data, unions);
     const got = wantCode === null ? problems.length === 0 : problems.some((p) => p.code === wantCode);
@@ -322,7 +407,8 @@ function selfTest() {
       console.error(`  self-test MISS — ${label}: wanted ${wantCode ?? "a clean pass"}, got [${problems.map((p) => p.code).join(", ") || "nothing"}]`);
     }
   }
-  console.log(`self-test: ${planted.length} planted fixtures, ${planted.length - failed} behaved, ${failed} did not.`);
+  const total = planted.length + freshCases.length + 2;
+  console.log(`self-test: ${total} planted fixtures, ${total - failed} behaved, ${failed} did not.`);
   console.log(
     failed === 0
       ? "self-test PASSED — the gate can still fail. (Says nothing about plausibility; see the limits above.)"
@@ -362,12 +448,40 @@ if (!IS_COMMAND) {
   }
 
   const problems = validateFixtures(data, unions);
+  const freshness = attendanceFreshness(data);
   const counts = Object.keys(SHAPE)
     .map((n) => `${Array.isArray(data[n]) ? data[n].length : 0} ${n}`)
     .join(", ");
   console.log(
     `check-fixtures: ${FIXTURES} read against ${REQUIRED_UNIONS.length} unions from ${CONTRACT} — ${counts}.`,
   );
+
+  /* SAID EVERY RUN, not only when it breaks — the point is that the team
+   * sees it coming rather than meeting it one morning. */
+  if (freshness.newest === null) {
+    console.log("check-fixtures: no attended class in the fixture, so it can demonstrate nobody attending recently.");
+  } else {
+    const expires = new Date((Math.floor(Date.now() / 86_400_000) + (FRESH_ENOUGH_DAYS - freshness.daysOld)) * 86_400_000)
+      .toISOString().slice(0, 10);
+    console.log(
+      `check-fixtures: newest attended class is ${freshness.newest}, ${freshness.daysOld} days ago — ` +
+        (freshness.daysOld > FRESH_ENOUGH_DAYS
+          ? `PAST the ${FRESH_ENOUGH_DAYS}-day mark, so this fixture can no longer show a recent attendee.`
+          : `${FRESH_ENOUGH_DAYS - freshness.daysOld} days of usable life left (goes stale ${expires}).`),
+    );
+  }
+  if (freshness.daysOld !== null && freshness.daysOld > FRESH_ENOUGH_DAYS) {
+    console.error(
+      `check-fixtures: the shared fixture has aged out. Its newest attended class is ${freshness.daysOld} days ` +
+        `old, so every member in it now reads as long-quiet and the deliberate near-miss the product briefs ` +
+        `require — a member who attended RECENTLY and must NOT be flagged — no longer exists.`,
+    );
+    console.error(
+      "check-fixtures: roll the dates in app/shared/fixtures.json forward (team-owned; state the agreement). " +
+        "Do NOT hardcode a fake today in a product — the pinned unit suites are the thing that must not move.",
+    );
+    process.exit(1);
+  }
 
   if (problems.length === 0) {
     console.log("check-fixtures: every reference resolves, every status is legal, every date is real. PASS");

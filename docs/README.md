@@ -42,6 +42,7 @@ cost somebody a day:
   | Where styles live | [styling.md](./styling.md) | `scripts/check-styles.mjs` |
   | The words we do not use, and no AI as a contributor | root `CLAUDE.md` | `scripts/check-language.mjs` |
   | The shared vocabulary the records must speak | root `SHARED_DATA_CONTRACT.md` | `scripts/check-fixtures.mjs` |
+  | The shared fixture still demonstrates what it claims to | the product briefs' acceptance checks | `scripts/check-fixtures.mjs` (the one place that reads the real clock, on purpose — it prints the countdown every run) |
   | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
 
   Each runs inside `npm run check`, each carries `--self-test`, and each

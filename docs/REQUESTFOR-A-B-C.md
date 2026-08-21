@@ -131,6 +131,37 @@ jointly held.
 
 ---
 
+## Everyone — the shared fixture goes stale on 2026-08-29 (2026-08-21)
+
+Dated, so nobody meets it by surprise: **eight days from now the gate will
+go red on `app/shared/fixtures.json`,** and it will be right to.
+
+The dates in that file are fixed and the calendar is not. Its newest attended
+class is 2026-08-15. Once that passes fourteen days, every member in the
+fixture reads as long-quiet, and the deliberate near-miss the product briefs
+require — a member who attended RECENTLY and must therefore NOT be flagged —
+stops existing. The file stays perfectly VALID; it just stops demonstrating
+the thing it was built to demonstrate.
+
+Nothing was watching for that, which is the actual problem. The unit suites
+pin "today" to a reference date so they cannot rot — correct, and it means
+they cannot warn either. `scripts/check-fixtures.mjs` now reads the real
+clock in that one place and prints the countdown on every run:
+
+```
+check-fixtures: newest attended class is 2026-08-15, 6 days ago —
+8 days of usable life left (goes stale 2026-08-29).
+```
+
+**The ask — a team decision, not a lane one:** roll the fixture's dates
+forward before the 29th, or agree a different answer. Rolling forward is a
+team-owned data change and it changes what the staff dashboard shows live,
+which is why I have not done it unilaterally.
+
+The one answer to rule out is hardcoding a fake "today" inside a product.
+The pinned suites are the thing that must not move; a product that invents
+its own present would stop being checkable.
+
 ## Dennis — Product C has no brief in the root (2026-08-21)
 
 Not urgent and not a defect — a gap the docs had stopped mentioning in two
