@@ -707,6 +707,17 @@ csvInput.addEventListener("change", () => {
         imported.namesCleaned === 0
           ? ""
           : ` ${imported.namesCleaned} ${imported.namesCleaned === 1 ? "name had" : "names had"} invisible or control characters removed — a zero-width space makes two identical-looking names two different members.`;
+      /* THE FILE CANNOT SAY WHICH, so the page does not pretend. Without a
+       * class column, a second class that day and a duplicated row are the
+       * same two rows. The evidence counts them once — inflating would be
+       * inventing attendance — and the count staff read is stated with the
+       * reason, because it is the number they judge a member by. */
+      const repeatNote =
+        imported.sameDayRepeats === 0
+          ? ""
+          : imported.classColumnMissing
+            ? ` ${imported.sameDayRepeats} ${imported.sameDayRepeats === 1 ? "row repeats" : "rows repeat"} a member and date already seen. Without a class column this file cannot say whether that is a second class that day or the same visit entered twice, so each counts once — the attendance shown may be low. Add a class column to tell them apart.`
+            : ` ${imported.sameDayRepeats} duplicate ${imported.sameDayRepeats === 1 ? "row was" : "rows were"} counted once, not twice.`;
       const splitNote =
         imported.splitIdentities.length === 0
           ? ""
@@ -722,7 +733,7 @@ csvInput.addEventListener("change", () => {
       renderRecords(
         imported.records,
         `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
-          `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${splitNote} ` +
+          `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${repeatNote}${splitNote} ` +
           `Everyone in the file is treated as an active member. ` +
           `This data never left your browser.`,
       );

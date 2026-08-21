@@ -39,6 +39,15 @@ export interface CsvImport {
   identityMethod: string;
   /** True when identity fell back to the member's name. */
   identityIsName: boolean;
+  /** Rows that landed on a member+session already recorded. With a class
+   *  column these are duplicate entries. WITHOUT one — a sign-in sheet is a
+   *  name and a date — a second class the same day looks exactly the same,
+   *  and the evidence counts it once either way. Stated when it happens,
+   *  because it changes the number staff read. */
+  sameDayRepeats: number;
+  /** True when the file carried no class column, which is what makes the
+   *  count above ambiguous rather than merely a duplicate. */
+  classColumnMissing: boolean;
   /** How many names had characters removed that cannot be part of a name —
    *  zero-width spaces, bidi overrides, control characters. Counted because
    *  silently editing somebody's name would be exactly the quiet correction
@@ -355,6 +364,11 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const skipped: string[] = [];
   const idsSeenPerName = new Map<string, Set<string>>();
   let namesCleaned = 0;
+  /* Same member, same session, more than once. With a class column that is
+   * a duplicated row; without one it is indistinguishable from a second
+   * class that day, and the file cannot say which. Counted either way. */
+  const seenAttendance = new Set<string>();
+  let sameDayRepeats = 0;
 
   /* Decided ONCE from the whole file, before any row is read: one row with
    * a first component above 12 settles the order for every other row. */
@@ -500,6 +514,9 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       });
     }
 
+    const attendanceKey = `${memberId}|${sessionId}`;
+    if (seenAttendance.has(attendanceKey)) sameDayRepeats += 1;
+    seenAttendance.add(attendanceKey);
     attendance.push({
       attendance_id: `csv_a_${attendance.length + 1}`,
       member_id: memberId,
@@ -538,6 +555,8 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     skipped,
     splitIdentities,
     namesCleaned,
+    sameDayRepeats,
+    classColumnMissing: classCol === -1,
     dateOrder,
     identityIsName,
     identityMethod: identityIsName

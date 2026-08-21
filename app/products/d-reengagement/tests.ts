@@ -1236,6 +1236,50 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     imported.splitIdentities.length, 0);
 }
 
+/* A SIGN-IN SHEET CANNOT TELL TWO CLASSES FROM ONE VISIT ENTERED TWICE.
+ *
+ * The session a row belongs to is keyed on date + class + instructor. Give
+ * the file no class column — which is exactly what a sign-in sheet is, a
+ * name and a date — and every row on one date collapses into one session,
+ * so a member who trains twice that day is credited with one visit.
+ * Measured: the same sixteen visits read as "8 classes (≈0.9/week)" from a
+ * sign-in sheet and "16 classes (≈1.9/week)" from an export that names the
+ * class. That number is the evidence staff judge a member by, and it also
+ * ranks the list.
+ *
+ * Counting them twice would be inventing attendance, so the count stays at
+ * one and the ambiguity is stated — the same answer this product gives
+ * everywhere it cannot know. */
+{
+  const days = ["07-06", "07-08", "07-10", "07-13"];
+  const sheet = ["member,date", ...days.flatMap((d) => [`Maria Santos,2026-${d}`, `Maria Santos,2026-${d}`])].join("\n") + "\n";
+  const named = ["member,date,class", ...days.flatMap((d) => [`Maria Santos,2026-${d},yoga`, `Maria Santos,2026-${d},HIIT`])].join("\n") + "\n";
+
+  const a = adaptAttendanceCsv(sheet, "America/New_York");
+  const b = adaptAttendanceCsv(named, "America/New_York");
+
+  check("a sign-in sheet collapses each day into one session",
+    a.records.class_sessions.length, days.length);
+  check("...while an export that names the class keeps both",
+    b.records.class_sessions.length, days.length * 2);
+  check("the collapse is counted", a.sameDayRepeats, days.length);
+  check("...and the file is known to lack a class column", a.classColumnMissing, true);
+  check("an export that names the class has no ambiguity to state",
+    [b.sameDayRepeats, b.classColumnMissing], [0, false]);
+
+  // A genuinely duplicated row, WITH a class column, is a duplicate — and
+  // still counts once, which was already the deliberate rule.
+  const dup = "member,date,class\nMaria Santos,2026-07-06,yoga\nMaria Santos,2026-07-06,yoga\n";
+  const d = adaptAttendanceCsv(dup, "America/New_York");
+  check("a true duplicate row is counted once", d.records.class_sessions.length, 1);
+  check("...and reported as a duplicate, not as an unknowable",
+    [d.sameDayRepeats, d.classColumnMissing], [1, false]);
+
+  const clean = "member,date,class\nMaria Santos,2026-07-06,yoga\nMaria Santos,2026-07-08,HIIT\n";
+  check("a clean file states nothing",
+    adaptAttendanceCsv(clean, "America/New_York").sameDayRepeats, 0);
+}
+
 /* ACCEPTANCE CHECK 7, WHICH NOTHING PROVED UNTIL NOW.
  *
  * The product brief lists seven acceptance checks. Six had cover somewhere

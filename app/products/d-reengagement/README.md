@@ -192,6 +192,18 @@ a real date under exactly one reading settles the order for every other row
 read month-first, and then the page says so. A file containing proof of both
 orders fits no single reading and says that instead of picking one.
 
+**A sign-in sheet cannot tell two classes from one visit entered twice**, and
+the page says so. A row belongs to a session keyed on date, class and
+instructor; with no class column every row on one date is the same session,
+so a member who trains twice that day is credited with one visit. The same
+sixteen visits read as *8 classes (≈0.9/week)* from a sign-in sheet and
+*16 (≈1.9/week)* from an export that names the class — and that number is
+both the evidence staff judge a member by and the order of the list.
+Counting them twice would be inventing attendance, so each counts once and
+the ambiguity is stated with the fix: add a class column. With a class
+column present, a repeat is simply a duplicate row, and it says that
+instead.
+
 **Names are cleaned of what cannot be in a name**, and the count is stated.
 A zero-width space makes `Bob` and `Bo<ZWSP>b` render identically and count
 as two members — the same history-splitting false flag as a half-filled
