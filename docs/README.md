@@ -8,6 +8,7 @@ Process documents for the people building Pulse Studio. These sit OUTSIDE
 | --- | --- |
 | [styling.md](./styling.md) | Where every style lives (shared vs your folder), why we do not use Sass, when a comment is required — enforced by `scripts/check-styles.mjs` at the gate |
 | [styles-baseline.json](./styles-baseline.json) | The style duplication that existed the day the gate landed, with the owner who can delete each one. This list only shrinks. |
+| [contrast-baseline.json](./contrast-baseline.json) | The accent colours that were below WCAG AA the day `check-contrast.mjs` landed, with the owner who can clear each one. A developer's colour is theirs, so nobody else clears these. This list only shrinks. |
 | [REQUESTFOR-A-B-C.md](./REQUESTFOR-A-B-C.md) | What Product D needs from A, B and C, and what D gives back — one section per teammate, each ending in ONE ask |
 | [SENIOR-DEV-BRIEF.md](./SENIOR-DEV-BRIEF.md) | The whole of Product D in one file: what it does, how it is proven, and every open question — written to be read start to finish by someone new |
 
@@ -30,7 +31,7 @@ cost somebody a day:
   should be able to fail when the rule is broken — a gate, a test, a
   script. `styling.md` has `scripts/check-styles.mjs`.
 
-  Three of the repo's laws now have one, and the reason the last two were
+  Four of the repo's laws now have one, and the reason the last two were
   added is the standard proving itself: the language law and the
   no-attribution law were stated in six files each and enforced by nobody,
   so `npm run check` printed 314 checks and 0 failures while the root data
@@ -41,6 +42,7 @@ cost somebody a day:
   | Where styles live | [styling.md](./styling.md) | `scripts/check-styles.mjs` |
   | The words we do not use, and no AI as a contributor | root `CLAUDE.md` | `scripts/check-language.mjs` |
   | The shared vocabulary the records must speak | root `SHARED_DATA_CONTRACT.md` | `scripts/check-fixtures.mjs` |
+  | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
 
   Each runs inside `npm run check`, each carries `--self-test`, and each
   states the counts it actually reached rather than passing in silence.

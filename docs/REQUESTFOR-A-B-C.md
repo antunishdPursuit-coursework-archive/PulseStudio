@@ -177,6 +177,52 @@ Nothing under `app/` references any of them, and the gate cannot see them.
 
 None of the above was touched by me — every file is in someone else's lane.
 
+## Your accent colour is not readable on the light theme (2026-08-21)
+
+Measured, not guessed — `node scripts/check-contrast.mjs` prints these live:
+
+| Owner | Pairing | Measured | WCAG AA needs |
+| --- | --- | --- | --- |
+| Kerrian | `#3b82f6` as text on white | **3.68:1** | 4.5:1 |
+| Kerrian | white label on `#3b82f6` (both themes) | **3.68:1** | 4.5:1 |
+| Manny | `#f59e0b` as text on white | **2.15:1** | 4.5:1 |
+| Dennis | `#10b981` as text on white | **2.54:1** | 4.5:1 |
+
+Mine was in this table too — violet was 4.23:1, also failing. Nothing had
+ever measured, so four of us shipped four palettes nobody could read at
+body size and none of us were told.
+
+**Your identity hex does not have to change, and I did not change mine.**
+`--rensley` is still exactly `#8b5cf6`. What I added in `app/shared/theme.css`
+is a companion token, `--rensley-strong`, used ONLY where a person has to
+READ something — link text, a button fill that carries a label, the role
+chip. Borders, rules and outlines keep the identity colour, because a UI
+boundary only needs 3:1 and all four of ours already clear that.
+
+It has to be theme-aware: no single lightness of a hue clears 4.5:1 against
+both white and black. At 64% lightness violet is 4.71 on white and 4.46 on
+black. So the dark blocks in `theme.css` move the companion back up and flip
+the ink. There is a worked pair there to copy.
+
+**The asks — one each:**
+
+- **Kerrian** — yours is the only one failing in BOTH themes, because white
+  on `#3b82f6` is 3.68:1 wherever it renders. A `--kerrian-strong` fixes the
+  text and the button label together.
+- **Manny** — `#f59e0b` on white is 2.15:1, the furthest from AA of the four.
+  Amber is a strong surface colour and a very weak text colour; the fix is
+  almost certainly a companion rather than a new amber.
+- **Dennis** — `#10b981` on white is 2.54:1. Same shape of fix.
+
+`scripts/check-contrast.mjs` runs inside `npm run check`. Yours are recorded
+in `docs/contrast-baseline.json` against your name, reported on every run and
+allowed — nothing of yours is red today and nothing of yours is blocked. Only
+a NEW failure fails the gate. When you clear yours the gate says `cleared ·
+… now passes` and tells you to delete the line; the list only shrinks.
+
+I did not touch any of your colours, and I will not — a developer's colour is
+theirs. This is measurement and one worked pairing, nothing more.
+
 ## If you disagree with anything here
 
 Say so on the PR or in person — every number above (14/60 thresholds

@@ -474,13 +474,28 @@ export function recentBookingActivity(
   let recentActionDay = -Infinity;
   for (const r of data.reservations) {
     if (r.member_id !== memberId) continue;
-    const actionDate = r.reserved_at.split("T")[0] ?? r.reserved_at;
+    /* DATE THE ACTION THAT ACTUALLY HAPPENED. A cancellation's date is
+     * canceled_at, not the date of the booking it cancels — and Booking
+     * writes a cancellation as a NEW row that PRESERVES the original
+     * reserved_at (a-booking/main.ts, cancelReservation). Reading
+     * reserved_at for both rows therefore gave them the same day, and a
+     * strict > kept whichever came first, so the "(canceled)" qualifier
+     * this product deliberately added never once rendered for a real
+     * cancellation from the live trail. Staff read "booked but did not
+     * attend" about a member who had cancelled properly days earlier —
+     * the evidence line inverting the member's own story. */
+    const isCanceled = r.reservation_status === "canceled";
+    const rawAction = isCanceled ? r.canceled_at ?? r.reserved_at : r.reserved_at;
+    const actionDate = rawAction.split("T")[0] ?? rawAction;
     const actionDay = dayNumberFromIso(actionDate);
     if (!Number.isFinite(actionDay) || actionDay <= lastDay || actionDay > today) continue;
-    if (actionDay > recentActionDay) {
+    /* LAST ROW WINS ON A TIE, the same reading Booking uses for its own log
+     * and the same rule upcomingReservedNextClassDates already follows. A
+     * cancel row is appended after the booking it cancels, so on the day
+     * both happened the cancel is the later word. */
+    if (actionDay >= recentActionDay) {
       recentActionDay = actionDay;
-      disclosed =
-        r.reservation_status === "canceled" ? `${actionDate} (canceled)` : actionDate;
+      disclosed = isCanceled ? `${actionDate} (canceled)` : actionDate;
     }
   }
   return disclosed;

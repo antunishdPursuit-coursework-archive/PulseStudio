@@ -579,6 +579,58 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     results.outcomes[0]?.result, "stillQuiet");
 }
 
+/* BOOKING'S REAL CANCEL SHAPE. cancelReservation in a-booking appends a NEW
+ * row that PRESERVES the original reserved_at and adds canceled_at. Both
+ * rows therefore carry the same reserved_at, so dating by reserved_at gave
+ * them the same day and a strict > kept the booking — the "(canceled)"
+ * qualifier this product added on purpose never rendered once for a real
+ * cancellation. The earlier check passed only because it fabricated a
+ * cancel row whose reserved_at was the cancel date, which Booking never
+ * emits. These use Booking's actual shape. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Booked Then Canceled", status: "active", attended: ["2026-08-01"] }]);
+  const bookedAt = "2026-08-10T09:00:00";
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: bookedAt, canceled_at: null },
+    // Booking's cancel row: SAME reserved_at, a real canceled_at.
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "canceled", reserved_at: bookedAt, canceled_at: "2026-08-16T14:00:00" },
+  ];
+  check("a cancellation is dated by when it was canceled, not when it was booked",
+    recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY), "2026-08-16 (canceled)");
+}
+{
+  const fx = recordsFor([{ id: "m1", name: "Same Day Cancel", status: "active", attended: ["2026-08-01"] }]);
+  const sameDay = "2026-08-12T09:00:00";
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: sameDay, canceled_at: null },
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "canceled", reserved_at: sameDay, canceled_at: sameDay },
+  ];
+  check("booked and cancelled on one day reads as cancelled — the last row is the last word",
+    recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY), "2026-08-12 (canceled)");
+}
+{
+  const fx = recordsFor([{ id: "m1", name: "Still Booked", status: "active", attended: ["2026-08-01"] }]);
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-10T09:00:00", canceled_at: null },
+  ];
+  check("a live booking is still reported without the qualifier",
+    recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY), "2026-08-10");
+}
+{
+  const fx = recordsFor([{ id: "m1", name: "Cancel Without Time", status: "active", attended: ["2026-08-01"] }]);
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+      reservation_status: "canceled", reserved_at: "2026-08-11T09:00:00", canceled_at: null },
+  ];
+  check("a cancel row with no canceled_at falls back to the booking date, still qualified",
+    recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY), "2026-08-11 (canceled)");
+}
+
 /* ------------------------------------------------------------------ */
 /* Reading the stored ledger back — the browser is hostile input        */
 /* ------------------------------------------------------------------ */

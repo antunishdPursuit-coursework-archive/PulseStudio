@@ -51,7 +51,9 @@
 }
 
 .quiet-pill {
-  background: var(--accent);
+  /* A fill carrying words: the readable companion, not the identity hex —
+     white on the brand violet is 4.23:1, under the 4.5:1 a person needs. */
+  background: var(--accent-strong, var(--accent));
   color: var(--accent-ink);
   border-radius: 999px;
   padding: 3px 14px;
@@ -104,7 +106,9 @@
 
 .btn-outline {
   background: transparent;
-  color: var(--accent);
+  /* The label is read, so it takes the companion; the border is a UI
+     boundary at 3:1, so it keeps the identity colour. */
+  color: var(--accent-strong, var(--accent));
   border: 2px solid var(--accent);
   text-decoration: none;
   display: inline-block;
@@ -157,7 +161,7 @@
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
-.footer-note a { color: var(--accent); }
+.footer-note a { color: var(--accent-strong, var(--accent)); }
 
 @media (max-width: 560px) {
   .member-head { flex-direction: column; align-items: flex-start; }
