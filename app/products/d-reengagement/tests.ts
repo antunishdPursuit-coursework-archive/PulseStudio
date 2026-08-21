@@ -23,6 +23,8 @@ import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
+  keepOutreachRecords,
+  keepSuppressionRecords,
   lapseKeyOf,
   outreachResults,
   outreachStateFor,
@@ -270,6 +272,31 @@ check("61 days quiet is NOT flagged (older is a different conversation)",
 
 // 6f. "Today" is the studio's date, not the viewer's: 02:30 UTC on Aug 19
 //     is still Aug 18 in America/New_York.
+/* An unreadable date must never become a real day. Date.UTC rolls over in
+ * silence, so these are the exact shapes that used to become evidence. */
+check("a real date reads as a day number",
+  Number.isFinite(dayNumberFromIso("2026-08-19")), true);
+check("an unpadded real date still reads",
+  dayNumberFromIso("2026-8-19"), dayNumberFromIso("2026-08-19"));
+check("February 30th is not a day",
+  Number.isFinite(dayNumberFromIso("2026-02-30")), false);
+check("month 13 is not a day",
+  Number.isFinite(dayNumberFromIso("2026-13-01")), false);
+check("day 0 is not a day",
+  Number.isFinite(dayNumberFromIso("2026-08-00")), false);
+check("a truncated date does not become the first of the month",
+  Number.isFinite(dayNumberFromIso("2026-08")), false);
+check("a leap day in a leap year is a day",
+  Number.isFinite(dayNumberFromIso("2028-02-29")), true);
+check("a leap day in a common year is not",
+  Number.isFinite(dayNumberFromIso("2026-02-29")), false);
+check("words are not a day",
+  Number.isFinite(dayNumberFromIso("last-Tuesday-ish")), false);
+check("an empty string is not a day",
+  Number.isFinite(dayNumberFromIso("")), false);
+check("a full timestamp still reads its date part",
+  dayNumberFromIso("2026-08-19T18:30:00"), dayNumberFromIso("2026-08-19"));
+
 check("today is computed in the studio timezone",
   todayDayNumber("America/New_York", new Date(Date.UTC(2026, 7, 19, 2, 30))),
   dayNumberFromIso("2026-08-18"));
@@ -473,6 +500,65 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     fx, TODAY);
   check("a visit BEFORE the note never counts as a return",
     results.outcomes[0]?.result, "stillQuiet");
+}
+
+/* ------------------------------------------------------------------ */
+/* Reading the stored ledger back — the browser is hostile input        */
+/* ------------------------------------------------------------------ */
+
+/* The ledger and the do-not-contact list are JSON in a browser store. A
+ * person, an extension, or an older build of this page can have written
+ * anything there. Before these checks the rows were cast unread, and a row
+ * missing takenAt reached the median arithmetic in outreachResults() and
+ * turned a staff-facing number into NaN. Each row is now judged alone. */
+{
+  const good = { memberId: "m1", lapseKey: "m1|2026-08-01", takenAt: "2026-08-12", channel: "copy" };
+  check("a well-formed ledger row survives",
+    keepOutreachRecords([good]).kept.length, 1);
+  check("a row missing takenAt is dropped and counted",
+    [keepOutreachRecords([{ memberId: "m1", lapseKey: "k", channel: "copy" }]).kept.length,
+     keepOutreachRecords([{ memberId: "m1", lapseKey: "k", channel: "copy" }]).dropped], [0, 1]);
+  check("a row whose takenAt is not a date is dropped",
+    keepOutreachRecords([{ ...good, takenAt: "last Tuesday" }]).dropped, 1);
+  check("an impossible date is not a date",
+    keepOutreachRecords([{ ...good, takenAt: "2026-02-30" }]).dropped, 1);
+  check("an unknown channel is dropped — only copy and email exist",
+    keepOutreachRecords([{ ...good, channel: "sms" }]).dropped, 1);
+  check("an empty member id is dropped, never treated as a member",
+    keepOutreachRecords([{ ...good, memberId: "" }]).dropped, 1);
+  check("null and strings among the rows are dropped, not read",
+    keepOutreachRecords([null, "not a row", 7, good]).kept.length, 1);
+  check("good rows survive alongside bad ones — one bad row is not a bad file",
+    [keepOutreachRecords([good, null, { memberId: "m2", lapseKey: "k2", takenAt: "2026-08-13", channel: "email" }]).kept.length,
+     keepOutreachRecords([good, null, { memberId: "m2", lapseKey: "k2", takenAt: "2026-08-13", channel: "email" }]).dropped],
+    [2, 1]);
+  check("a non-array store reads as nothing, never throws",
+    [keepOutreachRecords({ memberId: "m1" }).kept.length, keepOutreachRecords(null).kept.length], [0, 0]);
+  check("__proto__ in a row does not make it a record",
+    keepOutreachRecords([JSON.parse('{"__proto__":{"x":1}}')]).dropped, 1);
+}
+{
+  const good = { memberId: "m1", suppressedOn: "2026-08-16" };
+  check("a well-formed suppression survives", keepSuppressionRecords([good]).kept.length, 1);
+  check("a suppression without a date is dropped and counted",
+    [keepSuppressionRecords([{ memberId: "m1" }]).kept.length,
+     keepSuppressionRecords([{ memberId: "m1" }]).dropped], [0, 1]);
+  check("a suppression with an unreadable date is dropped",
+    keepSuppressionRecords([{ ...good, suppressedOn: "16/08/2026" }]).dropped, 1);
+}
+{
+  /* THE BUG THIS SECTION EXISTS FOR: an unreadable row must never reach the
+   * arithmetic. Fed straight through, the bad row used to produce NaN. */
+  const fx = recordsFor([{ id: "m1", name: "Returned One", status: "active", attended: ["2026-08-16"] }]);
+  const stored = [
+    { memberId: "m1", lapseKey: "m1|2026-08-01", takenAt: "2026-08-12", channel: "copy" },
+    { memberId: "m1", lapseKey: "m1|2026-08-01", channel: "copy" },
+  ];
+  const results = outreachResults(keepOutreachRecords(stored).kept, fx, TODAY);
+  check("a corrupt row never reaches the median — the number stays a number",
+    Number.isFinite(results.medianDaysToReturn ?? NaN), true);
+  check("the corrupt row is counted as dropped, not judged",
+    [keepOutreachRecords(stored).dropped, results.outcomes.length], [1, 1]);
 }
 
 /* ------------------------------------------------------------------ */

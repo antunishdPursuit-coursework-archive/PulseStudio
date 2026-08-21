@@ -178,3 +178,61 @@ export function unsuppress(
 ): SuppressionRecord[] {
   return suppressions.filter((s) => s.memberId !== memberId);
 }
+
+/* ------------------------------------------------------------------ */
+/* Reading the stored ledger back — hostile-input rules                 */
+/* ------------------------------------------------------------------ */
+
+/* THE STORED LEDGER IS NOT TRUSTED INPUT. It is a JSON blob in a browser
+ * that a person, an extension, or an older version of this page can have
+ * written. It used to be cast straight to OutreachRecord[], so a single row
+ * missing takenAt reached the median arithmetic in outreachResults() and
+ * turned a staff-facing number into NaN. Rows are validated one at a time:
+ * good rows survive, bad rows are COUNTED, and the page states the count —
+ * the same accounting attendance rows already get. */
+
+export interface KeptRows<T> {
+  kept: T[];
+  /** Rows that could not be read. Stated, never silently dropped. */
+  dropped: number;
+}
+
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return Number.isFinite(dayNumberFromIso(value));
+}
+
+export function isOutreachRecord(row: unknown): row is OutreachRecord {
+  if (typeof row !== "object" || row === null) return false;
+  const r = row as Record<string, unknown>;
+  return (
+    typeof r["memberId"] === "string" &&
+    r["memberId"] !== "" &&
+    typeof r["lapseKey"] === "string" &&
+    r["lapseKey"] !== "" &&
+    isIsoDate(r["takenAt"]) &&
+    (r["channel"] === "copy" || r["channel"] === "email")
+  );
+}
+
+export function isSuppressionRecord(row: unknown): row is SuppressionRecord {
+  if (typeof row !== "object" || row === null) return false;
+  const r = row as Record<string, unknown>;
+  return (
+    typeof r["memberId"] === "string" &&
+    r["memberId"] !== "" &&
+    isIsoDate(r["suppressedOn"])
+  );
+}
+
+export function keepOutreachRecords(rows: unknown): KeptRows<OutreachRecord> {
+  if (!Array.isArray(rows)) return { kept: [], dropped: 0 };
+  const kept = rows.filter(isOutreachRecord);
+  return { kept, dropped: rows.length - kept.length };
+}
+
+export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecord> {
+  if (!Array.isArray(rows)) return { kept: [], dropped: 0 };
+  const kept = rows.filter(isSuppressionRecord);
+  return { kept, dropped: rows.length - kept.length };
+}

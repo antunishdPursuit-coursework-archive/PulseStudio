@@ -27,11 +27,14 @@ import {
   type FlaggedMember,
 } from "./logic.js";
 import {
+  keepOutreachRecords,
+  keepSuppressionRecords,
   outreachResults,
   outreachStateFor,
   recordOutreach,
   suppress,
   unsuppress,
+  type KeptRows,
   type OutreachRecord,
   type SuppressionRecord,
 } from "./outreach.js";
@@ -48,24 +51,96 @@ function requiredElement<T extends Element>(selector: string): T {
  * like every other record here — nothing leaves it. Unreadable storage is
  * stated and reset, never silently trusted. */
 let storageWarning = "";
-function loadList<T>(key: string): T[] {
+
+/* STORAGE CAN REFUSE, AND THE REFUSAL MUST BE SAID OUT LOUD.
+ *
+ * A browser with site data blocked (a private window, an enterprise policy,
+ * a sandboxed frame) throws on the ACCESS to localStorage, not merely on the
+ * write. Two consequences were live here and are now closed:
+ *   - the old catch block called localStorage.removeItem(), so a throwing
+ *     store threw a SECOND time out of loadList, out of module top-level,
+ *     and the page rendered nothing at all — a blank screen, which the
+ *     truth law forbids more strongly than any wrong number.
+ *   - persist() was unguarded, so "Do not contact" could appear to work and
+ *     be forgotten on reload. A suppression that silently fails is the one
+ *     failure this product must never have: it is a member's "no". */
+function readStored(key: string): string | null {
   try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("not a list");
-    return parsed as T[];
+    return localStorage.getItem(key);
   } catch {
-    storageWarning += ` The stored ${key.replace("pulse-", "")} was unreadable and was reset.`;
-    localStorage.removeItem(key);
-    return [];
+    return null;
   }
 }
-let ledger = loadList<OutreachRecord>("pulse-outreach-ledger");
-let suppressions = loadList<SuppressionRecord>("pulse-suppressions");
+
+function clearStored(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Nothing to reset: a store that will not be read cannot hold a value.
+  }
+}
+
+/** True when this browser will remember anything at all. Checked once so the
+ *  page can state the limit beside the result instead of pretending. */
+function storageWorks(): boolean {
+  try {
+    const probe = "pulse-storage-probe";
+    localStorage.setItem(probe, "1");
+    localStorage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadList<T>(key: string, keep: (rows: unknown) => KeptRows<T>): T[] {
+  const label = key.replace("pulse-", "");
+  const raw = readStored(key);
+  if (raw === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    storageWarning += ` The stored ${label} was unreadable and was reset.`;
+    clearStored(key);
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    storageWarning += ` The stored ${label} was unreadable and was reset.`;
+    clearStored(key);
+    return [];
+  }
+  /* PER-ROW, NOT PER-FILE. One corrupt row used to be indistinguishable from
+   * a corrupt file, and an unchecked cast let a row with a missing takenAt
+   * reach the median arithmetic and produce NaN. The rule itself lives in
+   * outreach.ts so the unit checks hold it; this only states the count. */
+  const { kept, dropped } = keep(parsed);
+  if (dropped > 0) {
+    storageWarning += ` ${dropped} unreadable ${dropped === 1 ? "entry" : "entries"} in the stored ${label} ${dropped === 1 ? "was" : "were"} discarded.`;
+  }
+  return kept;
+}
+
+let ledger = loadList("pulse-outreach-ledger", keepOutreachRecords);
+let suppressions = loadList("pulse-suppressions", keepSuppressionRecords);
+
+if (!storageWorks()) {
+  storageWarning +=
+    " This browser is not saving site data, so notes taken and do-not-contact choices last only until this page is closed.";
+}
+
 function persist(): void {
-  localStorage.setItem("pulse-outreach-ledger", JSON.stringify(ledger));
-  localStorage.setItem("pulse-suppressions", JSON.stringify(suppressions));
+  try {
+    localStorage.setItem("pulse-outreach-ledger", JSON.stringify(ledger));
+    localStorage.setItem("pulse-suppressions", JSON.stringify(suppressions));
+  } catch {
+    /* Said once, and it stays said: a silent failure here would let a
+     * member's "do not contact" be forgotten without anyone knowing. */
+    if (!storageWarning.includes("not saving site data")) {
+      storageWarning +=
+        " This browser is not saving site data, so notes taken and do-not-contact choices last only until this page is closed.";
+    }
+  }
 }
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
 

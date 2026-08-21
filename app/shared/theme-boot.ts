@@ -23,6 +23,37 @@ const THEME_KEY = "pulse-theme";
 const CUSTOM_KEY = "pulse-theme-custom";
 const DEFAULT_CUSTOM = { background: "#ffffff", text: "#0a0a0a" };
 
+/* STORAGE IS A PRIVILEGE, NOT A GUARANTEE. A browser with site data blocked
+ * (private windows, enterprise policy, a sandboxed frame) throws on the very
+ * ACCESS to localStorage — not just on write. This module runs on every page
+ * in the studio and mounts the sign-in chip and the appearance control, so an
+ * unguarded throw here does not degrade one feature: it aborts the module and
+ * every page loses its header controls at once. Both directions are therefore
+ * guarded, and a refusal to remember is treated as "nothing remembered". */
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** True when the preference was actually stored. Callers that show the person
+ *  a result use it to avoid claiming a choice was remembered when it was not. */
+function writeStored(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* Whether the LAST applyTheme() actually reached storage. The appearance
+ * control states the truth rather than implying a choice will survive a
+ * reload when this browser refuses to remember it. */
+let themeRemembered = true;
+
 type Theme = "light" | "dark" | "custom";
 type CustomColors = typeof DEFAULT_CUSTOM;
 
@@ -48,7 +79,7 @@ function contrast(background: string, text: string): number {
 
 function customColors(): CustomColors {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(CUSTOM_KEY) ?? "");
+    const parsed: unknown = JSON.parse(readStored(CUSTOM_KEY) ?? "");
     if (typeof parsed === "object" && parsed !== null) {
       const record = parsed as Record<string, unknown>;
       const background = record.background;
@@ -70,11 +101,11 @@ function applyTheme(theme: Theme, colors = customColors()): void {
     root.style.removeProperty("--custom-bg");
     root.style.removeProperty("--custom-fg");
   }
-  localStorage.setItem(THEME_KEY, theme);
+  themeRemembered = writeStored(THEME_KEY, theme);
 }
 
 function initialTheme(): void {
-  const saved = localStorage.getItem(THEME_KEY);
+  const saved = readStored(THEME_KEY);
   if (saved === "light" || saved === "dark") {
     applyTheme(saved);
     return;
@@ -263,10 +294,13 @@ function mountAppearanceControl(): void {
     drawEditor(background.editor, textValue);
     drawEditor(text.editor, backgroundValue);
     useCustom.disabled = false;
+    const unremembered = themeRemembered
+      ? ""
+      : " This browser is not saving site data, so this choice lasts until you leave the page.";
     status.textContent =
-      theme === "custom"
+      (theme === "custom"
           ? `Custom colors active (${ratio.toFixed(1)}:1 contrast).`
-          : `Bright areas are available (${ratio.toFixed(1)}:1 contrast).`;
+          : `Bright areas are available (${ratio.toFixed(1)}:1 contrast).`) + unremembered;
   }
 
   light.addEventListener("click", () => { applyTheme("light"); refresh(); });
@@ -274,9 +308,13 @@ function mountAppearanceControl(): void {
   useCustom.addEventListener("click", () => {
     const selected = { background: hslToHex(background.editor.state), text: hslToHex(text.editor.state) };
     if (contrast(selected.background, selected.text) < 4.5) return;
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(selected));
+    const stored = writeStored(CUSTOM_KEY, JSON.stringify(selected));
     applyTheme("custom", selected);
     refresh();
+    if (!stored) {
+      status.textContent =
+        "Custom colors are active for this page. This browser is not saving site data, so they will not be remembered.";
+    }
   });
   function bindEditor(editor: ColorEditor, other: () => string): void {
     editor.canvas.addEventListener("pointerdown", (event) => {

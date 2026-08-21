@@ -48,13 +48,40 @@ export interface FlagResult {
 /* Date arithmetic on studio-local calendar days                       */
 /* ------------------------------------------------------------------ */
 
-/** Whole-day number of a fixture timestamp. The date part of every fixture
- *  timestamp is already studio-local (the offset is baked into the string),
- *  so taking the text before "T" needs no timezone conversion at all. */
+/** Whole-day number of a fixture timestamp, or NaN when the text is not a
+ *  real calendar date. The date part of every fixture timestamp is already
+ *  studio-local (the offset is baked into the string), so taking the text
+ *  before "T" needs no timezone conversion at all.
+ *
+ *  IT MUST ROUND-TRIP, AND HERE IS WHY. Date.UTC rolls over without
+ *  complaint: Date.UTC(2026, 1, 30) is the 2nd of March, and a missing day
+ *  component used to default to the 1st. So "2026-02-30" became a real
+ *  visit two days after the record claimed, and the truncated "2026-08"
+ *  became a visit on the 1st of August — both silently, both counted as
+ *  evidence a member attended. The CSV door has always round-tripped its
+ *  dates (normalizeDate in csv.ts); the shared records, the browser booking
+ *  log and the stored ledger did not, and those are the three sources this
+ *  product cannot see coming. Returning NaN puts an unreadable date on the
+ *  path the callers already handle: skipped, counted, and stated as
+ *  unusable evidence rather than guessed at. */
 export function dayNumberFromIso(iso: string): number {
   const datePart = iso.split("T")[0] ?? iso;
-  const [y, m, d] = datePart.split("-").map(Number);
-  return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1) / 86_400_000;
+  const parts = datePart.split("-");
+  if (parts.length !== 3) return NaN;
+  const [y, m, d] = parts.map(Number);
+  if (y === undefined || m === undefined || d === undefined) return NaN;
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return NaN;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return NaN;
+  const utc = Date.UTC(y, m - 1, d);
+  const roundTrip = new Date(utc);
+  if (
+    roundTrip.getUTCFullYear() !== y ||
+    roundTrip.getUTCMonth() !== m - 1 ||
+    roundTrip.getUTCDate() !== d
+  ) {
+    return NaN;
+  }
+  return utc / 86_400_000;
 }
 
 /** Whole-day number of the CURRENT date in the studio's timezone — not the
