@@ -43,6 +43,7 @@ import {
   firstNameOf,
   inviteWording,
   recentBookingActivity,
+  remainingSpots,
   suggestedSession,
   summaryLine,
   todayDayNumber,
@@ -479,6 +480,52 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
   check("draft keeps the three ways back even without an invite",
     text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
+}
+
+/* THE INVITATION HAS TO BE REAL. The draft says "want us to save you a
+ * spot?" — in a personal note, from a studio that just noticed this member
+ * stopped coming. Sent about a full class, the member cannot book or has to
+ * be told no, which is a worse second impression than the silence this tool
+ * exists to break. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Quiet One", status: "active", attended: ["2026-08-01@yoga"] }]);
+  const future = {
+    session_id: "s-future", class_type: "yoga", level: "all levels",
+    instructor_id: "i1", starts_at: "2026-08-22T09:00:00", ends_at: "2026-08-22T10:00:00",
+    capacity: 2, session_status: "scheduled" as const,
+  };
+  fx.class_sessions = [...fx.class_sessions, future];
+  const flagged = findQuietMembers(fx, TODAY, proposedRules).flagged[0];
+
+  check("an empty class has all its seats", remainingSpots(future, fx), 2);
+  check("...and is offered", suggestedSession(flagged!, fx, TODAY)?.session_id, "s-future");
+
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "other1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+    { reservation_id: "r2", member_id: "other2", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T10:00:00", canceled_at: null },
+  ];
+  check("a full class has no seats", remainingSpots(future, fx), 0);
+  check("...and is never offered", suggestedSession(flagged!, fx, TODAY), null);
+
+  // Booking appends a cancel row; last row wins, so the seat comes back.
+  fx.reservations = [...fx.reservations, {
+    reservation_id: "r2", member_id: "other2", session_id: "s-future",
+    reservation_status: "canceled" as const, reserved_at: "2026-08-20T10:00:00",
+    canceled_at: "2026-08-21T08:00:00",
+  }];
+  check("a cancellation frees the seat, by last-row-wins", remainingSpots(future, fx), 1);
+  check("...and the class is offered again", suggestedSession(flagged!, fx, TODAY)?.session_id, "s-future");
+
+  // One member appearing twice holds one seat, not two.
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "other1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+    { reservation_id: "r1", member_id: "other1", session_id: "s-future",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+  ];
+  check("a member counted twice still holds one seat", remainingSpots(future, fx), 1);
 }
 
 /* WHAT THE RECORDS DO NOT SAY. A sign-in sheet is a name and a date: it does

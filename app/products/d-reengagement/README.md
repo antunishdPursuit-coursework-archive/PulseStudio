@@ -42,10 +42,15 @@ it is enforced by `outreach.ts`, not by memory:
 - **Coming back is stated with the date.** A quiet member already holding an
   upcoming reserved spot is left alone and named with the day they return —
   a cue for staff to say "good to see you back" on the right morning.
-- **The invitation is concrete.** The draft names a real upcoming class
-  matching the member's own pattern — their usual class with their usual
-  instructor first — and falls back to an open offer rather than inventing
-  a session. A specific "yes" is easier to say than a vague one.
+- **The invitation is concrete, and the seat is really there.** The draft
+  names a real upcoming class matching the member's own pattern — their
+  usual class with their usual instructor first — and falls back to an open
+  offer rather than inventing a session. A full class is never offered: the
+  note asks "want us to save you a spot?", and sending that about a class
+  with no room means the member cannot book or has to be told no, which is a
+  worse second impression than the silence this tool exists to break. Seats
+  are counted the way Booking reads its own log — last row wins, so a
+  cancellation frees the seat and a member listed twice holds one.
 
 **The closed loop** is what keeps the loop honest: every taken note is
 judged against the records. Who came back (and how many days after the

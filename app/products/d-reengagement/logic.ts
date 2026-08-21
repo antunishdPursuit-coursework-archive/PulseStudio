@@ -451,6 +451,22 @@ function timeOf(startsAt: string): string {
  *  usual class with anyone. Null when the records hold no such session —
  *  a generic draft beats a made-up invitation. Deterministic: earliest
  *  date, then session id. */
+/** Seats left in a session, by the same last-row-wins reading Booking uses
+ *  for its own log: a member who booked and then cancelled has freed their
+ *  seat, and a member who appears twice holds one seat, not two. */
+export function remainingSpots(session: ClassSession, data: FixtureSet): number {
+  const statusByMember = new Map<string, string>();
+  for (const r of data.reservations) {
+    if (r.session_id !== session.session_id) continue;
+    statusByMember.set(r.member_id, r.reservation_status);
+  }
+  let taken = 0;
+  for (const status of statusByMember.values()) {
+    if (status === "reserved") taken += 1;
+  }
+  return session.capacity - taken;
+}
+
 export function suggestedSession(
   flagged: FlaggedMember,
   data: FixtureSet,
@@ -464,6 +480,14 @@ export function suggestedSession(
     .filter((s) => {
       if (s.session_status !== "scheduled") return false;
       if (s.class_type !== flagged.usualClassType) return false;
+      /* NEVER OFFER A SEAT THAT IS NOT THERE. The draft says "want us to
+       * save you a spot?" — an invitation, in a personal note, from a
+       * studio that has just noticed this member stopped coming. Sending
+       * that about a full class means the member either cannot book or has
+       * to be told no, which is a worse second impression than the silence
+       * this tool exists to break. An open offer is honest; a specific
+       * invitation to a class with no room is not. */
+      if (remainingSpots(s, data) < 1) return false;
       const day = dayNumberFromIso(s.starts_at);
       return Number.isFinite(day) && day > today && day <= today + 10;
     })
