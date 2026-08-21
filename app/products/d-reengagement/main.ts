@@ -243,6 +243,10 @@ function renderFlagged(
 ): HTMLElement {
   const card = document.createElement("article");
   card.className = "card member-card";
+  card.dataset["member"] = f.member.member_id;
+  // Focusable by script only: it never enters the tab order, so nobody has
+  // to tab through a card to reach its buttons.
+  card.tabIndex = -1;
 
   const head = document.createElement("div");
   head.className = "member-head";
@@ -305,6 +309,7 @@ function renderFlagged(
       un.addEventListener("click", () => {
         suppressions = unsuppress(suppressions, f.member.member_id);
         persist();
+        focusMemberAfterRender = f.member.member_id;
         rerender();
       });
       card.append(un);
@@ -339,7 +344,10 @@ function renderFlagged(
         copyBtn.textContent = "Copied ✓";
         ledger = recordOutreach(ledger, f, "copy", studioToday());
         persist();
-        setTimeout(rerender, 900);
+        setTimeout(() => {
+          focusMemberAfterRender = f.member.member_id;
+          rerender();
+        }, 900);
       },
       () => {
         copyBtn.textContent = "Copy failed — select the text above";
@@ -356,7 +364,10 @@ function renderFlagged(
     // staff member's hands from here.
     ledger = recordOutreach(ledger, f, "email", studioToday());
     persist();
-    setTimeout(rerender, 900);
+    setTimeout(() => {
+      focusMemberAfterRender = f.member.member_id;
+      rerender();
+    }, 900);
   });
 
   const suppressBtn = document.createElement("button");
@@ -366,6 +377,7 @@ function renderFlagged(
   suppressBtn.addEventListener("click", () => {
     suppressions = suppress(suppressions, f.member.member_id, studioToday());
     persist();
+    focusMemberAfterRender = f.member.member_id;
     rerender();
   });
 
@@ -450,6 +462,27 @@ function renderOutcomes(data: FixtureSet, today: number): void {
 /** Re-render with the CURRENT data source — workflow actions change ledger
  *  state, and the cards must say so immediately. */
 let rerender: () => void = () => {};
+
+/* WHERE THE KEYBOARD WAS. Every action on a card — taking a draft, opening
+ * the mail client, do-not-contact — rebuilds the whole list, and a rebuilt
+ * list has no focus in it: the browser drops focus to <body>. A staff
+ * member working down the page with the keyboard pressed a button on the
+ * fifth member and was thrown back to the top of the document, with the
+ * page summary re-announced at them. This remembers whose card was acted
+ * on so the rebuilt list can put them back where they were. */
+let focusMemberAfterRender: string | null = null;
+
+function restoreFocusAfterRender(): void {
+  if (focusMemberAfterRender === null) return;
+  const target = flaggedEl.querySelector<HTMLElement>(
+    `[data-member="${CSS.escape(focusMemberAfterRender)}"]`,
+  );
+  focusMemberAfterRender = null;
+  // The card may legitimately be gone — a suppressed member leaves the
+  // list. Falling back to the list itself keeps the keyboard in the region
+  // the person was working in rather than at the top of the document.
+  (target ?? flaggedEl).focus();
+}
 
 /** Paint the page from ANY contract-shaped record set — the shared studio
  *  records or an imported attendance file. One render path, two doors. */
@@ -539,6 +572,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     flaggedEl.append(el);
   }
   result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1, data, today)));
+  restoreFocusAfterRender();
 }
 
 function loadSharedRecords(): void {

@@ -125,6 +125,25 @@
   clip: rect(0 0 0 0);
 }
 .import .btn { cursor: pointer; }
+
+/* THE FOCUS RING HAS TO LAND SOMEWHERE A PERSON CAN SEE. The native file
+   input above is clipped to a 1px box so the labeled button can stand in
+   for it — which meant a keyboard user tabbing into the CSV door had the
+   ring drawn on something invisible and no way to tell they were there.
+   The ring is drawn on the label instead, which is the control they
+   actually see. */
+.import:has(input[type="file"]:focus-visible) .btn-outline {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* Focused by script after an action rebuilds the list, never in the tab
+   order — so nobody has to tab through a card to reach its buttons. */
+.member-card:focus-visible,
+#flagged:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 3px;
+}
 .btn-ghost {
   background: transparent;
   color: var(--muted);
