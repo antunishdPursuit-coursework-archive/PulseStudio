@@ -7,7 +7,7 @@
  * and measured 500-member performance.
  */
 
-import { ID_PATTERN } from "./contracts.js";
+import { ID_PATTERN, makeId } from "./contracts.js";
 import type { GeneratedStudioBundle } from "./contracts.js";
 import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
@@ -549,13 +549,57 @@ for (const n of [1, 2, 5, 12]) {
     leaks[0]?.detail.includes(`${doctored.dataset.members.length} records carry it`), true);
 }
 
+/* ONE DEFECT, ONE CODE. The credential scan ran twice under two names, so a
+ * single planted value produced two problems — and the reconciliation matches
+ * declared against found on code + entityId, which meant declaring either one
+ * left the other undeclared and edge-cases mode could never balance. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const victim = doctored.dataset.members[2];
+  if (victim) victim.displayName = "Card 4111111111111111";
+  const found = validateBundle(doctored).problems.filter(
+    (p) => p.code === "sensitive-pattern" || p.code === "real-pii-pattern",
+  );
+  check("one credential-shaped value raises exactly one problem", found.length, 1);
+  check("...under the surviving code", found[0]?.code, "sensitive-pattern");
+  check("...attributed to the record that owns it, so a declaration can name it",
+    found[0]?.entityId, victim?.id);
+}
+
+/* The pad is the sort key: a seventh digit sorts before every six-digit id. */
+{
+  let threw = "";
+  try { makeId("attendance", 1_000_000); } catch (e) { threw = (e as Error).name; }
+  check("an id past six digits refuses to be minted rather than mis-sorting", threw, "RangeError");
+  check("the last six-digit id is still fine", makeId("attendance", 999_999), "attendance:999999");
+  check("zero is not a record number", (() => {
+    try { makeId("member", 0); return ""; } catch (e) { return (e as Error).name; }
+  })(), "RangeError");
+}
+
+/* Every collection, because that is what the brief promises. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  // Reverse rather than index-swap: noUncheckedIndexedAccess makes every
+  // element possibly-undefined, and reverse() needs no indexing at all.
+  doctored.dataset.instructors.reverse();
+  check("instructors out of id order is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "unsorted-collection"), true);
+}
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  doctored.dataset.studioPolicies.reverse();
+  check("studioPolicies out of id order is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "unsorted-collection"), true);
+}
+
 // A credential-shaped value anywhere must scream.
 {
   const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
   const victim = doctored.dataset.members[1];
   if (victim) victim.displayName = "Card 4111111111111111";
   check("a credential-shaped value is caught by the decoded-value scan",
-    validateBundle(doctored).problems.some((p) => p.code === "real-pii-pattern"), true);
+    validateBundle(doctored).problems.some((p) => p.code === "sensitive-pattern"), true);
 }
 
 // A booking stamped after its class must scream.
