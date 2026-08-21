@@ -1645,6 +1645,37 @@ check("clean records produce no data-quality line",
     parseRuntimeReservations("{broken").length, 0);
   check("live trail: a half-row never sneaks in beside a whole one",
     parseRuntimeReservations(JSON.stringify([{ member_id: "m" }, rt])).length, 1);
+
+  /* THE BOOKING LOG IS ANOTHER PRODUCT'S localStorage, which makes it the
+   * least trusted input this product has: a person, an extension, or an
+   * older build of Booking can have written anything there, and this
+   * product's brief promises a corrupt log degrades to nothing and never
+   * breaks the page. Two checks proved the two easy shapes. These are the
+   * rest of what "anything" means. */
+  const rows = (raw: string): number => parseRuntimeReservations(raw).length;
+  check("null reads as nothing", rows("null"), 0);
+  check("a bare string reads as nothing", rows('"hello"'), 0);
+  check("a number reads as nothing", rows("42"), 0);
+  check("an object that is not an array reads as nothing", rows('{"a":1}'), 0);
+  check("an array of nulls reads as nothing", rows("[null,null]"), 0);
+  check("an array of strings reads as nothing", rows('["a","b"]'), 0);
+  check("a deeply nested array reads as nothing", rows("[[[[[1]]]]]"), 0);
+  check("an illegal reservation_status is refused",
+    rows(JSON.stringify([{ ...rt, reservation_status: "DROP TABLE" }])), 0);
+  check("numeric ids are refused — the contract says string",
+    rows(JSON.stringify([{ ...rt, reservation_id: 1, member_id: 2, session_id: 3 }])), 0);
+  check("a canceled_at that is neither string nor null is refused",
+    rows(JSON.stringify([{ ...rt, canceled_at: 7 }])), 0);
+  check("one good row survives ten thousand junk ones",
+    rows("[" + Array.from({ length: 10_000 }, () => "null").join(",") + "," + JSON.stringify(rt) + "]"), 1);
+
+  /* A row carrying __proto__ must not reach Object.prototype. JSON.parse
+   * makes it an ordinary own property, which is why this passes — the check
+   * exists so that stays true if the parsing ever changes. */
+  const polluting = JSON.stringify([{ ...rt, ["__proto__"]: { polluted: true } }]);
+  check("a __proto__ row is read as an ordinary row", rows(polluting), 1);
+  check("...and pollutes nothing",
+    ({} as Record<string, unknown>)["polluted"], undefined);
 }
 
 {
