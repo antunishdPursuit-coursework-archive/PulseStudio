@@ -184,9 +184,19 @@ harmless is a **setting**, not a fact about the code.
   the single string `"Studio"`. Git history keeps the code either way;
   reviving that panel would need a `room` field on the shared synthetic
   session, which is shared ground, so it is a conversation not a copy-paste.
-- **Kerrian:** retire root `member-booking.html`. It is a redirect living at
-  a URL nobody can reach, and its target (`app/products/a-booking/index.html`)
-  is not a real path on the published site anyway. Separately: the retired
+- **Kerrian:** root `member-booking.html` — **lowest priority of the eight,
+  and I owe you a correction here.** An earlier draft of this note called it
+  debris with a broken target. Both halves were wrong. `06aa064` shows you
+  cut a 547-line booking app down to a 12-line forwarder on purpose — commit
+  body: *"The root booking page now sends people to the lane"* — and at 14:11
+  that day the site was still served from the repo root, so it was a working
+  forward when you wrote it. Its target `app/products/a-booking/index.html`
+  exists and the href resolves correctly from the root. It is **unreachable
+  under the current Pages setting, not broken.** It is also the only one of
+  the eight with no duplicated logic and no color- or data-law violation —
+  and under the trapdoor above it is the one file that would still forward
+  the old booking URL into your lane. Retire it whenever suits you, or keep
+  it; nothing here argues for urgency. Separately, and unrelated: the retired
   root `member-dashboard.html` had a class-category filter (Yoga / Cycling /
   HIIT) and `a-booking` filters by day only. That may be a deliberate scope
   call — it is yours to make, I just did not want it to disappear silently.

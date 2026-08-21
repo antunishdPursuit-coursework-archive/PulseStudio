@@ -169,9 +169,17 @@ export function findDuplicates(sharedCss, sheets) {
 const key = (f) => `${f.kind}|${f.selector}|${f.file}`;
 
 /* ---------- self-test: break it on purpose and confirm it screams ----------
-   The war-room rule this obeys: a check whose only reference is the thing
-   it checks reports all-clear forever. So the gate carries a known-bad
-   case it MUST fail and a known-good case it must NOT flag. */
+   The rule this obeys: a check whose only reference is the thing it checks
+   reports all-clear forever. So the gate carries a known-bad case it MUST
+   fail and a known-good case it must NOT flag.
+
+   ITS LIMIT, STATED: this exercises findDuplicates() against strings held in
+   memory. It never opens SHARED, PRODUCT_SHEETS or BASELINE, so it proves
+   nothing about whether those paths still resolve — it printed PASSED even
+   when all four stylesheets were missing. Path resolution is covered by the
+   fail-closed checks above instead, which is where it belongs: the real run
+   exits 1 and names any file it could not read. To prove that half by hand,
+   rename a product stylesheet and confirm the gate exits 1. */
 if (IS_COMMAND && process.argv.includes("--self-test")) {
   const sharedCss = ".page-head .role { color: red; font-weight: 700 }";
   const planted = [
@@ -194,7 +202,11 @@ if (IS_COMMAND && process.argv.includes("--self-test")) {
     `belongs-in-shared caught=${caughtTwinCopy}, ` +
     `shared-component-touched caught=${caughtComponent}, ` +
     `clean-file-stays-clean=${cleanStaysClean}`);
-  console.log(ok ? "self-test PASSED — the gate can still fail." : "self-test FAILED — the gate is blind.");
+  console.log(
+    ok
+      ? "self-test PASSED — duplicate detection can still fail. (Says nothing about path resolution; see the note above.)"
+      : "self-test FAILED — the gate is blind.",
+  );
   process.exit(ok ? 0 : 1);
 }
 
@@ -209,8 +221,25 @@ if (sharedCss === null) {
   console.error(`check-styles: cannot read ${SHARED}`);
   process.exit(1);
 }
-const sheets = PRODUCT_SHEETS.map((file) => ({ file, css: read(file) }))
-  .filter((s) => s.css !== null);
+// A stylesheet we cannot read is a FAILURE, never a skip. Filtering the
+// unreadable ones away silently was this gate's worst bug: rename all four
+// and it printed "0 product stylesheets checked ... PASS" and exited 0 —
+// a green gate that had checked nothing. A renamed file is exactly when
+// you most need to be told.
+const readSheets = PRODUCT_SHEETS.map((file) => ({ file, css: read(file) }));
+const missing = readSheets.filter((s) => s.css === null).map((s) => s.file);
+if (missing.length > 0) {
+  console.error(
+    `check-styles: cannot read ${missing.length} of ${PRODUCT_SHEETS.length} product stylesheets:`,
+  );
+  for (const file of missing) console.error(`  missing: ${file}`);
+  console.error(
+    "check-styles: if a stylesheet moved or was renamed, update PRODUCT_SHEETS in this " +
+      "file in the same commit. The gate refuses to report a pass on files it never read.",
+  );
+  process.exit(1);
+}
+const sheets = readSheets;
 
 const findings = findDuplicates(sharedCss, sheets);
 const baselineRaw = read(BASELINE);
