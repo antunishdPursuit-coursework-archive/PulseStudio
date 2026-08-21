@@ -456,6 +456,33 @@ file is yours.
 If you would rather keep the dotenv convention, say so and it stays — the
 gate no longer objects to it, and this note becomes the record of why.
 
+## Kerrian — a member booking a class reads your name (2026-08-21)
+
+`app/products/a-booking/index.html:14` carries
+`<span class="owner-badge">Kerrian</span>`. It is not hidden and it is not
+small: I measured it in a browser at 74 by 26 pixels, sitting in the page
+header directly after BOOK A CLASS, so the header reads
+"BOOK A CLASS · Kerrian · Sign in".
+
+The audience law says a consumer-facing surface speaks TO its user and
+never ABOUT the project, and that authorship is carried by the builder's
+COLOUR plus `app/shared/storytold.html`. Your blue already does that job on
+every screen of Product A — the badge is the one part a member has no use
+for.
+
+**I have not touched it.** It is your file and your call, and I have put it
+in `docs/audience-baseline.json` so the new `scripts/check-audience.mjs`
+reports it as known rather than failing the build for everyone. Removing
+the span clears the line; drop it from the baseline in the same commit and
+the list gets shorter.
+
+Worth knowing: Product D's unit-check page has the same badge, and it stays
+— a tests page is read by a developer, not a member, which is why the gate
+skips it. The difference is who is looking.
+
+**The one ask:** delete that span, or tell me the badge is deliberate and I
+will write the reason into the baseline so nobody raises it again.
+
 ## If you disagree with anything here
 
 Say so on the PR or in person — every number above (14/60 thresholds

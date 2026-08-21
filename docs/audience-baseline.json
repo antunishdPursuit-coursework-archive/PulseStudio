@@ -1,0 +1,13 @@
+{
+  "note": "Builder names and product letters visible in copy a member or staff person reads, on the day scripts/check-audience.mjs landed (2026-08-21). The audience law says authorship is carried by the builder's COLOUR and by app/shared/storytold.html, never by a name on a customer screen. Each line names the owner who can clear it — a developer's own page is theirs, so nobody else edits it. This list only shrinks; anything not on it fails the gate.",
+  "allowed": [
+    {
+      "file": "app/products/a-booking/index.html",
+      "found": "Kerrian",
+      "line": 14,
+      "owner": "Kerrian",
+      "audience": "a member booking a class",
+      "why": "an .owner-badge pill in the page header, measured at 74x26px directly under BOOK A CLASS. The colour law already carries authorship in the accent, so the name is the one part a member does not need"
+    }
+  ]
+}
