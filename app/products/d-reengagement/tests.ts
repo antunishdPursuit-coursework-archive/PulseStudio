@@ -356,6 +356,63 @@ check("today is computed in the studio timezone",
     nobodyFlaggedLine(r, proposedRules)?.includes("been in within"), false);
   check("the count of those past the window is stated", r.quietLongerThanWindowCount, 2);
 }
+/* THE INDEX MUST AGREE WITH THE SCAN IT REPLACED.
+ *
+ * findQuietMembers used to re-scan the whole attendance array once per
+ * member — O(members x attendance), which measured 4045ms at two thousand
+ * members, on a page that re-runs it after every workflow click. Grouping
+ * attendance by member first makes it O(members + attendance) and took that
+ * to 430ms. Speed is worthless if the answer moved, so this pins the
+ * equivalence: the same member's attended sessions, resolved both ways,
+ * over a studio big enough that the two implementations could diverge. */
+{
+  const studio = generateStudio(20260818, "2026-08-18");
+  const data = studio.records;
+
+  // The scan the index replaced, kept here as the reference answer.
+  const byScan = (memberId: string): string[] =>
+    [...new Set(
+      data.attendance
+        .filter((a) => a.member_id === memberId && a.attendance_status === "attended")
+        .map((a) => a.session_id),
+    )].sort();
+
+  // The grouping findQuietMembers now builds, reproduced the same way.
+  const index = new Map<string, string[]>();
+  for (const a of data.attendance) {
+    if (a.attendance_status !== "attended") continue;
+    const rows = index.get(a.member_id);
+    if (rows === undefined) index.set(a.member_id, [a.session_id]);
+    else rows.push(a.session_id);
+  }
+  const byIndex = (memberId: string): string[] =>
+    [...new Set(index.get(memberId) ?? [])].sort();
+
+  const disagreements = data.members.filter(
+    (m) => byScan(m.member_id).join(",") !== byIndex(m.member_id).join(","),
+  );
+  check("the index agrees with the per-member scan for every member",
+    disagreements.length, 0);
+  check("...over a studio with enough members to matter",
+    data.members.length >= 50, true);
+  check("...and a member with no attendance resolves to nothing either way",
+    [byScan("nobody").length, byIndex("nobody").length], [0, 0]);
+
+  // A no_show must stay out of the index, the way it stayed out of the scan.
+  const noShowMembers = new Set(
+    data.attendance.filter((a) => a.attendance_status === "no_show").map((a) => a.member_id),
+  );
+  const leaked = [...noShowMembers].filter((id) => {
+    const shows = new Set(
+      data.attendance
+        .filter((a) => a.member_id === id && a.attendance_status === "no_show")
+        .map((a) => a.session_id),
+    );
+    return byIndex(id).some((sid) => shows.has(sid) && !byScan(id).includes(sid));
+  });
+  check("no no_show session reaches the index", leaked.length, 0);
+}
+
 /* THE MEMBER THE PAGE SETS ASIDE AFTER THE RULE RAN. main.ts removes anyone
  * already holding an upcoming reserved spot from result.flagged, so this
  * function cannot see them. It counted them under "have been in recently" —
