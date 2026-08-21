@@ -356,6 +356,39 @@ check("today is computed in the studio timezone",
     nobodyFlaggedLine(r, proposedRules)?.includes("been in within"), false);
   check("the count of those past the window is stated", r.quietLongerThanWindowCount, 2);
 }
+/* THE MEMBER THE PAGE SETS ASIDE AFTER THE RULE RAN. main.ts removes anyone
+ * already holding an upcoming reserved spot from result.flagged, so this
+ * function cannot see them. It counted them under "have been in recently" —
+ * flatly false about somebody quiet for seventeen days who simply booked
+ * their way back, and the exact kind of sentence this product exists not to
+ * produce. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Coming Back", status: "active", attended: ["2026-08-01@yoga"] }]);
+  fx.class_sessions = [...fx.class_sessions, {
+    session_id: "soon", class_type: "yoga", level: "all levels", instructor_id: "i1",
+    starts_at: "2026-08-22T09:00:00", ends_at: "2026-08-22T10:00:00",
+    capacity: 12, session_status: "scheduled" as const,
+  }];
+  fx.reservations = [{
+    reservation_id: "r1", member_id: "m1", session_id: "soon",
+    reservation_status: "reserved" as const, reserved_at: "2026-08-17T09:00:00", canceled_at: null,
+  }];
+  const result = findQuietMembers(fx, TODAY, proposedRules);
+  check("the rule flags them — they have been quiet 17 days", result.flagged.length, 1);
+  const returning = result.flagged.filter((f) =>
+    upcomingReservedNextClassDates(fx, TODAY).has(f.member.member_id));
+  result.flagged = result.flagged.filter((f) =>
+    !upcomingReservedNextClassDates(fx, TODAY).has(f.member.member_id));
+  check("...and the page sets them aside", [result.flagged.length, returning.length], [0, 1]);
+  const line = nobodyFlaggedLine(result, proposedRules, returning.length);
+  check("...and is NEVER described as having been in recently",
+    line?.includes("been in within"), false);
+  check("...but as quiet and already booked back in",
+    line?.includes("quiet but already booked back in"), true);
+  check("the old wording was the bug: without the count it lies",
+    nobodyFlaggedLine(result, proposedRules, 0)?.includes("been in within"), true);
+}
+
 {
   const allRecent = recordsFor([
     { id: "m1", name: "Was In Monday", status: "active", attended: ["2026-08-18"] },

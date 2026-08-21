@@ -619,7 +619,8 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
      * know about. The line now states which of them happened. */
     const calm = document.createElement("p");
     calm.className = "status";
-    calm.textContent = nobodyFlaggedLine(result, proposedRules) ?? "";
+    calm.textContent =
+      nobodyFlaggedLine(result, proposedRules, alreadyReturning.length) ?? "";
     flaggedEl.append(calm);
     return;
   }

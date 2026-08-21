@@ -368,7 +368,18 @@ export function coverageWarning(
  *  months ago as the studio where everybody came in last week.
  *
  *  Returns null when somebody WAS flagged — there is nothing to explain. */
-export function nobodyFlaggedLine(result: FlagResult, rules: QuietRules): string | null {
+export function nobodyFlaggedLine(
+  result: FlagResult,
+  rules: QuietRules,
+  /* Members the RULE flagged and the page then set aside because they
+   * already hold an upcoming reserved spot. The page removes them from
+   * result.flagged after findQuietMembers returns, so this function cannot
+   * see them and used to count them under "have been in recently" — a
+   * sentence that is flatly false about a member who has been quiet for
+   * seventeen days and simply booked their way back. They are quiet AND
+   * returning, which is its own good news and says so. */
+  alreadyReturningCount = 0,
+): string | null {
   if (result.flagged.length > 0) return null;
   const active = result.checkedCount - result.notActiveCount;
   if (result.checkedCount === 0) return "No usable member records loaded — nothing was checked.";
@@ -386,8 +397,16 @@ export function nobodyFlaggedLine(result: FlagResult, rules: QuietRules): string
       `${result.neverAttendedCount} ${result.neverAttendedCount === 1 ? "has" : "have"} never attended a class — that is onboarding, not re-engagement`,
     );
   }
+  if (alreadyReturningCount > 0) {
+    reasons.push(
+      `${alreadyReturningCount} ${alreadyReturningCount === 1 ? "is" : "are"} quiet but already booked back in, and left alone`,
+    );
+  }
   const inRecently =
-    active - result.quietLongerThanWindowCount - result.neverAttendedCount;
+    active -
+    result.quietLongerThanWindowCount -
+    result.neverAttendedCount -
+    alreadyReturningCount;
   if (inRecently > 0) {
     reasons.push(`${inRecently} ${inRecently === 1 ? "has" : "have"} been in within the last ${rules.minDaysQuiet} days`);
   }
