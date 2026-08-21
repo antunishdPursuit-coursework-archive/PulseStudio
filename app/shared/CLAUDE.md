@@ -42,16 +42,39 @@ the legacy contract) is what all four products speak.
   every promise rests on being reproducible from a seed.
 - **Product A consumes the compatibility view** (`currentSession()` /
   `onSessionChange()`, reading `.role` and `.member_id`). Do not remove
-  those exports until Kerrian migrates in his own lane.
+  those exports until Kerrian migrates in his own lane. It had NO checks
+  until 2026-08-21: one flipped comparison inside `currentSession()` hands
+  a member `role: "staff"` and a null `member_id`, showing a member the
+  staff view and losing their identity, inside somebody else's product.
+  Six checks now, including that the two roles never read the same.
 - **Future-version `pulse-session` values are deliberately NOT deleted**
   ("not ours to destroy") — a cleanup that wipes unrecognized versions
   breaks the contract and its test.
 - **`writePulseSession()` does not member-validate writes** — the
   guard-looking if-block is comment-only; the READ side clears unknown
   members. Tests cover the read side. Read the comment before "fixing".
+  `npm run mutate` confirms it independently: the condition can be
+  inverted with no check noticing, because the block does nothing. That is
+  evidence FOR this note, not a gap to close.
+- **The session listener wakes only for `pulse-session`** (and for a
+  `null` key, which means storage was cleared). Every cross-tab check used
+  to dispatch the session key, so the filter itself went unexercised —
+  which matters across lanes, because Product D writes and deletes
+  `pulse-storage-probe`, and a listener that woke on every key would
+  re-render four products whenever any of them touched storage.
 - **Serialization order is contract**: every synthetic collection sorts
   ascending by id, byte-for-byte reproducible; the validator has an
   `unsorted-collection` check.
+- **A sort that returns 0 is not a reproducibility promise.**
+  `csv-export.ts` sorted by date then member id and returned 0 for
+  anything still equal — and a member CAN attend two classes in one day,
+  which the shared studio's own data does. Those rows kept whatever order
+  the input held, deterministic only because `Array.prototype.sort` is
+  specified stable. Every column breaks the tie now, so the same records
+  give the same bytes whatever order they arrive in. The check that proves
+  it feeds the rows in REVERSED order; the older "export is deterministic"
+  check could not, because it regenerates the same config twice and a
+  fault mutates both sides equally.
 - **The validator scans for leaks**: record keys matching
   `/^(cohort|group|expected|eligib|quiet)/i` fail (answer-label-leak), as
   do 13–19-digit or exact-9-digit runs in any string value

@@ -70,6 +70,15 @@ report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They
 stayed green. A check proved against stale build output proves nothing.
 
+`npm run mutate` is the other half, and it is not part of the gate. It
+changes one token in a compiled module, reruns the suite, and puts the
+file back; anything the suite still passes is a way this code could be
+wrong that nobody would hear about. It has found real defects here — a
+greeting that used a member's whole name, an export whose byte order
+depended on sort stability — and it found a check in this very folder
+that could not fail at all. Read the survivors rather than the
+percentage: some are equivalent and no check could ever catch them.
+
 Then prove it in the browser, never from code reading:
 `/products/d-reengagement/tests.html` and `/shared/synthetic/tests.html`
 must both state "N checks run, N passed, 0 failed". A claim without a
