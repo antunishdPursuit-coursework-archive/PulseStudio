@@ -76,6 +76,25 @@ proposed in the UI:
 - ranked by attended classes in the 60 days before they went quiet — most
   frequent first, so the most valuable save is on top
 
+**Added since this brief was first written**, each documented in full in
+`app/products/d-reengagement/README.md` rather than duplicated here — a
+second copy is a second thing to keep true:
+
+- **The live trail** is now the DEFAULT door: the same running studio
+  Booking books against, with Booking's own reservation log merged in. Every
+  member in it is fictional and the page says so.
+- **The outreach discipline** — one note per lapse, do-not-contact, a
+  consent window, and an opt-in gate — all pure and unit-checked, with an
+  escape for a claim made by mistake.
+- **The closed loop** judges every note taken against the records: who came
+  back, how many days after, and which entries these records cannot judge.
+- **A coverage window**: a studio that stops RECORDING attendance looks
+  exactly like a studio everybody left, so the page says when the records
+  themselves have gone quiet rather than presenting a page of false flags.
+- **The page adapts to who is signed in** without ever gating: a member who
+  lands on this staff view is told what it is and where their own pages are,
+  and nothing is hidden.
+
 ## 4. The files
 
 All inside `app/products/d-reengagement/`:
@@ -116,9 +135,11 @@ Three ways data gets in, all through one render path:
 - **STAFF-ONLY.** Cancellation-risk inference never reaches a member-facing
   surface. The page is `noindex, nofollow` and deliberately **crawlable** so
   that tag can be read (see trap 7).
-- **STATED RESULTS, NEVER BLANK.** Every screen says what it checked:
-  "5 members checked, 1 flagged as of August 18, 2026." A quiet week must be
-  distinguishable from a broken tool.
+- **STATED RESULTS, NEVER BLANK.** Every screen says what it checked, in the
+  form "N members checked, M flagged as of <date>" — and when M is zero it
+  says WHICH of the four reasons applies, because a studio where everyone
+  came in last week and a studio where everyone left three months ago are
+  not the same news. A quiet week must be distinguishable from a broken tool.
 - **The words "demo", "example", and "mock" appear nowhere in the repo** —
   code, comments, docs, commits, or UI. This is a real product. The team's
   word for shared sample records is "fixture"; the first shipped version is
@@ -130,20 +151,34 @@ Three ways data gets in, all through one render path:
   is `var(--accent)` — violet for Product D. Never add a fifth colour or
   restyle another developer's.
 
-## 6. What is verified, with exact numbers
+## 6. What is verified, and where to read it
 
-Do not take these on trust — reproduce them. But they were true at the time of
-writing, checked in a real browser, not inferred from code.
+Do not take these on trust — reproduce them. And do not trust the NUMBERS a
+document quotes either: this section used to name two, "75 checks run" and
+"5 members checked, 1 flagged", and both went stale. The suite grew, and the
+default door stopped reading the 5-member starter fixture and started
+reading the running studio. A count in prose cannot be kept true; every one
+below says where to read it live instead.
 
-- **75 checks run, 75 passed, 0 failed** at
-  `/products/d-reengagement/tests.html`. The suite pins "today" to
-  2026-08-18 so verdicts never drift with the real clock.
-- On the shared records: **5 members checked, 1 flagged** — Maria Santos, last
-  attended yoga with Ana Torres on 2026-08-01, 3 classes in her prior 60 days.
-  James Okafor (3 days ago), Priya Patel (paused), Leo Kim (never attended),
-  and Sofia Reyes (canceled) are correctly not flagged.
-- On the generated studio: **60 members checked, 8 flagged**, ranked 13 → 12 →
-  10 → 8 prior classes — visibly ranked by value, not by days quiet.
+- **`/products/d-reengagement/tests.html` states its own verdict** in the
+  form "N checks run, N passed, 0 failed". Open it; that line is the claim.
+  The suite pins "today" to 2026-08-18 so verdicts never drift with the real
+  clock.
+- **The page states its own result** in the form "N members checked, M
+  flagged as of <date>", with the source of those records named directly
+  underneath — the running studio, a CSV you dropped in, or a generated one.
+  Every member in the running studio is fictional and the page says so.
+- **The near-misses are in the suite, not on the page**, which is where they
+  belong: a recent attendee, a paused member, a canceled one and a
+  never-attended newcomer are each pinned as NOT flagged, by name, against a
+  reference date that never moves. The names on the page shift with the
+  records; those checks do not.
+- **The ranking is visible on any door with enough members**: flagged members
+  come out ordered by prior attendance, most classes first, so the list is
+  ranked by value rather than by days quiet. The specific counts are not
+  quoted here — the generated studio is seeded on the calendar day and
+  builds different people every day, so any number written down about it is
+  wrong tomorrow by design.
 - The suite has been **proven able to fail**: changing the threshold from 14 to
   10 produced `FAIL — exactly 14 days quiet is NOT flagged (expected 0, got 1)`
   and nothing else. A suite that has never failed proves nothing.
@@ -182,6 +217,30 @@ These cost real time. They are the most valuable part of this brief.
    non-secure origins, so the click threw synchronously and the promise
    rejection handler never ran. Guarded now.
 
+9. **A shared record mutated in passing.** Nothing writes to the studio's
+   records, and until recently nothing checked that. The suite now
+   deep-freezes a generated record set, runs every function the page runs,
+   and compares the JSON byte for byte — acceptance check 7 from the product
+   brief, which had been stated in two documents and asserted nowhere.
+10. **A count in prose.** "75 checks run" and "5 members checked, 1 flagged"
+    were both written into this file and both went stale — the suite grew and
+    the default door changed. Product D's README had three timings that were
+    wrong within a day. Where a number matters, say where to read it live.
+11. **A member name that runs as a formula.** A CSV cell beginning `=`, `+`,
+    `-` or `@` is evaluated by every spreadsheet, and member names arrive
+    from a studio's own export. Every CSV this repo writes now defuses it.
+12. **An invisible character splitting one member into two.** A zero-width
+    space makes two identical-looking names two different people, each with
+    half a history and each able to be flagged for a silence that never
+    happened. Removed and counted — but NOT the zero-width joiner and
+    non-joiner, which are real letters in Persian and Devanagari.
+13. **A per-item question answered by scanning everything.** Four of these,
+    the worst freezing the page for 137 seconds at studio scale. Each fix was
+    proven byte-identical to what it replaced, not merely faster.
+14. **A metric mistaken for a behaviour.** `scrollWidth` exceeding
+    `clientWidth` is not a page that scrolls, and a timing taken at load
+    average 92 is not a regression. Both nearly sent a fix at working code.
+
 ## 8. Known open items — honest state
 
 - **The 14/60 thresholds are not ratified.** They are Rensley's proposal,
@@ -198,8 +257,27 @@ These cost real time. They are the most valuable part of this brief.
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
 - **Manny's staff dashboard has no `noindex`** and is live and public showing
-  member names and rosters. `app/robots.txt` blocks its crawl as a stopgap.
-  Only he can add the tag. This is flagged in `REQUESTFOR-A-B-C.md`.
+  member names and rosters. This brief used to add "`app/robots.txt` blocks
+  its crawl as a stopgap" — it does not, and never did on this deploy. That
+  file is served at `/PulseStudio/robots.txt` on a project page, while
+  crawlers read the USER site's root, which is a different repository; its
+  Disallow line was also missing the path prefix. Both corrected, and the
+  honest position is now written in three places: the robots file, the
+  sitemap, and `REQUESTFOR-A-B-C.md`. The dashboard has NO crawler
+  protection at all, and only its owner can add the tag.
+- **The session ids in the shared studio are not stable.** Measured: 1900 of
+  1900 move to a different date each day, because they are minted
+  positionally over a window anchored on today. Product A persists
+  reservations WITH a session id, so a stored reservation resolves to the
+  wrong class the next day. `SHARED_DATA_CONTRACT.md` says every record must
+  have a stable id; these do not. The fix is content-derived ids, which
+  changes every id in the dataset and everything pinned to them — a team
+  decision, raised rather than improvised, per `app/shared/CLAUDE.md`.
+- **Three developer accents are below WCAG AA** as text on the light theme —
+  blue 3.68:1, amber 2.15:1, green 2.54:1. Violet was too and is fixed
+  without changing its identity hex. `scripts/check-contrast.mjs` measures
+  all of them every run; the other three are baselined against their owners,
+  who are the only people who may change them.
 
 ## 9. How to run, gate, and commit
 
@@ -246,7 +324,7 @@ Be specific and be hard on it. In rough priority:
 1. **Try to break the rule.** Find an input where the flag list is wrong and
    nothing says so. Concrete input, wrong output, cite the file and line.
 2. **Attack the test suite, not just the code.** Which real bug classes would
-   pass all 75 checks today? Mutate `logic.ts` and find a change that keeps the
+   pass the suite as it stands today? Mutate `logic.ts` and find a change that keeps the
    suite green — that is a missing check, and it is worth more than a style note.
 3. **Judge the ranking rule.** "Most classes in the prior 60 days" is a proxy
    for "most valuable save". Is it the right proxy for a gym? What would you

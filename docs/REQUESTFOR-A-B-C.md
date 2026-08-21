@@ -9,10 +9,16 @@ The ground truth for all three sections: Pulse Studio is **one gym, one
 location, one shared record set**. Product D reads `member`, `membership`,
 `reservation`, and `attendance` through `app/shared/data.ts` only, writes
 nothing shared, and drafts outreach that staff send themselves. Verify any
-claim I make from this folder: open
-`/products/d-reengagement/tests.html` — it states
-"92 checks run, 92 passed, 0 failed" — and the page itself states
-"5 members checked, 1 flagged as of <today>".
+claim I make from this folder rather than taking it from here: open
+`/products/d-reengagement/tests.html`, which states its own verdict as
+"N checks run, N passed, 0 failed", and the page itself, which states its
+own result as "N members checked, M flagged as of <date>" with the source of
+those records named underneath.
+
+Those two lines used to be quoted here with real numbers in them. Both went
+stale — the suite grew and the default records changed — which is the whole
+reason this paragraph now tells you where to look instead of what you will
+see.
 
 ---
 
