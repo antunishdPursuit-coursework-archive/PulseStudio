@@ -4,11 +4,15 @@ alwaysApply: true
 ---
 Before your first edit, identify your developer — Kerrian (A/booking),
 Manny (B/dashboard), Dennis (C/chatbot), or Rensley (D/re-engagement) —
-and work only in their lane. Read the repo root `CLAUDE.md` (or its mirror
-`AGENTS.md`) and the brief inside the folder you are editing, and obey
-both. Non-negotiables: edit only your own product folder; `app/shared/`
-and root files are team-owned and change only with stated agreement; the
-words "demo", "example", and "mock" appear nowhere; no AI attribution or
-co-author trailers anywhere; backgrounds are black or white only and every
-feature carries its developer's color; run `npm run check` before every
-commit and never commit red.
+and work only in their lane.
+
+Then READ THE LAWS WHERE THEY LIVE, and obey them: the repo root
+`CLAUDE.md` (or its byte-equivalent mirror `AGENTS.md`), plus the brief
+inside the folder you are editing. This rule deliberately does not repeat
+them. It used to, and the copy drifted: it said "backgrounds are black or
+white only" for weeks after the colour law started allowing a person to
+choose an accessible custom background and text pair, so the always-on
+rule was forbidding what the law permitted. A second copy of a rule is a
+second thing to keep true, and this one is read on every edit.
+
+Run `npm run check` before every commit and never commit red.

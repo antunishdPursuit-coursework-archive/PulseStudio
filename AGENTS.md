@@ -163,13 +163,21 @@ each tool's native dialect, and THE CONTENT IS LAW, THE FILENAME IS NOT:
 
 - **CLAUDE.md** — the canonical file, read natively by Claude Code.
 - **AGENTS.md** — a byte-equivalent mirror of the sibling CLAUDE.md (after
-  each file's one-line header), read natively by OpenAI Codex and most
+  each file's two-line header and the blank line after it), read natively
+  by OpenAI Codex and most
   general agents. Regenerate it whenever CLAUDE.md changes:
   `bash scripts/sync-agent-briefs.sh`. If the two ever disagree, CLAUDE.md
   wins and the mirror needs regenerating.
-- **`.cursor/rules/*.mdc`** — thin Cursor rules that point at the
-  canonical files (one always-on team rule, one per-folder rule scoped by
-  glob). They carry no content of their own, so they cannot drift.
+- **`.cursor/rules/*.mdc`** — thin Cursor rules that point at the canonical
+  files (one always-on team rule, one per-folder rule scoped by glob). Each
+  states only which lane it is for and where to read the laws, so there is
+  almost nothing in them TO drift — a property that has to be maintained,
+  not assumed. The always-on team rule DID once carry its own copy of the
+  laws, and it drifted exactly as you would expect: it told every Cursor
+  user "backgrounds are black or white only" long after the colour law
+  started allowing an accessible custom pair, so the rule read on every
+  edit forbade what the law permitted. If you are tempted to paste a law
+  into a `.mdc` file, that is the story to remember.
 
 Whichever assistant you run: identify your developer, read the root brief
 plus the brief of the folder you are editing, and obey both.
