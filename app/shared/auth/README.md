@@ -54,6 +54,15 @@ reads as `null` here. If storage itself is unavailable or throwing, the
 page stays usable: the current choice is held in memory for the life of
 the page and will not survive navigation — stated behavior.
 
+That fallback is now true of the harder case as well, corrected 2026-08-21.
+A browser can READ fine and REFUSE WRITES — several do for a private or
+blocked context — and until this was fixed that signed a person out the
+instant they signed in: the write was caught and held in memory exactly as
+designed, and then the very next read saw an empty store, concluded nobody
+was signed in, and threw the memory away. An empty store is now only
+believed when the store would have kept a write. A genuine sign-out, here
+or in another tab, still signs out.
+
 Member sessions resolve against `studio.ts` — the same deterministic
 studio Product A books against — so a remembered `member_id` is always a
 real booking identity, and a stale one signs out visibly instead of
@@ -66,7 +75,7 @@ lingering.
 | `session.ts` | The v1 contract, its defensive reader/writer, events, and the compatibility view |
 | `studio.ts` | The one shared studio the dialog lists and sessions resolve against |
 | `schema.sql` | The Postgres schema for the hosted version — `member_id` is the identity there too; email is the login credential |
-| `tests.html` / `tests.ts` | 32 browser-run checks, written failing-first against this API |
+| `tests.html` / `tests.ts` | Browser-run checks, written failing-first against this API. The page states its own count — this table used to name one and it went stale. |
 | `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk as a separate staff row, chip + Sign out |
 
 ## The compatibility view (temporary, by design)
