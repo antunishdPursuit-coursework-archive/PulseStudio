@@ -7,7 +7,15 @@ program with attribution required on any copy; private after the program.
 Staff open one page and see which active members used to come and have gone
 quiet, why each one was flagged, and a ready personal message to copy or open
 in their own email app. Nothing here sends — staff send every message
-themselves, and the studio mailbox rides along as BCC for the record.
+themselves.
+
+This sentence used to end "and the studio mailbox rides along as BCC for the
+record", which is not true of this studio. `config.ts` sets
+`studioEmail: null` deliberately — Pulse Studio keeps no shared record
+mailbox, so the draft carries no BCC and the page claims none. A studio that
+HAS one puts its address there and the BCC appears; that is the whole edit.
+The code has always said so in a comment. The first paragraph of the README
+said otherwise.
 
 ## The rule (proposed, awaiting team ratification)
 

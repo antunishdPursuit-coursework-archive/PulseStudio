@@ -243,7 +243,12 @@ function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): stri
 
 /** A mailto: link opens the STAFF member's own mail client with the draft
  *  prefilled — the human chooses the recipient and presses send. The
- *  studio mailbox rides along as BCC so the studio keeps its own record. */
+ *  studio mailbox rides along as BCC so the studio keeps its own record —
+ *  WHEN there is one. brand.studioEmail is null for this studio on purpose,
+ *  so today the bcc below is the empty string and no copy is kept. The
+ *  README's opening paragraph stated the BCC unconditionally for a while,
+ *  and so did this comment; the code three lines down always handled it
+ *  correctly, which is exactly how a comment gets to be wrong for months. */
 function mailtoHref(f: FlaggedMember, draft: string): string {
   const subject = `We miss you at ${brand.studioName}, ${firstNameOf(f.member.display_name)}!`;
   // RFC 6068 wants CRLF line breaks in a mailto body; some clients collapse
