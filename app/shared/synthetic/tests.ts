@@ -137,6 +137,23 @@ check("clean mode validates with zero problems", cleanReport.problems.length, 0)
 check("clean mode declares zero violations", first.truth.declaredViolations.length, 0);
 check("clean serialization contains no injected ghost ids",
   serializeBundle(first).includes("member:999901"), false);
+/* THE VALIDATOR'S OWN COUNT, AGAINST THE ANSWER KEY.
+ *
+ * The re-engagement policy is computed twice on purpose: once by the
+ * generator, recorded in the truth key, and once by the validator from
+ * the finished records. They are meant to be independent — that is the
+ * whole value of an answer key — and nothing compared them.
+ *
+ * Mutation found it: changing `q > 14` to `q >= 14` in the validator's
+ * recomputation left every check green, because the number it produces
+ * was never read. The cohorts guarantee a member sitting at exactly 14
+ * quiet days, so that one flip silently moves the count by one. */
+check("the validator's eligible count matches the answer key's, computed independently",
+  cleanReport.stats["realizedEligible"] as number,
+  Object.values(first.truth.expectedReengagementEligibility).filter(Boolean).length);
+check("...and it is not zero, which would make the agreement meaningless",
+  (cleanReport.stats["realizedEligible"] as number) > 0, true);
+
 check("peak concurrent attendance respects the facility",
   cleanReport.stats["peakConcurrentAttendance"] as number <=
     first.dataset.studio.facilityCapacity, true);

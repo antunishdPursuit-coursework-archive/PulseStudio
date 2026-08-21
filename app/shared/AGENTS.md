@@ -106,6 +106,17 @@ the legacy contract) is what all four products speak.
   overlap one the member attended, which is deliberate and realistic, and
   there is a check pinning that so nobody "strengthens" the invariant into
   something false.
+- **The engine and Product D disagree about "today", latently.**
+  `validate.ts` skips attendance on the as-of date (`day >= asOfDay
+  continue; // future rows are never evidence`), while D's
+  `findQuietMembers` counts a class attended today (`day <= today`). They
+  have never disagreed, because the generator schedules no ATTENDED record
+  on the as-of date — measured 0 at 60 members and 0 at 300 on
+  2026-08-21 — so the boundary is unreachable and mutation there is
+  equivalent. If the generator ever fills today's classes, a member who
+  attended this morning would read as quiet to the answer key and as
+  recent to D, and the disagreement would look like a bug in whichever one
+  you were reading second. Raise it before changing that.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
