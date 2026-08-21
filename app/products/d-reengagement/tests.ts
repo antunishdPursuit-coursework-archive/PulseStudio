@@ -37,10 +37,12 @@ import {
   findQuietMembers,
   firstNameOf,
   inviteWording,
+  recentBookingActivity,
   suggestedSession,
   summaryLine,
   todayDayNumber,
   upcomingReservedMemberIds,
+  upcomingReservedNextClassDates,
   weeklyCadence,
 } from "./logic.js";
 
@@ -868,6 +870,61 @@ check("clean records produce no data-quality line",
     upcomingReservedMemberIds(trail([res("r1", "s_future", "waitlisted")]), TODAY_LIVE).size, 0);
   check("coming back: a past reservation says nothing about tomorrow",
     upcomingReservedMemberIds(trail([res("r1", "s_past", "reserved")]), TODAY_LIVE).size, 0);
+  // The dated view: not just WHO is coming back, but WHEN — and the id set
+  // is DERIVED from it, so the two readings can never disagree.
+  const two = trail([res("r1", "s_future", "reserved"), res("r2", "s_far", "reserved")]);
+  two.class_sessions.push({
+    session_id: "s_far", class_type: "yoga", level: "all levels", instructor_id: "i1",
+    starts_at: "2026-08-27T09:00:00", ends_at: "2026-08-27T10:00:00", capacity: 10,
+    session_status: "scheduled",
+  });
+  check("coming back: the next class DATE is the earliest upcoming one",
+    upcomingReservedNextClassDates(two, TODAY_LIVE).get("m1"), "2026-08-22");
+  check("coming back: the id set is exactly the dated map's keys",
+    [...upcomingReservedMemberIds(two, TODAY_LIVE)],
+    [...upcomingReservedNextClassDates(two, TODAY_LIVE).keys()]);
+}
+
+// Booking-without-attending since the last visit: disclosed, never a visit.
+{
+  const TODAY_LIVE = dayNumberFromIso("2026-08-18");
+  const LAST_VISIT = dayNumberFromIso("2026-07-28");
+  const withRes = (rows: Array<{ id: string; status: Reservation["reservation_status"]; at: string }>) => {
+    const fx = recordsFor([{ id: "m1", name: "Books Not Shows", status: "active", attended: ["2026-07-28"] }]);
+    fx.class_sessions.push({
+      session_id: "s_b", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "2026-08-12T09:00:00-04:00", ends_at: "2026-08-12T10:00:00-04:00",
+      capacity: 12, session_status: "scheduled",
+    });
+    fx.reservations = rows.map((r) => ({
+      reservation_id: r.id, member_id: "m1", session_id: "s_b",
+      reservation_status: r.status, reserved_at: r.at, canceled_at: null,
+    }));
+    return fx;
+  };
+  check("booking activity since the last visit is disclosed",
+    recentBookingActivity("m1",
+      withRes([{ id: "r1", status: "reserved", at: "2026-08-10T12:00:00" }]),
+      LAST_VISIT, TODAY_LIVE),
+    "2026-08-10");
+  check("a canceled booking is disclosed AS canceled — reaching and pulling back is still reaching",
+    recentBookingActivity("m1",
+      withRes([{ id: "r1", status: "canceled", at: "2026-08-16T12:00:00" }]),
+      LAST_VISIT, TODAY_LIVE),
+    "2026-08-16 (canceled)");
+  check("an action before the last visit is old news, not activity",
+    recentBookingActivity("m1",
+      withRes([{ id: "r1", status: "reserved", at: "2026-07-20T12:00:00" }]),
+      LAST_VISIT, TODAY_LIVE),
+    null);
+  check("an action after today never leaks in",
+    recentBookingActivity("m1",
+      withRes([{ id: "r1", status: "reserved", at: "2026-08-25T12:00:00" }]),
+      LAST_VISIT, TODAY_LIVE),
+    null);
+  check("booking activity never shrinks quiet days — only attendance is a visit",
+    run(withRes([{ id: "r1", status: "reserved", at: "2026-08-10T12:00:00" }])).flagged[0]?.daysSince,
+    21);
 }
 
 const passed = results.filter((r) => r.passed).length;

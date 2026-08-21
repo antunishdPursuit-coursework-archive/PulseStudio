@@ -14,15 +14,17 @@ import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
   dataQualityLine,
+  dayNumberFromIso,
   findQuietMembers,
   firstNameOf,
   inviteWording,
+  recentBookingActivity,
   suggestedSession,
   summaryLine,
   todayDayNumber,
+  upcomingReservedNextClassDates,
   weeklyCadence,
   type FlaggedMember,
-  upcomingReservedMemberIds,
 } from "./logic.js";
 import {
   outreachResults,
@@ -170,6 +172,23 @@ function renderFlagged(
     `(≈${weeklyCadence(f.priorCount, proposedRules.priorWindowDays)}/week) · ` +
     `usually ${f.usualClassType} with ${f.usualInstructorName}`;
   card.append(head, evidence);
+
+  // Booking without attending since the last visit is a DIFFERENT story
+  // from pure silence — the member reached for the studio and something
+  // got in the way. Disclosed so the note can meet them there; never
+  // counted as a visit, never shrinking the quiet-days count.
+  const activity = recentBookingActivity(
+    f.member.member_id,
+    data,
+    dayNumberFromIso(f.lastSession.starts_at),
+    today,
+  );
+  if (activity !== null) {
+    const line = document.createElement("p");
+    line.className = "evidence activity";
+    line.textContent = `Booked since their last visit — ${activity} — but did not attend.`;
+    card.append(line);
+  }
 
   /* THE DISCIPLINE. Evidence always renders — the flag and its why are
    * never withheld — but a draft is only offered when the policy allows:
@@ -353,11 +372,15 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   const result = findQuietMembers(data, today, proposedRules);
 
   // A quiet member who already holds a reserved spot for a class after
-  // today is coming back on their own — stated by name and left alone,
-  // never nagged. Read from the same reservation trail Booking writes.
-  const comingBack = upcomingReservedMemberIds(data, today);
-  const alreadyReturning = result.flagged.filter((f) => comingBack.has(f.member.member_id));
-  result.flagged = result.flagged.filter((f) => !comingBack.has(f.member.member_id));
+  // today is coming back on their own — stated by name AND date, and left
+  // alone, never nagged. Read from the same reservation trail Booking
+  // writes. Saying when they return turns the line from bookkeeping into
+  // a cue: staff know which day to say "good to see you back".
+  const nextClassDates = upcomingReservedNextClassDates(data, today);
+  const alreadyReturning = result.flagged.filter((f) =>
+    nextClassDates.has(f.member.member_id),
+  );
+  result.flagged = result.flagged.filter((f) => !nextClassDates.has(f.member.member_id));
 
   const asOf = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -373,7 +396,14 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     alreadyReturning.length === 0
       ? ""
       : ` ${alreadyReturning.length} left alone — already booked back in: ` +
-        `${alreadyReturning.map((f) => f.member.display_name).join(", ")}.`;
+        `${alreadyReturning
+          .map((f) => {
+            const date = nextClassDates.get(f.member.member_id);
+            return date === undefined
+              ? f.member.display_name
+              : `${f.member.display_name} (returns ${evidenceDate(`${date}T00:00:00`)})`;
+          })
+          .join(", ")}.`;
   statusEl.textContent =
     (quality
       ? `${summaryLine(result, asOf)} ${quality}${comingLine}`
