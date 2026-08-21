@@ -2313,6 +2313,9 @@ check("clean records produce no data-quality line",
       line.includes("the import recorded no class type and no instructor"), true);
     check("...while still carrying the date the flag rests on",
       line.includes("July 25, 2026"), true);
+    check("...and the whole line carries no invented clause at all",
+      line,
+      "Last attended: July 25, 2026 · 3 classes in the prior 60 days (≈0.4/week) · the import recorded no class type and no instructor");
     check("...and the count behind it",
       line.includes("3 classes in the prior 60 days"), true);
   }
@@ -2553,6 +2556,109 @@ check("clean records produce no data-quality line",
   check("...and it really is used, not merely accepted and ignored",
     generateStudio(20260818, "2026-08-18", "Europe/Lisbon").records.timezone ===
       generateStudio(20260818, "2026-08-18").records.timezone, false);
+}
+
+/* GAPS FOUND BY MUTATION, NOT BY READING.
+ *
+ * 143 single-token mutations were applied to the compiled engine and the
+ * suite rerun against each. 110 were caught; 33 survived. A survivor is a
+ * way the engine could be wrong that nobody would hear about. These close
+ * the three that were real rather than equivalent. */
+
+/* 1. dayNumberFromIso guards three distinct malformed shapes with three
+ * `||` chains. Turning any of them into `&&` survived, because every
+ * existing case tripped all the conditions at once. Each shape now has
+ * its own case, so each guard is load-bearing. */
+{
+  check("a date missing its day is unreadable", Number.isFinite(dayNumberFromIso("2026-08")), false);
+  check("a date missing month and day is unreadable", Number.isFinite(dayNumberFromIso("2026")), false);
+  check("a non-numeric day is unreadable", Number.isFinite(dayNumberFromIso("2026-08-0x")), false);
+  check("a non-numeric month is unreadable", Number.isFinite(dayNumberFromIso("2026-aug-01")), false);
+  check("a fractional day is unreadable", Number.isFinite(dayNumberFromIso("2026-08-1.5")), false);
+  check("month 13 is unreadable even with a valid day",
+    Number.isFinite(dayNumberFromIso("2026-13-01")), false);
+  check("month 0 is unreadable even with a valid day",
+    Number.isFinite(dayNumberFromIso("2026-00-15")), false);
+  check("day 0 is unreadable even in a valid month",
+    Number.isFinite(dayNumberFromIso("2026-08-00")), false);
+  check("...while a real date on the same shape reads fine",
+    Number.isFinite(dayNumberFromIso("2026-08-01")), true);
+}
+
+/* 2. mostCommon decides the "usually X with Y" a draft is built on.
+ * Changing its counter from +1 to -1 survived the whole suite, because
+ * every member tested had their most COMMON class also be their most
+ * RECENT one — so returning the wrong one looked identical. This member
+ * does not: three yoga classes, then one strength class last. */
+{
+  const mixed = [
+    "Member,Date,Class,Instructor",
+    "Pat Rivera,2026-06-27,yoga,Ana Reyes",
+    "Pat Rivera,2026-07-04,yoga,Ana Reyes",
+    "Pat Rivera,2026-07-11,yoga,Ana Reyes",
+    "Pat Rivera,2026-07-25,strength,Kim Lee",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(mixed, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  check("a member with a mixed history is flagged", only !== undefined, true);
+  if (only) {
+    check("'usually' means most common, not most recent",
+      only.usualClassType, "yoga");
+    check("...and the instructor follows the same rule",
+      only.usualInstructorName, "Ana Reyes");
+    check("...while 'last attended' really is the most recent",
+      only.lastSession.class_type, "strength");
+    check("...so the evidence line can say both without contradicting itself",
+      evidenceLine(only, proposedRules.priorWindowDays),
+      "Last attended: strength with Kim Lee on July 25, 2026 · 4 classes in the prior 60 days (≈0.5/week) · usually yoga with Ana Reyes");
+  }
+}
+
+/* 3. evidenceLine branches on class-known and instructor-known
+ * independently, and every `&&` between them survived mutation: only
+ * both-known and both-unknown were ever tested. These are the two mixed
+ * cases, which are what a real export with one missing column produces. */
+{
+  const today = dayNumberFromIso("2026-08-21");
+  const classOnly = adaptAttendanceCsv([
+    "Member,Date,Class",
+    "Sam Okoro,2026-06-27,pilates", "Sam Okoro,2026-07-11,pilates", "Sam Okoro,2026-07-25,pilates",
+  ].join("\n"), "America/New_York");
+  const a = findQuietMembers(classOnly.records, today, proposedRules).flagged[0];
+  if (a) {
+    const line = evidenceLine(a, proposedRules.priorWindowDays);
+    check("a file with a class column but no instructor names the class",
+      line.includes("Last attended: pilates on July 25, 2026"), true);
+    check("...and says the instructor is what is missing, not the class",
+      line.includes("the import recorded no instructor"), true);
+    check("...and does not claim the class is missing too",
+      line.includes("no class type"), false);
+    /* WHOLE LINE, not includes(). The includes() checks above all passed
+     * while a mutation made the "usually" clause read "usually class" from
+     * a placeholder — an extra clause is invisible to a substring test. */
+    check("...and the whole line reads exactly as intended",
+      line,
+      "Last attended: pilates on July 25, 2026 · 3 classes in the prior 60 days (≈0.4/week) · usually pilates · the import recorded no instructor");
+  }
+
+  const instructorOnly = adaptAttendanceCsv([
+    "Member,Date,Instructor",
+    "Lee Moreau,2026-06-27,Ana Reyes", "Lee Moreau,2026-07-11,Ana Reyes", "Lee Moreau,2026-07-25,Ana Reyes",
+  ].join("\n"), "America/New_York");
+  const b = findQuietMembers(instructorOnly.records, today, proposedRules).flagged[0];
+  if (b) {
+    const line = evidenceLine(b, proposedRules.priorWindowDays);
+    check("a file with an instructor but no class names the instructor",
+      line.includes("a class with Ana Reyes"), true);
+    check("...and says the class type is what is missing",
+      line.includes("the import recorded no class type"), true);
+    check("...and does not claim the instructor is missing too",
+      line.includes("no instructor"), false);
+    check("...and the whole line reads exactly as intended",
+      line,
+      "Last attended: a class with Ana Reyes on July 25, 2026 · 3 classes in the prior 60 days (≈0.4/week) · usually with Ana Reyes · the import recorded no class type");
+  }
 }
 
 const passed = results.filter((r) => r.passed).length;

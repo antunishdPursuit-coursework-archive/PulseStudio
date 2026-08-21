@@ -66,6 +66,21 @@ cost somebody a day:
   indistinguishable from a broken one. Every gate here carries a
   self-test that plants a known-bad case (`--self-test`), and was run
   against a real planted fault before it shipped.
+
+  The unit SUITES had no equivalent, and on 2026-08-21 a check was written
+  in the re-engagement suite that could not fail at all — it asserted that
+  two equal strings were equal. `npm run mutate` answers the question for a
+  whole module: it changes one token in the compiled output, reruns the
+  suite, and puts the file back. First run on the re-engagement engine: 143
+  mutations, 110 caught, 33 survived. Reading the survivors found three real
+  gaps — every guard in the date parser masked by the one after it, the
+  "usually X" chooser returning most-RECENT instead of most-COMMON without
+  a single check noticing, and an evidence line whose four branches were
+  only ever tested at two corners. Closing them took it to 116 of 143.
+
+  It is deliberately NOT in `npm run check`: the number is a survey of the
+  suite, not a property of the code, and failing a build on it would teach
+  people to delete checks to keep a percentage up.
 - **A stated negative beats an absence.** "0 new duplicates in 4
   stylesheets" is a result; a silent pass is not.
 - **Never write a count you cannot keep true.** Numbers in prose go stale;

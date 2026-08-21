@@ -16,6 +16,7 @@
     "check:published": "node scripts/check-published.mjs",
     "check:audience": "node scripts/check-audience.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "mutate": "node scripts/mutate-suite.mjs",
     "check:contrast": "node scripts/check-contrast.mjs"
   },
   "devDependencies": {
