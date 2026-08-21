@@ -204,14 +204,6 @@ footerEl.textContent =
 }
 
 /** Studio-local calendar date of a fixture timestamp, for evidence lines. */
-function evidenceDate(iso: string): string {
-  const datePart = iso.split("T")[0] ?? iso;
-  const [y, m, d] = datePart.split("-").map(Number);
-  return new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1)).toLocaleDateString(
-    "en-US",
-    { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" },
-  );
-}
 
 function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): string {
   /* The placeholder-to-null mapping this used to hold inline now lives in
@@ -255,7 +247,7 @@ function renderFlagged(
   evidence.className = "evidence";
   evidence.textContent =
     `Last attended: ${f.lastSession.class_type} with ${f.lastInstructorName} ` +
-    `on ${evidenceDate(f.lastSession.starts_at)} · ` +
+    `on ${longDate(f.lastSession.starts_at)} · ` +
     `${f.priorCount} classes in the prior ${proposedRules.priorWindowDays} days ` +
     `(≈${weeklyCadence(f.priorCount, proposedRules.priorWindowDays)}/week) · ` +
     `usually ${f.usualClassType} with ${f.usualInstructorName}`;
@@ -580,7 +572,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
             const date = nextClassDates.get(f.member.member_id);
             return date === undefined
               ? f.member.display_name
-              : `${f.member.display_name} (returns ${evidenceDate(`${date}T00:00:00`)})`;
+              : `${f.member.display_name} (returns ${longDate(date)})`;
           })
           .join(", ")}.`;
   statusEl.textContent =
