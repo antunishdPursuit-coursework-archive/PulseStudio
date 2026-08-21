@@ -13,7 +13,22 @@
     /* Status colors, semantic and page-local, same convention as
        storytold.html: green = proven, red = open. Builder accents keep
        meaning who built what. */
-    :root { --done: #10b981; --todo: #ef4444; }
+    /* GREEN AND RED HAVE TO BE READ, not just seen. Measured against the
+       light theme, the status colours this board was using were 2.54:1
+       (green) and 3.76:1 (red) — both under the 4.5:1 a person needs for
+       text, on a page whose entire job is being read out loud in a room.
+       Splitting them into an identity hue plus a readable companion — the
+       shape used for the developer accents in theme.css — was the wrong
+       answer here, because the bright green failed the 3:1 a BORDER needs
+       too (2.54:1). These are status colours, not anybody's identity, so
+       there is nothing to preserve: the whole token moves per theme.
+       Theme-aware because no single lightness of a hue clears 4.5:1
+       against both white and black. */
+    :root { --done: #067a55; --todo: #c62828; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --done: #34d399; --todo: #f87171; }
+    }
+    :root[data-theme="dark"] { --done: #34d399; --todo: #f87171; }
     main { max-width: 880px; }
 
     .verdict { border: 2px solid var(--done); border-radius: 14px; padding: 18px 20px; margin-top: 24px; }
