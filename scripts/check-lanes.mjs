@@ -137,7 +137,14 @@ function git(args) {
 function newCommits() {
   let base;
   try {
-    base = git(["merge-base", "origin/main", "HEAD"]).trim();
+    /* stderr is discarded because this call is EXPECTED to fail on a
+     * shallow CI checkout, where actions/checkout fetches one commit and
+     * no origin/main ref. Letting git print "fatal: Not a valid object
+     * name" there makes a green run look broken to whoever reads the log. */
+    base = execFileSync("git", ["-C", ROOT, "merge-base", "origin/main", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return { base: null, commits: [] };
   }
