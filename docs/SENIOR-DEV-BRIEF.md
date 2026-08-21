@@ -97,22 +97,30 @@ second copy is a second thing to keep true:
 
 ## 4. The files
 
-All inside `app/products/d-reengagement/`:
+All inside `app/products/d-reengagement/` unless the path says otherwise.
 
-| File | Lines | Role |
-| --- | --- | --- |
-| `logic.ts` | 185 | **The engine.** Pure functions: no DOM, no clock, no fetch. "Today" is always a parameter. |
-| `config.ts` | 60 | **The brand seam.** Studio name, mailbox, thresholds, and the outreach voice — every studio-specific value lives here and nowhere else. |
-| `deps.ts` | 30 | **The portability seam.** The only file that imports from outside the folder. |
-| `main.ts` | 266 | The page: renders flags, evidence, drafts; wires the three data doors. |
-| `csv.ts` | 297 | Parses and adapts a studio's own attendance export, in-browser. |
-| `generate.ts` | 277 | Seeded studio generator (60 fictional members) so the ranking is visible. |
-| `tests.ts` / `tests.html` | 585 / 37 | 75 browser-run unit checks with a pinned reference date. |
-| `styles.css` | 144 | Violet-on-black/white, built entirely on shared theme tokens. |
-| `index.html` | 48 | The page. Staff-only: carries `noindex, nofollow`. |
-| `README.md` | 133 | Folder documentation, rebrand checklist, plug-in spec. |
-| `REQUESTFOR-A-B-C.md` | 137 | What we need from the other three developers. |
-| `PROPOSAL-pages-deploy.md` | 84 | The deploy decision record. |
+There is no line-count column. There was one, and on 2026-08-21 every
+number in it was wrong — `logic.ts` was listed at 185 lines against 905,
+`tests.ts` at 585 against 2549, and the suite at "75 checks" against 435.
+This document already carries the lesson in section 6 ("a count in prose"),
+and then kept a whole table of them. What a file DOES stays true; how long
+it is does not, and nobody reading this needs the number.
+
+| File | Role |
+| --- | --- |
+| `logic.ts` | **The engine.** Pure functions: no DOM, no clock, no fetch. "Today" is always a parameter. Also holds every sentence the page shows that is a rule rather than markup — the evidence line, the rule statement, the empty-state lines — so each one can be checked. |
+| `config.ts` | **The brand seam.** Studio name, mailbox, thresholds, the outreach voice, and the two placeholders the records use for "the data does not say" — every studio-specific value lives here and nowhere else. |
+| `deps.ts` | **The portability seam.** The only file that imports from outside the folder. |
+| `main.ts` | The page: builds elements, wires events, moves focus. Whatever it renders that is a *decision* has been moved out, because this module touches the DOM at import and so no headless check can load it. |
+| `csv.ts` | Parses and adapts a studio's own attendance export, in-browser. |
+| `outreach.ts` | The ledger, the suppression list, the consent window, and the outcome of every note taken. |
+| `live-studio.ts` | The default door: the running studio plus Booking's published reservation log. |
+| `generate.ts` | Seeded studio generator (60 fictional members) so the ranking is visible. |
+| `tests.ts` / `tests.html` | The browser suite, with a pinned reference date. It states its own count on the page and in `npm run check` — read it there, not here. |
+| `styles.css` | Violet-on-black/white, built entirely on shared theme tokens. |
+| `index.html` | The page. Staff-only: carries `noindex, nofollow`. |
+| `README.md` | Folder documentation, rebrand checklist, plug-in spec. |
+| `docs/REQUESTFOR-A-B-C.md` | What we need from the other three developers. **In `docs/`, not here** — it sat in this folder and was served at a public URL until 2026-08-21. |
 
 Three ways data gets in, all through one render path:
 
@@ -252,11 +260,17 @@ These cost real time. They are the most valuable part of this brief.
 - **No real studio has used this.** No real member has received a note. The
   product has never been in front of a real user — that is the biggest gap and
   it is human work, not code.
-- **The shared fixtures age.** `fixtures.json` has fixed 2026 dates, so around
-  2026-09-30 Maria passes 60 days and the shared-records view correctly shows
-  0 flagged. The unit checks are pinned and will not rot, but the live page on
-  shared records eventually shows an empty list. Refreshing the team-owned
-  fixture is the fix — **never hardcode a fake "today"**.
+- **The shared fixtures age.** `fixtures.json` has fixed 2026 dates. Two
+  active members can be flagged from it: Maria Santos (last attended
+  2026-08-01, so past 60 days on 2026-09-30) and James Okafor (2026-08-15,
+  past 60 on 2026-10-14). Sofia Reyes is canceled and never flags.
+  **So the list empties on 2026-10-15, not 2026-09-30** — this paragraph
+  said the earlier date until 2026-08-21, having taken the first member to
+  age out for the last. The unit checks are pinned and will not rot; the
+  live page on shared records is what goes empty. `scripts/check-fixtures.mjs`
+  prints the countdown on every run, so the number is read from the gate
+  rather than from here. Refreshing the team-owned fixture is the fix —
+  **never hardcode a fake "today"**.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
