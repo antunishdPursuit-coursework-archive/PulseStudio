@@ -7,13 +7,14 @@ first; this file adds what is true about THIS folder.
 ## What this product is (proven in code, not aspiration)
 
 A client-side booking page over the shared deterministic synthetic studio:
-a day-chip schedule with per-day class counts and spots left, book /
-waitlist / cancel with a full guard chain (canceled, not-scheduled,
-already-booked, already-waitlisted, full — each a typed error), automatic
-waitlist promotion when a reserved spot cancels, a "Your reservations"
-panel for the signed-in member, and `?session=<id>` deep links that
-preselect and highlight a class. No server, no framework: `main.ts`
-compiles to a sibling `main.js` ES module.
+the member-facing H1 is "Book a class" (Kerrian's owner badge stays; blue
+is the color-law signature). Signed-in members see "Your classes" above
+the public schedule, with a next-class line when they hold a reserved
+spot. Day chips say Today / Tomorrow. Book / waitlist / cancel with a full
+guard chain, automatic waitlist promotion, and `?session=<id>` deep links.
+Occupancy is the generator's own bookings plus rows the signed-in member
+(or waitlist promotion) writes — never a random fill on first open. No
+server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
 
 ## Lane law
 
@@ -27,7 +28,7 @@ compiles to a sibling `main.js` ES module.
 
 | File | What it is |
 | --- | --- |
-| `main.ts` | All product logic: schedule, booking rules, capacity math, waitlist promotion, the one-time studio auto-fill, session-gated UI |
+| `main.ts` | All product logic: schedule, booking rules, capacity math, waitlist promotion, session-gated UI |
 | `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save, `latestReservation()` (last row wins) |
 | `index.html` | The page shell; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
 | `styles.css` | Product-local styling; every color is a theme token |
@@ -47,22 +48,22 @@ The upgrade path, whenever Kerrian wants it: switch to
 
 ## The traps that are DELIBERATE (do not "fix" without team intent)
 
-- **The auto-fill is unconditional and random**: on any load where the
-  `pulse-reservations-a` log is empty, `spreadReservationsAcrossStudio()`
-  randomly books 40–100% of each class from active members. The
-  `?fill-reservations=1` param is cosmetic — it never gates the fill.
-  Clearing the key regenerates a different random fill; two browsers will
-  show different spots-left numbers over the SAME deterministic studio.
 - **The log is append-only and last-row-wins.** `cancelReservation()`
   appends a canceled row REUSING the prior `reservation_id`, and
   promotion appends a fresh reserved row above the old waitlist row — so
   `reservation_id` is NOT unique in the log. Consumers must use
   `latestReservation()` semantics, never index by id.
-- **`-04:00` is hardcoded** in the day/time formatters — right in EDT,
-  an hour off in EST. Display-only, known simplification.
 - **The studio is dated to TODAY** (`sharedStudio()`), so yesterday's
   reservations can reference session ids that no longer render; they
   linger harmlessly in the log.
+- **Times are studio-local wall clocks with no offset.** Formatters append
+  `Z` and use `timeZone: "UTC"` so the written hour prints as written,
+  including in winter. Day chips use `dataset.meta.asOfDate` for Today /
+  Tomorrow. Do not reintroduce a hardcoded `-04:00`.
+
+Do not restore first-open occupancy seeding. An empty
+`pulse-reservations-a` means nobody has booked from this browser yet; D
+reads that log as the live trail.
 
 ## Seams other lanes rely on — never break silently
 
