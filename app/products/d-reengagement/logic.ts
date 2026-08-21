@@ -648,6 +648,27 @@ export function draftFactsFor(
   };
 }
 
+/* THE PAGE DESCRIBING ITS OWN RULE, TO THE PEOPLE ACTING ON IT.
+ *
+ * Staff decide whether to trust a list by reading what produced it, so
+ * this sentence has to stay true to findQuietMembers and not merely near
+ * it. The NUMBERS interpolate, so those cannot drift. The WORDS can:
+ * "more than X and at most Y" describes two boundary conditions, and
+ * changing one comparison in the rule from > to >= would turn this line
+ * into a confident, unremarkable lie that no compiler would notice.
+ *
+ * Which is why the checks on this function do not stop at the string.
+ * They run the real rule against members sitting exactly on each
+ * boundary and confirm the sentence still describes what happened. */
+export function ruleStatement(rules: QuietRules): string {
+  return (
+    `Proposed thresholds (not yet ratified by the team): flag active members ` +
+    `whose last attended class is more than ${rules.minDaysQuiet} and ` +
+    `at most ${rules.maxDaysQuiet} days ago. Only attended classes ` +
+    `count — a no-show is never a visit.`
+  );
+}
+
 /* JOINING SENTENCE PARTS, IN ONE PLACE THAT IS CHECKED.
  *
  * Every status line on this page is several optional clauses stitched

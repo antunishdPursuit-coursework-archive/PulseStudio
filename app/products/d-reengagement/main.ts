@@ -20,6 +20,7 @@ import {
   draftTextFor,
   evidenceLine,
   joinSentence,
+  ruleStatement,
   firstNameOf,
   recentBookingActivity,
   summaryLine,
@@ -567,11 +568,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     joinSentence([summaryLine(result, asOf), quality, availability]) +
     comingLine + storageWarning;
   sourceEl.textContent = sourceNote;
-  ruleEl.textContent =
-    `Proposed thresholds (not yet ratified by the team): flag active members ` +
-    `whose last attended class is more than ${proposedRules.minDaysQuiet} and ` +
-    `at most ${proposedRules.maxDaysQuiet} days ago. Only attended classes ` +
-    `count — a no-show is never a visit.`;
+  ruleEl.textContent = ruleStatement(proposedRules);
 
   renderOutcomes(data, today);
 

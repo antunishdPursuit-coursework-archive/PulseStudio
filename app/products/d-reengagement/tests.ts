@@ -54,6 +54,7 @@ import {
   draftTextFor,
   evidenceLine,
   joinSentence,
+  ruleStatement,
   inviteWording,
   recentBookingActivity,
   remainingSpots,
@@ -2468,6 +2469,60 @@ check("clean records produce no data-quality line",
     outcomesLine({ ...base, outcomes: [1] as never[], stillQuiet: 1, notEvaluable: 2 }).startsWith("Outreach so far: 3 notes"), true);
   check("the sentence always ends in a full stop",
     outcomesLine({ ...base, outcomes: [1] as never[] }).endsWith("."), true);
+}
+
+/* THE PAGE'S DESCRIPTION OF ITS OWN RULE, CHECKED AGAINST THE RULE.
+ *
+ * Staff decide whether to trust the list by reading this sentence. Its
+ * numbers interpolate so they cannot drift; its WORDS can. "More than 14
+ * and at most 60" is two boundary claims, and flipping one comparison in
+ * findQuietMembers from > to >= would leave this line confident and
+ * wrong, with nothing to notice.
+ *
+ * So these do not stop at the string. Four members sit exactly on the
+ * boundaries the sentence names, and the real rule decides each one. */
+{
+  const sentence = ruleStatement(proposedRules);
+  check("the sentence names the studio's own lower threshold",
+    sentence.includes(`more than ${proposedRules.minDaysQuiet}`), true);
+  check("...and its upper one",
+    sentence.includes(`at most ${proposedRules.maxDaysQuiet}`), true);
+  check("...and says the quiet part about no-shows out loud",
+    sentence.includes("a no-show is never a visit"), true);
+  check("...and does not present an unratified rule as settled",
+    sentence.startsWith("Proposed thresholds (not yet ratified by the team)"), true);
+  check("a studio with different thresholds gets its own numbers, not these",
+    ruleStatement({ minDaysQuiet: 7, maxDaysQuiet: 30, priorWindowDays: 30 }),
+    "Proposed thresholds (not yet ratified by the team): flag active members " +
+    "whose last attended class is more than 7 and at most 30 days ago. " +
+    "Only attended classes count — a no-show is never a visit.");
+
+  /* today is 2026-08-21. Each of these last attended exactly N days ago. */
+  const onTheLine = [
+    "Member,Date",
+    "Exactly Fourteen,2026-08-07",   // 14 days — "more than 14" excludes
+    "Exactly Fifteen,2026-08-06",    // 15 days — first day included
+    "Exactly Sixty,2026-06-22",      // 60 days — "at most 60" includes
+    "Exactly SixtyOne,2026-06-21",   // 61 days — first day excluded
+  ].join("\n");
+  const imported = adaptAttendanceCsv(onTheLine, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const result = findQuietMembers(imported.records, today, proposedRules);
+  const flaggedNames = result.flagged.map((f) => f.member.display_name).sort();
+
+  check("all four boundary members were read from the file", result.checkedCount, 4);
+  check("'more than 14' excludes the member who is exactly 14 days quiet",
+    flaggedNames.includes("Exactly Fourteen"), false);
+  check("...and includes the one who is 15",
+    flaggedNames.includes("Exactly Fifteen"), true);
+  check("'at most 60' includes the member who is exactly 60 days quiet",
+    flaggedNames.includes("Exactly Sixty"), true);
+  check("...and excludes the one who is 61",
+    flaggedNames.includes("Exactly SixtyOne"), false);
+  check("so the sentence describes exactly the two the rule chose",
+    flaggedNames.join(", "), "Exactly Fifteen, Exactly Sixty");
+  check("...and the days-quiet the page shows match the boundary exactly",
+    result.flagged.map((f) => f.daysSince).sort((a, b) => a - b).join(","), "15,60");
 }
 
 const passed = results.filter((r) => r.passed).length;
