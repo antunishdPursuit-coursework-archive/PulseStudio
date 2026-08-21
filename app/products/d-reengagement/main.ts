@@ -34,9 +34,11 @@ import {
   type FlaggedMember,
 } from "./logic.js";
 import {
+  forgetOutreach,
   keepOutreachRecords,
   mailtoIsTooLong,
   keepSuppressionRecords,
+  lapseKeyOf,
   outreachResults,
   outreachStateFor,
   recordOutreach,
@@ -334,6 +336,26 @@ function renderFlagged(
         rerender();
       });
       card.append(un);
+    }
+    if (state.kind === "alreadyReached") {
+      /* THE ONE-WAY DOOR THAT NEEDED A HANDLE. Opening the mail client
+       * claims the lapse, because from there the note is in a person's
+       * hands. A client that never opened leaves the claim standing over a
+       * note that does not exist, and the discipline then correctly refuses
+       * to offer it again — so the member's silence goes unanswered by a
+       * rule working perfectly on a wrong fact. Suppression has always been
+       * reversible; this is the same escape for the same kind of mistake. */
+      const undo = document.createElement("button");
+      undo.className = "btn-ghost";
+      undo.type = "button";
+      undo.textContent = "That note never went out — offer the draft again";
+      undo.addEventListener("click", () => {
+        ledger = forgetOutreach(ledger, lapseKeyOf(f));
+        persist();
+        focusMemberAfterRender = f.member.member_id;
+        rerender();
+      });
+      card.append(undo);
     }
     return card;
   }

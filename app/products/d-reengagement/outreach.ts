@@ -197,6 +197,27 @@ export function outreachResults(
   };
 }
 
+/** Forget a claim on one lapse, so its draft is offered again.
+ *
+ *  WHY THIS HAS TO EXIST. Opening the mail client CLAIMS the lapse, because
+ *  from here the note is in a person's hands and the tool cannot see what
+ *  happens next. But a mail client that never opened — no handler
+ *  configured, a blocked pop-up, a mistaken click — leaves the lapse
+ *  claimed for a note that does not exist, and once claimed the discipline
+ *  correctly never offers it again. The member's silence goes unanswered
+ *  forever, by a rule working exactly as designed on a fact that was wrong.
+ *
+ *  Suppression has always been reversible for the same reason. This is the
+ *  same escape for the same kind of mistake, and it is not rewriting
+ *  history: the ledger records what a staff member TOOK, and if nothing was
+ *  taken there is nothing to record. */
+export function forgetOutreach(
+  ledger: readonly OutreachRecord[],
+  lapseKey: string,
+): OutreachRecord[] {
+  return ledger.filter((r) => r.lapseKey !== lapseKey);
+}
+
 export function suppress(
   suppressions: readonly SuppressionRecord[],
   memberId: string,

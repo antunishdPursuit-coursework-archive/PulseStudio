@@ -143,8 +143,25 @@ export function generateStudio(
   const random = makeRandom(seed);
   const today = dayNumber(todayIso);
 
+  /* IDS CARRY THE SEED, BECAUSE A DIFFERENT SEED IS DIFFERENT PEOPLE.
+   *
+   * This door is seeded on the calendar day, so the studio it builds is
+   * reproducible for everyone opening the page today and different
+   * tomorrow. The ids were not: gen_m_1 was Farah Zhang today and Zara
+   * Tanaka tomorrow — all sixty of them, every day. Do-not-contact stores
+   * a member id and nothing else, so suppressing Farah today silently
+   * suppressed whoever inherited her number tomorrow, and a staff member
+   * would meet a person marked do-not-contact they had never seen and had
+   * no way to explain.
+   *
+   * Two different people need two different ids. The seed in the prefix
+   * gives them that, and keeps this door's ids distinct from the live
+   * trail's (member:000001) and a CSV import's (csv_m_1) as they already
+   * were. */
+  const ns = `gen${seed}`;
+
   const instructors: Instructor[] = INSTRUCTOR_NAMES.map((display_name, i) => ({
-    instructor_id: `gen_i_${i + 1}`,
+    instructor_id: `${ns}_i_${i + 1}`,
     display_name,
   }));
 
@@ -160,7 +177,7 @@ export function generateStudio(
     const key = `${day}|${classType}|${instructorId}`;
     const existing = sessionIdByKey.get(key);
     if (existing !== undefined) return existing;
-    const id = `gen_s_${sessionIdByKey.size + 1}`;
+    const id = `${ns}_s_${sessionIdByKey.size + 1}`;
     sessionIdByKey.set(key, id);
     const date = isoFromDay(day);
     sessions.push({
@@ -188,7 +205,7 @@ export function generateStudio(
       } while (usedNames.has(displayName));
       usedNames.add(displayName);
 
-      const memberId = `gen_m_${memberNumber}`;
+      const memberId = `${ns}_m_${memberNumber}`;
       const favouriteClass = pick(random, CLASS_TYPES);
       const usualInstructor = pick(random, instructors);
 
@@ -202,7 +219,7 @@ export function generateStudio(
 
       const startedDaysAgo = archetype === "newcomer" ? intBetween(random, 10, 40) : intBetween(random, 90, 700);
       memberships.push({
-        membership_id: `gen_ms_${memberNumber}`,
+        membership_id: `${ns}_ms_${memberNumber}`,
         member_id: memberId,
         plan_name: pick(random, PLANS),
         status,
@@ -232,7 +249,7 @@ export function generateStudio(
         const instructor = random() < 0.8 ? usualInstructor : pick(random, instructors);
         const sessionId = sessionOn(day, classType, instructor.instructor_id);
         attendance.push({
-          attendance_id: `gen_a_${attendance.length + 1}`,
+          attendance_id: `${ns}_a_${attendance.length + 1}`,
           member_id: memberId,
           session_id: sessionId,
           attendance_status: "attended",
@@ -246,7 +263,7 @@ export function generateStudio(
         const missedDay = today - Math.max(1, lastVisitDaysAgo - intBetween(random, 2, 8));
         const sessionId = sessionOn(missedDay, favouriteClass, usualInstructor.instructor_id);
         attendance.push({
-          attendance_id: `gen_a_${attendance.length + 1}`,
+          attendance_id: `${ns}_a_${attendance.length + 1}`,
           member_id: memberId,
           session_id: sessionId,
           attendance_status: "no_show",

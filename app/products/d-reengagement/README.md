@@ -29,7 +29,11 @@ it is enforced by `outreach.ts`, not by memory:
 - **One note per lapse.** Taking a draft (a successful copy, or opening the
   email) claims that lapse in a browser-local ledger
   (`pulse-outreach-ledger`). The same silence is never nagged twice; a member
-  who returns and lapses again re-arms.
+  who returns and lapses again re-arms. And a claim made by mistake is
+  reversible — a mail client that never opened would otherwise leave the
+  lapse claimed over a note that does not exist, and the discipline would
+  correctly refuse it forever. *"That note never went out"* forgets the
+  claim, that lapse only, and offers the draft again.
 - **"No" is remembered.** *Do not contact* puts a member on a suppression
   list (`pulse-suppressions`) that outranks everything except the studio's
   own opt-in. It is reversible, and the card says when it was set.

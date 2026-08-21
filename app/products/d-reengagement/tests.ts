@@ -24,6 +24,7 @@ import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
   MAILTO_SAFE_LENGTH,
+  forgetOutreach,
   keepOutreachRecords,
   mailtoIsTooLong,
   keepSuppressionRecords,
@@ -1234,6 +1235,88 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   const imported = adaptAttendanceCsv(twoPeople, "America/New_York");
   check("two genuinely different names are not a split",
     imported.splitIdentities.length, 0);
+}
+
+/* A CLAIM MADE BY MISTAKE WAS PERMANENT.
+ *
+ * Opening the mail client claims the lapse, because from there the note is
+ * in a person's hands and this tool cannot see what happens next. A client
+ * that never opened — no handler, a blocked window, a stray click — left
+ * the claim standing over a note that did not exist, and the discipline
+ * then correctly refused to offer that lapse again. The member's silence
+ * went unanswered forever, by a rule working exactly as designed on a fact
+ * that was wrong. Suppression was always reversible; this was not. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Quiet One", status: "active", attended: ["2026-08-01"] }]);
+  const f = findQuietMembers(fx, TODAY, proposedRules).flagged[0]!;
+  const key = lapseKeyOf(f);
+
+  let ledger = recordOutreach([], f, "email", "2026-08-12");
+  check("taking a draft claims the lapse",
+    outreachStateFor(f, outreachPolicy, ledger, []).kind, "alreadyReached");
+
+  ledger = forgetOutreach(ledger, key);
+  check("forgetting the claim offers the draft again",
+    outreachStateFor(f, outreachPolicy, ledger, []).kind, "ready");
+  check("...and leaves no entry behind", ledger.length, 0);
+
+  // It must forget ONE lapse, not a member's whole history.
+  const other = { memberId: f.member.member_id, lapseKey: "m1|2026-05-01",
+    takenAt: "2026-05-10", channel: "copy" as const };
+  const mixed = forgetOutreach([...recordOutreach([], f, "email", "2026-08-12"), other], key);
+  check("an older lapse for the same member is untouched",
+    mixed.map((r) => r.lapseKey), ["m1|2026-05-01"]);
+
+  // And it must not resurrect anything when the key is not there.
+  check("forgetting a lapse that was never claimed changes nothing",
+    forgetOutreach([other], "m1|not-a-lapse").length, 1);
+
+  // Suppression is a different rule and outranks this one either way.
+  check("forgetting a claim does not un-suppress anybody",
+    outreachStateFor(f, outreachPolicy, forgetOutreach(ledger, key),
+      suppress([], f.member.member_id, "2026-08-16")).kind, "suppressed");
+}
+
+/* TWO DIFFERENT PEOPLE NEED TWO DIFFERENT IDS.
+ *
+ * This door is seeded on the calendar day, so it builds a different studio
+ * tomorrow — but the ids did not move with it: gen_m_1 was one person today
+ * and another tomorrow, all sixty of them, every day. Do-not-contact stores
+ * a member id and nothing else, so suppressing somebody today silently
+ * suppressed whoever inherited their number tomorrow, and a staff member
+ * would meet a person marked do-not-contact they had never seen. */
+{
+  const a = generateStudio(20260821, "2026-08-21").records;
+  const b = generateStudio(20260822, "2026-08-22").records;
+
+  const allIds = (r: typeof a): Set<string> => new Set([
+    ...r.members.map((m) => m.member_id),
+    ...r.memberships.map((m) => m.membership_id),
+    ...r.instructors.map((i) => i.instructor_id),
+    ...r.class_sessions.map((s) => s.session_id),
+    ...r.attendance.map((x) => x.attendance_id),
+    ...r.reservations.map((x) => x.reservation_id),
+  ]);
+  const shared = [...allIds(a)].filter((id) => allIds(b).has(id));
+  check("two seeds share no id at all", shared.length, 0);
+
+  const sameNumberDifferentPerson = a.members.filter((m) => {
+    const other = b.members.find((x) => x.member_id === m.member_id);
+    return other !== undefined && other.display_name !== m.display_name;
+  });
+  check("no id means one person today and another tomorrow",
+    sameNumberDifferentPerson.length, 0);
+
+  // The same seed must still be perfectly reproducible — that is the whole
+  // point of this door, and namespacing must not have broken it.
+  check("the same seed builds the same studio, byte for byte",
+    JSON.stringify(generateStudio(20260821, "2026-08-21").records), JSON.stringify(a));
+
+  // And the three doors still cannot collide with each other.
+  check("generated ids never look like the live trail's",
+    a.members.some((m) => m.member_id.startsWith("member:")), false);
+  check("...nor like a CSV import's",
+    a.members.some((m) => m.member_id.startsWith("csv_m_")), false);
 }
 
 /* A SIGN-IN SHEET CANNOT TELL TWO CLASSES FROM ONE VISIT ENTERED TWICE.
