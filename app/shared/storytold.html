@@ -56,14 +56,19 @@
     .edge line, .edge path { stroke-width: 3; fill: none; }
     .edge.done line, .edge.done path { stroke: var(--done); }
     .edge.todo line, .edge.todo path { stroke: var(--todo); stroke-dasharray: 7 6; opacity: 0.85; }
-    .edge .runner { stroke: var(--fg); stroke-width: 5; stroke-linecap: round; opacity: 0; }
+    /* Each runner carries its road's MEASURED length twice: in its
+       dasharray ("26 <len>" - the period exceeds the road, so exactly one
+       light travels it at a time) and as --len for the sweep below. The
+       old one-size 260px sweep died partway down any road longer than 260
+       (the A-to-D curve measures 616) - lengths are measured, not guessed. */
+    .edge .runner { stroke: var(--fg); stroke-width: 5; stroke-linecap: round; opacity: 0; --len: 260; }
     @media (prefers-reduced-motion: no-preference) {
       .edge.done .runner { animation: fire 2.6s linear infinite; }
       @keyframes fire {
-        0%   { stroke-dashoffset: 260; opacity: 0; }
+        0%   { stroke-dashoffset: 26; opacity: 0; }
         8%   { opacity: 0.9; }
         88%  { opacity: 0.9; }
-        100% { stroke-dashoffset: 0; opacity: 0; }
+        100% { stroke-dashoffset: calc(-1 * var(--len)); opacity: 0; }
       }
     }
     .node rect { fill: var(--bg); stroke-width: 2.5; rx: 10; }
@@ -194,33 +199,33 @@
         <!-- B -> C : DONE. C's spaces-left answers read A's live reservation log. -->
         <g class="edge done e-bc">
           <line x1="410" y1="66" x2="460" y2="66"/>
-          <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 234"/>
+          <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 52" style="--len: 52"/>
           <text class="lbl done" x="435" y="56" text-anchor="middle">live</text>
         </g>
         <!-- A -> D : DONE. Re-engagement reads the running studio with A's
              live reservation log merged in (last row wins). -->
         <g class="edge done e-ad">
           <path d="M150 92 C 300 168, 620 168, 750 92"/>
-          <path class="runner" d="M150 92 C 300 168, 620 168, 750 92" stroke-dasharray="26 234"/>
+          <path class="runner" d="M150 92 C 300 168, 620 168, 750 92" stroke-dasharray="26 618" style="--len: 618"/>
           <text class="lbl done" x="450" y="150" text-anchor="middle">the live trail</text>
         </g>
 
         <!-- the shared rail feeds every product: all DONE -->
         <g class="edge done r-a">
           <path d="M370 196 C 320 160, 140 150, 105 92"/>
-          <path class="runner" d="M370 196 C 320 160, 140 150, 105 92" stroke-dasharray="26 234"/>
+          <path class="runner" d="M370 196 C 320 160, 140 150, 105 92" stroke-dasharray="26 291" style="--len: 291"/>
         </g>
         <g class="edge done r-b">
           <path d="M405 196 C 390 160, 340 140, 325 92"/>
-          <path class="runner" d="M405 196 C 390 160, 340 140, 325 92" stroke-dasharray="26 234"/>
+          <path class="runner" d="M405 196 C 390 160, 340 140, 325 92" stroke-dasharray="26 135" style="--len: 135"/>
         </g>
         <g class="edge done r-c">
           <path d="M455 196 C 470 160, 530 140, 545 92"/>
-          <path class="runner" d="M455 196 C 470 160, 530 140, 545 92" stroke-dasharray="26 234"/>
+          <path class="runner" d="M455 196 C 470 160, 530 140, 545 92" stroke-dasharray="26 141" style="--len: 141"/>
         </g>
         <g class="edge done r-d">
           <path d="M490 196 C 540 160, 720 150, 765 92"/>
-          <path class="runner" d="M490 196 C 540 160, 720 150, 765 92" stroke-dasharray="26 234"/>
+          <path class="runner" d="M490 196 C 540 160, 720 150, 765 92" stroke-dasharray="26 299" style="--len: 299"/>
         </g>
       </svg>
     </div>
