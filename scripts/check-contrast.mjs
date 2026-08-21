@@ -29,11 +29,13 @@
  *   - It reads the TOKENS, not the rendered page. It knows what
  *     --accent-strong resolves to on each theme; it does not know that
  *     some rule somewhere put grey text on a grey panel.
- *   - It cannot check the custom theme at all. Those colours are chosen by
- *     the person using the page at run time — theme-boot enforces 4.5:1
- *     between their background and text, and nothing yet enforces it for
- *     the accent against their background. That hole is real and this gate
- *     does not close it.
+ *   - It cannot check the custom theme, because those colours are chosen by
+ *     the person using the page at run time. That hole is now covered at
+ *     RUN TIME instead: theme-boot enforces 4.5:1 between their background
+ *     and text, measures both accent tones against the background they
+ *     picked and keeps the readable one, and says so plainly when neither
+ *     clears 4.5:1 — which a two-tone palette cannot do for a mid-tone
+ *     background. This gate still measures only the two built-in themes.
  *   - Opacity, gradients, images behind text, and anything computed by
  *     filter() are invisible to it.
  *   - It assumes body-size text. A pairing that fails here may be legal

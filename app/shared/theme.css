@@ -96,8 +96,15 @@
   --rensley-strong: #743df5;   /* 5.63:1 on white, white ink 5.63:1 */
 }
 
+/* CUSTOM OWNS ITS WHOLE PALETTE, so it opts out of this block entirely.
+   Without the :not, a person on a system set to dark who chose a LIGHT
+   custom background still got the dark-tuned accent: --bg and --fg are
+   redefined by the custom block below and win, but the accent companions
+   are only set here and in :root, so the media query kept them. Measured on
+   a warm cream background: 3.02:1, under the 4.5:1 a person needs, with the
+   tone correctly detected as light and nothing acting on it. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-theme="custom"]) {
     --bg: #000000;
     --fg: #ffffff;
     --line: #333333;
@@ -122,6 +129,19 @@
   --fg: var(--custom-fg, #0a0a0a);
   --line: color-mix(in srgb, var(--fg) 24%, var(--bg));
   --muted: color-mix(in srgb, var(--fg) 68%, var(--bg));
+}
+
+/* A CUSTOM BACKGROUND STILL HAS A TONE, and the accent has to follow it.
+   Every accent companion is tuned to one background; the light-tuned violet
+   sits at about 3.7:1 on a dark custom background, under the 4.5:1 a person
+   needs to read it. Built-in light and dark redefine the companions per
+   theme, and custom cannot — the background is chosen at run time and CSS
+   cannot measure it. theme-boot measures it and stamps data-custom-tone, so
+   this is the same mechanism driven by a number instead of a media query.
+   A developer adding their own companion adds one line here. */
+:root[data-theme="custom"][data-custom-tone="dark"] {
+  --rensley-strong: #9e77f8;
+  --rensley-ink: #0a0a0a;
 }
 
 * { box-sizing: border-box; }

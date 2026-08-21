@@ -92,14 +92,76 @@ function customColors(): CustomColors {
   return DEFAULT_CUSTOM;
 }
 
+/* WHICH ACCENT SURVIVES THIS BACKGROUND.
+ *
+ * The custom theme redefines --bg, --fg, --line and --muted and left the
+ * developer accents exactly where the LIGHT theme put them. Every accent
+ * companion is tuned to one background: pick a dark custom background and
+ * the light-tuned accent lands at about 3.7:1 against it, under the 4.5:1
+ * a person needs, so the control colour a product is identified by fades
+ * into the page the moment somebody chooses their own colours.
+ *
+ * Built-in light and dark solve this by redefining the companions per
+ * theme. Custom cannot, because the background is chosen at run time and
+ * CSS cannot measure it. So the tone is measured HERE and stamped on the
+ * root, and theme.css carries one block per tone — the same mechanism,
+ * driven by a number instead of a media query. */
+/* MEASURE BOTH, KEEP THE WINNER — do not guess from the background alone.
+ *
+ * The first version bucketed by comparing the background against white,
+ * which is right at the ends and wrong in the middle: a mid-slate #4a5568
+ * reads as "dark", takes the dark-tuned accent and lands at 2.31:1, while
+ * the light-tuned one is no better. A bucket cannot know that; a
+ * measurement can.
+ *
+ * So both tones are tried on the real element and the resulting accent is
+ * read back out of the cascade, which keeps this generic: it never names a
+ * developer's colour, so a companion added later is measured the same way
+ * with no edit here. */
+function bestToneFor(background: string): { tone: "light" | "dark"; ratio: number } {
+  const previous = root.dataset["customTone"];
+  let best: { tone: "light" | "dark"; ratio: number } = { tone: "light", ratio: -1 };
+  for (const tone of ["light", "dark"] as const) {
+    root.dataset["customTone"] = tone;
+    /* READ IT OFF THE BODY, NOT THE ROOT. The accent tokens are scoped by
+     * `body.product-a|b|c|d` — the colour law in one class — so :root
+     * resolves --accent-strong to nothing and every measurement came back
+     * empty. Caught by measuring in a browser rather than reasoning about
+     * the cascade. */
+    const accent = getComputedStyle(document.body).getPropertyValue("--accent-strong").trim();
+    // A page with no product accent (shared infrastructure carries none by
+    // law) has nothing to measure, and nothing to get wrong either.
+    if (!isHexColor(accent)) continue;
+    const ratio = contrast(accent, background);
+    if (ratio > best.ratio) best = { tone, ratio };
+  }
+  if (previous === undefined) delete root.dataset["customTone"];
+  else root.dataset["customTone"] = previous;
+  /* No product accent on this page: fall back to matching the background's
+   * own tone, which is right for the built-in tokens and harmless here. */
+  if (best.ratio < 0) {
+    return { tone: contrast(background, "#ffffff") >= 4.5 ? "dark" : "light", ratio: -1 };
+  }
+  return best;
+}
+
+/* Set when the chosen background leaves NO accent variant readable — said
+ * out loud rather than shipped as a colour nobody can see. */
+let accentUnreadableRatio: number | null = null;
+
 function applyTheme(theme: Theme, colors = customColors()): void {
   root.dataset.theme = theme;
   if (theme === "custom") {
     root.style.setProperty("--custom-bg", colors.background);
     root.style.setProperty("--custom-fg", colors.text);
+    const best = bestToneFor(colors.background);
+    root.dataset["customTone"] = best.tone;
+    accentUnreadableRatio = best.ratio >= 0 && best.ratio < 4.5 ? best.ratio : null;
   } else {
     root.style.removeProperty("--custom-bg");
     root.style.removeProperty("--custom-fg");
+    delete root.dataset["customTone"];
+    accentUnreadableRatio = null;
   }
   themeRemembered = writeStored(THEME_KEY, theme);
 }
@@ -297,10 +359,14 @@ function mountAppearanceControl(): void {
     const unremembered = themeRemembered
       ? ""
       : " This browser is not saving site data, so this choice lasts until you leave the page.";
+    const accentWarning =
+      accentUnreadableRatio === null
+        ? ""
+        : ` Note: this background leaves the page's own accent colour at ${accentUnreadableRatio.toFixed(1)}:1, below the 4.5:1 needed to read it — buttons and links will be hard to see.`;
     status.textContent =
       (theme === "custom"
           ? `Custom colors active (${ratio.toFixed(1)}:1 contrast).`
-          : `Bright areas are available (${ratio.toFixed(1)}:1 contrast).`) + unremembered;
+          : `Bright areas are available (${ratio.toFixed(1)}:1 contrast).`) + accentWarning + unremembered;
   }
 
   light.addEventListener("click", () => { applyTheme("light"); refresh(); });
