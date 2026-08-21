@@ -508,6 +508,47 @@ for (const n of [1, 2, 5, 12]) {
     report.problems.some((p) => p.code === "answer-label-leak"), true);
 }
 
+/* THE LEAK THAT IS NOT ON RECORD ZERO. The scan above used to read only
+ * value[0] of every array, which catches a label that is on the TYPE and
+ * misses the one that is on a RECORD — a stray field on member 30, or on
+ * the single member an edge-case injection touched, walked straight past
+ * it. That is the shape this check most needs to catch. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const deep = doctored.dataset.members.length - 1;
+  (doctored.dataset.members[deep] as unknown as Record<string, unknown>)["cohortIntent"] = "fader";
+  const report = validateBundle(doctored);
+  check("an answer label on the LAST record is caught, not just the first",
+    report.problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+// Instructors and class types were outside the scan entirely.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  (doctored.dataset.instructors[0] as unknown as Record<string, unknown>)["expectedLoad"] = 3;
+  check("an answer label on an instructor is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "answer-label-leak"), true);
+}
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  (doctored.dataset.classTypes[0] as unknown as Record<string, unknown>)["quietRate"] = 0.2;
+  check("an answer label on a class type is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+// A label on the TYPE — every record carrying it — is ONE line, not one per
+// record: a report nobody can read is a report nobody reads.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  for (const m of doctored.dataset.members) {
+    (m as unknown as Record<string, unknown>)["cohort"] = "regular";
+  }
+  const leaks = validateBundle(doctored).problems.filter((p) => p.code === "answer-label-leak");
+  check("a label on every record is reported once, with the count", leaks.length, 1);
+  check("...and the count is stated",
+    leaks[0]?.detail.includes(`${doctored.dataset.members.length} records carry it`), true);
+}
+
 // A credential-shaped value anywhere must scream.
 {
   const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;

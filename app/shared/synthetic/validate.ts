@@ -428,16 +428,30 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     // the member-facing text itself — production data. The forbidden
     // vocabulary is the kind that would let a product read a verdict.
     const forbiddenKey = /^(cohort|group|expected|eligib|quiet)/i;
+    /* EVERY ELEMENT, NOT THE FIRST ONE. This used to scan only value[0] of
+     * each array — `const sample = value.length > 0 ? [value[0]] : []` —
+     * which catches a leak that is on the TYPE and misses entirely the
+     * leak that is on a RECORD. A stray label on member 500, or on the one
+     * member an edge-case injection touched, walked straight past it, and
+     * a leak on a single record is the shape this check most needs to
+     * catch. The cost of doing it properly is a key-name test per field on
+     * a few tens of thousands of records: milliseconds, against a check
+     * that was close to decorative.
+     *
+     * Reported once per distinct key with a count, so a leak that IS on
+     * the type produces one line instead of fifty thousand. */
+    const leakCounts = new Map<string, { count: number; first: string }>();
     const scan = (value: unknown, path: string): void => {
       if (Array.isArray(value)) {
-        const sample = value.length > 0 ? [value[0]] : [];
-        for (const v of sample) scan(v, `${path}[0]`);
+        for (let i = 0; i < value.length; i += 1) scan(value[i], `${path}[${i}]`);
         return;
       }
       if (typeof value !== "object" || value === null) return;
       for (const [k, v] of Object.entries(value)) {
         if (forbiddenKey.test(k)) {
-          add("answer-label-leak", path, `record key "${k}" belongs in the answer key, not on records`);
+          const seen = leakCounts.get(k);
+          if (seen === undefined) leakCounts.set(k, { count: 1, first: path });
+          else seen.count += 1;
         }
         scan(v, `${path}.${k}`);
       }
@@ -446,6 +460,8 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       {
         members: dataset.members,
         memberships: dataset.memberships,
+        instructors: dataset.instructors,
+        classTypes: dataset.classTypes,
         classSessions: dataset.classSessions,
         bookings: dataset.bookings,
         attendance: dataset.attendance,
@@ -453,6 +469,14 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       },
       "dataset",
     );
+    for (const [key, { count, first }] of leakCounts) {
+      add(
+        "answer-label-leak",
+        first,
+        `record key "${key}" belongs in the answer key, not on records` +
+          (count > 1 ? ` (${count} records carry it)` : ""),
+      );
+    }
   }
 
   // --- sensitive data: scan DECODED field values, not file text ---------
