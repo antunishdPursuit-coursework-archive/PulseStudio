@@ -608,7 +608,15 @@ export function inviteWording(session: ClassSession): string {
 
 /** First word of a display name, for the draft's greeting. */
 export function firstNameOf(displayName: string): string {
-  return displayName.split(" ")[0] ?? displayName;
+  /* ANY whitespace, not just a space. This split on " " alone until
+   * 2026-08-21, which is correct for every name typed on one line and
+   * wrong for one that arrived from a wrapped cell in a spreadsheet: CSV
+   * allows a line break inside a quoted field, so "Ada\nRowe" is a real
+   * export shape. The draft then opened "Hi Ada\nRowe —", greeting a
+   * member by their full name with a line break through the middle of the
+   * sentence. Trimmed first, so a leading break does not return "". */
+  const first = displayName.trim().split(/\s+/)[0] ?? "";
+  return first === "" ? displayName : first;
 }
 
 /* WHAT THE RECORDS DO NOT SAY, TURNED INTO WHAT THE VOICE CAN SAY.

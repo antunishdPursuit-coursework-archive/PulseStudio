@@ -2661,6 +2661,197 @@ check("clean records produce no data-quality line",
   }
 }
 
+/* THE CONSENT BOUNDARY, WHICH NOTHING COULD REACH.
+ *
+ * Mutation found this: turning `daysSince > consentWindowDays` into `>=`
+ * left every check green. The reason is not a weak suite — it is that the
+ * shipped numbers make the branch unreachable. consentWindowDays is 730
+ * and maxDaysQuiet is 60, so findQuietMembers never produces a member the
+ * consent window could exclude.
+ *
+ * That is correct defensive code: the two thresholds are configured
+ * independently, and a studio that widens its quiet window to three years
+ * needs the consent rule to still hold. But "unreachable today" is a
+ * property of one config, not of the rule, and the rule deciding whether a
+ * studio may write to somebody at all is the last one that should go
+ * unchecked. So these give it a config where it CAN fire. */
+{
+  const wideRules = { minDaysQuiet: 14, maxDaysQuiet: 1000, priorWindowDays: 60 };
+  const today = dayNumberFromIso("2026-08-21");
+  /* 2026-08-21 minus 730 days is 2024-08-21; minus 731 is 2024-08-20. */
+  const longGone = adaptAttendanceCsv([
+    "Member,Date",
+    "Exactly Seven Thirty,2024-08-21",
+    "Seven Thirty One,2024-08-20",
+  ].join("\n"), "America/New_York");
+  const flagged = findQuietMembers(longGone.records, today, wideRules).flagged;
+  const byName = new Map(flagged.map((f) => [f.member.display_name, f]));
+
+  check("a wider quiet window reaches members the shipped one never does",
+    flagged.length, 2);
+  check("...and their days-quiet land exactly on the boundary",
+    flagged.map((f) => f.daysSince).sort((a, b) => a - b).join(","), "730,731");
+
+  const at = byName.get("Exactly Seven Thirty");
+  const past = byName.get("Seven Thirty One");
+  if (at && past) {
+    check("a member quiet for exactly the consent window may still be written to",
+      outreachStateFor(at, outreachPolicy, [], []).kind, "ready");
+    check("...and one day further may not",
+      outreachStateFor(past, outreachPolicy, [], []).kind, "outsideConsent");
+    const state = outreachStateFor(past, outreachPolicy, [], []);
+    check("...and the page says how long they have been quiet, not just that it refused",
+      state.kind === "outsideConsent" ? state.days : -1, 731);
+    check("...in a sentence naming the window it was measured against",
+      workflowStateLine(state, outreachPolicy),
+      `Outside the ${outreachPolicy.consentWindowDays}-day consent window (731 days quiet) — no draft offered.`);
+  }
+
+  /* Stated so nobody "simplifies" one of the two numbers into the other:
+   * they are independent on purpose, and today one hides the other. */
+  check("the shipped config really does make this branch unreachable",
+    outreachPolicy.consentWindowDays > proposedRules.maxDaysQuiet, true);
+}
+
+/* SAME DAY IS NOT "CAME BACK", AND THAT IS A DECISION.
+ *
+ * Mutation found `day > notedDay` could become `>=` with nothing
+ * noticing. The strictness is deliberate: the ledger stores a date and no
+ * time, so a class attended the same day the note was taken cannot be
+ * shown to have followed it. Counting it would credit the note with a
+ * visit that may have happened hours before — the one claim this panel
+ * exists not to make. */
+{
+  const attended = adaptAttendanceCsv([
+    "Member,Date",
+    "Robin Vale,2026-06-20", "Robin Vale,2026-07-04", "Robin Vale,2026-08-10",
+  ].join("\n"), "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const id = attended.records.members[0]?.member_id ?? "";
+  const note = (takenAt: string) => [{
+    memberId: id, lapseKey: `${id}|2026-07-04`, takenAt, channel: "copy" as const,
+  }];
+
+  const sameDay = outreachResults(note("2026-08-10"), attended.records, today);
+  check("a visit on the very day of the note is not counted as coming back",
+    sameDay.returned, 0);
+  check("...it is left as still quiet, not dropped from the total",
+    sameDay.stillQuiet, 1);
+  check("...and no days-to-return is invented for it",
+    sameDay.medianDaysToReturn, null);
+
+  const dayBefore = outreachResults(note("2026-08-09"), attended.records, today);
+  check("a visit the day after the note does count",
+    dayBefore.returned, 1);
+  check("...and is measured as one day", dayBefore.medianDaysToReturn, 1);
+
+  const earlier = outreachResults(note("2026-06-25"), attended.records, today);
+  check("the FIRST visit past the note is the one measured, not the latest",
+    earlier.medianDaysToReturn, dayNumberFromIso("2026-07-04") - dayNumberFromIso("2026-06-25"));
+}
+
+/* WINDOWS LINE ENDINGS — the format a real studio actually exports.
+ *
+ * Mutation found four separate ways to break CRLF handling with every
+ * check still green, and the reason was simple: there was not one \r
+ * anywhere in this suite. A studio exporting attendance from Excel or
+ * almost any Windows tool sends CRLF, so the parser's most likely real
+ * input was its least tested one.
+ *
+ * The invariant is what matters, not the byte: the same records, however
+ * the file ends its lines. */
+{
+  const rows = ["Member,Date,Class", "Ada Rowe,2026-07-01,yoga", "Bo Vance,2026-07-02,strength"];
+  const lf = adaptAttendanceCsv(rows.join("\n"), "America/New_York");
+  const crlf = adaptAttendanceCsv(rows.join("\r\n"), "America/New_York");
+  const cr = adaptAttendanceCsv(rows.join("\r"), "America/New_York");
+
+  check("a Windows file reads the same number of rows as a Unix one",
+    crlf.rowCount, lf.rowCount);
+  check("...and the same members", crlf.memberCount, lf.memberCount);
+  check("...and skips nothing the Unix file kept", crlf.skipped.length, lf.skipped.length);
+  check("...and produces byte-identical records",
+    JSON.stringify(crlf.records), JSON.stringify(lf.records));
+  check("...with no stray carriage return left in a member's name",
+    crlf.records.members.some((m) => /[\r\n]/.test(m.display_name)), false);
+  check("...or in a class type",
+    crlf.records.class_sessions.some((c) => /[\r\n]/.test(c.class_type)), false);
+
+  check("an old-style Mac file with bare carriage returns reads the same too",
+    JSON.stringify(cr.records), JSON.stringify(lf.records));
+
+  /* A trailing newline is normal in an exported file and must not become
+   * an empty row — in either dialect. */
+  const trailingLf = adaptAttendanceCsv(rows.join("\n") + "\n", "America/New_York");
+  const trailingCrlf = adaptAttendanceCsv(rows.join("\r\n") + "\r\n", "America/New_York");
+  check("a trailing newline does not invent a row", trailingLf.rowCount, lf.rowCount);
+  check("...and neither does a trailing CRLF", trailingCrlf.rowCount, lf.rowCount);
+  check("...and neither invents a member",
+    trailingCrlf.memberCount + trailingLf.memberCount, lf.memberCount * 2);
+}
+
+/* ONE MISSING COLUMN, NOT BOTH.
+ *
+ * The only case here passed a file missing BOTH required columns, so the
+ * `||` joining the two conditions could become `&&` untouched — and a
+ * file with names but no dates would have been accepted. Each is now
+ * refused on its own, and the message names the one that is missing
+ * without naming the one that is not. */
+{
+  const failsWith = (text: string): string => {
+    try {
+      adaptAttendanceCsv(text, "America/New_York");
+      return "did not throw";
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  const noDate = failsWith("Member,Class\nAda Rowe,yoga\n");
+  check("a file with names but no dates is refused", noDate !== "did not throw", true);
+  check("...and the error names the date column", noDate.includes("date column"), true);
+  check("...and does not claim the member column is missing too",
+    noDate.includes("member column"), false);
+
+  const noMember = failsWith("Date,Class\n2026-07-01,yoga\n");
+  check("a file with dates but no names is refused", noMember !== "did not throw", true);
+  check("...and the error names the member column", noMember.includes("member column"), true);
+  check("...and does not claim the date column is missing too",
+    noMember.includes("date column"), false);
+}
+
+/* A LINE BREAK INSIDE A QUOTED FIELD — legal CSV, and the last corner of
+ * the parser nothing reached.
+ *
+ * The CRLF checks above cover the outside-quotes branch. There is a second
+ * branch for a newline INSIDE quotes, and mutation could break it four
+ * ways with every check still green. A field that spans lines is ordinary
+ * in an export whose source had a wrapped cell, and it must be one row in
+ * both dialects, with the carriage return normalised away rather than
+ * carried into a name. */
+{
+  const lf = adaptAttendanceCsv('Member,Date\n"Ada\nRowe",2026-07-01\n', "America/New_York");
+  const crlf = adaptAttendanceCsv('Member,Date\r\n"Ada\r\nRowe",2026-07-01\r\n', "America/New_York");
+
+  check("a quoted field spanning two lines is still one row", lf.rowCount, 1);
+  check("...and one member", lf.memberCount, 1);
+  check("...and nothing is skipped", lf.skipped.length, 0);
+  check("a CRLF inside quotes normalises to the same field as an LF one",
+    JSON.stringify(crlf.records), JSON.stringify(lf.records));
+  check("...so no carriage return survives into a member's name",
+    crlf.records.members.some((m) => m.display_name.includes("\r")), false);
+
+  /* What the page then does with it. A newline in a name is not stripped —
+   * cleanName removes characters that cannot be part of a name, and a line
+   * break in a wrapped cell is a layout artefact rather than an attack. It
+   * must still reach a draft as a plain first name. */
+  const name = crlf.records.members[0]?.display_name ?? "";
+  check("the newline is kept as a newline, not a literal backslash-n",
+    name, "Ada\nRowe");
+  check("...and the draft still greets a person, not a line break",
+    firstNameOf(name), "Ada");
+}
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 

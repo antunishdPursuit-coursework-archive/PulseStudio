@@ -171,7 +171,16 @@ export function outreachResults(
     const notedDay = dayNumberFromIso(record.takenAt);
     let firstReturnDay: number | null = null;
     for (const day of attendedDaysByMember.get(record.memberId) ?? []) {
-      // Ascending, so the first day past the note is THE first return.
+      /* Ascending, so the first day PAST the note is THE first return.
+       *
+       * Strictly past, and that is a judgement rather than an accident.
+       * The ledger records a DATE, not a time — so when a member attends
+       * a class on the same day the note was taken, nothing here can tell
+       * whether the note came first. Counting it as "came back" would
+       * claim the note caused a visit that may have happened hours
+       * earlier, which is the one thing this panel exists not to do. A
+       * same-day visit is left as still quiet, and the member's next
+       * visit counts normally. */
       if (day > notedDay) {
         firstReturnDay = day;
         break;
