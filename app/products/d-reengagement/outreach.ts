@@ -15,7 +15,7 @@
 
 import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
-import { dayNumberFromIso, type FlaggedMember } from "./logic.js";
+import { dayNumberFromIso, firstNameOf, type FlaggedMember } from "./logic.js";
 
 export interface OutreachRecord {
   memberId: string;
@@ -318,6 +318,42 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
  * config.ts is explicitly the file a reseller rewrites, and a longer voice,
  * a longer studio name, or longer links all push the same number up with
  * nothing to notice. 1800 leaves room under the lowest known ceiling. */
+/* THE DRAFT AS A LINK THE STAFF MEMBER'S OWN MAIL CLIENT WILL OPEN.
+ *
+ * Nothing here sends: the product law is draft-only, and this hands the
+ * note to a human who still has to press send.
+ *
+ * The studio name and address are PARAMETERS rather than reads of `brand`,
+ * because the shipped brand carries studioEmail: null — so the bcc branch
+ * below had never once run, in code or in a check, until they were passed
+ * in. A branch that only executes at a reseller's site is exactly the kind
+ * that is wrong on the day it first matters.
+ *
+ * Every interpolated value is member-supplied: display_name arrives from a
+ * CSV a studio exported, and a mailto URL parses "&" as the start of
+ * another header. A name of the form `Bob&bcc=stranger@elsewhere.invalid`
+ * would
+ * add a recipient to a note about a member if it reached the URL raw.
+ * encodeURIComponent is what stops that, which is why it is checked and
+ * not merely written. */
+export function mailtoHref(
+  f: FlaggedMember,
+  draft: string,
+  studioName: string,
+  studioEmail: string | null,
+): string {
+  const subject = `We miss you at ${studioName}, ${firstNameOf(f.member.display_name)}!`;
+  const bcc = studioEmail === null ? "" : `bcc=${encodeURIComponent(studioEmail)}&`;
+  /* RFC 6068 wants CRLF line breaks in a mailto body; some clients collapse
+   * a bare %0A. Only the URL gets CRLF — screen and clipboard stay LF. */
+  return (
+    "mailto:?" +
+    bcc +
+    `subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(draft.replace(/\n/g, "\r\n"))}`
+  );
+}
+
 export const MAILTO_SAFE_LENGTH = 1800;
 
 export function mailtoIsTooLong(href: string): boolean {

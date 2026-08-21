@@ -35,6 +35,7 @@ import {
 import {
   forgetOutreach,
   keepOutreachRecords,
+  mailtoHref,
   mailtoIsTooLong,
   keepSuppressionRecords,
   lapseKeyOf,
@@ -227,19 +228,6 @@ function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): stri
  *  README's opening paragraph stated the BCC unconditionally for a while,
  *  and so did this comment; the code three lines down always handled it
  *  correctly, which is exactly how a comment gets to be wrong for months. */
-function mailtoHref(f: FlaggedMember, draft: string): string {
-  const subject = `We miss you at ${brand.studioName}, ${firstNameOf(f.member.display_name)}!`;
-  // RFC 6068 wants CRLF line breaks in a mailto body; some clients collapse
-  // bare %0A. Only the URL gets CRLF — screen and clipboard stay LF.
-  const bcc =
-    brand.studioEmail === null ? "" : `bcc=${encodeURIComponent(brand.studioEmail)}&`;
-  return (
-    "mailto:?" +
-    bcc +
-    `subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(draft.replace(/\n/g, "\r\n"))}`
-  );
-}
 
 function renderFlagged(
   f: FlaggedMember,
@@ -381,7 +369,7 @@ function renderFlagged(
     );
   });
 
-  const href = mailtoHref(f, draft);
+  const href = mailtoHref(f, draft, brand.studioName, brand.studioEmail);
   /* A mail client would truncate an over-long link, silently — and opening
    * it would CLAIM THE LAPSE, so the member gets one half-finished note and
    * then correctly never hears about this silence again. It is not offered

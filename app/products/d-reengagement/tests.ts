@@ -26,6 +26,7 @@ import {
   MAILTO_SAFE_LENGTH,
   forgetOutreach,
   keepOutreachRecords,
+  mailtoHref,
   mailtoIsTooLong,
   keepSuppressionRecords,
   lapseKeyOf,
@@ -2211,6 +2212,70 @@ check("clean records produce no data-quality line",
       facts.usualInstructorFirstName, "Ana");
     const note = draftTextFor(only, imported.records, today, brand.studioName);
     check("...so the note names both", note.includes("Ana") && note.includes("yoga"), true);
+  }
+}
+
+/* A NAME IS UNTRUSTED INPUT, AND A MAILTO URL IS A HEADER LIST.
+ *
+ * display_name arrives from a CSV some other system exported. In a mailto
+ * URL "&" starts another header, so a name shaped like an injection would
+ * add a recipient to a note ABOUT a member if it reached the URL raw —
+ * and cleanName does not strip "&", because "Ben & Jerry" is a real name.
+ * encodeURIComponent is the whole defence, so it gets checked rather than
+ * trusted. */
+{
+  const hostileFile = [
+    "Member,Date",
+    "Bob&bcc=stranger@elsewhere.invalid,2026-06-27",
+    "Bob&bcc=stranger@elsewhere.invalid,2026-07-11",
+    "Bob&bcc=stranger@elsewhere.invalid,2026-07-25",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(hostileFile, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  check("a name shaped like an injection still imports as a member",
+    only !== undefined, true);
+  if (only) {
+    const href = mailtoHref(only, "the note", "Pulse Studio", null);
+    /* Structural, not a substring search: with no studio address there are
+     * exactly two headers, subject and body. A third means one came from
+     * the member's name. */
+    check("...and the URL it builds carries exactly the two headers we wrote",
+      href.split("&").length, 2);
+    check("...so the injected recipient never becomes a recipient",
+      href.includes("bcc="), false);
+    check("...it is carried as encoded text inside the subject instead",
+      href.includes("%26bcc%3D"), true);
+  }
+}
+
+/* THE BRANCH THAT HAD NEVER RUN. The shipped brand sets studioEmail to
+ * null, so until these lines nothing had ever built the bcc form — not in
+ * a browser, not in a check. A reseller turning it on would have been the
+ * first to find out whether it worked. */
+{
+  const hostileFile = [
+    "Member,Date",
+    "Ana Reyes,2026-06-27",
+    "Ana Reyes,2026-07-11",
+    "Ana Reyes,2026-07-25",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(hostileFile, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  if (only) {
+    const href = mailtoHref(only, "line one\nline two", "Pulse Studio", "front+desk@studio.invalid");
+    check("a studio address becomes a bcc header", href.startsWith("mailto:?bcc="), true);
+    check("...with its plus sign encoded, not read as a space",
+      href.includes("front%2Bdesk%40studio.invalid"), true);
+    check("...and the subject still names the member",
+      href.includes(encodeURIComponent("Ana")), true);
+    /* RFC 6068: the body wants CRLF. Only the URL gets it — the draft the
+     * staff member reads on screen and copies keeps plain LF. */
+    check("...and the body's line breaks are CRLF in the URL",
+      href.includes("%0D%0A"), true);
+    check("...with no bare LF left beside them",
+      /%0A/.test(href.replace(/%0D%0A/g, "")), false);
   }
 }
 
