@@ -9,15 +9,14 @@ brief first; this file adds what is true about THIS folder.
 
 ## What this product is (proven in code, not aspiration)
 
-A single-page, fully client-side keyword-routed Q&A widget — **no LLM and no
-network calls** — that answers member questions from the shared synthetic
-dataset and Booking's published browser reservation log through four paths, checked in this order: a
-privacy refusal for member-data questions, current-policy answers on five
-topics, a next-5-classes schedule answer with optional spaces-left counts,
-and an honest capability-listing fallback. Every answer renders as chat
-bubbles with an explicit "N classes and M policies checked" status line.
-Three source files: `index.html`, `main.ts` (~143 lines — everything),
-`styles.css`.
+A single-page member support chat that keeps a fail-closed privacy refusal in
+the browser, builds member-safe context from the shared synthetic dataset and
+Booking's published browser reservation log, and sends safe questions to
+Claude Haiku through the local `/api/chat` server. The deployed GitHub Pages
+site has no backend and states that conversational support is unavailable.
+Every answer renders as chat bubbles with an explicit schedule-and-policy
+status line. The local server and its maintained safe guidance live in
+`scripts/start-haiku.mjs` and `docs/member-support-haiku.md` by team agreement.
 
 ## Lane law
 
@@ -38,21 +37,21 @@ Three source files: `index.html`, `main.ts` (~143 lines — everything),
   member's first name (≥3 chars), or phrases like "my booking", is
   refused — the chatbot has no session identity, so it cannot know whose
   data "my" means. Innocent questions can be refused; that is the design.
-- **Matching is lowercase substring/keyword** (`question.includes`). No
-  fuzzy matching, no typo handling — claims of anything smarter would
-  break the truth law.
+- **Haiku never receives specific member records.** The browser sends only
+  the studio name and timezone, upcoming class details with aggregate spaces
+  left, current policies, and the member's safe question.
 - **The dataset regenerates with TODAY's date** on every load
   (overriding the pinned default), so answers drift with the real
   calendar and differ from products that pin `asOfDate`.
-- The five policy topic strings in `policyAnswer()` ("cancellation",
-  "what to bring", "class levels", "guest passes", "late arrival") must
-  keep matching the topics the synthetic generator emits.
+- The browser privacy guard still runs before the network request. Its
+  deliberate false positives remain safer than sending an ambiguous member
+  question to the model.
 
 ## Integration facts
 
-- Data: `shared/synthetic/config.js`, `contracts.js`, `generate.js` —
-  its ONLY runtime data dependencies. It does NOT use `loadFixtures()`,
-  `fixtures.json`, or `shared/auth/session.js`.
+- Data: `shared/synthetic/config.js`, `contracts.js`, `generate.js`, plus
+  Product A's published browser reservation log. It does NOT use
+  `loadFixtures()`, `fixtures.json`, or `shared/auth/session.js`.
 - Theme: `product-c` body class + `shared/theme.css` +
   `shared/theme-boot.js` — which also mounts the shared sign-in chip in
   the header. The chatbot itself ignores the session today; if it ever
@@ -61,6 +60,10 @@ Three source files: `index.html`, `main.ts` (~143 lines — everything),
 - Storage: it writes nothing. Spaces-left answers defensively read Product A's
   published `pulse-reservations-a` log; the latest row per member and session
   overrides the generated booking state.
+- Network: `npm run start:haiku` serves the site and proxies `/api/chat` to
+  Anthropic with `ANTHROPIC_API_KEY` from the local environment. The key never
+  enters browser code or the repository. The server rereads the marked safe
+  guidance and Storytold beats on every request.
 
 ## Gate
 

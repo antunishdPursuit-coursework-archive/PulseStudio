@@ -15,8 +15,10 @@ const form = requiredElement<HTMLFormElement>("#chat-form");
 const input = requiredElement<HTMLInputElement>("#question");
 const messages = requiredElement<HTMLElement>("#messages");
 const status = requiredElement<HTMLParagraphElement>("#status");
+const sendButton = requiredElement<HTMLButtonElement>("button[type='submit']");
 
 const BOOKING_LOG_KEY = "pulse-reservations-a";
+const CHAT_ENDPOINT = new URL("../../api/chat", import.meta.url);
 
 interface RuntimeReservation {
   reservation_id: string;
@@ -83,15 +85,9 @@ const privateMemberNames = dataset.members.flatMap((member) => {
   return firstName && firstName.length >= 3 ? [normalized, firstName] : [normalized];
 });
 
-function upcomingSessions(question: string): SyntheticClassSession[] {
-  const className = dataset.classTypes.find((item) =>
-    question.includes(item.name.toLowerCase()),
-  )?.name;
+function upcomingSessions(): SyntheticClassSession[] {
   return dataset.classSessions
-    .filter((session) => {
-      const type = classTypeById.get(session.classTypeId);
-      return session.status === "scheduled" && (!className || type?.name === className);
-    })
+    .filter((session) => session.status === "scheduled")
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
     .slice(0, 5);
 }
@@ -129,20 +125,6 @@ function formatSession(session: SyntheticClassSession, includeSpaces: boolean): 
   return `${type?.name ?? "Class"} (${type?.level ?? "level unavailable"}) — ${when} with ${instructor?.displayName ?? "studio staff"}${spaces}`;
 }
 
-function policyAnswer(question: string): string | null {
-  const keywords: Record<string, string[]> = {
-    cancellation: ["cancel", "cancellation", "refund"],
-    "what to bring": ["bring", "wear", "towel", "mat", "shoes"],
-    "class levels": ["level", "beginner", "advanced", "difficulty"],
-    "guest passes": ["guest", "friend", "pass"],
-    "late arrival": ["late", "arrival", "doors"],
-  };
-  const topic = Object.entries(keywords).find(([, words]) =>
-    words.some((word) => question.includes(word)),
-  )?.[0];
-  return dataset.studioPolicies.find((policy) => policy.isCurrent && policy.topic === topic)?.answer ?? null;
-}
-
 function asksForPrivateMemberData(question: string): boolean {
   if (privateMemberNames.some((name) => question.includes(name))) return true;
   return [
@@ -155,27 +137,65 @@ function asksForPrivateMemberData(question: string): boolean {
   ].some((pattern) => pattern.test(question));
 }
 
-function answer(question: string, records: SyntheticDataset): string {
-  const normalized = question.toLowerCase().trim();
-  if (asksForPrivateMemberData(normalized)) {
-    return "I can’t provide member accounts, bookings, attendance, or visit history. Please contact Pulse Studio staff for help with private account information.";
-  }
-  const policy = policyAnswer(normalized);
-  if (policy) return policy;
+interface SafeStudioContext {
+  studio: { name: string; timezone: string; current_date: string };
+  upcoming_classes: Array<{
+    class_name: string;
+    level: string;
+    starts_at: string;
+    instructor: string;
+    capacity: number;
+    spaces_left: number;
+  }>;
+  current_policies: Array<{ topic: string; answer: string }>;
+  availability_note: string;
+}
 
-  const asksSchedule = ["class", "schedule", "available", "space", "spot", "instructor", "yoga", "cycling", "hiit", "pilates", "strength"]
-    .some((word) => normalized.includes(word));
-  if (asksSchedule) {
-    const sessions = upcomingSessions(normalized);
-    if (sessions.length === 0) return "I checked the upcoming schedule, but no matching classes were found.";
-    const includeSpaces = ["available", "space", "spot", "full"].some((word) => normalized.includes(word));
-    const availabilityNote = includeSpaces
-      ? "\nCounts include live reservations from this browser and may change as members book or cancel."
-      : "";
-    return `Here are the next ${sessions.length} matching classes:\n${sessions.map((session) => `• ${formatSession(session, includeSpaces)}`).join("\n")}${availabilityNote}`;
-  }
+function safeStudioContext(records: SyntheticDataset): SafeStudioContext {
+  const upcoming = upcomingSessions();
+  return {
+    studio: {
+      name: records.studio.name,
+      timezone: records.studio.timezone,
+      current_date: studioDate(),
+    },
+    upcoming_classes: upcoming.map((session) => {
+      const type = classTypeById.get(session.classTypeId);
+      return {
+        class_name: type?.name ?? "Class",
+        level: type?.level ?? "level unavailable",
+        starts_at: formatSession(session, false).split(" — ")[1] ?? session.startsAt,
+        instructor: instructorById.get(session.instructorId)?.displayName ?? "studio staff",
+        capacity: session.capacity,
+        spaces_left: Math.max(0, session.capacity - confirmedMemberCount(session.id)),
+      };
+    }),
+    current_policies: records.studioPolicies
+      .filter((policy) => policy.isCurrent)
+      .map((policy) => ({ topic: policy.topic, answer: policy.answer })),
+    availability_note: "Counts include live reservations from this browser and may change as members book or cancel.",
+  };
+}
 
-  return `I can help with the schedule, availability, instructors, class levels, cancellation, what to bring, guest passes, and late arrival. For anything else, please contact ${records.studio.name} staff.`;
+function isChatResponse(value: unknown): value is { answer: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>)["answer"] === "string"
+  );
+}
+
+async function haikuAnswer(question: string): Promise<string> {
+  const response = await fetch(CHAT_ENDPOINT, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question, context: safeStudioContext(dataset) }),
+  });
+  const result: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isChatResponse(result)) {
+    throw new Error("Conversational member support is unavailable.");
+  }
+  return result.answer;
 }
 
 function addMessage(text: string, role: "user" | "assistant"): void {
@@ -186,14 +206,46 @@ function addMessage(text: string, role: "user" | "assistant"): void {
   message.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const question = input.value.trim();
   if (!question) return;
   addMessage(question, "user");
-  addMessage(answer(question, dataset), "assistant");
   input.value = "";
-  input.focus();
+  const normalized = question.toLowerCase();
+  if (asksForPrivateMemberData(normalized)) {
+    addMessage("I can’t provide member accounts, bookings, attendance, or visit history. Please contact Pulse Studio staff for help with private account information.", "assistant");
+    input.focus();
+    return;
+  }
+
+  sendButton.disabled = true;
+  form.setAttribute("aria-busy", "true");
+  status.textContent = "Checking the current studio information.";
+  try {
+    addMessage(await haikuAnswer(question), "assistant");
+    status.textContent = `${dataset.classSessions.filter((session) => session.status === "scheduled").length} upcoming classes and ${dataset.studioPolicies.filter((policy) => policy.isCurrent).length} current policies available to conversational support.`;
+  } catch {
+    addMessage("Conversational member support is unavailable right now. Please contact Pulse Studio staff for help.", "assistant");
+    status.textContent = "The schedule and policies are ready, but conversational support is unavailable.";
+  } finally {
+    sendButton.disabled = false;
+    form.removeAttribute("aria-busy");
+    input.focus();
+  }
 });
 
-status.textContent = `${dataset.classSessions.filter((session) => session.status === "scheduled").length} upcoming classes and ${dataset.studioPolicies.filter((policy) => policy.isCurrent).length} current policies checked.`;
+async function reportAvailability(): Promise<void> {
+  try {
+    const response = await fetch(CHAT_ENDPOINT, { headers: { accept: "application/json" } });
+    const result: unknown = await response.json();
+    const available = response.ok && typeof result === "object" && result !== null && (result as Record<string, unknown>)["available"] === true;
+    status.textContent = available
+      ? `${dataset.classSessions.filter((session) => session.status === "scheduled").length} upcoming classes and ${dataset.studioPolicies.filter((policy) => policy.isCurrent).length} current policies available to conversational support.`
+      : "The schedule and policies are ready, but conversational support is unavailable.";
+  } catch {
+    status.textContent = "The schedule and policies are ready, but conversational support is unavailable.";
+  }
+}
+
+void reportAvailability();

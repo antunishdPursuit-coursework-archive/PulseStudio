@@ -7,6 +7,7 @@
     "check": "tsc && node scripts/check-styles.mjs && node scripts/check-contrast.mjs && node scripts/check-language.mjs && node scripts/check-fixtures.mjs && node scripts/run-suites.mjs",
     "build": "tsc",
     "start": "python3 -m http.server 4173 --directory app",
+    "start:haiku": "npm run build && node --env-file-if-exists=.env scripts/start-haiku.mjs",
     "check:styles": "node scripts/check-styles.mjs",
     "check:suites": "tsc && node scripts/run-suites.mjs",
     "check:language": "node scripts/check-language.mjs",
