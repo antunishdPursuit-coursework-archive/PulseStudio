@@ -11,16 +11,28 @@ import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv } from "./csv.js";
 import { generateStudio } from "./generate.js";
-import { brand, draftMessage, proposedRules } from "./config.js";
+import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
   dataQualityLine,
   findQuietMembers,
   firstNameOf,
+  inviteWording,
+  suggestedSession,
   summaryLine,
   todayDayNumber,
+  weeklyCadence,
   type FlaggedMember,
   upcomingReservedMemberIds,
 } from "./logic.js";
+import {
+  outreachResults,
+  outreachStateFor,
+  recordOutreach,
+  suppress,
+  unsuppress,
+  type OutreachRecord,
+  type SuppressionRecord,
+} from "./outreach.js";
 
 /** Find a required element up front, loudly — a missing mount point is a
  *  broken page, and broken should never look like "nothing to report". */
@@ -29,6 +41,31 @@ function requiredElement<T extends Element>(selector: string): T {
   if (!el) throw new Error(`Re-engagement page is missing ${selector}.`);
   return el;
 }
+
+/* The outreach ledger and the do-not-contact list live in THIS browser,
+ * like every other record here — nothing leaves it. Unreadable storage is
+ * stated and reset, never silently trusted. */
+let storageWarning = "";
+function loadList<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("not a list");
+    return parsed as T[];
+  } catch {
+    storageWarning += ` The stored ${key.replace("pulse-", "")} was unreadable and was reset.`;
+    localStorage.removeItem(key);
+    return [];
+  }
+}
+let ledger = loadList<OutreachRecord>("pulse-outreach-ledger");
+let suppressions = loadList<SuppressionRecord>("pulse-suppressions");
+function persist(): void {
+  localStorage.setItem("pulse-outreach-ledger", JSON.stringify(ledger));
+  localStorage.setItem("pulse-suppressions", JSON.stringify(suppressions));
+}
+const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
 const statusEl = requiredElement<HTMLParagraphElement>("#status");
 const ruleEl = requiredElement<HTMLParagraphElement>("#rule");
@@ -69,7 +106,10 @@ function evidenceDate(iso: string): string {
   );
 }
 
-function buildDraftText(f: FlaggedMember): string {
+function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): string {
+  // The concrete invitation: a real upcoming class matching their pattern,
+  // or null — the voice falls back to the open offer, never an invented one.
+  const session = suggestedSession(f, data, today);
   // The "the team" fallback (used when an instructor record is missing) must
   // not go through firstNameOf — "the" is not a name.
   const instructorFirst =
@@ -82,6 +122,7 @@ function buildDraftText(f: FlaggedMember): string {
     usualClassType: f.usualClassType,
     usualInstructorFirstName: instructorFirst,
     studioName: brand.studioName,
+    suggestedInvite: session === null ? null : inviteWording(session),
   });
 }
 
@@ -102,7 +143,12 @@ function mailtoHref(f: FlaggedMember, draft: string): string {
   );
 }
 
-function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
+function renderFlagged(
+  f: FlaggedMember,
+  rank: number,
+  data: FixtureSet,
+  today: number,
+): HTMLElement {
   const card = document.createElement("article");
   card.className = "card member-card";
 
@@ -120,10 +166,44 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
   evidence.textContent =
     `Last attended: ${f.lastSession.class_type} with ${f.lastInstructorName} ` +
     `on ${evidenceDate(f.lastSession.starts_at)} · ` +
-    `${f.priorCount} classes in the prior ${proposedRules.priorWindowDays} days · ` +
+    `${f.priorCount} classes in the prior ${proposedRules.priorWindowDays} days ` +
+    `(≈${weeklyCadence(f.priorCount, proposedRules.priorWindowDays)}/week) · ` +
     `usually ${f.usualClassType} with ${f.usualInstructorName}`;
+  card.append(head, evidence);
 
-  const draft = buildDraftText(f);
+  /* THE DISCIPLINE. Evidence always renders — the flag and its why are
+   * never withheld — but a draft is only offered when the policy allows:
+   * opted-in studio, not suppressed, inside the consent window, and this
+   * lapse not already acted on. The card says WHICH rule spoke. */
+  const state = outreachStateFor(f, outreachPolicy, ledger, suppressions);
+  if (state.kind !== "ready") {
+    const line = document.createElement("p");
+    line.className = "workflow-state";
+    line.textContent =
+      state.kind === "disabled"
+        ? "Outreach workflow is off — this studio has not opted in."
+        : state.kind === "suppressed"
+          ? `Do not contact — suppressed ${state.since}.`
+          : state.kind === "outsideConsent"
+            ? `Outside the ${outreachPolicy.consentWindowDays}-day consent window (${state.days} days quiet) — no draft offered.`
+            : `Already reached for this lapse (${state.channel}, ${state.takenAt}). A new lapse re-arms.`;
+    card.append(line);
+    if (state.kind === "suppressed") {
+      const un = document.createElement("button");
+      un.className = "btn-ghost";
+      un.type = "button";
+      un.textContent = "Allow contact again";
+      un.addEventListener("click", () => {
+        suppressions = unsuppress(suppressions, f.member.member_id);
+        persist();
+        rerender();
+      });
+      card.append(un);
+    }
+    return card;
+  }
+
+  const draft = buildDraftText(f, data, today);
   const draftBlock = document.createElement("pre");
   draftBlock.className = "draft";
   draftBlock.textContent = draft;
@@ -139,6 +219,8 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
     // A failed copy must be loud, never a silent shrug — including on
     // non-secure origins where navigator.clipboard does not exist at all
     // (e.g. the page opened over plain http from another device).
+    // ONLY a successful copy claims the lapse: a failed copy leaves the
+    // draft offered, because nothing was actually taken.
     if (!navigator.clipboard) {
       copyBtn.textContent = "Copy failed — select the text above";
       return;
@@ -146,7 +228,9 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
     navigator.clipboard.writeText(draft).then(
       () => {
         copyBtn.textContent = "Copied ✓";
-        setTimeout(() => (copyBtn.textContent = "Copy message"), 2000);
+        ledger = recordOutreach(ledger, f, "copy", todayIso());
+        persist();
+        setTimeout(rerender, 900);
       },
       () => {
         copyBtn.textContent = "Copy failed — select the text above";
@@ -158,15 +242,110 @@ function renderFlagged(f: FlaggedMember, rank: number): HTMLElement {
   mailLink.className = "btn btn-outline";
   mailLink.href = mailtoHref(f, draft);
   mailLink.textContent = "Open in your email app";
+  mailLink.addEventListener("click", () => {
+    // Opening the mail client IS taking the draft — the note is in the
+    // staff member's hands from here.
+    ledger = recordOutreach(ledger, f, "email", todayIso());
+    persist();
+    setTimeout(rerender, 900);
+  });
 
-  actions.append(copyBtn, mailLink);
-  card.append(head, evidence, draftBlock, actions);
+  const suppressBtn = document.createElement("button");
+  suppressBtn.className = "btn-ghost";
+  suppressBtn.type = "button";
+  suppressBtn.textContent = "Do not contact";
+  suppressBtn.addEventListener("click", () => {
+    suppressions = suppress(suppressions, f.member.member_id, todayIso());
+    persist();
+    rerender();
+  });
+
+  actions.append(copyBtn, mailLink, suppressBtn);
+  card.append(draftBlock, actions);
   return card;
 }
+
+/** The closed loop, rendered: what happened after every taken draft. A
+ *  reference win-back engine sends and never learns; this one states it —
+ *  who came back, how fast, who stayed quiet, and which ledger entries
+ *  these records cannot judge. */
+function renderOutcomes(data: FixtureSet, today: number): void {
+  const outcomesEl = requiredElement<HTMLElement>("#outcomes");
+  outcomesEl.replaceChildren();
+  if (ledger.length === 0) return;
+  const results = outreachResults(ledger, data, today);
+  const line = document.createElement("p");
+  line.className = "status outcomes-line";
+  const total = results.outcomes.length + results.notEvaluable;
+  const parts = [`Outreach so far: ${total} ${total === 1 ? "note" : "notes"} taken`];
+  parts.push(
+    `${results.returned} came back` +
+      (results.medianDaysToReturn === null
+        ? ""
+        : ` (median ${results.medianDaysToReturn} days after the note)`),
+  );
+  parts.push(`${results.stillQuiet} still quiet`);
+  if (results.notEvaluable > 0) {
+    parts.push(`${results.notEvaluable} not evaluable in these records`);
+  }
+  line.textContent = parts.join(" · ") + ".";
+  outcomesEl.append(line);
+
+  const memberName = new Map(data.members.map((m) => [m.member_id, m.display_name]));
+  const returned = results.outcomes.filter((o) => o.result === "returned");
+  if (returned.length > 0) {
+    // The welcome-back cue: these members answered a note with a visit.
+    // The save is only finished when someone at the studio says so.
+    const list = document.createElement("p");
+    list.className = "evidence";
+    list.textContent =
+      "Came back after a note — worth a hello at the front desk: " +
+      returned
+        .map(
+          (o) =>
+            `${memberName.get(o.record.memberId) ?? o.record.memberId} (${o.daysToReturn} days)`,
+        )
+        .join(" · ");
+    outcomesEl.append(list);
+  }
+  const logBtn = document.createElement("button");
+  logBtn.className = "btn-ghost";
+  logBtn.type = "button";
+  logBtn.textContent = "Download the outreach log (stays on this device)";
+  logBtn.addEventListener("click", () => {
+    const lines = ["member,member id,channel,note taken,result,days to return"];
+    for (const o of results.outcomes) {
+      const nameText = memberName.get(o.record.memberId) ?? "";
+      lines.push(
+        [
+          /[",\n]/.test(nameText) ? `"${nameText.replaceAll('"', '""')}"` : nameText,
+          o.record.memberId,
+          o.record.channel,
+          o.record.takenAt,
+          o.result === "returned" ? "came back" : "still quiet",
+          o.daysToReturn === null ? "" : String(o.daysToReturn),
+        ].join(","),
+      );
+    }
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "outreach-log.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  outcomesEl.append(logBtn);
+}
+
+/** Re-render with the CURRENT data source — workflow actions change ledger
+ *  state, and the cards must say so immediately. */
+let rerender: () => void = () => {};
 
 /** Paint the page from ANY contract-shaped record set — the shared studio
  *  records or an imported attendance file. One render path, two doors. */
 function renderRecords(data: FixtureSet, sourceNote: string): void {
+  rerender = () => renderRecords(data, sourceNote);
   // "Today" is the record set's declared timezone — the shared fixture
   // states the studio's; an import uses the staff member's, since they are
   // at the studio. Either way thresholds never shift with a viewer's zone.
@@ -195,15 +374,18 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
       ? ""
       : ` ${alreadyReturning.length} left alone — already booked back in: ` +
         `${alreadyReturning.map((f) => f.member.display_name).join(", ")}.`;
-  statusEl.textContent = quality
-    ? `${summaryLine(result, asOf)} ${quality}${comingLine}`
-    : `${summaryLine(result, asOf)}${comingLine}`;
+  statusEl.textContent =
+    (quality
+      ? `${summaryLine(result, asOf)} ${quality}${comingLine}`
+      : `${summaryLine(result, asOf)}${comingLine}`) + storageWarning;
   sourceEl.textContent = sourceNote;
   ruleEl.textContent =
     `Proposed thresholds (not yet ratified by the team): flag active members ` +
     `whose last attended class is more than ${proposedRules.minDaysQuiet} and ` +
     `at most ${proposedRules.maxDaysQuiet} days ago. Only attended classes ` +
     `count — a no-show is never a visit.`;
+
+  renderOutcomes(data, today);
 
   flaggedEl.replaceChildren();
   if (data.members.length === 0) {
@@ -225,7 +407,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     flaggedEl.append(calm);
     return;
   }
-  result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1)));
+  result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1, data, today)));
 }
 
 function loadSharedRecords(): void {

@@ -132,6 +132,20 @@
   margin-left: 8px;
 }
 
+/* The discipline line: which policy rule spoke, when a draft is withheld.
+   Muted on purpose — it is a state, not an alarm. */
+.workflow-state {
+  color: var(--muted);
+  font-size: 0.92rem;
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  margin: 10px 0 4px;
+}
+/* The closed-loop strip sits above the cards; extra bottom room so the
+   outcome line never crowds the first flagged member. */
+#outcomes { margin-bottom: 18px; }
+#outcomes .outcomes-line { margin-bottom: 6px; }
+
 .footer-note {
   margin-top: 28px;
   color: var(--muted);

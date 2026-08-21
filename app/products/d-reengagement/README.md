@@ -21,6 +21,35 @@ Flag a member when all of these hold, measured in studio-local calendar days:
 - flagged members rank by attendance in the 60 days before they went quiet,
   most frequent first — the most valuable save on top
 
+## Bring them back — and never nag them back out the door
+
+Finding the quiet member is half the job. The other half is discipline, and
+it is enforced by `outreach.ts`, not by memory:
+
+- **One note per lapse.** Taking a draft (a successful copy, or opening the
+  email) claims that lapse in a browser-local ledger
+  (`pulse-outreach-ledger`). The same silence is never nagged twice; a member
+  who returns and lapses again re-arms.
+- **"No" is remembered.** *Do not contact* puts a member on a suppression
+  list (`pulse-suppressions`) that outranks everything except the studio's
+  own opt-in. It is reversible, and the card says when it was set.
+- **Consent ages.** Beyond the policy window the tool refuses to draft at
+  all, by name — silence that old is a different conversation.
+- **The invitation is concrete.** The draft names a real upcoming class
+  matching the member's own pattern — their usual class with their usual
+  instructor first — and falls back to an open offer rather than inventing
+  a session. A specific "yes" is easier to say than a vague one.
+
+**The closed loop** is what keeps the loop honest: every taken note is
+judged against the records. Who came back (and how many days after the
+note), who stayed quiet, and which ledger entries these records cannot
+judge — stated on the page, with a local CSV export. The members who came
+back are listed as exactly that: *worth a hello at the front desk* — the
+save is finished by a person, not a metric.
+
+Nothing here sends, still. The ledger records what a staff member took,
+never what a machine did.
+
 ## Files
 
 | File | What it is |
@@ -30,6 +59,7 @@ Flag a member when all of these hold, measured in studio-local calendar days:
 | `csv.ts` | The CSV door: a studio's own attendance export, adapted in-browser |
 | `generate.ts` | Seeded studio generator — see the tool at real scale, reproducibly |
 | `logic.ts` | Pure rule functions — no DOM, no clock, no fetch; "today" is a parameter |
+| `outreach.ts` | The outreach discipline, pure: once per lapse, do-not-contact, consent window, opt-in — and the closed loop that judges every note against the records |
 | `main.ts` | The page: loads shared records, renders flags, evidence, drafts |
 | `styles.css` | Violet-on-black/white styling over the shared theme tokens |
 | `tests.ts` / `tests.html` | Browser-run unit checks with a pinned reference date |

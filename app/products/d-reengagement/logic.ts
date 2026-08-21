@@ -243,6 +243,67 @@ export function dataQualityLine(result: FlagResult): string | null {
   return parts.length === 0 ? null : `${parts.join("; ")}.`;
 }
 
+/** Visits per week over the prior window, comparable across members and
+ *  honestly rounded — a twice-a-week regular and a once-a-month visitor
+ *  should never look alike on the card. */
+export function weeklyCadence(priorCount: number, windowDays: number): number {
+  return Math.round((priorCount / (windowDays / 7)) * 10) / 10;
+}
+
+const WEEKDAY_NAMES = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
+
+function weekdayNameOf(date: string): string {
+  return WEEKDAY_NAMES[(((dayNumberFromIso(date) + 4) % 7) + 7) % 7] ?? "soon";
+}
+
+function timeOf(startsAt: string): string {
+  const hh = Number(startsAt.slice(11, 13));
+  const mm = startsAt.slice(14, 16);
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${h12}:${mm} ${hh < 12 ? "AM" : "PM"}`;
+}
+
+/** The next scheduled class matching the member's own pattern, within ten
+ *  days: their usual class WITH their usual instructor first, then their
+ *  usual class with anyone. Null when the records hold no such session —
+ *  a generic draft beats a made-up invitation. Deterministic: earliest
+ *  date, then session id. */
+export function suggestedSession(
+  flagged: FlaggedMember,
+  data: FixtureSet,
+  today: number,
+): ClassSession | null {
+  const instructorByName = new Map(
+    data.instructors.map((i) => [i.display_name, i.instructor_id]),
+  );
+  const usualInstructorId = instructorByName.get(flagged.usualInstructorName) ?? null;
+  const candidates = data.class_sessions
+    .filter((s) => {
+      if (s.session_status !== "scheduled") return false;
+      if (s.class_type !== flagged.usualClassType) return false;
+      const day = dayNumberFromIso(s.starts_at);
+      return Number.isFinite(day) && day > today && day <= today + 10;
+    })
+    .sort((a, b) =>
+      a.starts_at === b.starts_at
+        ? a.session_id < b.session_id ? -1 : 1
+        : a.starts_at < b.starts_at ? -1 : 1,
+    );
+  return (
+    candidates.find((s) => s.instructor_id === usualInstructorId) ??
+    candidates[0] ??
+    null
+  );
+}
+
+/** "on Thursday at 9:00 AM" — the words the draft weaves in. */
+export function inviteWording(session: ClassSession): string {
+  const date = session.starts_at.split("T")[0] ?? session.starts_at;
+  return `on ${weekdayNameOf(date)} at ${timeOf(session.starts_at)}`;
+}
+
 /** First word of a display name, for the draft's greeting. */
 export function firstNameOf(displayName: string): string {
   return displayName.split(" ")[0] ?? displayName;

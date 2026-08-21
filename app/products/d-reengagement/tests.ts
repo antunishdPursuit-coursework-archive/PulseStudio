@@ -21,15 +21,27 @@ import { adaptAttendanceCsv, normalizeStatus, parseCsv } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
-import { brand, draftMessage, proposedRules } from "./config.js";
+import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import {
+  lapseKeyOf,
+  outreachResults,
+  outreachStateFor,
+  recordOutreach,
+  suppress,
+  unsuppress,
+  type OutreachRecord,
+} from "./outreach.js";
 import {
   dataQualityLine,
   dayNumberFromIso,
   findQuietMembers,
   firstNameOf,
+  inviteWording,
+  suggestedSession,
   summaryLine,
   todayDayNumber,
   upcomingReservedMemberIds,
+  weeklyCadence,
 } from "./logic.js";
 
 /* ------------------------------------------------------------------ */
@@ -304,12 +316,161 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
     usualClassType: "yoga",
     usualInstructorFirstName: firstNameOf("Ana Torres"),
     studioName: brand.studioName,
+    suggestedInvite: null,
   });
   check("draft carries the member's first name", text.includes("Maria"), true);
   check("draft carries the days away", text.includes("17"), true);
   check("draft carries their usual class", text.includes("yoga"), true);
   check("draft carries the studio name from config", text.includes(brand.studioName), true);
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
+  check("draft keeps the three ways back even without an invite",
+    text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
+}
+
+/* ------------------------------------------------------------------ */
+/* The outreach discipline: once per lapse, suppression, consent, opt-in */
+/* ------------------------------------------------------------------ */
+
+// 12a. The outreach ledger: one note per lapse, re-armed by a NEW lapse.
+{
+  const first = run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }])).flagged[0];
+  if (!first) throw new Error("fixture defect: nobody flagged");
+  let ledger: OutreachRecord[] = [];
+  check("an untouched lapse is ready",
+    outreachStateFor(first, outreachPolicy, ledger, []).kind, "ready");
+  ledger = recordOutreach(ledger, first, "copy", "2026-08-18");
+  check("taking the draft claims the lapse",
+    outreachStateFor(first, outreachPolicy, ledger, []).kind, "alreadyReached");
+  // The member returns (new last-attended), then lapses again: NEW lapse.
+  const relapsed = run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01", "2026-08-02"] }])).flagged[0];
+  if (!relapsed) throw new Error("fixture defect: relapse not flagged");
+  check("a new lapse re-arms the outreach",
+    outreachStateFor(relapsed, outreachPolicy, ledger, []).kind, "ready");
+  check("lapse identity is member + last-attended date",
+    lapseKeyOf(first) === lapseKeyOf(relapsed), false);
+}
+
+// 12b. Suppression: checked BEFORE the ledger, reversible, idempotent.
+{
+  const f = run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }])).flagged[0];
+  if (!f) throw new Error("fixture defect");
+  const ledger = recordOutreach([], f, "email", "2026-08-17");
+  let sup = suppress([], "m1", "2026-08-16");
+  check("suppression beats the ledger",
+    outreachStateFor(f, outreachPolicy, ledger, sup).kind, "suppressed");
+  check("suppressing twice stores once", suppress(sup, "m1", "2026-08-17").length, 1);
+  sup = unsuppress(sup, "m1");
+  check("unsuppression restores the ledger verdict",
+    outreachStateFor(f, outreachPolicy, ledger, sup).kind, "alreadyReached");
+}
+
+// 12c. Consent aging: silence beyond the window refuses to draft, by name.
+{
+  const f = run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }])).flagged[0];
+  if (!f) throw new Error("fixture defect");
+  const narrow = { ...outreachPolicy, consentWindowDays: 10 };
+  check("outside the consent window the tool refuses, by name",
+    outreachStateFor(f, narrow, [], []).kind, "outsideConsent");
+  // A member BOTH suppressed AND outside the window: the do-not-contact
+  // answer wins, because "they said no" outranks "we waited too long" —
+  // the card should state the member's own decision, not our timing.
+  check("suppression outranks the consent window",
+    outreachStateFor(f, narrow, [], suppress([], "m1", "2026-08-10")).kind,
+    "suppressed");
+}
+
+// 12d. The opt-in gate outranks everything, including suppression state.
+{
+  const f = run(recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] }])).flagged[0];
+  if (!f) throw new Error("fixture defect");
+  const off = { ...outreachPolicy, enabled: false };
+  check("a studio that never opted in gets no outreach workflow",
+    outreachStateFor(f, off, [], suppress([], "m1", "2026-08-16")).kind, "disabled");
+}
+
+/* ------------------------------------------------------------------ */
+/* Concrete invites, cadence, and the closed loop                       */
+/* ------------------------------------------------------------------ */
+
+// 12e. The draft invites to a REAL class matching the member's own pattern —
+//      usual class with the usual instructor first, then usual class with
+//      anyone, and never an invented invitation.
+{
+  const fx = recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01@yoga"] }]);
+  fx.instructors.push({ instructor_id: "i_2", display_name: "Kim Lee" });
+  fx.class_sessions.push(
+    { session_id: "up_1", class_type: "yoga", level: "all levels", instructor_id: "i_2",
+      starts_at: "2026-08-20T09:00:00-04:00", ends_at: "2026-08-20T10:00:00-04:00",
+      capacity: 12, session_status: "scheduled" },
+    { session_id: "up_2", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "2026-08-21T18:00:00-04:00", ends_at: "2026-08-21T19:00:00-04:00",
+      capacity: 12, session_status: "scheduled" },
+    { session_id: "up_3", class_type: "cycling", level: "beginner", instructor_id: "i_1",
+      starts_at: "2026-08-19T07:00:00-04:00", ends_at: "2026-08-19T07:45:00-04:00",
+      capacity: 12, session_status: "scheduled" },
+  );
+  const f = run(fx).flagged[0];
+  if (!f) throw new Error("fixture defect");
+  const pick = suggestedSession(f, fx, TODAY);
+  check("the invite prefers their usual instructor over an earlier class",
+    pick?.session_id, "up_2");
+  check("the invite words are concrete", pick ? inviteWording(pick) : "",
+    "on Friday at 6:00 PM");
+  fx.class_sessions = fx.class_sessions.filter((x) => x.session_id !== "up_2");
+  const fallback = suggestedSession(f, fx, TODAY);
+  check("without their instructor, their usual class still wins",
+    fallback?.session_id, "up_1");
+}
+{
+  const fx = recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01@yoga"] }]);
+  const f = run(fx).flagged[0];
+  if (!f) throw new Error("fixture defect");
+  check("no upcoming schedule means no invented invitation",
+    suggestedSession(f, fx, TODAY), null);
+  const text = draftMessage({
+    firstName: "Maria", daysSince: 17, usualClassType: "yoga",
+    usualInstructorFirstName: "Ana", studioName: brand.studioName,
+    suggestedInvite: "on Thursday at 9:00 AM",
+  });
+  check("the draft weaves the concrete invite in",
+    text.includes("on Thursday at 9:00 AM"), true);
+}
+
+// 12f. Cadence: comparable across members, honestly rounded.
+check("cadence math: 12 classes in 60 days is 1.4 a week", weeklyCadence(12, 60), 1.4);
+check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 0.4);
+
+// 12g. The closed loop: a note followed by attendance is a RETURN with the
+//      days counted; silence after the note is stated; a visit BEFORE the
+//      note never counts; foreign ledger entries are accounted, not dropped.
+{
+  const fx = recordsFor([
+    { id: "m1", name: "Saved Member", status: "active", attended: ["2026-07-20", "2026-08-10"] },
+    { id: "m2", name: "Still Gone", status: "active", attended: ["2026-07-25"] },
+  ]);
+  const ledger = [
+    { memberId: "m1", lapseKey: "m1|2026-07-20", takenAt: "2026-08-06", channel: "email" as const },
+    { memberId: "m2", lapseKey: "m2|2026-07-25", takenAt: "2026-08-12", channel: "copy" as const },
+    { memberId: "ghost", lapseKey: "ghost|2026-07-01", takenAt: "2026-08-01", channel: "copy" as const },
+  ];
+  const results = outreachResults(ledger, fx, TODAY);
+  check("a visit after the note is a return, days counted",
+    results.outcomes.find((o) => o.record.memberId === "m1")?.daysToReturn, 4);
+  check("silence after the note is stated, not hidden",
+    results.outcomes.find((o) => o.record.memberId === "m2")?.result, "stillQuiet");
+  check("a foreign ledger entry is accounted, never silently dropped",
+    results.notEvaluable, 1);
+  check("the aggregate states the loop",
+    [results.returned, results.stillQuiet, results.medianDaysToReturn], [1, 1, 4]);
+}
+{
+  // The visit-before-the-note trap: attendance on 08-10, note on 08-12.
+  const fx = recordsFor([{ id: "m1", name: "Pre Noted", status: "active", attended: ["2026-08-10"] }]);
+  const results = outreachResults(
+    [{ memberId: "m1", lapseKey: "m1|2026-08-10", takenAt: "2026-08-12", channel: "copy" }],
+    fx, TODAY);
+  check("a visit BEFORE the note never counts as a return",
+    results.outcomes[0]?.result, "stillQuiet");
 }
 
 /* ------------------------------------------------------------------ */

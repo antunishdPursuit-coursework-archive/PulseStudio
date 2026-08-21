@@ -92,10 +92,10 @@ instead of doing it.
 ## The git law
 
 - Gate before every commit: `npm run check` must pass. It compiles every
-  `.ts`, checks for style drift, and runs all 284 unit checks from the three
+  `.ts`, checks for style drift, and runs every unit check from the three
   suites (synthetic engine, session contract, re-engagement) headlessly — the
   same checks the `tests.html` pages show in a browser. It prints the count it
-  actually ran, never a silent pass.
+  actually ran, never a silent pass — read the count there, not from prose.
 - One branch per product change, plain commit messages anyone can read.
   Merge to `main` through a PR using the template.
 - The AI is NEVER a contributor: no Claude or AI names, no `Co-Authored-By`,
