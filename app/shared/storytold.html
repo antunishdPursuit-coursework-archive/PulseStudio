@@ -62,6 +62,14 @@
     .lbl.done { fill: var(--done); }
     .lbl.todo { fill: var(--todo); }
 
+    /* how to read the picture — words a second grader owns */
+    .how { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+    .how h2 { margin: 0 0 8px; font-size: 1rem; }
+    .how ul { list-style: none; margin: 0; padding: 0; }
+    .how li { display: flex; align-items: center; gap: 10px; margin: 8px 0; color: var(--muted); }
+    .how li svg { flex: 0 0 auto; }
+    .how li strong { color: var(--fg); }
+
     /* the muscle lists */
     .muscles { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
     @media (max-width: 700px) { .muscles { grid-template-columns: 1fr; } }
@@ -163,6 +171,28 @@
         </g>
       </svg>
     </div>
+
+    <section class="how" aria-label="How to read this picture">
+      <h2>How to read this picture</h2>
+      <ul>
+        <li>
+          <svg width="46" height="14" viewBox="0 0 46 14" aria-hidden="true"><rect x="1" y="1" width="44" height="12" rx="4" fill="var(--bg)" stroke="var(--rensley)" stroke-width="2"/></svg>
+          <span>Each <strong>box</strong> is one part of the studio. Its color tells you <strong>who built it</strong>.</span>
+        </li>
+        <li>
+          <svg width="46" height="8" viewBox="0 0 46 8" aria-hidden="true"><line x1="2" y1="4" x2="44" y2="4" stroke="var(--done)" stroke-width="3"/><line x1="14" y1="4" x2="26" y2="4" stroke="var(--fg)" stroke-width="5" stroke-linecap="round"/></svg>
+          <span>The <strong>lines are roads</strong> the studio's notes travel on. A <strong>green road works today</strong> — a little light runs along it, like a heartbeat. If you see the light, that road is real, not a plan.</span>
+        </li>
+        <li>
+          <svg width="46" height="8" viewBox="0 0 46 8" aria-hidden="true"><line x1="2" y1="4" x2="44" y2="4" stroke="var(--todo)" stroke-width="3" stroke-dasharray="6 5"/></svg>
+          <span>A <strong>red dotted road is not built yet</strong>. No notes can travel on it, so it has no heartbeat. Red is not bad — it is honest. It shows exactly <strong>what we still have to build</strong>, and whose job it is (the list below says).</span>
+        </li>
+        <li>
+          <svg width="46" height="16" viewBox="0 0 46 16" aria-hidden="true"><path d="M2 8 h10 l4-6 5 12 4-6 h19" fill="none" stroke="var(--dennis)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><strong>Why the heartbeat matters:</strong> when boxes share a road, they share one life — book a class in one box and another box feels it the same minute. When every road turns green, the whole studio beats as <strong>one pulse</strong>: nothing anyone does gets lost, and no member gets forgotten.</span>
+        </li>
+      </ul>
+    </section>
 
     <div class="muscles">
       <section class="on">
