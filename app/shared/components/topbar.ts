@@ -260,7 +260,7 @@ function injectStylesOnce(): void {
   width: 9px; height: 9px; border-radius: 50%;
   background: var(--accent, var(--fg)); /* solid accent — the sanctioned fill */
 }
-.pulse-session-role { font-style: normal; font-size: 0.78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.pulse-session-role { font-style: normal; font-size: 0.78rem; white-space: nowrap; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
 .pulse-session-dialog {
   background: var(--bg); /* the law: surfaces are black or white only */
   color: var(--fg);
