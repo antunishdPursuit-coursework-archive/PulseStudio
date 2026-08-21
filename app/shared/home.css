@@ -91,7 +91,7 @@ body.home { overflow-x: hidden; }
   margin: 0 0 22px;
   /* Big, and tight enough that the four promises stack like a wall of
      text in a studio rather than four separate sentences. */
-  font-size: clamp(1.75rem, 5vw, 3.6rem);
+  font-size: clamp(1.9rem, 5.5vw, 4rem);
   line-height: 1.02;
   max-width: none;
 }
