@@ -28,6 +28,25 @@ member information.
 The shared data should support the four MVPs without requiring every product to
 read every field. A product should read only the data its user needs.
 
+## The envelope around the records
+
+`app/shared/fixtures.json` is not a bare list of entities. It is one object
+that carries the collections **and two fields of its own**, both live in
+`app/shared/contract.ts` as `FixtureSet` and both read at run time:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `timezone` | string | The IANA zone this record set's dates are in. Every product that computes a day boundary — "how many days quiet", "is this class today" — resolves it here, so a staff member in another timezone still gets the STUDIO's answer. |
+| `note` | string | What this record set is, in one sentence, including that the people in it are fictional. It travels with the data so a set can never be mistaken for a real studio's records once it leaves this repo. |
+
+Then the collections: `members`, `memberships`, `instructors`,
+`class_sessions`, `reservations`, `attendance`, `studio_policies`.
+
+Documented 2026-08-21: these two fields existed in `contract.ts` and were
+described nowhere here, so the document that defines the vocabulary was
+silent about the field every day boundary in the studio is computed from.
+`scripts/check-fixtures.mjs` requires both.
+
 ## Core entities
 
 ### Member

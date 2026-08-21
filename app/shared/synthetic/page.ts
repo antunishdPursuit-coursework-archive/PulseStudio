@@ -78,7 +78,16 @@ generateBtn.addEventListener("click", () => {
     statusEl.textContent = `Generation refused: ${error instanceof Error ? error.message : String(error)}`;
     reportEl.replaceChildren();
     violationsEl.textContent = "";
+    /* BOTH doors close, not one. This hid the JSON download and left the CSV
+     * download standing, still holding the PREVIOUS studio's attendance — so
+     * a page saying "Generation refused" would hand a visitor a file from a
+     * run that is not the one in front of them, named after a seed they
+     * never asked for. The stale bytes go too, so nothing can be handed out
+     * by a later click either. */
     downloadBtn.hidden = true;
+    downloadCsvBtn.hidden = true;
+    lastSerialized = null;
+    lastCsv = null;
     return;
   }
   const t1 = performance.now();
