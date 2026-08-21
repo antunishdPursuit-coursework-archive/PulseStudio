@@ -93,7 +93,7 @@
     </ol>
 
     <!-- The map. Status lives on each edge's class: done | todo. -->
-    <div class="map" role="img" aria-label="The data flow is a hub, not a line: shared records feed all four products (working). A's booking log flows into the Dashboard (working) and into Re-engagement (working). Support answering from the live log is the one hand-off not built yet.">
+    <div class="map" role="img" aria-label="The data flow: shared records feed all four products. A's bookings flow into B, C answers from live bookings, and D reads the live trail. Every hand-off is working.">
       <svg viewBox="0 0 860 250">
         <!-- the shared rail -->
         <g class="node">
@@ -130,10 +130,11 @@
           <line class="runner" x1="190" y1="66" x2="240" y2="66" stroke-dasharray="26 234"/>
           <text class="lbl done" x="215" y="56" text-anchor="middle">live</text>
         </g>
-        <!-- A -> C : TODO. Support's spaces-left ignores the live log so far. -->
-        <g class="edge todo">
-          <path d="M140 40 C 250 4, 440 4, 528 40"/>
-          <text class="lbl todo" x="335" y="16" text-anchor="middle">not yet · live spots</text>
+        <!-- B -> C : DONE. C's spaces-left answers read A's live reservation log. -->
+        <g class="edge done">
+          <line x1="410" y1="66" x2="460" y2="66"/>
+          <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 234"/>
+          <text class="lbl done" x="435" y="56" text-anchor="middle">live</text>
         </g>
         <!-- A -> D : DONE. Re-engagement reads the running studio with A's
              live reservation log merged in (last row wins). -->
@@ -169,6 +170,8 @@
         <ul>
           <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip b">B</span> watches, <span class="chip c">C</span> answers from, and <span class="chip d">D</span> reconciles against independent truth.</li>
           <li><strong><span class="chip a">A</span> → <span class="chip b">B</span>:</strong> every booking lands in the append-only reservation log and the Dashboard reads it live — book a spot, watch the meter move.</li>
+          <li><strong><span class="chip b">B</span> → <span class="chip c">C</span>:</strong> support's spaces-left answers include Booking's live reservation log from this browser, with each member's latest reservation state winning.</li>
+          <li><strong><span class="chip b">B</span> publishes for real:</strong> confirmed weekly schedules persist in this browser after a reload.</li>
           <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, 27 checks deep.</li>
           <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file — a clone renames the studio in four files total.</li>
           <li><strong><span class="chip b">B</span> turns the fill on:</strong> the Dashboard uses the engine's occupancy knob to keep the upcoming week realistically filled.</li>
@@ -177,11 +180,8 @@
         </ul>
       </section>
       <section class="off">
-        <h2><span class="state">Red — still to build</span></h2>
-        <ul>
-          <li><strong><span class="chip c">C</span> sees live bookings (the A→C hand-off):</strong> spaces-left answers come from the day's schedule, not the live reservation log — Dennis's lane.</li>
-          <li><strong><span class="chip b">B</span> publishes for real:</strong> staged weekly schedules vanish on reload, so <span class="chip a">A</span> can never book a class staff just published — Manny's lane.</li>
-        </ul>
+        <h2><span class="state">Red — nothing waiting</span></h2>
+        <ul><li>0 hand-offs are waiting on this board.</li></ul>
       </section>
     </div>
 
