@@ -13,6 +13,9 @@ export interface StudioBrand {
   /** The studio's outreach mailbox. Drafts BCC it so the studio keeps a
    *  record of what staff sent — the tool itself never sends anything. */
   studioEmail: string;
+  /** The studio's public web address, used in draft links so a member can
+   *  book, ask, or browse straight from the note. Ends with a slash. */
+  studioUrl: string;
 }
 
 import { STUDIO_NAME } from "./deps.js";
@@ -24,6 +27,7 @@ export const brand: StudioBrand = {
    * product ships standalone under its own name. */
   studioName: STUDIO_NAME,
   studioEmail: "pulse@githat.io",
+  studioUrl: "https://antunishdpursuit.github.io/PulseStudio/",
 };
 
 /** The quiet-member rule, PROPOSED — the team has not ratified these
@@ -58,9 +62,13 @@ export interface DraftFacts {
  *  the voice. Every value is filled from real records before render;
  *  the unit checks prove no unfilled placeholder can reach a screen. */
 export function draftMessage(f: DraftFacts): string {
+  /* The note always hands the member their three ways back — book a spot,
+   * ask a question, or just look at what's new — so replying is never the
+   * only door. The links come from config (the reseller seam). */
   return [
     `Hi ${f.firstName} — it's been ${f.daysSince} days since your last ${f.usualClassType} class, and we've missed seeing you.`,
     `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`,
+    `Or come back your own way:\n· Book a class: ${brand.studioUrl}products/a-booking/\n· Ask us anything: ${brand.studioUrl}products/c-chatbot/\n· See what's new this week: ${brand.studioUrl}`,
     `— ${f.studioName}`,
   ].join("\n\n");
 }
