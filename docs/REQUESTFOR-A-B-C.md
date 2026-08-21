@@ -179,6 +179,29 @@ If anything looks different on your product and you think one of these did
 it, say so and I will fix it or revert it — shared ground is not mine, and
 "it passed the gate" is not the same as "it is right for your page".
 
+### And a clean result, recorded so nobody re-derives it (2026-08-21)
+
+I swept every tracked `.ts` and `.html` for DOM and eval sinks —
+`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`,
+`new Function`, `srcdoc`, `javascript:` URLs, inline `on*=` handlers. Not
+because I suspected anything; because I had claimed "no sinks" earlier on
+the strength of a three-pattern grep over my own folder, and a hand sweep on
+this branch has already missed something a systematic one caught.
+
+**Nothing is wrong.** Product D and `app/shared` contain no sink of any
+kind; every value reaches the DOM through `textContent`. Products A and B
+use `innerHTML` — fourteen places between them — and both escape correctly:
+each has its own `escapeHtml` covering `& < > " '`, and every interpolated
+value that could carry a person's text goes through it. What is left
+unescaped in both is counts and lengths, which are numbers, and one
+locally-computed headline string in A that no input reaches.
+
+So there is no ask here either. It is written down because a checked
+negative is worth as much as a finding and costs the next person the same
+hour it cost me — and because if either of you adds an `innerHTML` later,
+the thing to keep is the habit already in your code: escape at the
+interpolation, not at the source.
+
 ## Everyone — the shared fixture goes stale on 2026-08-29 (2026-08-21)
 
 Dated, so nobody meets it by surprise — and deliberately NOT a deadline on
