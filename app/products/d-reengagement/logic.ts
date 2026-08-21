@@ -484,20 +484,55 @@ function timeOf(startsAt: string): string {
  *  usual class with anyone. Null when the records hold no such session —
  *  a generic draft beats a made-up invitation. Deterministic: earliest
  *  date, then session id. */
+/* SEATS COUNTED ONCE PER RECORD SET, NOT ONCE PER QUESTION.
+ *
+ * remainingSpots first walked the whole reservation list per session. That
+ * is fine for one lookup and ruinous inside suggestedSession, which asks it
+ * about every candidate class for every flagged member: at two thousand
+ * members the card loop took 137 SECONDS — a regression I introduced with
+ * the capacity fix itself, trading a wrong answer for one nobody would wait
+ * for. Both were mine.
+ *
+ * The counts are derived from the reservations and nothing else, so they are
+ * memoised against THAT ARRAY rather than against the record set holding it.
+ * Keying on the record set was the obvious move and it was wrong: a caller
+ * that swaps in a different reservation list on the same object — which the
+ * suite does, and which is the natural way to write such a check — kept
+ * getting the first answer forever. Four checks caught it immediately.
+ * Keying on the array means any new list misses and recomputes.
+ *
+ * THE REMAINING CONSTRAINT, stated because it is invisible: mutating the
+ * SAME array in place after a lookup would still read stale. Nothing here
+ * does — fixtureSetFrom, the CSV door and the generator each build a fresh
+ * array, and the page never appends to one — but a future caller that
+ * pushes onto data.reservations has to know this exists. */
+const seatsTakenCache = new WeakMap<readonly Reservation[], Map<string, number>>();
+
+function seatsTakenBySession(data: FixtureSet): Map<string, number> {
+  const cached = seatsTakenCache.get(data.reservations);
+  if (cached !== undefined) return cached;
+  /* Last row wins per (member, session) — the same reading Booking uses for
+   * its own log — so a cancellation frees the seat and a member listed
+   * twice holds one. Built in one pass over the reservations. */
+  const latestStatus = new Map<string, string>();
+  for (const r of data.reservations) {
+    latestStatus.set(`${r.session_id}|${r.member_id}`, r.reservation_status);
+  }
+  const taken = new Map<string, number>();
+  for (const [key, status] of latestStatus) {
+    if (status !== "reserved") continue;
+    const sessionId = key.slice(0, key.lastIndexOf("|"));
+    taken.set(sessionId, (taken.get(sessionId) ?? 0) + 1);
+  }
+  seatsTakenCache.set(data.reservations, taken);
+  return taken;
+}
+
 /** Seats left in a session, by the same last-row-wins reading Booking uses
  *  for its own log: a member who booked and then cancelled has freed their
  *  seat, and a member who appears twice holds one seat, not two. */
 export function remainingSpots(session: ClassSession, data: FixtureSet): number {
-  const statusByMember = new Map<string, string>();
-  for (const r of data.reservations) {
-    if (r.session_id !== session.session_id) continue;
-    statusByMember.set(r.member_id, r.reservation_status);
-  }
-  let taken = 0;
-  for (const status of statusByMember.values()) {
-    if (status === "reserved") taken += 1;
-  }
-  return session.capacity - taken;
+  return session.capacity - (seatsTakenBySession(data).get(session.session_id) ?? 0);
 }
 
 export function suggestedSession(

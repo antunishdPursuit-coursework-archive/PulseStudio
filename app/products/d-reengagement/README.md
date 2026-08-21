@@ -142,9 +142,10 @@ into a different host is two moves:
 The engine itself (`logic.ts`) is framework-free and clock-free — a server
 route can call `findQuietMembers(records, todayDayNumber(tz), rules)` and
 render the result in any UI. It runs in one pass over the records
-(O(members + attendance)), so it holds up at studio scale: 2000 members and
-170,000 attendance rows resolve in about 430ms, which matters because the
-page re-runs the rule after every action a staff member takes. The HTML/CSS here is a reference skin, not a
+(O(members + attendance)), and the whole rule-plus-cards path — the work one
+click costs, because the page re-renders after every action a staff member
+takes — measures 10ms at 60 members, 394ms at 1000, and about 1.2s at 2000
+members against 170,000 attendance rows and 163,000 reservations. The HTML/CSS here is a reference skin, not a
 requirement; its only tethers are the shared theme tokens, swapped when
 porting.
 

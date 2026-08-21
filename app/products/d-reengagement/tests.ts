@@ -356,6 +356,52 @@ check("today is computed in the studio timezone",
     nobodyFlaggedLine(r, proposedRules)?.includes("been in within"), false);
   check("the count of those past the window is stated", r.quietLongerThanWindowCount, 2);
 }
+/* THE SEAT COUNTS ARE MEMOISED, AND A MEMO CAN GO STALE.
+ *
+ * remainingSpots is asked about every candidate class for every flagged
+ * member, so it counts seats once per reservation list rather than once per
+ * question — 137 SECONDS down to 391ms at two thousand members. The first
+ * version keyed that memo on the RECORD SET, and swapping in a different
+ * reservation list on the same object kept returning the first answer
+ * forever. Four checks below caught it within a minute of it being written;
+ * these keep it caught. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Someone", status: "active", attended: ["2026-08-01@yoga"] }]);
+  const session = {
+    session_id: "s-cache", class_type: "yoga", level: "all levels", instructor_id: "i1",
+    starts_at: "2026-08-22T09:00:00", ends_at: "2026-08-22T10:00:00",
+    capacity: 2, session_status: "scheduled" as const,
+  };
+  fx.class_sessions = [...fx.class_sessions, session];
+
+  fx.reservations = [];
+  check("an empty list leaves every seat", remainingSpots(session, fx), 2);
+
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "a", session_id: "s-cache",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+  ];
+  check("swapping in a new list is seen, not served from the last answer",
+    remainingSpots(session, fx), 1);
+
+  fx.reservations = [
+    { reservation_id: "r1", member_id: "a", session_id: "s-cache",
+      reservation_status: "reserved", reserved_at: "2026-08-20T09:00:00", canceled_at: null },
+    { reservation_id: "r2", member_id: "b", session_id: "s-cache",
+      reservation_status: "reserved", reserved_at: "2026-08-20T10:00:00", canceled_at: null },
+  ];
+  check("...and again when it fills", remainingSpots(session, fx), 0);
+
+  // Asking twice must give the same answer — that is the memo working.
+  check("two lookups on the same list agree",
+    [remainingSpots(session, fx), remainingSpots(session, fx)], [0, 0]);
+
+  // A different session in the same list is counted separately.
+  const other = { ...session, session_id: "s-other", capacity: 5 };
+  check("seats are per session, not shared across the studio",
+    remainingSpots(other, fx), 5);
+}
+
 /* THE INDEX MUST AGREE WITH THE SCAN IT REPLACED.
  *
  * findQuietMembers used to re-scan the whole attendance array once per
