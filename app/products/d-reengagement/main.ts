@@ -368,24 +368,28 @@ function renderFlagged(
   });
 
   const href = mailtoHref(f, draft);
-  const mailLink = document.createElement("a");
-  mailLink.className = "btn btn-outline";
+  /* A mail client would truncate an over-long link, silently — and opening
+   * it would CLAIM THE LAPSE, so the member gets one half-finished note and
+   * then correctly never hears about this silence again. It is not offered
+   * at all rather than offered as a trap; copying has no length limit and
+   * is right there.
+   *
+   * Each branch builds its own element. The first version made an <a>,
+   * stripped an href it had never set, and re-roled it into a note —
+   * which worked and read as an accident. A sentence is a <p>. */
+  let mailLink: HTMLElement;
   if (mailtoIsTooLong(href)) {
-    /* A mail client would truncate this, silently — and opening it would
-     * CLAIM THE LAPSE, so the member gets one half-finished note and then
-     * correctly never hears about this silence again. The link is not
-     * offered at all rather than offered as a trap; copying has no length
-     * limit and is right there. */
-    mailLink.removeAttribute("href");
-    mailLink.setAttribute("role", "note");
-    mailLink.classList.add("btn-ghost");
-    mailLink.classList.remove("btn", "btn-outline");
-    mailLink.textContent =
-      "Too long to open in an email app — copy it instead (a mail link this long gets cut off without warning)";
+    const tooLong = document.createElement("p");
+    tooLong.className = "evidence";
+    tooLong.textContent =
+      "Too long to open in an email app — copy it instead (a mail link this long gets cut off without warning).";
+    mailLink = tooLong;
   } else {
-    mailLink.href = href;
-    mailLink.textContent = "Open in your email app";
-    mailLink.addEventListener("click", () => {
+    const anchor = document.createElement("a");
+    anchor.className = "btn btn-outline";
+    anchor.href = href;
+    anchor.textContent = "Open in your email app";
+    anchor.addEventListener("click", () => {
       // Opening the mail client IS taking the draft — the note is in the
       // staff member's hands from here.
       ledger = recordOutreach(ledger, f, "email", studioToday());
@@ -395,6 +399,7 @@ function renderFlagged(
         rerender();
       }, 900);
     });
+    mailLink = anchor;
   }
 
   const suppressBtn = document.createElement("button");
