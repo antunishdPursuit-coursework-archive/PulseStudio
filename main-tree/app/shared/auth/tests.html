@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unit checks — shared session contract</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="../theme.css">
+  <style>
+    .pass { color: var(--muted); margin: 2px 0; }
+    .fail { color: var(--fg); font-weight: 700; margin: 2px 0; }
+    #summary { font-weight: 700; }
+  </style>
+</head>
+<body data-no-session>
+  <header class="page-head">
+    <a class="back" href="../../index.html">← Pulse Studio</a>
+    <h1>Shared session contract — unit checks</h1>
+  </header>
+  <main>
+    <p id="summary" class="status" aria-live="polite">Running the checks…</p>
+    <section id="results" aria-label="Check results"></section>
+  </main>
+  <script type="module" src="./tests.js"></script>
+</body>
+</html>

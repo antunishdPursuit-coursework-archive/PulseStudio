@@ -1,0 +1,14 @@
+const A = "/Users/Rensley/Desktop/pulseStudio/PulseStudio/app/";
+globalThis.localStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{}};
+const { DEFAULT_CONFIG, GENERATOR_VERSION } = await import(A+"shared/synthetic/config.js");
+const { generateStudio } = await import(A+"shared/synthetic/generate.js");
+const { sharedStudio } = await import(A+"shared/auth/studio.js");
+const a = sharedStudio();
+const b = generateStudio({...DEFAULT_CONFIG,generatorVersion:GENERATOR_VERSION,seed:'capacity-watch-2026',asOfDate:'2026-08-19',memberCount:60,historyDays:180,mode:'clean',upcomingFillTarget:0.85}).dataset;
+const bIds=new Set(b.classSessions.map(s=>s.id));
+const bMem=new Set(b.members.map(m=>m.id));
+const aUpcoming=a.classSessions.filter(s=>s.status==="scheduled"&&s.startsAt.slice(0,10)>="2026-08-20");
+console.log("A sessions:",a.classSessions.length,"B sessions:",b.classSessions.length);
+console.log("A upcoming session ids present in B:", aUpcoming.filter(s=>bIds.has(s.id)).length, "of", aUpcoming.length);
+console.log("A member ids present in B:", a.members.filter(m=>bMem.has(m.id)).length, "of", a.members.length);
+console.log("sample A id:",aUpcoming[0]?.id," sample B id:",b.classSessions[0]?.id);

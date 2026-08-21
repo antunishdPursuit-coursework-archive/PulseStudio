@@ -1,0 +1,191 @@
+/* Pulse Studio — shared theme.
+   TEAM-OWNED: change only by team agreement (see CLAUDE.md).
+
+   The shared appearance rules this file enforces:
+   1. Built-in light and dark backgrounds are white and black. A person may
+      choose a custom background/text pair only through theme-boot's
+      accessible appearance picker; every page still uses var(--bg).
+   2. Every visible feature carries its developer's color, so anyone
+      looking at a screen can tell who built what:
+        Kerrian  · Product A · blue
+        Manny    · Product B · amber
+        Dennis   · Product C · green
+        Rensley  · Product D · violet
+      Put class="product-a|b|c|d" on your page's <body> and style your
+      controls with var(--accent) / var(--accent-ink). */
+
+:root {
+  color-scheme: light dark;
+
+  /* built-in backgrounds: white (light) / black (dark) */
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --line: #d4d4d4;
+  --muted: #595959;
+
+  /* one color per developer */
+  --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
+  --manny:   #f59e0b;  --manny-ink:   #0a0a0a;
+  --dennis:  #10b981;  --dennis-ink:  #0a0a0a;
+  --rensley: #8b5cf6;  --rensley-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --fg: #ffffff;
+    --line: #333333;
+    --muted: #a3a3a3;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --fg: #ffffff;
+  --line: #333333;
+  --muted: #a3a3a3;
+}
+
+:root[data-theme="custom"] {
+  color-scheme: normal;
+  --bg: var(--custom-bg, #ffffff);
+  --fg: var(--custom-fg, #0a0a0a);
+  --line: color-mix(in srgb, var(--fg) 24%, var(--bg));
+  --muted: color-mix(in srgb, var(--fg) 68%, var(--bg));
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main { padding: 24px; max-width: 960px; margin: 0 auto; }
+
+a { color: var(--accent, var(--fg)); }
+
+/* developer scoping — the color law in one class */
+.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
+.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink); }
+.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink); }
+.product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); }
+
+/* shared building blocks — every control a developer ships uses their accent */
+.btn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.owner-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 3px solid var(--accent, var(--line));
+}
+.page-head h1 { font-size: 1.25rem; margin: 0; flex: 1; }
+.page-head .back { text-decoration: none; color: var(--muted); }
+
+.card {
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--accent, var(--line));
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 12px 0;
+}
+.card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.card p { margin: 4px 0; color: var(--muted); }
+
+/* status lines state what ran — a stated result, never a blank panel */
+.status { color: var(--muted); border-left: 4px solid var(--accent, var(--line)); padding-left: 12px; }
+
+.appearance-control { position: relative; }
+.appearance-control summary {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 38px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  list-style: none;
+}
+.appearance-control summary::-webkit-details-marker { display: none; }
+.appearance-control summary:focus-visible,
+.appearance-mode:focus-visible,
+.appearance-custom:focus-visible,
+.appearance-hue:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
+.appearance-panel {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 250px;
+  padding: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--fg) 18%, transparent);
+}
+.appearance-heading { margin: 0 0 10px; font-weight: 700; }
+.appearance-modes { margin-bottom: 12px; }
+.appearance-mode, .appearance-custom {
+  min-height: 36px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  cursor: pointer;
+}
+.appearance-mode { width: 42px; font-size: 1.1rem; }
+.appearance-mode:disabled { color: var(--accent, var(--fg)); border-color: var(--accent, var(--line)); cursor: default; opacity: 1; }
+.appearance-editor { margin: 0 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.appearance-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: .8rem; }
+.appearance-color-value { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem; font-weight: 600; }
+.appearance-color-field { display: block; width: 100%; height: 104px; border: 2px solid var(--accent, var(--line)); border-radius: 7px; cursor: crosshair; }
+.appearance-hue { width: 100%; height: 12px; margin-top: 9px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
+.appearance-editor-note { margin: 6px 0 0; color: var(--muted); font-size: .74rem; }
+.appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
+.appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
+.appearance-custom:disabled { cursor: not-allowed; opacity: .55; }
+.appearance-status { margin: 9px 0 0; color: var(--muted); font-size: .76rem; }
+
+/* The branded home link every product header carries — styled ONCE here,
+   never per-page. The WORD inside renders from shared/brand.ts at runtime
+   (components/brand-header.ts, called by theme-boot); page markup holds
+   only a pre-module placeholder. */
+.home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
+.home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent, var(--fg)); }
+.home-brand:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
+
+/* The label naming what a page IS, sitting beside the brand in the same
+   header ("Book a class", "Member Re-engagement"). Every product header
+   shows one, so it is styled ONCE here — a copy pasted into a product's
+   own stylesheet is the drift this file exists to prevent. */
+.page-head .role { color: var(--accent, var(--fg)); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }

@@ -1,0 +1,328 @@
+/* Product D — the CSV door. Rensley's lane.
+ *
+ * Turns a studio's own attendance export into the contract shape so the
+ * engine can run on REAL records. Everything here is pure and everything
+ * runs in the browser: the file never leaves the staff member's machine —
+ * no upload, no server, no third party. That is a promise the UI states,
+ * so this module must never gain a network call.
+ *
+ * Accepted shape (headers are case-insensitive, order-free):
+ *   required: a member column (member/name/member name/customer/client)
+ *             a date column   (date/class date/visit date/day)
+ *   optional: status     (attended/no-show — absent means attended, because
+ *                         a sign-in sheet only records presence; anything
+ *                         unrecognized maps to unknown, never to attended)
+ *             class      (class/class type/service/type)
+ *             instructor (instructor/staff/teacher/coach)
+ *
+ * Honesty rules this module lives by:
+ *   - A guessed value is worse than a skipped row: unreadable and
+ *     impossible dates become stated skips naming the PHYSICAL file line.
+ *   - Identity is the name as written (case-insensitive), never a lossy
+ *     slug — 王伟 and 佐藤花子 are different people even though neither
+ *     survives ASCII slugging.
+ *   - A bare attendance export says nothing about memberships, so every
+ *     person in the file is treated as an active member; the UI states it.
+ */
+
+import type { Attendance, ClassSession, FixtureSet, Member } from "./deps.js";
+
+export interface CsvImport {
+  records: FixtureSet;
+  rowCount: number;
+  memberCount: number;
+  /** Rows we could not use, each naming its physical file line and the
+   *  reason — never silent. */
+  skipped: string[];
+  /** Which column identity was matched on, so the page can say so. Name
+   *  matching is a real limitation, not a detail to hide. */
+  identityMethod: string;
+  /** True when identity fell back to the member's name. */
+  identityIsName: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Parsing — small, correct, quote-aware, line-tracking                */
+/* ------------------------------------------------------------------ */
+
+export interface CsvRow {
+  cells: string[];
+  /** 1-based physical line in the file where this row starts — the number
+   *  a staff member sees in their spreadsheet, blank lines included. */
+  line: number;
+}
+
+/** Parse CSV text into rows of fields with their physical line numbers.
+ *  Handles quoted fields, embedded commas, doubled quotes, and embedded
+ *  newlines inside quotes. All-blank rows are dropped from the result but
+ *  still advance the line count, so stated line numbers stay true. */
+export function parseCsvRows(text: string): CsvRow[] {
+  const rows: CsvRow[] = [];
+  let field = "";
+  let row: string[] = [];
+  let inQuotes = false;
+  let line = 1;
+  let rowLine = 1;
+  const endRow = (): void => {
+    row.push(field);
+    field = "";
+    if (row.some((f) => f.trim() !== "")) rows.push({ cells: row, line: rowLine });
+    row = [];
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i += 1;
+        line += 1;
+        field += "\n";
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1;
+      endRow();
+      line += 1;
+      rowLine = line;
+    } else {
+      field += ch;
+    }
+  }
+  endRow();
+  return rows;
+}
+
+/** Rows only, for callers that do not need line numbers. */
+export function parseCsv(text: string): string[][] {
+  return parseCsvRows(text).map((r) => r.cells);
+}
+
+/* ------------------------------------------------------------------ */
+/* Header + value mapping                                              */
+/* ------------------------------------------------------------------ */
+
+const HEADER_NAMES = {
+  // A stable identifier, when the studio's export has one. Priority order:
+  // an explicit id beats an email, and either beats a name. Names are NOT
+  // reliable identity — two members can share one, and one member can be
+  // spelled two ways — but a name-only export is still worth reading, so
+  // the name is the documented fallback and the page states which was used.
+  identity: ["member id", "customer id", "client id", "member_id", "id", "email", "email address"],
+  member: ["member", "name", "member name", "customer", "client"],
+  date: ["date", "class date", "visit date", "day"],
+  status: ["status", "attendance", "attended", "showed"],
+  classType: ["class", "class type", "service", "type"],
+  instructor: ["instructor", "staff", "teacher", "coach"],
+} as const;
+
+/** Find a column by synonym PRIORITY, not header position: a file with
+ *  both a "Day" column (weekday names) and a "Date" column must read the
+ *  real dates, so earlier synonyms in the list win over later ones. */
+function findColumn(headers: string[], names: readonly string[]): number {
+  const lowered = headers.map((h) => h.trim().toLowerCase());
+  for (const name of names) {
+    const i = lowered.indexOf(name);
+    if (i !== -1) return i;
+  }
+  return -1;
+}
+
+/** Normalize a date cell to YYYY-MM-DD. Accepts ISO (padded or not) and
+ *  the common US export shape M/D/YYYY — then round-trips the value
+ *  through the real calendar, so an impossible date (month 13, Feb 30)
+ *  returns null and becomes a stated skip instead of a guessed visit. */
+export function normalizeDate(value: string): string | null {
+  const v = value.trim();
+  let y: number;
+  let m: number;
+  let d: number;
+  const iso = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const us = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (iso) {
+    y = Number(iso[1]);
+    m = Number(iso[2]);
+    d = Number(iso[3]);
+  } else if (us) {
+    y = Number(us[3]);
+    m = Number(us[1]);
+    d = Number(us[2]);
+  } else {
+    return null;
+  }
+  const roundTrip = new Date(Date.UTC(y, m - 1, d));
+  if (
+    roundTrip.getUTCFullYear() !== y ||
+    roundTrip.getUTCMonth() !== m - 1 ||
+    roundTrip.getUTCDate() !== d
+  ) {
+    return null;
+  }
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** Map a status cell to the contract's attendance values. An absent or
+ *  empty status means attended — a sign-in sheet records presence.
+ *  Anything unrecognized maps to unknown, never to attended. */
+export function normalizeStatus(value: string): Attendance["attendance_status"] {
+  const v = value.trim().toLowerCase();
+  if (v === "" || ["attended", "present", "checked in", "checked-in", "yes", "showed", "show"].includes(v)) {
+    return "attended";
+  }
+  if (["no-show", "no show", "noshow", "missed", "absent", "no"].includes(v)) {
+    return "no_show";
+  }
+  return "unknown";
+}
+
+/** Readable id fragment only — NEVER identity. Identity is keyed on the
+ *  name as written; this just makes ids nicer to read when it can. */
+function slug(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
+/* ------------------------------------------------------------------ */
+/* The adapter                                                         */
+/* ------------------------------------------------------------------ */
+
+/** Build a contract-shaped record set from attendance CSV text. Throws a
+ *  loud, named error when the required columns are missing; collects
+ *  per-row skips (bad dates, empty names) with stated file lines. */
+export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
+  const rows = parseCsvRows(text);
+  const headerRow = rows[0];
+  if (!headerRow) throw new Error("The file is empty — no header row found.");
+  const headers = headerRow.cells.map((h) => h.trim());
+
+  const memberCol = findColumn(headers, HEADER_NAMES.member);
+  const dateCol = findColumn(headers, HEADER_NAMES.date);
+  if (memberCol === -1 || dateCol === -1) {
+    const missing = [
+      memberCol === -1 ? `a member column (one of: ${HEADER_NAMES.member.join(", ")})` : null,
+      dateCol === -1 ? `a date column (one of: ${HEADER_NAMES.date.join(", ")})` : null,
+    ].filter((m): m is string => m !== null);
+    throw new Error(`The file is missing ${missing.join(" and ")}. Found headers: ${headers.join(", ")}`);
+  }
+  const identityCol = findColumn(headers, HEADER_NAMES.identity);
+  const statusCol = findColumn(headers, HEADER_NAMES.status);
+  const classCol = findColumn(headers, HEADER_NAMES.classType);
+  const instructorCol = findColumn(headers, HEADER_NAMES.instructor);
+
+  const members: Member[] = [];
+  const memberIdByName = new Map<string, string>();
+  const sessions: ClassSession[] = [];
+  const sessionIdByKey = new Map<string, string>();
+  const instructors: { instructor_id: string; display_name: string }[] = [];
+  const instructorIdByName = new Map<string, string>();
+  const attendance: Attendance[] = [];
+  const skipped: string[] = [];
+
+  for (let r = 1; r < rows.length; r += 1) {
+    const { cells, line } = rows[r] ?? { cells: [], line: 0 };
+    const name = (cells[memberCol] ?? "").trim();
+    const date = normalizeDate(cells[dateCol] ?? "");
+    if (name === "") {
+      skipped.push(`line ${line}: empty member name`);
+      continue;
+    }
+    if (!date) {
+      skipped.push(`line ${line}: unreadable or impossible date "${(cells[dateCol] ?? "").trim()}" (use YYYY-MM-DD or M/D/YYYY)`);
+      continue;
+    }
+    const classType = classCol === -1 ? "class" : (cells[classCol] ?? "").trim() || "class";
+    const instructorName = instructorCol === -1 ? "" : (cells[instructorCol] ?? "").trim();
+
+    // Identity: the stable identifier when the export carries one, the
+    // name otherwise. A blank identifier cell falls back to that row's
+    // name rather than collapsing every blank into one person.
+    //
+    // The key is NAMESPACED by source ("id:" vs "name:") so an identifier
+    // whose value happens to equal somebody's name can never collide with
+    // that person. Normalization is deliberately minimal — trim and
+    // case-fold, nothing more: anything cleverer (stripping dots from an
+    // email, collapsing punctuation in a name) would merge people the
+    // studio considers distinct, which is inventing identity rather than
+    // reading it.
+    const rawIdentity = identityCol === -1 ? "" : (cells[identityCol] ?? "").trim();
+    const nameKey = rawIdentity !== ""
+      ? `id:${rawIdentity.toLowerCase()}`
+      : `name:${name.toLowerCase()}`;
+    let memberId = memberIdByName.get(nameKey);
+    if (memberId === undefined) {
+      memberId = `csv_m_${memberIdByName.size + 1}_${slug(name) || "member"}`;
+      memberIdByName.set(nameKey, memberId);
+      members.push({ member_id: memberId, display_name: name, membership_status: "active" });
+    }
+
+    let instructorId = "";
+    if (instructorName !== "") {
+      const instKey = instructorName.toLowerCase();
+      instructorId = instructorIdByName.get(instKey) ?? "";
+      if (instructorId === "") {
+        instructorId = `csv_i_${instructorIdByName.size + 1}_${slug(instructorName) || "instructor"}`;
+        instructorIdByName.set(instKey, instructorId);
+        instructors.push({ instructor_id: instructorId, display_name: instructorName });
+      }
+    }
+
+    const sessionKey = `${date}|${classType.toLowerCase()}|${instructorName.toLowerCase()}`;
+    let sessionId = sessionIdByKey.get(sessionKey);
+    if (sessionId === undefined) {
+      sessionId = `csv_s_${sessionIdByKey.size + 1}_${date}`;
+      sessionIdByKey.set(sessionKey, sessionId);
+      sessions.push({
+        session_id: sessionId,
+        class_type: classType,
+        level: "all levels",
+        instructor_id: instructorId,
+        starts_at: `${date}T00:00:00`,
+        ends_at: `${date}T00:00:00`,
+        capacity: 0,
+        session_status: "completed",
+      });
+    }
+
+    attendance.push({
+      attendance_id: `csv_a_${attendance.length + 1}`,
+      member_id: memberId,
+      session_id: sessionId,
+      attendance_status: statusCol === -1 ? "attended" : normalizeStatus(cells[statusCol] ?? ""),
+      recorded_at: `${date}T00:00:00`,
+    });
+  }
+
+  const records: FixtureSet = {
+    timezone: timeZone,
+    note: "Imported attendance — this data stays in this browser.",
+    members,
+    memberships: [],
+    instructors,
+    class_sessions: sessions,
+    reservations: [],
+    attendance,
+    studio_policies: [],
+  };
+
+  const identityIsName = identityCol === -1;
+  return {
+    records,
+    rowCount: rows.length - 1,
+    memberCount: members.length,
+    skipped,
+    identityIsName,
+    identityMethod: identityIsName
+      ? "member name (add a member id or email column for exact matching)"
+      : `the "${headers[identityCol]}" column`,
+  };
+}

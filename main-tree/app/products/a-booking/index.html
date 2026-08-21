@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Member Booking — Pulse Studio</title>
+  <link rel="stylesheet" href="../../shared/theme.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="product-a">
+  <header class="page-head">
+    <a class="home-brand" href="../../index.html" aria-label="Return to Pulse Studio home"><span class="home-arrow" aria-hidden="true">←</span><span class="brand-word">PULSE<span>STUDIO</span></span></a>
+    <h1 class="role">Member Booking App</h1>
+    <span class="owner-badge">Kerrian</span>
+  </header>
+  <main>
+    <p class="status" id="status">Loading the shared studio schedule.</p>
+    <p class="error" id="error" hidden></p>
+
+    <section id="confirmation" class="confirm" hidden></section>
+
+    <section>
+      <h2>Class schedule</h2>
+      <p class="lede">The schedule is public. Choose a day, then reserve a spot. Sign in from the top bar as a member to book. Other members' names stay hidden.</p>
+      <nav class="days" id="days" aria-label="Schedule days"></nav>
+      <h3 class="day-title" id="day-title"></h3>
+      <div id="schedule"></div>
+    </section>
+
+    <section id="mine-wrap" hidden>
+      <h2>Your reservations</h2>
+      <div id="mine"></div>
+    </section>
+  </main>
+  <script type="module" src="../../shared/theme-boot.js"></script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

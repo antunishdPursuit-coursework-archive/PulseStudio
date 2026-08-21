@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Storytold — how the records flow</title>
+  <meta name="description" content="The five-beat story of the studio's data flow, with the live map of which hand-offs fire today and which are still to build.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./theme.css">
+  <style>
+    /* STATUS COLORS, deliberately semantic and only on this page:
+       done = green, still-to-build = red — the owner's rule for this board
+       ("green if done, red if not"). They are status marks, not builder
+       colors; the four builder accents still mean who built what. */
+    :root { --done: #10b981; --todo: #ef4444; }
+
+    main { max-width: 880px; }
+    .beats { list-style: none; margin: 26px 0 0; padding: 0; counter-reset: beat; }
+    .beats li { position: relative; padding: 10px 0 10px 92px; }
+    .beats li::before {
+      counter-increment: beat;
+      content: counter(beat) " · " attr(data-beat);
+      position: absolute; left: 0; top: 12px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      color: var(--muted); text-transform: uppercase;
+    }
+
+    /* the product chips — builder colors, as everywhere */
+    .chip { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 0.8rem; font-weight: 700; }
+    .chip.a { background: var(--kerrian); color: var(--kerrian-ink); }
+    .chip.b { background: var(--manny); color: var(--manny-ink); }
+    .chip.c { background: var(--dennis); color: var(--dennis-ink); }
+    .chip.d { background: var(--rensley); color: var(--rensley-ink); }
+    .chip.s { border: 1px solid var(--line); color: var(--fg); }
+
+    /* the flow map */
+    .map { margin: 30px 0 8px; border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; }
+    .map svg { display: block; width: 100%; height: auto; min-width: 560px; }
+
+    /* an edge fires only when it is DONE: the pulse travels it forever.
+       A TODO edge stays a dashed red line — nothing to fire yet. Anyone
+       finishing a hand-off flips class "todo" to "done" on its <g> in THIS
+       file and the segment starts pulsing; that is the whole update. */
+    .edge line, .edge path { stroke-width: 3; fill: none; }
+    .edge.done line, .edge.done path { stroke: var(--done); }
+    .edge.todo line, .edge.todo path { stroke: var(--todo); stroke-dasharray: 7 6; opacity: 0.85; }
+    .edge .runner { stroke: var(--fg); stroke-width: 5; stroke-linecap: round; opacity: 0; }
+    @media (prefers-reduced-motion: no-preference) {
+      .edge.done .runner { animation: fire 2.6s linear infinite; }
+      @keyframes fire {
+        0%   { stroke-dashoffset: 260; opacity: 0; }
+        8%   { opacity: 0.9; }
+        88%  { opacity: 0.9; }
+        100% { stroke-dashoffset: 0; opacity: 0; }
+      }
+    }
+    .node rect { fill: var(--bg); stroke-width: 2.5; rx: 10; }
+    .node text { font: 700 15px system-ui, sans-serif; fill: var(--fg); }
+    .node .sub { font: 400 10.5px system-ui, sans-serif; fill: var(--muted); }
+    .lbl { font: 600 10.5px system-ui, sans-serif; }
+    .lbl.done { fill: var(--done); }
+    .lbl.todo { fill: var(--todo); }
+
+    /* how to read the picture — words a second grader owns */
+    .how { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+    .how h2 { margin: 0 0 8px; font-size: 1rem; }
+    .how ul { list-style: none; margin: 0; padding: 0; }
+    .how li { display: flex; align-items: center; gap: 10px; margin: 8px 0; color: var(--muted); }
+    .how li svg { flex: 0 0 auto; }
+    .how li strong { color: var(--fg); }
+
+    /* the muscle lists */
+    .muscles { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+    @media (max-width: 700px) { .muscles { grid-template-columns: 1fr; } }
+    .muscles section { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .muscles h2 { margin: 0 0 4px; font-size: 1rem; }
+    .muscles .state { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    .muscles .on  h2 .state { color: var(--done); }
+    .muscles .off h2 .state { color: var(--todo); }
+    .muscles ul { margin: 8px 0 0; padding-left: 18px; }
+    .muscles li { margin: 7px 0; color: var(--muted); }
+    .muscles li strong { color: var(--fg); }
+    .note { color: var(--muted); font-size: 0.9rem; margin-top: 18px; }
+  </style>
+</head>
+<body data-no-session>
+  <header class="page-head">
+    <a class="back" href="../index.html">← Home</a>
+    <h1>Storytold — how the records flow</h1>
+  </header>
+  <main>
+    <!-- The five beats. One sentence each, the product waits until Beat 4,
+         and Beat 5 points at the map below — the thing that visibly fires. -->
+    <ol class="beats">
+      <li data-beat="Role">Dana runs the front desk of a 60-member boutique fitness studio, and every morning she needs two answers before the 9am rush — which classes will fill today, and which members have quietly stopped coming.</li>
+      <li data-beat="Problem">She can't answer either from one screen, because every booking, roster, member question, and absence is recorded in a different tool that never hands its records to the next one.</li>
+      <li data-beat="Value">When the records flow instead, a spot booked at 9:02 moves her capacity board the same minute, and a member 15 days quiet gets a personal draft before they become 60 days gone.</li>
+      <li data-beat="Solution">Pulse Studio runs that flow as one line: a member books in <span class="chip a">A Booking</span>, the reservation lands on <span class="chip b">B The Dashboard</span>, <span class="chip c">C Support</span> answers members from the same schedule, and <span class="chip d">D Re-engagement</span> reads the whole attendance trail to flag who's gone quiet — draft ready, nothing sent by a machine.</li>
+      <li data-beat="Demo">Watch the map below: every green segment pulses because that hand-off runs on the live site today, and the red segments stay dark because those hand-offs are not built yet.</li>
+    </ol>
+
+    <!-- The map. Status lives on each edge's class: done | todo. -->
+    <div class="map" role="img" aria-label="The data flow: shared records feed all four products. A's bookings flow into B, C answers from live bookings, and D reads the live trail. Every hand-off is working.">
+      <svg viewBox="0 0 860 250">
+        <!-- the shared rail -->
+        <g class="node">
+          <rect x="330" y="196" width="200" height="42" style="stroke: var(--line)"/>
+          <text x="430" y="214" text-anchor="middle">shared</text>
+          <text x="430" y="229" text-anchor="middle" class="sub">one studio · one session · one brand</text>
+        </g>
+        <!-- product nodes, each in its builder's color -->
+        <g class="node">
+          <rect x="20"  y="40" width="170" height="52" style="stroke: var(--kerrian)"/>
+          <text x="105" y="62" text-anchor="middle">A · Booking</text>
+          <text x="105" y="79" text-anchor="middle" class="sub">members reserve spots</text>
+        </g>
+        <g class="node">
+          <rect x="240" y="40" width="170" height="52" style="stroke: var(--manny)"/>
+          <text x="325" y="62" text-anchor="middle">B · Dashboard</text>
+          <text x="325" y="79" text-anchor="middle" class="sub">staff run the week</text>
+        </g>
+        <g class="node">
+          <rect x="460" y="40" width="170" height="52" style="stroke: var(--dennis)"/>
+          <text x="545" y="62" text-anchor="middle">C · Support</text>
+          <text x="545" y="79" text-anchor="middle" class="sub">members ask, it answers</text>
+        </g>
+        <g class="node">
+          <rect x="680" y="40" width="170" height="52" style="stroke: var(--rensley)"/>
+          <text x="765" y="62" text-anchor="middle">D · Re-engage</text>
+          <text x="765" y="79" text-anchor="middle" class="sub">the quiet get a draft</text>
+        </g>
+
+        <!-- The booking log fans OUT from A — a hub, not a chain. -->
+        <!-- A -> B : DONE. The Dashboard reads A's live reservation log. -->
+        <g class="edge done">
+          <line x1="190" y1="66" x2="240" y2="66"/>
+          <line class="runner" x1="190" y1="66" x2="240" y2="66" stroke-dasharray="26 234"/>
+          <text class="lbl done" x="215" y="56" text-anchor="middle">live</text>
+        </g>
+        <!-- B -> C : DONE. C's spaces-left answers read A's live reservation log. -->
+        <g class="edge done">
+          <line x1="410" y1="66" x2="460" y2="66"/>
+          <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 234"/>
+          <text class="lbl done" x="435" y="56" text-anchor="middle">live</text>
+        </g>
+        <!-- A -> D : DONE. Re-engagement reads the running studio with A's
+             live reservation log merged in (last row wins). -->
+        <g class="edge done">
+          <path d="M150 92 C 300 168, 620 168, 750 92"/>
+          <path class="runner" d="M150 92 C 300 168, 620 168, 750 92" stroke-dasharray="26 234"/>
+          <text class="lbl done" x="450" y="150" text-anchor="middle">the live trail</text>
+        </g>
+
+        <!-- the shared rail feeds every product: all DONE -->
+        <g class="edge done">
+          <path d="M370 196 C 320 160, 140 150, 105 92"/>
+          <path class="runner" d="M370 196 C 320 160, 140 150, 105 92" stroke-dasharray="26 234"/>
+        </g>
+        <g class="edge done">
+          <path d="M405 196 C 390 160, 340 140, 325 92"/>
+          <path class="runner" d="M405 196 C 390 160, 340 140, 325 92" stroke-dasharray="26 234"/>
+        </g>
+        <g class="edge done">
+          <path d="M455 196 C 470 160, 530 140, 545 92"/>
+          <path class="runner" d="M455 196 C 470 160, 530 140, 545 92" stroke-dasharray="26 234"/>
+        </g>
+        <g class="edge done">
+          <path d="M490 196 C 540 160, 720 150, 765 92"/>
+          <path class="runner" d="M490 196 C 540 160, 720 150, 765 92" stroke-dasharray="26 234"/>
+        </g>
+      </svg>
+    </div>
+
+    <section class="how" aria-label="How to read this picture">
+      <h2>How to read this picture</h2>
+      <ul>
+        <li>
+          <svg width="46" height="14" viewBox="0 0 46 14" aria-hidden="true"><rect x="1" y="1" width="44" height="12" rx="4" fill="var(--bg)" stroke="var(--rensley)" stroke-width="2"/></svg>
+          <span>Each <strong>box</strong> is one part of the studio. Its color tells you <strong>who built it</strong>.</span>
+        </li>
+        <li>
+          <svg width="46" height="8" viewBox="0 0 46 8" aria-hidden="true"><line x1="2" y1="4" x2="44" y2="4" stroke="var(--done)" stroke-width="3"/><line x1="14" y1="4" x2="26" y2="4" stroke="var(--fg)" stroke-width="5" stroke-linecap="round"/></svg>
+          <span>The <strong>lines are roads</strong> the studio's notes travel on. A <strong>green road works today</strong> — a little light runs along it, like a heartbeat. If you see the light, that road is real, not a plan.</span>
+        </li>
+        <li>
+          <svg width="46" height="8" viewBox="0 0 46 8" aria-hidden="true"><line x1="2" y1="4" x2="44" y2="4" stroke="var(--todo)" stroke-width="3" stroke-dasharray="6 5"/></svg>
+          <span>A <strong>red dotted road is not built yet</strong>. No notes can travel on it, so it has no heartbeat. Red is not bad — it is honest. It shows exactly <strong>what we still have to build</strong>, and whose job it is (the list below says).</span>
+        </li>
+        <li>
+          <svg width="46" height="16" viewBox="0 0 46 16" aria-hidden="true"><path d="M2 8 h10 l4-6 5 12 4-6 h19" fill="none" stroke="var(--dennis)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><strong>Why the heartbeat matters:</strong> when boxes share a road, they share one life — book a class in one box and another box feels it the same minute. When every road turns green, the whole studio beats as <strong>one pulse</strong>: nothing anyone does gets lost, and no member gets forgotten.</span>
+        </li>
+      </ul>
+    </section>
+
+    <div class="muscles">
+      <section class="on">
+        <h2><span class="state">Green — fires today</span></h2>
+        <ul>
+          <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip b">B</span> watches, <span class="chip c">C</span> answers from, and <span class="chip d">D</span> reconciles against independent truth.</li>
+          <li><strong><span class="chip a">A</span> → <span class="chip b">B</span>:</strong> every booking lands in the append-only reservation log and the Dashboard reads it live — book a spot, watch the meter move.</li>
+          <li><strong><span class="chip b">B</span> → <span class="chip c">C</span>:</strong> support's spaces-left answers include Booking's live reservation log from this browser, with each member's latest reservation state winning.</li>
+          <li><strong><span class="chip b">B</span> publishes for real:</strong> confirmed weekly schedules persist in this browser after a reload.</li>
+          <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, 27 checks deep.</li>
+          <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file — a clone renames the studio in four files total.</li>
+          <li><strong><span class="chip b">B</span> turns the fill on:</strong> the Dashboard uses the engine's occupancy knob to keep the upcoming week realistically filled.</li>
+          <li><strong>The occupancy engine:</strong> the generator can fill a week to a realistic mix on demand — deterministic, capacity-safe, proven by 160 checks.</li>
+          <li><strong><span class="chip d">D</span> reads the live trail:</strong> re-engagement's default records are the running studio plus Booking's own reservation log — and a quiet member already booked back in is stated by name and left alone, never nagged.</li>
+        </ul>
+      </section>
+      <section class="off">
+        <h2><span class="state">Red — nothing waiting</span></h2>
+        <ul><li>0 hand-offs are waiting on this board.</li></ul>
+      </section>
+    </div>
+
+    <p class="note">Updating this board is one edit: when a hand-off ships, flip its
+    <code>class="edge todo"</code> to <code>class="edge done"</code> in this file (and move
+    its line between the two lists) — the segment starts firing on its own. Green and red
+    here are status marks only; the four builder colors keep meaning who built what.</p>
+  </main>
+  <script type="module" src="./theme-boot.js"></script>
+</body>
+</html>

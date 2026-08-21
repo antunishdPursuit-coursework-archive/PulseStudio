@@ -60,10 +60,31 @@ function applyView(session: PulseSession | null): void {
 let previous = readPulseSession();
 applyView(previous);
 
+/* The pending landing, so a later change can cancel it. */
+let pendingNavigation: number | null = null;
+
+/** Did the sign-in actually reach storage? readPulseSession() falls back to
+ *  an in-memory session when storage is unavailable, and that session does
+ *  NOT survive a navigation — so it must never trigger one. */
+function sessionPersisted(): boolean {
+  try {
+    return localStorage.getItem("pulse-session") !== null;
+  } catch {
+    return false;
+  }
+}
+
 subscribeToPulseSession((session, origin) => {
   const signedInJustNow = previous === null && session !== null;
   previous = session;
   applyView(session);
+
+  /* Any change at all cancels a landing already in flight — signing out
+     during the pause must not still send you to a members-only page. */
+  if (pendingNavigation !== null) {
+    window.clearTimeout(pendingNavigation);
+    pendingNavigation = null;
+  }
 
   if (!signedInJustNow || origin !== "this-tab" || session === null) return;
 
@@ -76,7 +97,37 @@ subscribeToPulseSession((session, origin) => {
         ? `Welcome back, ${session.display_name} — taking you to your classes…`
         : `Signed in as ${session.display_name} — taking you to the dashboard…`;
   }
-  window.setTimeout(() => {
+  /* The pause exists so the sentence above can be read. Three things it
+     must survive, each one an audit finding:
+       · a sign-out (or any change) during the pause CANCELS it — otherwise
+         the timer fires later and hijacks wherever the person went next;
+       · a session that did not actually persist never navigates — with
+         storage unavailable the destination page would read no session and
+         the person would arrive signed out, which is worse than staying;
+       · coming BACK to this page from the destination restores it from the
+         browser's cache mid-sentence, so pageshow repaints the view. */
+  if (!sessionPersisted()) {
+    if (hello !== null) {
+      hello.textContent =
+        `Signed in as ${session.display_name} — this browser will not remember it, ` +
+        `so you are staying here. Your links still work.`;
+    }
+    return;
+  }
+  pendingNavigation = window.setTimeout(() => {
+    pendingNavigation = null;
     window.location.assign(HOME_FOR[session.actor_type]);
   }, 450);
+});
+
+/* A page restored from the back/forward cache keeps whatever it said when
+   it left — including "taking you to…" for a trip that already happened. */
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  if (pendingNavigation !== null) {
+    window.clearTimeout(pendingNavigation);
+    pendingNavigation = null;
+  }
+  previous = readPulseSession();
+  applyView(previous);
 });
