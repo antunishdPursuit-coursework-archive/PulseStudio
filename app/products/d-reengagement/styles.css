@@ -1,7 +1,8 @@
 /* Product D — Member Re-engagement Tool. Rensley's lane.
  *
  * Everything here builds on the shared theme's tokens: backgrounds stay
- * var(--bg) (black or white only), and every splash of color is
+ * var(--bg) — white or black built in, or an accessible custom pair a
+ * person chose — and every splash of color is
  * var(--accent) — the violet assigned to this product. A reseller who
  * changes the accent token in the shared theme recolors this whole page
  * with zero edits here.
@@ -96,8 +97,9 @@
   border-radius: 10px;
   padding: 14px 16px;
   margin: 12px 0;
-  /* No tinted surface here: backgrounds are black or white ONLY (the
-     team's background law) — the dashed accent border marks ownership. */
+  /* No tinted surface here: the background is whatever var(--bg) resolves
+     to — white, black, or the accessible pair a person chose — never a
+     colour this file invents. The dashed accent border marks ownership. */
   background: var(--bg);
 }
 

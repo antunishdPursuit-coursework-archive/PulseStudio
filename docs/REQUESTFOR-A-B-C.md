@@ -271,6 +271,8 @@ publishing `app/`. They are unreachable now: `app/` is the site root, so root
 `index.html` is shadowed by `app/index.html` and the other seven return 404.
 Nothing under `app/` references any of them, and the gate cannot see them.
 
+Ownership below is from `git log --diff-filter=A`, not from guessing:
+
 | Files | Owner | State |
 | --- | --- | --- |
 | `member-dashboard.{html,css,js}` · `staff-dashboard.{html,css,js}` | Manny | 404 · hardcoded `#f4f1eb` and hardcoded records, so they break the color and data laws |

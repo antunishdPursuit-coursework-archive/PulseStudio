@@ -147,9 +147,13 @@ Three ways data gets in, all through one render path:
 - **No AI is ever a contributor.** No `Co-Authored-By`, no "Generated with",
   no assistant name in any commit, PR, comment, or file. Rensley is the sole
   author. If you write commit messages, write them in his voice, plainly.
-- **Backgrounds are black or white only** (`var(--bg)`); every feature colour
-  is `var(--accent)` — violet for Product D. Never add a fifth colour or
-  restyle another developer's.
+- **Backgrounds come from `var(--bg)`** — built-in light and dark stay white
+  and black, and a person may choose an accessible custom background/text
+  pair through the shared appearance control. No gradients. Every feature
+  colour is `var(--accent)` — violet for Product D — with
+  `var(--accent-strong)` wherever that colour has to be READ, because the
+  identity hex is below WCAG AA as text on white. Never add a fifth colour
+  or restyle another developer's.
 
 ## 6. What is verified, and where to read it
 
