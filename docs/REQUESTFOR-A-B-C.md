@@ -136,6 +136,84 @@ reads would be worse than naming none.
 
 Either way, nothing in this repo sends mail. That stays human.
 
+## The repo root: eight files that are not mine to delete (2026-08-21)
+
+I cleaned the repo root and stopped at the files I do not own. Everything
+below is measured, not guessed — the HTTP codes are from fetching the live
+site on 2026-08-21.
+
+**The short version:** eight files at the repo ROOT are the site we had
+*before* Pages switched to publishing `app/`. They are unreachable now.
+`.github/workflows/pages.yml` uploads with `path: app`, so `app/` is the
+website root — root `index.html` is shadowed by `app/index.html` at every
+URL, and the rest simply 404.
+
+| File | Live URL | Author |
+| --- | --- | --- |
+| `member-dashboard.html` / `.css` / `.js` | 404 | Manny |
+| `staff-dashboard.html` / `.css` / `.js` | 404 | Manny |
+| `member-booking.html` | 404 | Kerrian |
+| `index.html` | shadowed by `app/index.html` | team lead |
+
+They form a closed island: root `index.html` links to the two dashboards,
+`member-booking.html` is a 398-byte redirect stub pointing into `app/`, and
+nothing under `app/` references any of them. The gate cannot see them
+either — `tsconfig.json` compiles only `app/**/*.ts`, and `check-styles.mjs`
+reads only the four lane stylesheets.
+
+### Why this is worth five minutes rather than zero
+
+Two of the team's own laws are broken inside these files — hardcoded
+`#f4f1eb` backgrounds against the color law, and hardcoded records against
+the data law. Nobody is served by them, but they are the first thing a new
+contributor sees when they open the repo root, and patterns get copied from
+whatever is nearest.
+
+There is also a live trapdoor. GitHub's legacy `pages-build-deployment`
+builder still exists on this repo and still records `source: {branch: main,
+path: "/"}` underneath the Actions deploy. If anyone ever flips Settings →
+Pages → Source back to branch-deploy, these eight files become the live
+site again and `app/` demotes to a subfolder. The boundary that makes them
+harmless is a **setting**, not a fact about the code.
+
+### The asks
+
+- **Manny:** retire root `member-dashboard.*` and `staff-dashboard.*`. One
+  thing worth a look before you do — root `staff-dashboard.js` models three
+  rooms with a ranked room-demand panel, and the live dashboard hardcodes
+  the single string `"Studio"`. Git history keeps the code either way;
+  reviving that panel would need a `room` field on the shared synthetic
+  session, which is shared ground, so it is a conversation not a copy-paste.
+- **Kerrian:** retire root `member-booking.html`. It is a redirect living at
+  a URL nobody can reach, and its target (`app/products/a-booking/index.html`)
+  is not a real path on the published site anyway. Separately: the retired
+  root `member-dashboard.html` had a class-category filter (Yoga / Cycling /
+  HIIT) and `a-booking` filters by day only. That may be a deliberate scope
+  call — it is yours to make, I just did not want it to disappear silently.
+- **Team lead:** root `index.html` is yours, not a lane owner's. It reaches
+  two of the four products and links to two stale pages.
+
+### One that matters more, and is inside the published site
+
+`app/products/b-dashboard/staff-dashboard.html` returns **HTTP 200**. It is
+live right now. `app/products/b-dashboard/CLAUDE.md` already documents it as
+a stale sibling with color-law violations and says the stale pair is Manny's
+to retire — so this is not a new finding, only a newly measured one. The
+difference from the root files is the whole point: those are dead and
+invisible; this one is dead and **public**.
+
+Also in that folder: `staff-dashboard.js` is the only hand-written `.js`
+tracked under `app/`, and the repo ignores `app/**/*.js` as build output. It
+survives only because ignore rules do not apply to files already tracked. If
+it is ever deleted and re-added, `git add` will silently refuse it and the
+page loses its script with no gate failure. Worth either renaming it to
+`.ts` so the compiler owns it, or adding a `!` negation line to `.gitignore`
+so its tracked status is deliberate.
+
+**Nothing above was touched by me** — every one of these files belongs to
+someone else's lane, and the lane law is the reason this is a note instead
+of a commit.
+
 ## If you disagree with anything here
 
 Say so on the PR or in person — every number above (14/60 thresholds
