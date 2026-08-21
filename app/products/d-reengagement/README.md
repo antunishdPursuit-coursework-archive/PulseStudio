@@ -71,6 +71,10 @@ never what a machine did.
 | `styles.css` | Violet-on-black/white styling over the shared theme tokens |
 | `tests.ts` / `tests.html` | Browser-run unit checks with a pinned reference date |
 
+The reviewer bundle is built by `sh scripts/bundle-product-d.sh` — tooling, so
+it lives in `scripts/`, not here. It used to sit in this folder, which meant
+the live site served it: everything under `app/` has a public address.
+
 ## Live
 
 <https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/> — published from
@@ -151,12 +155,34 @@ Accepted columns (case-insensitive, any order): a member column
 `staff`/`teacher`/`coach`). Status values: attended-like words count as
 attended, no-show-like words as no-show, an absent or empty status means
 attended (a sign-in sheet records presence), and anything unrecognized maps
-to `unknown` — which is never counted as a visit. Dates read as
-`YYYY-MM-DD` (padded or not) or `M/D/YYYY` and are checked against the real
-calendar; unreadable or impossible dates are skipped with the physical file
-line stated, never silently. A bare attendance export says nothing about
-memberships, so everyone in the file is treated as an active member — the
-page states that too.
+to `unknown` — which is never counted as a visit.
+
+**Dates** read as `YYYY-MM-DD` (padded or not) or a slash date, and every
+value is round-tripped through the real calendar, so an impossible date is
+skipped with its physical file line stated rather than guessed at.
+
+Which number in a slash date is the month is decided **once, from the whole
+file, before any row is read** — because guessing it is the quietest way to
+be wrong. Read month-first, a European export dated `05/03/2026` becomes the
+3rd of May instead of the 5th of March, and `25/03/2026` is thrown away for
+having a 25th month: half the file misdated, half discarded. A value that is
+a real date under exactly one reading settles the order for every other row
+(`13/1/2026` can only be day-first). Only a file where no value settles it is
+read month-first, and then the page says so. A file containing proof of both
+orders fits no single reading and says that instead of picking one.
+
+**Identity** is stated when it splits. If the identifier column is filled on
+some of a member's rows and blank on others, that member is read as two
+people, their visits divided between them — and the half holding the older
+last visit can be flagged while the whole person has been coming in all
+along. The page names anyone this happened to. They are never merged:
+merging on a shared name would be inventing identity rather than reading it.
+
+A bare attendance export says nothing about memberships, so everyone in the
+file is treated as an active member — the page states that too. And if a
+quote opens and never closes, everything after it collapses into one cell:
+the page names the line it opened on, because the rows below it were not
+read at all.
 
 ## See it at studio scale
 
