@@ -55,11 +55,24 @@
      the DISPLAY voice: heavy, condensed-feeling, uppercase, tight. Anything
      a person has to actually read speaks in the BODY voice: quiet, roomy,
      sentence case.
-     Both stacks resolve to faces already on the reader's machine — no font
-     is downloaded from anywhere, which keeps this site's promise that
-     nothing about a visitor leaves their browser, and keeps the page fast
-     on a phone in a locker room. */
+     Both faces are SELF-HOSTED from this origin (the two @font-face rules
+     at the top of this file). The promise that nothing about a visitor
+     leaves their browser holds because no third party is ever contacted —
+     no Google Fonts link, no CDN — and NOT, as this comment used to claim,
+     because "no font is downloaded from anywhere". Two are, from here. The
+     distinction is the whole point: a reader who believed the old sentence
+     and added a hosted-font link would think they were preserving a
+     property that self-hosting was preserving all along.
+
+     ANTON SHIPS ONE WEIGHT and it is already the heavy one, so asking for
+     800 or 900 makes a browser SYNTHESISE bold by smearing the glyphs —
+     worst on a condensed face at small sizes. The display-voice rules keep
+     their declared weight, because the fallback stack does have real bold
+     cuts, and set font-synthesis-weight: none so the real Anton is used
+     when Anton is what loaded. */
   --font-display: "Anton", "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
+  /* Never fake a weight Anton does not have; a fallback with a real bold
+     cut still uses it. Set wherever --font-display is applied. */
   --font-body: "Epilogue", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* one color per developer */
@@ -142,6 +155,19 @@
 :root[data-theme="custom"][data-custom-tone="dark"] {
   --rensley-strong: #9e77f8;
   --rensley-ink: #0a0a0a;
+}
+
+/* ANTON HAS ONE WEIGHT, so the browser must not invent the others: 800 and
+   900 on an already-heavy condensed face come out smeared, worst at small
+   sizes. Set once here and INHERITED, because the first attempt listed the
+   selectors by hand and missed one — .home .truths strong was still asking
+   for 800 and still getting it faked. A hand-kept list of everything that
+   speaks in the display voice is a list that goes stale; every face this
+   site actually ships or falls back to (Anton, variable Epilogue, and the
+   system stacks) has real cuts for the weights it claims, so nothing here
+   needs a fake one. */
+:root {
+  font-synthesis-weight: none;
 }
 
 * { box-sizing: border-box; }
