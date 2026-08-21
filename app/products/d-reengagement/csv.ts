@@ -212,7 +212,17 @@ function findColumn(headers: string[], names: readonly string[]): number {
  * a second component above 12 proves month-first the same way. Only a file
  * where NEITHER position ever exceeds 12 is genuinely ambiguous, and then
  * the page says which reading it used rather than pretending it knew. */
-export type SlashDateOrder = "month-first" | "day-first" | "ambiguous" | "contradictory";
+export type SlashDateOrder =
+  | "month-first"
+  | "day-first"
+  | "ambiguous"
+  /* NO SLASH DATE IN THE FILE AT ALL, which is not the same as one whose
+   * order cannot be settled. An all-ISO export has nothing to disclose, and
+   * telling a staff member how their slash dates were read when they have
+   * none is the kind of always-on disclosure that teaches people to skip
+   * the ones that matter. */
+  | "none"
+  | "contradictory";
 
 export function detectSlashDateOrder(values: readonly string[]): SlashDateOrder {
   /* ONLY A DATE THAT IS VALID UNDER EXACTLY ONE READING IS EVIDENCE.
@@ -223,9 +233,11 @@ export function detectSlashDateOrder(values: readonly string[]): SlashDateOrder 
    * a bad row, and it gets skipped by name further down. */
   let onlyDayFirst = false;
   let onlyMonthFirst = false;
+  let sawASlashDate = false;
   for (const value of values) {
     const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (m === null) continue;
+    sawASlashDate = true;
     const [a, b, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
     const monthFirstWorks = isRealYmd(y, a, b);
     const dayFirstWorks = isRealYmd(y, b, a);
@@ -235,7 +247,7 @@ export function detectSlashDateOrder(values: readonly string[]): SlashDateOrder 
   if (onlyDayFirst && onlyMonthFirst) return "contradictory";
   if (onlyDayFirst) return "day-first";
   if (onlyMonthFirst) return "month-first";
-  return "ambiguous";
+  return sawASlashDate ? "ambiguous" : "none";
 }
 
 /** A real calendar date, checked by round-trip — Date.UTC rolls over. */
@@ -576,4 +588,69 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       : `the "${headers[identityCol]}" column`,
     identityMayCountRows,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* What the page says about an import                                   */
+/* ------------------------------------------------------------------ */
+
+/* THE PROVENANCE LINE, ASSEMBLED WHERE IT CAN BE CHECKED.
+ *
+ * This is the sentence a staff member reads to decide how much to trust
+ * everything below it: where the records came from, how many rows were
+ * skipped and why, which reading of a slash date was used, whose name was
+ * cleaned, what repeated, and who was read as two people. Five conditional
+ * branches with pluralisation in each.
+ *
+ * It lived in main.ts, which no check imports — main.ts touches the DOM at
+ * module load, so a headless suite cannot pull it in. That made every one
+ * of those branches provable only by opening the page and reading it, which
+ * is exactly the kind of text that quietly goes wrong: I got the count in
+ * one of them wrong on this branch (rows, said "names") and only caught it
+ * by writing a reproduction by hand.
+ *
+ * Pure function, same rule as logic.ts. The page renders what it returns. */
+export function importProvenance(imported: CsvImport, fileName: string): string {
+  /* Bounded: a file with five hundred bad dates produced a five-hundred-
+   * clause sentence, which is unreadable in exactly the way that teaches
+   * staff to skip the disclosures that matter. */
+  const SHOWN = 5;
+  const skippedNote =
+    imported.skipped.length === 0
+      ? "0 rows skipped"
+      : `${imported.skipped.length} rows skipped: ${imported.skipped.slice(0, SHOWN).join("; ")}` +
+        (imported.skipped.length > SHOWN
+          ? ` — and ${imported.skipped.length - SHOWN} more, not listed here`
+          : "");
+
+  /* Said only when the file did NOT settle which number is the month — a
+   * disclosure that always appears teaches staff to ignore it. */
+  const dateNote =
+    imported.dateOrder === "day-first"
+      ? " Slash dates were read day-first, which this file's own values prove."
+      : imported.dateOrder === "ambiguous"
+        ? " Slash dates were read month-first; no value in this file settles which number is the month, so use YYYY-MM-DD if that is wrong."
+        : "";
+
+  const cleanedNote =
+    imported.namesCleaned === 0
+      ? ""
+      : ` ${imported.namesCleaned} ${imported.namesCleaned === 1 ? "name had" : "names had"} invisible or control characters removed — a zero-width space makes two identical-looking names two different members.`;
+
+  const repeatNote =
+    imported.sameDayRepeats === 0
+      ? ""
+      : imported.classColumnMissing
+        ? ` ${imported.sameDayRepeats} ${imported.sameDayRepeats === 1 ? "row repeats" : "rows repeat"} a member and date already seen. Without a class column this file cannot say whether that is a second class that day or the same visit entered twice, so each counts once — the attendance shown may be low. Add a class column to tell them apart.`
+        : ` ${imported.sameDayRepeats} duplicate ${imported.sameDayRepeats === 1 ? "row was" : "rows were"} counted once, not twice.`;
+
+  const splitNote =
+    imported.splitIdentities.length === 0 ? "" : ` ${imported.splitIdentities.join(" ")}`;
+
+  return (
+    `Data: ${fileName} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
+    `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${repeatNote}${splitNote} ` +
+    `Everyone in the file is treated as an active member. ` +
+    `This data never left your browser.`
+  );
 }

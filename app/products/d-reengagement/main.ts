@@ -9,7 +9,7 @@
 
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
-import { GENERIC_CLASS_TYPE, adaptAttendanceCsv } from "./csv.js";
+import { GENERIC_CLASS_TYPE, adaptAttendanceCsv, importProvenance } from "./csv.js";
 import { csvField, onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
@@ -712,58 +712,11 @@ csvInput.addEventListener("change", () => {
     .then((text) => {
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const imported = adaptAttendanceCsv(text, timeZone);
-      /* BOUNDED, AND SAYS SO. This joined EVERY skipped row into one
-       * sentence: a file with five hundred unreadable dates produced a
-       * five-hundred-clause line, which is unreadable in exactly the way
-       * that makes staff stop reading the disclosures that matter. The
-       * count is the number that matters; the reasons repeat. */
-      const SHOWN = 5;
-      const skippedNote =
-        imported.skipped.length === 0
-          ? "0 rows skipped"
-          : `${imported.skipped.length} rows skipped: ${imported.skipped.slice(0, SHOWN).join("; ")}` +
-            (imported.skipped.length > SHOWN
-              ? ` — and ${imported.skipped.length - SHOWN} more, not listed here`
-              : "");
-      /* A SPLIT PERSON IS A FALSE FLAG WAITING TO HAPPEN, so it is said
-       * beside the count rather than left for staff to notice. */
-      /* Said only when it happened. A name that had a zero-width space or a
-       * bidi override removed is a name the file rendered one way and the
-       * studio stores another; that is worth one sentence. */
-      const cleanedNote =
-        imported.namesCleaned === 0
-          ? ""
-          : ` ${imported.namesCleaned} ${imported.namesCleaned === 1 ? "name had" : "names had"} invisible or control characters removed — a zero-width space makes two identical-looking names two different members.`;
-      /* THE FILE CANNOT SAY WHICH, so the page does not pretend. Without a
-       * class column, a second class that day and a duplicated row are the
-       * same two rows. The evidence counts them once — inflating would be
-       * inventing attendance — and the count staff read is stated with the
-       * reason, because it is the number they judge a member by. */
-      const repeatNote =
-        imported.sameDayRepeats === 0
-          ? ""
-          : imported.classColumnMissing
-            ? ` ${imported.sameDayRepeats} ${imported.sameDayRepeats === 1 ? "row repeats" : "rows repeat"} a member and date already seen. Without a class column this file cannot say whether that is a second class that day or the same visit entered twice, so each counts once — the attendance shown may be low. Add a class column to tell them apart.`
-            : ` ${imported.sameDayRepeats} duplicate ${imported.sameDayRepeats === 1 ? "row was" : "rows were"} counted once, not twice.`;
-      const splitNote =
-        imported.splitIdentities.length === 0
-          ? ""
-          : ` ${imported.splitIdentities.join(" ")}`;
-      /* Which number was the month. Said only when the file did NOT settle
-       * it — a disclosure that always appears teaches staff to ignore it. */
-      const dateNote =
-        imported.dateOrder === "day-first"
-          ? " Slash dates were read day-first, which this file's own values prove."
-          : imported.dateOrder === "ambiguous"
-            ? " Slash dates were read month-first; no value in this file settles which number is the month, so use YYYY-MM-DD if that is wrong."
-            : "";
-      renderRecords(
-        imported.records,
-        `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
-          `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${repeatNote}${splitNote} ` +
-          `Everyone in the file is treated as an active member. ` +
-          `This data never left your browser.`,
-      );
+      /* The sentence itself is assembled in csv.ts, where a check can
+       * reach it. main.ts touches the DOM at module load, so no headless
+       * suite can import it — anything shaped like a rule that lives here
+       * is provable only by opening the page. */
+      renderRecords(imported.records, importProvenance(imported, file.name));
       csvReset.hidden = false;
     })
     .catch((error: unknown) => {

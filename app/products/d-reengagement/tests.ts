@@ -17,7 +17,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { adaptAttendanceCsv, cleanName, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
+import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
@@ -1214,8 +1214,17 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     detectSlashDateOrder(["05/03/2026", "04/06/2026"]), "ambiguous");
   check("a file with both above 12 fits no single reading",
     detectSlashDateOrder(["25/03/2026", "03/25/2026"]), "contradictory");
-  check("ISO dates never make a file ambiguous either way",
-    detectSlashDateOrder(["2026-08-19", "2026-08-20"]), "ambiguous");
+  /* An all-ISO file has NO slash date to have an order, which is not the
+   * same as one whose order cannot be settled. It used to report
+   * "ambiguous", and the page then told staff how their slash dates were
+   * read when they had none — an always-on disclosure, which is the kind
+   * that teaches people to skip the ones that matter. Caught by a check on
+   * the provenance line, not by reading this function. */
+  check("a file with no slash date at all reports none, not ambiguous",
+    detectSlashDateOrder(["2026-08-19", "2026-08-20"]), "none");
+  check("a slash date that settles nothing IS ambiguous",
+    detectSlashDateOrder(["05/03/2026", "04/06/2026"]), "ambiguous");
+  check("an empty file reports none", detectSlashDateOrder([]), "none");
   check("a day-first file reads the day first",
     normalizeDate("05/03/2026", "day-first"), "2026-03-05");
   check("the same text read month-first is a different day",
@@ -1462,6 +1471,80 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   check("...over a record set worth running (members)", data.members.length >= 50, true);
   check("...and worth running (attendance rows)", data.attendance.length >= 200, true);
   check("...and it actually found somebody, so the run was real", flaggedCount > 0, true);
+}
+
+/* THE SENTENCE A STAFF MEMBER READS TO DECIDE HOW MUCH TO TRUST THE REST.
+ *
+ * Five conditional branches with pluralisation in each, and until now every
+ * one was provable only by opening the page — it lived in main.ts, which no
+ * headless suite can import because it touches the DOM at module load. That
+ * is exactly the kind of text that goes quietly wrong: one of these counts
+ * said "names" while counting rows for several commits. */
+{
+  const clean = "member,date,class\nMaria Santos,2026-08-01,yoga\nJames Okafor,2026-08-02,HIIT\n";
+  const line = importProvenance(adaptAttendanceCsv(clean, "America/New_York"), "roster.csv");
+  check("a clean import names the file, the rows and the members",
+    line.startsWith("Data: roster.csv — 2 rows, 2 members, 0 rows skipped."), true);
+  check("...and says nothing it does not have to",
+    /invisible|repeats|read as|Slash dates/.test(line), false);
+  check("...but always states the two standing limits",
+    line.includes("treated as an active member") && line.includes("never left your browser"), true);
+}
+{
+  // Every disclosure at once, so their order and spacing are pinned too.
+  const ZWSP = String.fromCodePoint(0x200b);
+  const messy = ["member id,member,date",
+    `123,Mar${ZWSP}ia Santos,13/1/2026`,
+    `,Mar${ZWSP}ia Santos,14/1/2026`,
+    "James Okafor,,not-a-date"].join("\n") + "\n";
+  const imported = adaptAttendanceCsv(messy, "America/New_York");
+  const line = importProvenance(imported, "messy.csv");
+  check("the date reading is disclosed when the file proves it",
+    line.includes("read day-first"), true);
+  check("the cleaned name is disclosed", line.includes("invisible or control characters removed"), true);
+  check("a skipped row is disclosed with its reason", line.includes("rows skipped:"), true);
+  check("...and the sentence still ends with the standing limits",
+    line.endsWith("This data never left your browser."), true);
+}
+{
+  // Pluralisation, both sides, for each count that has one.
+  const one = { rowCount: 1, memberCount: 1, skipped: [], splitIdentities: [],
+    namesCleaned: 1, sameDayRepeats: 1, classColumnMissing: false, dateOrder: "month-first" as const,
+    identityIsName: true, identityMethod: "member name", identityMayCountRows: false,
+    records: { timezone: "", note: "", members: [], memberships: [], instructors: [],
+      class_sessions: [], reservations: [], attendance: [], studio_policies: [] } };
+  const oneLine = importProvenance(one, "f.csv");
+  check("one cleaned name reads 'name had', not 'names had'",
+    oneLine.includes("1 name had") && !oneLine.includes("1 names had"), true);
+  check("one duplicate row reads 'row was'", oneLine.includes("1 duplicate row was"), true);
+
+  const many = { ...one, namesCleaned: 3, sameDayRepeats: 4 };
+  const manyLine = importProvenance(many, "f.csv");
+  check("three cleaned names read 'names had'", manyLine.includes("3 names had"), true);
+  check("four duplicates read 'rows were'", manyLine.includes("4 duplicate rows were"), true);
+
+  // Without a class column the same repeat is an unknowable, not a duplicate.
+  const unknowable = importProvenance({ ...one, classColumnMissing: true }, "f.csv");
+  check("with no class column a repeat is disclosed as unknowable",
+    unknowable.includes("cannot say whether that is a second class"), true);
+  check("...and never as a plain duplicate",
+    unknowable.includes("duplicate row was"), false);
+}
+{
+  // The bound on skipped rows: five shown, the rest counted.
+  const many = { rowCount: 9, memberCount: 0, splitIdentities: [], namesCleaned: 0,
+    sameDayRepeats: 0, classColumnMissing: false, dateOrder: "month-first" as const,
+    identityIsName: true, identityMethod: "member name", identityMayCountRows: false,
+    skipped: Array.from({ length: 9 }, (_, i) => `line ${i + 2}: bad`),
+    records: { timezone: "", note: "", members: [], memberships: [], instructors: [],
+      class_sessions: [], reservations: [], attendance: [], studio_policies: [] } };
+  const line = importProvenance(many, "f.csv");
+  check("nine skipped rows list five and count the rest",
+    line.includes("and 4 more, not listed here"), true);
+  check("...stating the true total up front", line.includes("9 rows skipped:"), true);
+  const five = importProvenance({ ...many, skipped: many.skipped.slice(0, 5) }, "f.csv");
+  check("exactly five are all listed, with no 'and more'",
+    five.includes("not listed here"), false);
 }
 
 /* AN INVISIBLE CHARACTER SPLITS A MEMBER IN TWO, AND NOBODY CAN SEE IT.
