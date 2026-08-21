@@ -28,6 +28,7 @@ import {
   keepOutreachRecords,
   availabilityLine,
   mailtoHref,
+  outcomesLine,
   outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
@@ -52,6 +53,7 @@ import {
   draftFactsFor,
   draftTextFor,
   evidenceLine,
+  joinSentence,
   inviteWording,
   recentBookingActivity,
   remainingSpots,
@@ -2417,6 +2419,55 @@ check("clean records produce no data-quality line",
     check("...and the sentence names it",
       availabilityLine(suppressed).includes("1 do not contact"), true);
   }
+}
+
+/* THE STITCHING ITSELF. Every status line here is optional clauses joined
+ * together, and the joining kept being written inline where no check could
+ * reach it. That cost a real defect: a `string | null` part, an inline
+ * `!== ""` filter that does not narrow a null away, and a double space in
+ * the middle of a sentence a staff member reads. These are the cases that
+ * would have caught it. */
+{
+  check("a null part is dropped, not joined as nothing",
+    joinSentence(["one", null, "two"]), "one two");
+  check("...which is exactly the double space that shipped",
+    joinSentence(["Checked.", null, "Flagged."]).includes("  "), false);
+  check("undefined is dropped too", joinSentence(["one", undefined, "two"]), "one two");
+  check("an empty string is dropped", joinSentence(["one", "", "two"]), "one two");
+  check("a whitespace-only part is dropped", joinSentence(["one", "   ", "two"]), "one two");
+  check("parts are trimmed, so a padded clause cannot double the gap",
+    joinSentence([" one ", " two "]), "one two");
+  check("everything empty gives an empty string, never a stray separator",
+    joinSentence([null, "", "  "]), "");
+  check("one part alone is returned unchanged", joinSentence(["only"]), "only");
+  check("no parts at all is empty", joinSentence([]), "");
+  check("a custom separator is used between every kept part",
+    joinSentence(["a", null, "b", "c"], " · "), "a · b · c");
+  check("...and never leaves a trailing separator when the last part is null",
+    joinSentence(["a", "b", null], " · "), "a · b");
+}
+
+/* THE OUTCOMES LINE — the closed loop's own claim, in a sentence. */
+{
+  const base = { outcomes: [], returned: 0, stillQuiet: 0, notEvaluable: 0, medianDaysToReturn: null };
+  check("one note reads as a note, not notes",
+    outcomesLine({ ...base, outcomes: [1] as never[], stillQuiet: 1 }),
+    "Outreach so far: 1 note taken · 0 came back · 1 still quiet.");
+  check("more than one reads as notes",
+    outcomesLine({ ...base, outcomes: [1, 2] as never[], stillQuiet: 2 }),
+    "Outreach so far: 2 notes taken · 0 came back · 2 still quiet.");
+  check("a median is only offered once somebody has come back",
+    outcomesLine({ ...base, outcomes: [1, 2] as never[], returned: 1, stillQuiet: 1, medianDaysToReturn: 9 }),
+    "Outreach so far: 2 notes taken · 1 came back (median 9 days after the note) · 1 still quiet.");
+  check("...and is left out entirely when nobody has",
+    outcomesLine({ ...base, outcomes: [1] as never[], stillQuiet: 1 }).includes("median"), false);
+  check("a note whose member is not in these records is counted, never dropped",
+    outcomesLine({ ...base, outcomes: [1] as never[], stillQuiet: 1, notEvaluable: 2 }),
+    "Outreach so far: 3 notes taken · 0 came back · 1 still quiet · 2 not evaluable in these records.");
+  check("...and the total it reports is the one that adds up",
+    outcomesLine({ ...base, outcomes: [1] as never[], stillQuiet: 1, notEvaluable: 2 }).startsWith("Outreach so far: 3 notes"), true);
+  check("the sentence always ends in a full stop",
+    outcomesLine({ ...base, outcomes: [1] as never[] }).endsWith("."), true);
 }
 
 const passed = results.filter((r) => r.passed).length;

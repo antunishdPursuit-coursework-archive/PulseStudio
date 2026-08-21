@@ -648,6 +648,30 @@ export function draftFactsFor(
   };
 }
 
+/* JOINING SENTENCE PARTS, IN ONE PLACE THAT IS CHECKED.
+ *
+ * Every status line on this page is several optional clauses stitched
+ * together, and the stitching kept being written inline where nothing
+ * could reach it. That cost a real defect on 2026-08-21: one of the
+ * parts was typed `string | null`, the inline filter tested `!== ""`,
+ * which does not narrow a null away, and the surviving null joined as an
+ * empty segment and put a double space in the middle of a sentence a
+ * staff member reads. It compiled, because `filter` with an ordinary
+ * predicate does not narrow and `join` accepts anything.
+ *
+ * So the rule lives here instead: nulls and blank-or-whitespace parts are
+ * dropped, each surviving part is trimmed, and what is left is joined
+ * once. Adding a fifth clause cannot reintroduce the bug. */
+export function joinSentence(
+  parts: readonly (string | null | undefined)[],
+  separator = " ",
+): string {
+  return parts
+    .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+    .map((part) => part.trim())
+    .join(separator);
+}
+
 /* THE EVIDENCE A STAFF MEMBER JUDGES THE FLAG BY.
  *
  * Same placeholders, opposite handling from the draft. The draft drops

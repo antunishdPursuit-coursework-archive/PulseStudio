@@ -15,7 +15,7 @@
 
 import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
-import { dayNumberFromIso, firstNameOf, type FlaggedMember } from "./logic.js";
+import { dayNumberFromIso, firstNameOf, joinSentence, type FlaggedMember } from "./logic.js";
 
 export interface OutreachRecord {
   memberId: string;
@@ -318,6 +318,37 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
  * config.ts is explicitly the file a reseller rewrites, and a longer voice,
  * a longer studio name, or longer links all push the same number up with
  * nothing to notice. 1800 leaves room under the lowest known ceiling. */
+/* WHAT CAME OF THE NOTES ALREADY TAKEN, IN A SENTENCE.
+ *
+ * The closed loop's whole claim is that every note gets judged, so this
+ * line is where the claim is either kept or quietly broken. It was built
+ * inline in the renderer, which no headless check can load, and it
+ * carries four clauses, two pluralisations and a median that is null
+ * until somebody actually comes back. */
+export function outcomesLine(results: OutreachResults): string {
+  const total = results.outcomes.length + results.notEvaluable;
+  const median =
+    results.medianDaysToReturn === null
+      ? ""
+      : ` (median ${results.medianDaysToReturn} days after the note)`;
+  return (
+    joinSentence(
+      [
+        `Outreach so far: ${total} ${total === 1 ? "note" : "notes"} taken`,
+        `${results.returned} came back${median}`,
+        `${results.stillQuiet} still quiet`,
+        /* Never dropped in silence: a ledger entry whose member is not in
+         * THESE records still happened, and saying so is the difference
+         * between a total that adds up and one that quietly does not. */
+        results.notEvaluable > 0
+          ? `${results.notEvaluable} not evaluable in these records`
+          : null,
+      ],
+      " · ",
+    ) + "."
+  );
+}
+
 /* HOW MANY OF THE FLAGGED CAN ACTUALLY BE WRITTEN TO.
  *
  * The summary says "N members checked, M flagged". It has never said how

@@ -19,6 +19,7 @@ import {
   findQuietMembers,
   draftTextFor,
   evidenceLine,
+  joinSentence,
   firstNameOf,
   recentBookingActivity,
   summaryLine,
@@ -37,6 +38,7 @@ import {
   keepOutreachRecords,
   availabilityLine,
   mailtoHref,
+  outcomesLine,
   outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
@@ -414,19 +416,7 @@ function renderOutcomes(data: FixtureSet, today: number): void {
   const results = outreachResults(ledger, data, today);
   const line = document.createElement("p");
   line.className = "status outcomes-line";
-  const total = results.outcomes.length + results.notEvaluable;
-  const parts = [`Outreach so far: ${total} ${total === 1 ? "note" : "notes"} taken`];
-  parts.push(
-    `${results.returned} came back` +
-      (results.medianDaysToReturn === null
-        ? ""
-        : ` (median ${results.medianDaysToReturn} days after the note)`),
-  );
-  parts.push(`${results.stillQuiet} still quiet`);
-  if (results.notEvaluable > 0) {
-    parts.push(`${results.notEvaluable} not evaluable in these records`);
-  }
-  line.textContent = parts.join(" · ") + ".";
+  line.textContent = outcomesLine(results);
   outcomesEl.append(line);
 
   const memberName = new Map(data.members.map((m) => [m.member_id, m.display_name]));
@@ -571,19 +561,11 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   const availability = availabilityLine(
     outreachAvailability(result.flagged, outreachPolicy, ledger, suppressions),
   );
-  /* dataQualityLine returns string | null, and a plain `!== ""` filter does
-   * not narrow that — null survived it, joined as an empty segment, and put
-   * a double space in the sentence. Typed predicate, so the compiler holds
-   * the shape instead of the next reader having to. */
-  const statusParts: readonly (string | null)[] = [
-    summaryLine(result, asOf),
-    quality,
-    availability,
-  ];
+  /* joinSentence drops nulls and blank parts and is checked; the inline
+   * version of this line is what put a double space mid-sentence. */
   statusEl.textContent =
-    statusParts
-      .filter((part): part is string => part !== null && part.trim() !== "")
-      .join(" ") + comingLine + storageWarning;
+    joinSentence([summaryLine(result, asOf), quality, availability]) +
+    comingLine + storageWarning;
   sourceEl.textContent = sourceNote;
   ruleEl.textContent =
     `Proposed thresholds (not yet ratified by the team): flag active members ` +
