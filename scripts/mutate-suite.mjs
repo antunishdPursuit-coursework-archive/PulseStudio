@@ -33,6 +33,14 @@
  * exists to satisfy `noUncheckedIndexedAccess`, not to run. Read the
  * survivors; do not chase the number.
  *
+ * THE OPERATOR ITSELF MAKES SOME. Swapping `>` for `>=` inside a shift
+ * turns `h >>> 0` into `h >>>= 0`, which is valid, assigns, and returns
+ * the same value — so every bit-twiddling line reports a survivor that
+ * says nothing about the checks. Expect one per shift in code like
+ * `random.ts`. A boolean threshold is the other recurring case: `<` and
+ * `<=` differ only on exact equality, and for a float drawn from a 32-bit
+ * integer that is roughly one draw in four billion.
+ *
  * Run:
  *   npm run build
  *   npm run mutate                     # the re-engagement engine

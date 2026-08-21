@@ -13,6 +13,7 @@ import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudi
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { attendanceCsv, csvField } from "./csv-export.js";
+import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn } from "./lifecycle.js";
 import { dateOfTimestamp, dayNumberOf, weekdayOf } from "./normalize.js";
@@ -956,6 +957,60 @@ for (const file of ENGINE_SOURCES) {
       shouldFire,
     );
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* The seeded stream — everything above rests on it, and nothing        */
+/* checked it directly until 2026-08-21.                                */
+/* ------------------------------------------------------------------ */
+
+/* Every promise this engine makes reduces to one claim: the same seed
+ * gives the same sequence. random.ts was only ever exercised THROUGH
+ * generateStudio, which proves the whole pipeline agrees with itself but
+ * says nothing about which part is responsible. Mutation found the gap:
+ * changing `if (hi < lo) throw` to `<=` makes int(5, 5) throw instead of
+ * returning 5 — and picking from a one-element list is an ordinary call,
+ * `int(0, items.length - 1)`. Nothing noticed. */
+{
+  const a = makeStream("proof-seed-0001", "attendance");
+  const b = makeStream("proof-seed-0001", "attendance");
+  const other = makeStream("proof-seed-0001", "names");
+  const otherSeed = makeStream("proof-seed-0002", "attendance");
+
+  const take = (s: { next(): number }, n: number): number[] =>
+    Array.from({ length: n }, () => s.next());
+
+  const first = take(a, 20);
+  check("the same seed and stream give the same sequence",
+    JSON.stringify(first), JSON.stringify(take(b, 20)));
+  check("a different stream name gives a different sequence",
+    JSON.stringify(first) === JSON.stringify(take(other, 20)), false);
+  check("a different seed gives a different sequence",
+    JSON.stringify(first) === JSON.stringify(take(otherSeed, 20)), false);
+  check("every draw sits in [0, 1)",
+    first.every((n) => n >= 0 && n < 1), true);
+
+  const ints = makeStream("proof-seed-0001", "ints");
+  check("a single-value range returns that value rather than throwing",
+    ints.int(5, 5), 5);
+  check("...including zero, which is what int(0, list.length - 1) gives a one-item list",
+    ints.int(0, 0), 0);
+  let reversedRefused = false;
+  try {
+    ints.int(9, 2);
+  } catch {
+    reversedRefused = true;
+  }
+  check("a reversed range is refused, because an empty range has no answer",
+    reversedRefused, true);
+  check("every int lands inside the range asked for",
+    Array.from({ length: 500 }, () => ints.int(3, 7)).every((n) => n >= 3 && n <= 7), true);
+
+  const odds = makeStream("proof-seed-0001", "odds");
+  check("a probability of 0 never fires",
+    Array.from({ length: 2000 }, () => odds.chance(0)).some(Boolean), false);
+  check("a probability of 1 always fires",
+    Array.from({ length: 2000 }, () => odds.chance(1)).every(Boolean), true);
 }
 
 /* ------------------------------------------------------------------ */
