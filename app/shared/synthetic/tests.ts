@@ -97,6 +97,22 @@ check("every member id is namespaced",
   const duplicateGroups = [...byName.values()].filter((ids) => ids.length > 1);
   check("different members share a display name with DISTINCT ids",
     duplicateGroups.some((ids) => new Set(ids).size === ids.length && ids.length === 2), true);
+
+  /* THE PART THAT MAKES THE PAIR USEFUL.
+   *
+   * That they exist was checked. What they are FOR was not. scenarios.ts
+   * gives the two contrasting behaviour on purpose — "the pair Product D
+   * must tell apart" — and that is the half a consumer gets wrong: key
+   * off display_name instead of member_id and you either write to
+   * somebody who came in last week or stay silent about somebody who has
+   * been gone a month. Product D's CSV door was caught doing exactly that
+   * once, which is why the pair is here at all. */
+  const pair = duplicateGroups.find((ids) => ids.length === 2) ?? [];
+  check("...and the pair's re-engagement answers are OPPOSITE, which is the point",
+    pair.map((id) => first.truth.expectedReengagementEligibility[id]).sort().join(","),
+    "false,true");
+  check("...so anything keying off the name alone gets one of them wrong",
+    new Set(pair.map((id) => first.truth.expectedQuietDays[id])).size, 2);
 }
 check("unicode names survive verbatim",
   first.dataset.members.some((m) => m.displayName === "王伟") &&
