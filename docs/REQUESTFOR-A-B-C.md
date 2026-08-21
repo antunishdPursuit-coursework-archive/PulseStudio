@@ -1,8 +1,9 @@
 # Integration requests — from Product D to A, B, and C
 
-**From:** Rensley (Product D — Member Re-engagement) · **Lives in:** my folder,
-so nobody waits on me to find anything · **Format per teammate:** what I give
-you → what I need from you → a check with a known answer → ONE ask.
+**From:** Rensley (Product D — Member Re-engagement) · **Lives in:** `docs/`,
+because it is written for you to read before you write code and it must not
+ship to the public site · **Format per teammate:** what I give you → what I
+need from you → a check with a known answer → ONE ask.
 
 The ground truth for all three sections: Pulse Studio is **one gym, one
 location, one shared record set**. Product D reads `member`, `membership`,
