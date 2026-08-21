@@ -16,11 +16,24 @@
    `.home-brand` ruleset all headers use — style it here, never per-page).
 3. **`app/favicon.svg`** — the mark (`logo.ts` carries the same path for
    in-page use).
-4. **`app/index.html`** — the front door's title/meta/theme-color, the one
-   static remainder.
+3b. **`app/shared/photos/`** — the studio's own pictures, and
+   `app/shared/fonts/` if the new studio has its own faces. Both fold into
+   one instruction: replace the files, keep the licence files honest.
+4. **`app/index.html`** — the front door's title, meta description, and
+   theme-color: values a `<meta>` tag cannot read at runtime.
 
-That is the whole rebrand. Anything asking for a fifth file is a bug in
-this structure — say so instead of adding one.
+That is the whole rebrand **for everything shared**. Two honest remainders,
+each in an owner's lane rather than here (an audit caught this page claiming
+otherwise):
+
+- **Each product page's `<title>`** still spells the studio out, because a
+  document title is read before any module runs. Four one-word edits, one
+  per owner.
+- **Anything a product hardcodes in its own copy.** The gate cannot see
+  prose, so a rebrand ends with one grep for the old studio name.
+
+If you find a *shared* file asking to be edited on a rebrand, that is a bug
+in this structure — say so instead of adding it to the list.
 
 ## The rule for adding a component
 

@@ -91,7 +91,12 @@ function storage(): StorageLike {
    that is stated behavior, not a bug. */
 let memorySession: PulseSession | null = null;
 
-type Listener = (session: PulseSession | null) => void;
+/* Where a change happened. A surface that NAVIGATES on sign-in must only
+ * do so for its own tab's action — yanking a second tab to another page
+ * because someone signed in over here would be a page moving under a
+ * person's hands. Listeners that don't care simply take one parameter. */
+export type SessionChangeOrigin = "this-tab" | "other-tab";
+type Listener = (session: PulseSession | null, origin: SessionChangeOrigin) => void;
 const listeners = new Set<Listener>();
 
 /* ---------- validation ---------- */
@@ -204,13 +209,13 @@ export function writePulseSession(session: PulseSession): void {
     /* memory-only from here — stated lifecycle, not silence */
   }
   memorySession = session;
-  notify(session);
+  notify(session, "this-tab");
 }
 
 export function clearPulseSession(): void {
   quietRemove();
   memorySession = null;
-  notify(null);
+  notify(null, "this-tab");
 }
 
 function quietRemove(): void {
@@ -232,8 +237,8 @@ export function subscribeToPulseSession(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
-function notify(session: PulseSession | null): void {
-  for (const listener of [...listeners]) listener(session);
+function notify(session: PulseSession | null, origin: SessionChangeOrigin): void {
+  for (const listener of [...listeners]) listener(session, origin);
 }
 
 let storageEventWired = false;
@@ -241,7 +246,9 @@ function wireStorageEventOnce(): void {
   if (storageEventWired) return;
   storageEventWired = true;
   window.addEventListener("storage", (event) => {
-    if (event.key === SESSION_KEY || event.key === null) notify(readPulseSession());
+    if (event.key === SESSION_KEY || event.key === null) {
+      notify(readPulseSession(), "other-tab");
+    }
   });
 }
 

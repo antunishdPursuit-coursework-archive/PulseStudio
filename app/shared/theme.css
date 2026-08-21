@@ -1,3 +1,29 @@
+/* ---------- the studio's two faces ----------
+   Hosted in app/shared/fonts/, never fetched from a font service: a CDN
+   link would call a third party from every visitor's browser on every
+   page, which would quietly break the promise this site makes members.
+   96 KB total, latin subset. Licensing and the swap rules are in
+   app/shared/fonts/README.md — both faces are SIL OFL 1.1 and their
+   license files ship beside them.
+
+   font-display: swap means the page paints immediately in the fallback
+   and upgrades when the file lands — text is never invisible. */
+
+@font-face {
+  font-family: "Anton";
+  font-style: normal;
+  font-weight: 400; /* Anton ships one weight — it is already the heavy one */
+  font-display: swap;
+  src: url("./fonts/anton-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Epilogue";
+  font-style: normal;
+  font-weight: 400 700; /* one variable file covers the whole range */
+  font-display: swap;
+  src: url("./fonts/epilogue-variable.woff2") format("woff2");
+}
+
 /* Pulse Studio — shared theme.
    TEAM-OWNED: change only by team agreement (see CLAUDE.md).
 
@@ -22,6 +48,19 @@
   --fg: #0a0a0a;
   --line: #d4d4d4;
   --muted: #595959;
+
+  /* TWO VOICES.
+     A fitness studio does not sound like a settings screen. Anything that
+     should carry energy — a headline, a page's name, a button — speaks in
+     the DISPLAY voice: heavy, condensed-feeling, uppercase, tight. Anything
+     a person has to actually read speaks in the BODY voice: quiet, roomy,
+     sentence case.
+     Both stacks resolve to faces already on the reader's machine — no font
+     is downloaded from anywhere, which keeps this site's promise that
+     nothing about a visitor leaves their browser, and keeps the page fast
+     on a phone in a locker room. */
+  --font-display: "Anton", "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Epilogue", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* one color per developer */
   --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
@@ -60,12 +99,64 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/1.6 var(--font-body);
 }
 
 main { padding: 24px; max-width: 960px; margin: 0 auto; }
 
 a { color: var(--accent, var(--fg)); }
+
+/* THE DISPLAY VOICE — every page's name and every headline.
+   Uppercase and heavy is the fitness-studio convention (walk into any
+   studio and read the wall); tight tracking keeps a heavy face from
+   sprawling. Body copy is deliberately NOT included: shouting at someone
+   who is trying to read a cancellation policy is how a page loses them. */
+h1, h2, h3, .display, .page-head .role, .brand {
+  font-family: var(--font-display);
+  /* Anton has exactly one weight. Asking for 700/800 makes the browser
+     SYNTHESISE a bold — smeared, heavier, wrong. Ask for what exists. */
+  font-weight: 400;
+  /* The luxury end of this category sets big uppercase TIGHT (Equinox runs
+     -0.02em at 64px). Anton is already condensed, so a small negative is
+     enough to make it feel set rather than typed. */
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  line-height: 1.0;
+}
+
+/* The small line above a headline — the studio's own label for what is
+   coming. Used on every surface, so it lives here now instead of being
+   re-invented per page. */
+.eyebrow {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- photography ----------
+   Four pictures, four photographers, four rooms. One grade here makes them
+   one studio: a little desaturated so no stray colour fights the builder
+   accents, contrast lifted so dark rooms stay dark instead of grey.
+   Change it once and every picture on the site follows.
+
+   Note on the colour law: these are IMAGES — content in the page — not
+   page backgrounds. Every surface underneath is still var(--bg). */
+.studio-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.55) contrast(1.12) brightness(0.92);
+}
+.photo-frame {
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
 
 /* developer scoping — the color law in one class */
 .product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
@@ -79,9 +170,12 @@ a { color: var(--accent, var(--fg)); }
   color: var(--accent-ink);
   border: 0;
   border-radius: 8px;
-  padding: 10px 18px;
-  font: inherit;
-  font-weight: 600;
+  padding: 11px 20px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 .btn:hover { filter: brightness(1.08); }
@@ -99,8 +193,9 @@ a { color: var(--accent, var(--fg)); }
 
 .page-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px 12px;
   padding: 16px 24px;
   border-bottom: 3px solid var(--accent, var(--line));
 }
@@ -183,3 +278,14 @@ a { color: var(--accent, var(--fg)); }
 .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
 .home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent, var(--fg)); }
 .home-brand:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
+
+/* The label naming what a page IS, sitting beside the brand in the same
+   header ("Book a class", "Member Re-engagement"). Every product header
+   shows one, so it is styled ONCE here — a copy pasted into a product's
+   own stylesheet is the drift this file exists to prevent. */
+.page-head .role { color: var(--accent, var(--fg)); font-size: 1.3rem; font-style: normal; }
+/* On a narrow screen the page's name takes its own line rather than
+   squeezing whoever is signed in into a column of single words. */
+@media (max-width: 860px) {
+  .page-head .role { flex-basis: 100%; font-size: 1.1rem; }
+}

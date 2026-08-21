@@ -30,13 +30,15 @@
 
 import type { SyntheticMember } from "../synthetic/contracts.js";
 import {
-  FRONT_DESK,
   clearPulseSession,
   readPulseSession,
   subscribeToPulseSession,
-  writePulseSession,
 } from "../auth/session.js";
-import { sharedStudioMembers } from "../auth/studio.js";
+import {
+  signInAsFrontDesk,
+  signInAsMember,
+  signInChoices,
+} from "../auth/sign-in.js";
 
 const CONTROL_ID = "pulse-session-control";
 const STYLE_ID = "pulse-session-styles";
@@ -128,7 +130,7 @@ async function openDialog(): Promise<void> {
 
   state.textContent = "Loading the member records…";
   try {
-    const members = sharedStudioMembers();
+    const { members } = signInChoices();
     state.textContent =
       members.length === 0
         ? "0 members in the shared studio — there is nobody to sign in as."
@@ -185,22 +187,20 @@ function buildDialogShell(): HTMLDialogElement {
    id IS the identity that gets remembered, so it is shown, not hidden.
    No email appears: v1 stores none, derives none, and manufactures none. */
 function memberRow(member: SyntheticMember): HTMLButtonElement {
+  /* Presentation only: WHO may sign in and WHAT gets written is
+   * auth/sign-in.ts's decision — this file just draws the rows. */
   return row(member.displayName, member.id, member.currentStatusSnapshot, () => {
-    writePulseSession({
-      version: 1,
-      actor_type: "member",
-      member_id: member.id,
-      display_name: member.displayName,
-    });
+    signInAsMember(member);
   });
 }
 
 function staffRow(): HTMLButtonElement {
+  const { staff } = signInChoices();
   return row(
-    FRONT_DESK.display_name,
-    FRONT_DESK.actor_type === "staff" ? FRONT_DESK.staff_id : "",
+    staff.display_name,
+    staff.actor_type === "staff" ? staff.staff_id : "",
     "staff · front desk",
-    () => { writePulseSession(FRONT_DESK); },
+    () => { signInAsFrontDesk(); },
   );
 }
 
@@ -260,7 +260,7 @@ function injectStylesOnce(): void {
   width: 9px; height: 9px; border-radius: 50%;
   background: var(--accent, var(--fg)); /* solid accent — the sanctioned fill */
 }
-.pulse-session-role { font-style: normal; font-size: 0.78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.pulse-session-role { font-style: normal; font-size: 0.78rem; white-space: nowrap; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
 .pulse-session-dialog {
   background: var(--bg); /* the law: surfaces are black or white only */
   color: var(--fg);

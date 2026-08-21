@@ -12,8 +12,8 @@
 .page-head {
   box-shadow: 0 6px 30px color-mix(in srgb, var(--accent) 35%, transparent);
 }
-/* .home-brand styling lives ONCE in shared/theme.css now. */
-.page-head .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
+/* The shared header pieces — .home-brand and .role — are styled ONCE in
+   shared/theme.css. Nothing about them belongs in this file. */
 
 .status {
   font-size: 1.05rem;
@@ -131,6 +131,24 @@
   cursor: pointer;
   margin-left: 8px;
 }
+
+/* Booking-without-attending: engagement worth seeing at full strength,
+   unlike the muted metadata around it. */
+.evidence.activity { color: var(--fg); }
+
+/* The discipline line: which policy rule spoke, when a draft is withheld.
+   Muted on purpose — it is a state, not an alarm. */
+.workflow-state {
+  color: var(--muted);
+  font-size: 0.92rem;
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  margin: 10px 0 4px;
+}
+/* The closed-loop strip sits above the cards; extra bottom room so the
+   outcome line never crowds the first flagged member. */
+#outcomes { margin-bottom: 18px; }
+#outcomes .outcomes-line { margin-bottom: 6px; }
 
 .footer-note {
   margin-top: 28px;

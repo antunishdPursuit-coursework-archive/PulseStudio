@@ -243,6 +243,67 @@ export function dataQualityLine(result: FlagResult): string | null {
   return parts.length === 0 ? null : `${parts.join("; ")}.`;
 }
 
+/** Visits per week over the prior window, comparable across members and
+ *  honestly rounded — a twice-a-week regular and a once-a-month visitor
+ *  should never look alike on the card. */
+export function weeklyCadence(priorCount: number, windowDays: number): number {
+  return Math.round((priorCount / (windowDays / 7)) * 10) / 10;
+}
+
+const WEEKDAY_NAMES = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
+
+function weekdayNameOf(date: string): string {
+  return WEEKDAY_NAMES[(((dayNumberFromIso(date) + 4) % 7) + 7) % 7] ?? "soon";
+}
+
+function timeOf(startsAt: string): string {
+  const hh = Number(startsAt.slice(11, 13));
+  const mm = startsAt.slice(14, 16);
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${h12}:${mm} ${hh < 12 ? "AM" : "PM"}`;
+}
+
+/** The next scheduled class matching the member's own pattern, within ten
+ *  days: their usual class WITH their usual instructor first, then their
+ *  usual class with anyone. Null when the records hold no such session —
+ *  a generic draft beats a made-up invitation. Deterministic: earliest
+ *  date, then session id. */
+export function suggestedSession(
+  flagged: FlaggedMember,
+  data: FixtureSet,
+  today: number,
+): ClassSession | null {
+  const instructorByName = new Map(
+    data.instructors.map((i) => [i.display_name, i.instructor_id]),
+  );
+  const usualInstructorId = instructorByName.get(flagged.usualInstructorName) ?? null;
+  const candidates = data.class_sessions
+    .filter((s) => {
+      if (s.session_status !== "scheduled") return false;
+      if (s.class_type !== flagged.usualClassType) return false;
+      const day = dayNumberFromIso(s.starts_at);
+      return Number.isFinite(day) && day > today && day <= today + 10;
+    })
+    .sort((a, b) =>
+      a.starts_at === b.starts_at
+        ? a.session_id < b.session_id ? -1 : 1
+        : a.starts_at < b.starts_at ? -1 : 1,
+    );
+  return (
+    candidates.find((s) => s.instructor_id === usualInstructorId) ??
+    candidates[0] ??
+    null
+  );
+}
+
+/** "on Thursday at 9:00 AM" — the words the draft weaves in. */
+export function inviteWording(session: ClassSession): string {
+  const date = session.starts_at.split("T")[0] ?? session.starts_at;
+  return `on ${weekdayNameOf(date)} at ${timeOf(session.starts_at)}`;
+}
+
 /** First word of a display name, for the draft's greeting. */
 export function firstNameOf(displayName: string): string {
   return displayName.split(" ")[0] ?? displayName;
@@ -255,18 +316,63 @@ export function firstNameOf(displayName: string): string {
  *  spot, and never counts. A quiet member in this set is already coming
  *  back on their own: they are stated and left alone, never nagged. */
 export function upcomingReservedMemberIds(data: FixtureSet, today: number): Set<string> {
+  // Derived from the dated map below so the two views can never drift:
+  // same reading of the trail, one implementation.
+  return new Set(upcomingReservedNextClassDates(data, today).keys());
+}
+
+/** Per coming-back member, the DATE of their earliest upcoming reserved
+ *  class — so the page can say not just that they are coming back, but
+ *  when. Same reservation reading as above: last row wins, waitlisted is
+ *  hope not a hold, only classes dated after "today" count. */
+export function upcomingReservedNextClassDates(
+  data: FixtureSet,
+  today: number,
+): Map<string, string> {
   const latest = new Map<string, Reservation>();
   for (const r of data.reservations) {
     latest.set(`${r.member_id}|${r.session_id}`, r);
   }
-  const sessionDay = new Map(
-    data.class_sessions.map((s) => [s.session_id, dayNumberFromIso(s.starts_at)]),
+  const sessionStart = new Map(
+    data.class_sessions.map((s) => [s.session_id, s.starts_at]),
   );
-  const ids = new Set<string>();
+  const nextDate = new Map<string, string>();
   for (const r of latest.values()) {
     if (r.reservation_status !== "reserved") continue;
-    const day = sessionDay.get(r.session_id);
-    if (day !== undefined && day > today) ids.add(r.member_id);
+    const startsAt = sessionStart.get(r.session_id);
+    if (startsAt === undefined) continue;
+    const day = dayNumberFromIso(startsAt);
+    if (!Number.isFinite(day) || day <= today) continue;
+    const date = startsAt.split("T")[0] ?? startsAt;
+    const prior = nextDate.get(r.member_id);
+    if (prior === undefined || date < prior) nextDate.set(r.member_id, date);
   }
-  return ids;
+  return nextDate;
+}
+
+/** Most recent booking ACTION since the member's last visit — booked,
+ *  maybe canceled, never attended — or null. Booking without attending is
+ *  a different story from silence, and staff should see the difference:
+ *  disclosed on the card, never silently merged into "activity", and it
+ *  NEVER shrinks the quiet-days count (only attendance is a visit). */
+export function recentBookingActivity(
+  memberId: string,
+  data: FixtureSet,
+  lastDay: number,
+  today: number,
+): string | null {
+  let disclosed: string | null = null;
+  let recentActionDay = -Infinity;
+  for (const r of data.reservations) {
+    if (r.member_id !== memberId) continue;
+    const actionDate = r.reserved_at.split("T")[0] ?? r.reserved_at;
+    const actionDay = dayNumberFromIso(actionDate);
+    if (!Number.isFinite(actionDay) || actionDay <= lastDay || actionDay > today) continue;
+    if (actionDay > recentActionDay) {
+      recentActionDay = actionDay;
+      disclosed =
+        r.reservation_status === "canceled" ? `${actionDate} (canceled)` : actionDate;
+    }
+  }
+  return disclosed;
 }

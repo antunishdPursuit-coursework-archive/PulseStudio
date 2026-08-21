@@ -1,0 +1,133 @@
+/* Pulse Studio — the front door's view logic. TEAM-OWNED.
+ *
+ * THE AUDIENCE LAW applied: this page speaks to the studio's MEMBER first
+ * and adapts — never gates — by who is signed in. A member session gets a
+ * greeting by name; a staff session gets the staff tools called out. No
+ * route is ever hidden or blocked: the session only changes emphasis and
+ * words, exactly the honesty rule the session contract itself states.
+ *
+ * AND: signing in HERE takes a person to their own home — a member to
+ * booking, staff to the dashboard — because nobody signs in to keep
+ * reading the front page. The three rules that keep that from becoming a
+ * trap:
+ *   1. Only on the ACT of signing in (signed-out → signed-in), never on
+ *      page load. A signed-in person can open the front door any time —
+ *      click the brand, the Home link, or type the URL — and it stays put.
+ *   2. Only when the sign-in happened in THIS tab. A second tab does not
+ *      lurch to another page because someone signed in over here.
+ *   3. Never on sign-out, and never on any product page: this file loads
+ *      only on the front door, so no product surface can be navigated by
+ *      the session.
+ * Every route stays reachable by link and by URL — this is where a person
+ * lands, not what they are allowed to see. */
+
+import {
+  readPulseSession,
+  subscribeToPulseSession,
+  type PulseSession,
+  type SessionChangeOrigin,
+} from "./auth/session.js";
+
+/** Where each actor's own home is, relative to the front door. */
+const HOME_FOR = {
+  member: "./products/a-booking/",
+  staff: "./products/b-dashboard/",
+} as const;
+
+function applyView(session: PulseSession | null): void {
+  document.body.dataset["view"] = session === null ? "" : session.actor_type;
+
+  const hello = document.getElementById("member-hello");
+  if (hello !== null) {
+    hello.textContent =
+      session !== null && session.actor_type === "member"
+        ? `Welcome back, ${session.display_name}.`
+        : "";
+  }
+
+  const staffNote = document.getElementById("staff-note");
+  if (staffNote !== null) {
+    staffNote.textContent =
+      session !== null && session.actor_type === "staff"
+        ? `Signed in as ${session.display_name} — these are your tools.`
+        : "Staff only — sign in as Front Desk from the top bar.";
+  }
+}
+
+/* The page's own memory of who was signed in a moment ago. Seeded from
+ * the CURRENT session at load, which is precisely what makes rule 1 work:
+ * arriving already signed in is not a transition, so nothing moves. */
+let previous = readPulseSession();
+applyView(previous);
+
+/* The pending landing, so a later change can cancel it. */
+let pendingNavigation: number | null = null;
+
+/** Did the sign-in actually reach storage? readPulseSession() falls back to
+ *  an in-memory session when storage is unavailable, and that session does
+ *  NOT survive a navigation — so it must never trigger one. */
+function sessionPersisted(): boolean {
+  try {
+    return localStorage.getItem("pulse-session") !== null;
+  } catch {
+    return false;
+  }
+}
+
+subscribeToPulseSession((session, origin) => {
+  const signedInJustNow = previous === null && session !== null;
+  previous = session;
+  applyView(session);
+
+  /* Any change at all cancels a landing already in flight — signing out
+     during the pause must not still send you to a members-only page. */
+  if (pendingNavigation !== null) {
+    window.clearTimeout(pendingNavigation);
+    pendingNavigation = null;
+  }
+
+  if (!signedInJustNow || origin !== "this-tab" || session === null) return;
+
+  /* Say where they are going before going — a page that moves without a
+   * word is a page that feels broken. */
+  const hello = document.getElementById("member-hello");
+  if (hello !== null) {
+    hello.textContent =
+      session.actor_type === "member"
+        ? `Welcome back, ${session.display_name} — taking you to your classes…`
+        : `Signed in as ${session.display_name} — taking you to the dashboard…`;
+  }
+  /* The pause exists so the sentence above can be read. Three things it
+     must survive, each one an audit finding:
+       · a sign-out (or any change) during the pause CANCELS it — otherwise
+         the timer fires later and hijacks wherever the person went next;
+       · a session that did not actually persist never navigates — with
+         storage unavailable the destination page would read no session and
+         the person would arrive signed out, which is worse than staying;
+       · coming BACK to this page from the destination restores it from the
+         browser's cache mid-sentence, so pageshow repaints the view. */
+  if (!sessionPersisted()) {
+    if (hello !== null) {
+      hello.textContent =
+        `Signed in as ${session.display_name} — this browser will not remember it, ` +
+        `so you are staying here. Your links still work.`;
+    }
+    return;
+  }
+  pendingNavigation = window.setTimeout(() => {
+    pendingNavigation = null;
+    window.location.assign(HOME_FOR[session.actor_type]);
+  }, 450);
+});
+
+/* A page restored from the back/forward cache keeps whatever it said when
+   it left — including "taking you to…" for a trip that already happened. */
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  if (pendingNavigation !== null) {
+    window.clearTimeout(pendingNavigation);
+    pendingNavigation = null;
+  }
+  previous = readPulseSession();
+  applyView(previous);
+});

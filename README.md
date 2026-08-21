@@ -1,5 +1,10 @@
 # Pulse Studio
 
+> **In development.** Start here: **[Are we ready to present?](https://antunishdpursuit.github.io/PulseStudio/shared/ready.html)**
+> · [Storytold — how the records flow](https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html)
+> · [The live site](https://antunishdpursuit.github.io/PulseStudio/)
+
+
 ## Project 4: Membership Studio
 
 Pulse Studio is a single-location boutique fitness studio offering group
@@ -68,8 +73,8 @@ often they used to come), and a ready personal note to copy or open in their
 own email app. It never sends anything — that stays a human decision. Staff
 can also check the studio's own attendance export, which is read in the
 browser and never uploaded anywhere.
-[Live](https://gymsley.github.io/app/products/d-reengagement/) ·
-[Unit checks](https://gymsley.github.io/app/products/d-reengagement/tests.html)
+[Live](https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/) ·
+[Unit checks](https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/tests.html)
 · [Brief](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md) ·
 [Folder README](app/products/d-reengagement/README.md)
 
@@ -84,8 +89,8 @@ browser and never uploaded anywhere.
 
 ## Live
 
-<https://gymsley.github.io/app/> — the front door, linking to all four
-products.
+<https://antunishdpursuit.github.io/PulseStudio/> — the front door, linking to all four
+products. (The team repo is what deploys; a personal fork is not published.)
 
 ## How the team builds
 

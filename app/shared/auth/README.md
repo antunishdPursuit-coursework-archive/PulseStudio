@@ -66,7 +66,7 @@ lingering.
 | `session.ts` | The v1 contract, its defensive reader/writer, events, and the compatibility view |
 | `studio.ts` | The one shared studio the dialog lists and sessions resolve against |
 | `schema.sql` | The Postgres schema for the hosted version — `member_id` is the identity there too; email is the login credential |
-| `tests.html` / `tests.ts` | 27 browser-run checks, written failing-first against this API |
+| `tests.html` / `tests.ts` | 32 browser-run checks, written failing-first against this API |
 | `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk as a separate staff row, chip + Sign out |
 
 ## The compatibility view (temporary, by design)
@@ -84,9 +84,9 @@ their own lane, the view retires.
 - **Kerrian / Booking** — already reads the shared session; when
   convenient, switch `currentSession()` → `readPulseSession()` and branch
   on `actor_type` instead of `role`.
-- **Manny / Scheduling** — the dashboard doesn't load `theme-boot.js`;
-  one script tag adds the chip and theme toggle. `pulse-reservations-a`
-  (A's runtime reservations) is data, not identity — no action needed.
+- **Manny / Scheduling** — the dashboard loads `theme-boot.js` and carries
+  the chip already. `pulse-reservations-a` (A's runtime reservations) is
+  data, not identity — no action needed.
 - **Dennis / Support** — the chip is already on the page; the chatbot may
   branch on `actor_type` to avoid staff-flavored answers for members.
 - **Rensley / Re-engagement** — suggested disclosure when showing shared

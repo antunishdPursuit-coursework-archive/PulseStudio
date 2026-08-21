@@ -1,8 +1,9 @@
 # Integration requests — from Product D to A, B, and C
 
-**From:** Rensley (Product D — Member Re-engagement) · **Lives in:** my folder,
-so nobody waits on me to find anything · **Format per teammate:** what I give
-you → what I need from you → a check with a known answer → ONE ask.
+**From:** Rensley (Product D — Member Re-engagement) · **Lives in:** `docs/`,
+because it is written for you to read before you write code and it must not
+ship to the public site · **Format per teammate:** what I give you → what I
+need from you → a check with a known answer → ONE ask.
 
 The ground truth for all three sections: Pulse Studio is **one gym, one
 location, one shared record set**. Product D reads `member`, `membership`,
@@ -10,7 +11,7 @@ location, one shared record set**. Product D reads `member`, `membership`,
 nothing shared, and drafts outreach that staff send themselves. Verify any
 claim I make from this folder: open
 `/products/d-reengagement/tests.html` — it states
-"27 checks run, 27 passed, 0 failed" — and the page itself states
+"92 checks run, 92 passed, 0 failed" — and the page itself states
 "5 members checked, 1 flagged as of <today>".
 
 ---
@@ -126,9 +127,55 @@ jointly held.
 
 ## The studio mailbox (affects everyone)
 
-`pulse@githat.io` is live: inbound mail forwards to the owner, and the studio
-can send from it. My outreach flow BCCs it so the studio keeps a record of
-every note staff send. Nothing in this repo sends mail — that stays human.
+The studio's record mailbox is configuration, and for this studio it is
+deliberately UNSET (`studioEmail: null` in `config.ts`). A studio that keeps
+a shared mailbox puts its own address there; the footer names it and every
+draft BCCs it, so the studio keeps a copy of what staff sent. With no
+address set, the page simply does not mention one — naming a mailbox nobody
+reads would be worse than naming none.
+
+Either way, nothing in this repo sends mail. That stays human.
+
+## The repo root — eight files, three owners (2026-08-21)
+
+Eight files at the repo root are the site we had before Pages switched to
+publishing `app/`. They are unreachable now: `app/` is the site root, so root
+`index.html` is shadowed by `app/index.html` and the other seven return 404.
+Nothing under `app/` references any of them, and the gate cannot see them.
+
+| Files | Owner | State |
+| --- | --- | --- |
+| `member-dashboard.{html,css,js}` · `staff-dashboard.{html,css,js}` | Manny | 404 · hardcoded `#f4f1eb` and hardcoded records, so they break the color and data laws |
+| `member-booking.html` | Kerrian | 404 · clean; a deliberate forwarder that worked when it was written |
+| `index.html` | team lead | shadowed · reaches two of four products |
+
+**The asks — one each, none urgent:**
+
+- **Manny** — retire the six. Worth a look first: root `staff-dashboard.js`
+  models three rooms with a ranked demand panel; the live dashboard hardcodes
+  `"Studio"`. Reviving it needs a `room` field on the shared session, so it is
+  a conversation, not a copy-paste. Git keeps the code either way.
+- **Kerrian** — retire `member-booking.html` whenever it suits, or keep it.
+  Correcting myself: an earlier draft called it broken debris. It is neither.
+  `06aa064` cut 547 lines to a 12-line forwarder on purpose, and it worked at
+  the time — the root was still being served. Unreachable now, not broken, and
+  the only one of the eight with no law violation. Lowest priority here.
+- **Team lead** — root `index.html` is yours, not a lane owner's.
+
+**Two things that matter more than the root:**
+
+1. `app/products/b-dashboard/staff-dashboard.html` returns **HTTP 200**. The
+   page `b-dashboard/CLAUDE.md` already calls stale is public right now.
+   Manny's to retire. Same folder: `staff-dashboard.js` is the only tracked
+   `.js` under `app/`, which the repo ignores as build output — it survives
+   only because ignore rules skip already-tracked files. Delete and re-add it
+   and `git add` refuses silently, with no gate failure.
+2. **The boundary is a setting.** GitHub's legacy builder still records
+   `source: {branch: main, path: "/"}` under the Actions deploy. Flip
+   Settings → Pages → Source back and those eight files are the live site
+   again. That is the real argument for retiring them.
+
+None of the above was touched by me — every file is in someone else's lane.
 
 ## If you disagree with anything here
 

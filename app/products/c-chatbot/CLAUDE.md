@@ -6,9 +6,9 @@ brief first; this file adds what is true about THIS folder.
 
 ## What this product is (proven in code, not aspiration)
 
-A single-page, fully client-side keyword-routed Q&A widget — **no LLM, no
-network calls, no persistence** — that answers member questions from the
-shared synthetic dataset through four paths, checked in this order: a
+A single-page, fully client-side keyword-routed Q&A widget — **no LLM and no
+network calls** — that answers member questions from the shared synthetic
+dataset and Booking's published browser reservation log through four paths, checked in this order: a
 privacy refusal for member-data questions, current-policy answers on five
 topics, a next-5-classes schedule answer with optional spaces-left counts,
 and an honest capability-listing fallback. Every answer renders as chat
@@ -55,7 +55,9 @@ Three source files: `index.html`, `main.ts` (~143 lines — everything),
   the header. The chatbot itself ignores the session today; if it ever
   branches by `actor_type`, that is Dennis's lane call (see
   `app/shared/auth/README.md`).
-- Storage: none of its own (`pulse-theme` belongs to the shared boot).
+- Storage: it writes nothing. Spaces-left answers defensively read Product A's
+  published `pulse-reservations-a` log; the latest row per member and session
+  overrides the generated booking state.
 
 ## Gate
 
