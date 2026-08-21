@@ -23,7 +23,9 @@ import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
+  MAILTO_SAFE_LENGTH,
   keepOutreachRecords,
+  mailtoIsTooLong,
   keepSuppressionRecords,
   lapseKeyOf,
   outreachResults,
@@ -480,6 +482,43 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
   check("draft keeps the three ways back even without an invite",
     text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
+}
+
+/* A MAILTO LINK THAT WOULD BE TRUNCATED MUST NOT BE OFFERED. Mail clients
+ * cut long URLs without saying so, and opening the client CLAIMS THE LAPSE
+ * — so the member receives one half-finished note and then, correctly by
+ * the discipline, never hears about that silence again. */
+{
+  check("the shipped voice is nowhere near the limit",
+    mailtoIsTooLong("mailto:?subject=x&body=" + "y".repeat(900)), false);
+  check("a link past the safe length is refused",
+    mailtoIsTooLong("mailto:?subject=x&body=" + "y".repeat(MAILTO_SAFE_LENGTH)), true);
+  check("exactly the safe length is allowed",
+    mailtoIsTooLong("y".repeat(MAILTO_SAFE_LENGTH)), false);
+  check("one character over is not",
+    mailtoIsTooLong("y".repeat(MAILTO_SAFE_LENGTH + 1)), true);
+  check("the limit sits under the lowest known client ceiling",
+    MAILTO_SAFE_LENGTH < 2000, true);
+}
+
+/* THE LOG IS A RECORD OF WHAT STAFF DID, so it cannot quietly omit rows.
+ * Notes taken against a different data source cannot be judged by the
+ * records loaded now — the page counts them, and the download used to drop
+ * them, which made an incomplete file read as a complete one. */
+{
+  const fx = recordsFor([{ id: "m1", name: "Judged One", status: "active", attended: ["2026-08-16"] }]);
+  const ledger = [
+    { memberId: "m1", lapseKey: "m1|2026-08-01", takenAt: "2026-08-12", channel: "copy" as const },
+    { memberId: "ghost", lapseKey: "ghost|2026-07-01", takenAt: "2026-08-01", channel: "email" as const },
+  ];
+  const results = outreachResults(ledger, fx, TODAY);
+  check("the unjudgeable note is counted, not judged", results.notEvaluable, 1);
+  check("...and it is NOT among the outcomes", results.outcomes.length, 1);
+  // The download writes one line per outcome PLUS one per ledger entry that
+  // produced no outcome, so every note taken appears exactly once.
+  const written = results.outcomes.length +
+    ledger.filter((r) => !results.outcomes.some((o) => o.record === r)).length;
+  check("every note taken gets exactly one line in the log", written, ledger.length);
 }
 
 /* THE INVITATION HAS TO BE REAL. The draft says "want us to save you a

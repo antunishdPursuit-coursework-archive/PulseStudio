@@ -55,7 +55,9 @@ it is enforced by `outreach.ts`, not by memory:
 **The closed loop** is what keeps the loop honest: every taken note is
 judged against the records. Who came back (and how many days after the
 note), who stayed quiet, and which ledger entries these records cannot
-judge — stated on the page, with a local CSV export. The members who came
+judge — stated on the page, with a local CSV export that carries EVERY note
+taken, the unjudgeable ones included and labelled as such. A log that
+quietly drops rows is worse than no log, because it reads as complete. The members who came
 back are listed as exactly that: *worth a hello at the front desk* — the
 save is finished by a person, not a metric.
 

@@ -236,3 +236,31 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
   const kept = rows.filter(isSuppressionRecord);
   return { kept, dropped: rows.length - kept.length };
 }
+
+/* ------------------------------------------------------------------ */
+/* How long a mailto: link may be                                       */
+/* ------------------------------------------------------------------ */
+
+/* WHY THIS HAS A NUMBER ON IT. A mailto: URL is a URL, and mail clients
+ * truncate long ones — Outlook and the Windows shell handler stop somewhere
+ * around two thousand characters, without saying so. A truncated draft is a
+ * note that arrives cut off mid-sentence, from a studio telling a member it
+ * missed them.
+ *
+ * The part that makes it worse than an ugly email: opening the mail client
+ * CLAIMS THE LAPSE in the ledger. Once claimed, the discipline never offers
+ * that silence again — so a member could receive one half-finished note and
+ * then, correctly by the rules, never be written to about it. That is the
+ * outreach discipline working perfectly on a note that never should have
+ * gone.
+ *
+ * The shipped voice is nowhere near it — the longest draft against the
+ * running studio is about 820 characters of href. This exists because
+ * config.ts is explicitly the file a reseller rewrites, and a longer voice,
+ * a longer studio name, or longer links all push the same number up with
+ * nothing to notice. 1800 leaves room under the lowest known ceiling. */
+export const MAILTO_SAFE_LENGTH = 1800;
+
+export function mailtoIsTooLong(href: string): boolean {
+  return href.length > MAILTO_SAFE_LENGTH;
+}

@@ -33,6 +33,7 @@ import {
 } from "./logic.js";
 import {
   keepOutreachRecords,
+  mailtoIsTooLong,
   keepSuppressionRecords,
   outreachResults,
   outreachStateFor,
@@ -363,20 +364,35 @@ function renderFlagged(
     );
   });
 
+  const href = mailtoHref(f, draft);
   const mailLink = document.createElement("a");
   mailLink.className = "btn btn-outline";
-  mailLink.href = mailtoHref(f, draft);
-  mailLink.textContent = "Open in your email app";
-  mailLink.addEventListener("click", () => {
-    // Opening the mail client IS taking the draft — the note is in the
-    // staff member's hands from here.
-    ledger = recordOutreach(ledger, f, "email", studioToday());
-    persist();
-    setTimeout(() => {
-      focusMemberAfterRender = f.member.member_id;
-      rerender();
-    }, 900);
-  });
+  if (mailtoIsTooLong(href)) {
+    /* A mail client would truncate this, silently — and opening it would
+     * CLAIM THE LAPSE, so the member gets one half-finished note and then
+     * correctly never hears about this silence again. The link is not
+     * offered at all rather than offered as a trap; copying has no length
+     * limit and is right there. */
+    mailLink.removeAttribute("href");
+    mailLink.setAttribute("role", "note");
+    mailLink.classList.add("btn-ghost");
+    mailLink.classList.remove("btn", "btn-outline");
+    mailLink.textContent =
+      "Too long to open in an email app — copy it instead (a mail link this long gets cut off without warning)";
+  } else {
+    mailLink.href = href;
+    mailLink.textContent = "Open in your email app";
+    mailLink.addEventListener("click", () => {
+      // Opening the mail client IS taking the draft — the note is in the
+      // staff member's hands from here.
+      ledger = recordOutreach(ledger, f, "email", studioToday());
+      persist();
+      setTimeout(() => {
+        focusMemberAfterRender = f.member.member_id;
+        rerender();
+      }, 900);
+    });
+  }
 
   const suppressBtn = document.createElement("button");
   suppressBtn.className = "btn-ghost";
@@ -442,17 +458,38 @@ function renderOutcomes(data: FixtureSet, today: number): void {
   logBtn.type = "button";
   logBtn.textContent = "Download the outreach log (stays on this device)";
   logBtn.addEventListener("click", () => {
+    const quote = (text: string): string =>
+      /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
     const lines = ["member,member id,channel,note taken,result,days to return"];
     for (const o of results.outcomes) {
-      const nameText = memberName.get(o.record.memberId) ?? "";
       lines.push(
         [
-          /[",\n]/.test(nameText) ? `"${nameText.replaceAll('"', '""')}"` : nameText,
+          quote(memberName.get(o.record.memberId) ?? ""),
           o.record.memberId,
           o.record.channel,
           o.record.takenAt,
           o.result === "returned" ? "came back" : "still quiet",
           o.daysToReturn === null ? "" : String(o.daysToReturn),
+        ].join(","),
+      );
+    }
+    /* EVERY NOTE TAKEN, INCLUDING THE ONES THESE RECORDS CANNOT JUDGE.
+     * outreachResults counts those separately as notEvaluable — a note taken
+     * against a different data source, whose member is not in the records
+     * loaded now. The page states the count; this file used to drop them
+     * entirely, so the downloaded log was an incomplete record of what staff
+     * actually did, with nothing in the file to say so. A log that quietly
+     * omits rows is worse than no log: it reads as complete. */
+    for (const record of ledger) {
+      if (results.outcomes.some((o) => o.record === record)) continue;
+      lines.push(
+        [
+          quote(memberName.get(record.memberId) ?? ""),
+          record.memberId,
+          record.channel,
+          record.takenAt,
+          "not in these records — cannot be judged",
+          "",
         ].join(","),
       );
     }
@@ -613,10 +650,19 @@ csvInput.addEventListener("change", () => {
     .then((text) => {
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const imported = adaptAttendanceCsv(text, timeZone);
+      /* BOUNDED, AND SAYS SO. This joined EVERY skipped row into one
+       * sentence: a file with five hundred unreadable dates produced a
+       * five-hundred-clause line, which is unreadable in exactly the way
+       * that makes staff stop reading the disclosures that matter. The
+       * count is the number that matters; the reasons repeat. */
+      const SHOWN = 5;
       const skippedNote =
         imported.skipped.length === 0
           ? "0 rows skipped"
-          : `${imported.skipped.length} rows skipped: ${imported.skipped.join("; ")}`;
+          : `${imported.skipped.length} rows skipped: ${imported.skipped.slice(0, SHOWN).join("; ")}` +
+            (imported.skipped.length > SHOWN
+              ? ` — and ${imported.skipped.length - SHOWN} more, not listed here`
+              : "");
       /* A SPLIT PERSON IS A FALSE FLAG WAITING TO HAPPEN, so it is said
        * beside the count rather than left for staff to notice. */
       const splitNote =
