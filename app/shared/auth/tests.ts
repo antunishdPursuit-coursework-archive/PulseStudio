@@ -9,6 +9,7 @@
    identity. */
 
 import {
+  currentSession,
   FRONT_DESK,
   clearPulseSession,
   readPulseSession,
@@ -265,6 +266,50 @@ check("a cross-tab storage event reaches subscribers", () => {
     : "the staff session did not survive the event";
 });
 
+/* WHICH KEYS THE LISTENER WAKES FOR.
+ *
+ * Every cross-tab check above dispatches the session key, so the filter
+ * that decides WHICH keys matter was never exercised — mutation could
+ * invert it and all of them stayed green. This matters across lanes:
+ * app/shared/CLAUDE.md records that Product D writes and deletes
+ * `pulse-storage-probe` to find out whether this browser saves site data,
+ * and that the shared listener must not wake for it. A listener that woke
+ * on every key would re-render four products every time any of them
+ * touched storage. */
+
+check("a storage event for another product's key is ignored", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-storage-probe" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-reservations-a" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-theme" }));
+  stop();
+  return eq(woke, 0);
+});
+
+check("...while the session key still wakes it, so the filter is not simply off", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-storage-probe" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+  stop();
+  return eq(woke, 1);
+});
+
+check("a cleared storage (key null) wakes it, because that clears the session too", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: null }));
+  stop();
+  return eq(woke, 1);
+});
+
 check("a same-tab change reports origin this-tab", () => {
   fresh();
   const seen: string[] = [];
@@ -418,6 +463,85 @@ check("clearing with a throwing storage still signs the page out", () => {
 });
 
 /* ---------- run ---------- */
+
+/* ---------- the compatibility view Product A reads ---------- */
+
+/* THE ONE SHAPE ANOTHER PRODUCT DEPENDS ON.
+ *
+ * app/shared/CLAUDE.md names this as load-bearing: "Product A consumes the
+ * compatibility view (currentSession() / onSessionChange(), reading .role
+ * and .member_id). Do not remove those exports until Kerrian migrates."
+ * It had no checks at all — mutation found that flipping one comparison in
+ * currentSession hands a MEMBER role "staff" and a null member_id, which
+ * would show a member the staff view and lose their identity, inside
+ * somebody else's lane, with nothing here to notice. */
+
+check("a signed-in member reads as role member, with their id kept", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  const view = currentSession();
+  if (view === null) return "compatibility view returned null";
+  if (view.role !== "member") return `role ${view.role}`;
+  return eq(view.member_id, m1.id);
+});
+
+check("...and carries the name the header shows", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  return eq(currentSession()?.display_name, m1.displayName);
+});
+
+check("a signed-in staff person reads as role staff", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.role, "staff");
+});
+
+check("...and carries NO member_id, so no member's data can be keyed off it", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.member_id, null);
+});
+
+check("signed out reads as null, not as an empty member", () => {
+  fresh();
+  return eq(currentSession(), null);
+});
+
+check("the two roles are never the same value", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  const asMember = currentSession()?.role;
+  fresh();
+  writePulseSession(FRONT_DESK);
+  const asStaff = currentSession()?.role;
+  return asMember === asStaff ? `both read as ${asMember}` : true;
+});
+
+/* THE SESSION THAT GOES STALE OVERNIGHT.
+ *
+ * studio.ts dates the studio to TODAY, so a remembered member_id can name
+ * somebody who is no longer in the roster. The read side clears that
+ * session by design — shared/CLAUDE.md says so — and nothing checked it.
+ * Mutation could invert the condition and every check stayed green. */
+
+check("a session naming a member who is not in the roster is cleared", () => {
+  fresh();
+  writePulseSession(memberSession("member:gone-yesterday", "Someone Who Left"));
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view reports it as signed out, not as a ghost", () => {
+  fresh();
+  writePulseSession(memberSession("member:gone-yesterday", "Someone Who Left"));
+  return eq(currentSession(), null);
+});
+
+check("...while a staff session survives, having no member to go stale", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.role, "staff");
+});
 
 const results = checks.map(({ name, run }) => {
   let verdict: string | true;

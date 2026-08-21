@@ -49,7 +49,23 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_TARGETS = ["app/products/d-reengagement/logic.js"];
 const targets = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const TARGETS = targets.length > 0 ? targets : DEFAULT_TARGETS;
-const SUITE = "reengagement";
+
+/* Which suite is asked to notice. Defaults from the target's own folder,
+ * because running the re-engagement checks against a mutation in
+ * app/shared/auth would report everything as "caught" for the wrong
+ * reason — that suite never loads the module, so nothing it says is
+ * evidence either way. Override with --suite=<key>. */
+const SUITE_BY_PREFIX = [
+  ["app/shared/synthetic/", "synthetic"],
+  ["app/shared/auth/", "auth"],
+  ["app/products/d-reengagement/", "reengagement"],
+];
+const explicit = process.argv.find((a) => a.startsWith("--suite="));
+const suiteFor = (rel) => {
+  if (explicit) return explicit.slice("--suite=".length);
+  const hit = SUITE_BY_PREFIX.find(([prefix]) => rel.startsWith(prefix));
+  return hit === undefined ? null : hit[1];
+};
 
 /* Token swaps that change behaviour without usually breaking syntax. */
 const SWAPS = [
@@ -59,11 +75,11 @@ const SWAPS = [
   ["+ 1", "- 1"], ["- 1", "+ 1"],
 ];
 
-function runSuite() {
+function runSuite(suite) {
   try {
     const out = execFileSync(
       "node",
-      [join(ROOT, "scripts/run-suites.mjs"), "--suite", SUITE],
+      [join(ROOT, "scripts/run-suites.mjs"), "--suite", suite],
       { encoding: "utf8", timeout: 20_000, cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
     );
     const m = out.match(/___RUN_SUITES_RESULT___(\{.*\})/);
@@ -99,6 +115,15 @@ function sites(src, tok) {
 let anyMissing = false;
 for (const rel of TARGETS) {
   const path = join(ROOT, rel);
+  const suite = suiteFor(rel);
+  if (suite === null) {
+    console.error(
+      `mutate-suite: no suite covers ${rel}. Pass --suite=<synthetic|auth|reengagement>, ` +
+        "or accept that nothing checks this module — which is itself the finding.",
+    );
+    anyMissing = true;
+    continue;
+  }
   if (!existsSync(path)) {
     console.error(
       `mutate-suite: ${rel} is not built. Run \`npm run build\` first — this reads compiled output, never source.`,
@@ -118,7 +143,7 @@ for (const rel of TARGETS) {
         if (mutated === original) continue;
         writeFileSync(path, mutated);
         applied += 1;
-        if (runSuite().failed === 0) {
+        if (runSuite(suite).failed === 0) {
           const lineNo = original.slice(0, at).split("\n").length;
           survivors.push({
             lineNo,
@@ -137,7 +162,7 @@ for (const rel of TARGETS) {
 
   const caught = applied - survivors.length;
   const pct = applied === 0 ? 0 : Math.round((caught / applied) * 100);
-  console.log(`\nmutate-suite: ${rel}`);
+  console.log(`\nmutate-suite: ${rel} — judged by the "${suite}" suite`);
   console.log(
     `mutate-suite: ${applied} single-token mutations — ${caught} caught, ${survivors.length} survived (${pct}% caught).`,
   );
