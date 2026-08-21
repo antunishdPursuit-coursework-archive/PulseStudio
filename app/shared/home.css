@@ -438,3 +438,16 @@ body.home { overflow-x: hidden; }
     96%, 100% { background: transparent; border-color: var(--line); }
   }
 }
+
+/* ---------- the audience law on this page ---------- */
+
+/* the member greeting under the lede — filled by home.ts, empty when
+   nobody (or staff) is signed in */
+.home .member-hello { margin: -16px 0 22px; font-weight: 600; color: var(--fg); min-height: 0; }
+.home .member-hello:empty { display: none; }
+
+/* the staff door: plainly named, never hidden — the session only changes
+   the words (home.ts) and the emphasis below */
+.home .staff-head { margin-top: 84px; }
+.home .staff-head .staff-note { color: var(--muted); max-width: 60ch; margin: 0; }
+body[data-view="staff"] .staff-note { color: var(--fg); font-weight: 600; }
