@@ -85,6 +85,13 @@
 .draft {
   font: inherit;
   white-space: pre-wrap;
+  /* THE DRAFT ENDS IN THREE STUDIO URLS, and a URL has nothing a browser
+     will break on. pre-wrap wraps at spaces; with none inside a link, the
+     longest one sets the width of the block and the whole page scrolls
+     sideways — measured on a 375px phone, this box wanted 487px inside a
+     278px card. A staff member checking the Monday list at the front desk
+     is exactly who reads this on a phone. */
+  overflow-wrap: anywhere;
   border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line));
   border-radius: 10px;
   padding: 14px 16px;
