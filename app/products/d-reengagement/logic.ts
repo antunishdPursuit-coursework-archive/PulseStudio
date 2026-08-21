@@ -623,6 +623,28 @@ export function upcomingReservedNextClassDates(
   return nextDate;
 }
 
+/* Reservations grouped by member, memoised against the reservation ARRAY —
+ * the same key and the same stated constraint as the seat counts: a caller
+ * that mutates that array in place after a lookup would read stale, and
+ * nothing does. */
+const reservationsByMemberCache = new WeakMap<
+  readonly Reservation[],
+  Map<string, Reservation[]>
+>();
+
+function reservationsByMember(data: FixtureSet): Map<string, Reservation[]> {
+  const cached = reservationsByMemberCache.get(data.reservations);
+  if (cached !== undefined) return cached;
+  const grouped = new Map<string, Reservation[]>();
+  for (const r of data.reservations) {
+    const rows = grouped.get(r.member_id);
+    if (rows === undefined) grouped.set(r.member_id, [r]);
+    else rows.push(r);
+  }
+  reservationsByMemberCache.set(data.reservations, grouped);
+  return grouped;
+}
+
 /** Most recent booking ACTION since the member's last visit — booked,
  *  maybe canceled, never attended — or null. Booking without attending is
  *  a different story from silence, and staff should see the difference:
@@ -636,8 +658,11 @@ export function recentBookingActivity(
 ): string | null {
   let disclosed: string | null = null;
   let recentActionDay = -Infinity;
-  for (const r of data.reservations) {
-    if (r.member_id !== memberId) continue;
+  /* Per member, not per studio: this is asked once per card, and walking
+   * every reservation each time cost 489ms across 275 cards on a
+   * 2000-member studio. Same index, same memo, same array key as the seat
+   * counts above. */
+  for (const r of reservationsByMember(data).get(memberId) ?? []) {
     /* DATE THE ACTION THAT ACTUALLY HAPPENED. A cancellation's date is
      * canceled_at, not the date of the booking it cancels — and Booking
      * writes a cancellation as a NEW row that PRESERVES the original

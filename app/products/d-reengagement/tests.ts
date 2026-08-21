@@ -356,6 +356,49 @@ check("today is computed in the studio timezone",
     nobodyFlaggedLine(r, proposedRules)?.includes("been in within"), false);
   check("the count of those past the window is stated", r.quietLongerThanWindowCount, 2);
 }
+/* THE CLOSED LOOP INDEXES ATTENDANCE, AND THE LEDGER ONLY GROWS.
+ *
+ * outreachResults used to scan the whole attendance list once per note, so
+ * it got slower every week the studio was used — 10 notes 52ms, 500 notes
+ * 555ms, 2000 notes 2220ms on a 2000-member studio. It now collects each
+ * asked-about member's attended days once, ascending, so the first visit
+ * after a note is a walk over that member's own history. These pin the
+ * behaviour the index has to preserve. */
+{
+  const fx = recordsFor([
+    { id: "m1", name: "Came Back", status: "active", attended: ["2026-08-01", "2026-08-14", "2026-08-16"] },
+    { id: "m2", name: "Stayed Quiet", status: "active", attended: ["2026-07-20"] },
+  ]);
+  const ledger = [
+    { memberId: "m1", lapseKey: "m1|a", takenAt: "2026-08-12", channel: "copy" as const },
+    { memberId: "m2", lapseKey: "m2|a", takenAt: "2026-08-12", channel: "copy" as const },
+    { memberId: "ghost", lapseKey: "g|a", takenAt: "2026-08-01", channel: "email" as const },
+  ];
+  const r = outreachResults(ledger, fx, TODAY);
+  check("the FIRST visit after the note is the return, not the last",
+    r.outcomes.find((o) => o.record.memberId === "m1")?.daysToReturn, 2);
+  check("a member with only earlier visits is still quiet",
+    r.outcomes.find((o) => o.record.memberId === "m2")?.result, "stillQuiet");
+  check("a member outside these records is accounted, not judged", r.notEvaluable, 1);
+
+  // Two notes about the same member resolve independently off one index.
+  const twice = [
+    { memberId: "m1", lapseKey: "m1|old", takenAt: "2026-07-25", channel: "copy" as const },
+    { memberId: "m1", lapseKey: "m1|new", takenAt: "2026-08-15", channel: "copy" as const },
+  ];
+  const r2 = outreachResults(twice, fx, TODAY);
+  check("an earlier note finds the earlier return",
+    r2.outcomes.find((o) => o.record.lapseKey === "m1|old")?.daysToReturn, 7);
+  check("a later note finds the later one",
+    r2.outcomes.find((o) => o.record.lapseKey === "m1|new")?.daysToReturn, 1);
+  check("no_show rows never become a return",
+    outreachResults(
+      [{ memberId: "m2", lapseKey: "x", takenAt: "2026-07-01", channel: "copy" as const }],
+      recordsFor([{ id: "m2", name: "No Shows Only", status: "active", attended: ["2026-06-15"], noShows: ["2026-08-10"] }]),
+      TODAY).outcomes[0]?.result,
+    "stillQuiet");
+}
+
 /* THE SEAT COUNTS ARE MEMOISED, AND A MEMO CAN GO STALE.
  *
  * remainingSpots is asked about every candidate class for every flagged
