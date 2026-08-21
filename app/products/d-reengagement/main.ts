@@ -687,6 +687,13 @@ csvInput.addEventListener("change", () => {
               : "");
       /* A SPLIT PERSON IS A FALSE FLAG WAITING TO HAPPEN, so it is said
        * beside the count rather than left for staff to notice. */
+      /* Said only when it happened. A name that had a zero-width space or a
+       * bidi override removed is a name the file rendered one way and the
+       * studio stores another; that is worth one sentence. */
+      const cleanedNote =
+        imported.namesCleaned === 0
+          ? ""
+          : ` ${imported.namesCleaned} ${imported.namesCleaned === 1 ? "name had" : "names had"} invisible or control characters removed — a zero-width space makes two identical-looking names two different members.`;
       const splitNote =
         imported.splitIdentities.length === 0
           ? ""
@@ -702,7 +709,7 @@ csvInput.addEventListener("change", () => {
       renderRecords(
         imported.records,
         `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
-          `Members matched by ${imported.identityMethod}.${dateNote}${splitNote} ` +
+          `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${splitNote} ` +
           `Everyone in the file is treated as an active member. ` +
           `This data never left your browser.`,
       );

@@ -17,7 +17,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { adaptAttendanceCsv, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
+import { adaptAttendanceCsv, cleanName, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
@@ -1234,6 +1234,49 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   const imported = adaptAttendanceCsv(twoPeople, "America/New_York");
   check("two genuinely different names are not a split",
     imported.splitIdentities.length, 0);
+}
+
+/* AN INVISIBLE CHARACTER SPLITS A MEMBER IN TWO, AND NOBODY CAN SEE IT.
+ *
+ * A zero-width space makes "Bob" and "Bo<ZWSP>b" render identically and
+ * count as two members — the same history-splitting false flag as a
+ * half-filled identifier column, except undiagnosable from the screen. A
+ * right-to-left override reverses how the rest of a name displays, which
+ * reaches the member in a drafted note. Control characters are never a
+ * name at all. */
+{
+  const ZWSP = String.fromCodePoint(0x200b);
+  const NUL = String.fromCodePoint(0x00);
+  const RTL = String.fromCodePoint(0x202e);
+  const twin = ["member,date", `Bo${ZWSP}b,2026-08-01`, "Bob,2026-08-04", "Bob,2026-08-08"].join("\n") + "\n";
+  const imported = adaptAttendanceCsv(twin, "America/New_York");
+  check("an invisible twin is one member, not two", imported.memberCount, 1);
+  check("...keeping all of that member's visits", imported.records.attendance.length, 3);
+  check("...and the cleaning is counted, never silent", imported.namesCleaned, 1);
+
+  check("a null byte is not part of a name", cleanName(`Mar${NUL}ia`), "Maria");
+  check("a right-to-left override is removed", cleanName(`Ann${RTL}exe.png`), "Annexe.png");
+  check("a zero-width space is removed", cleanName(`Bo${ZWSP}b`), "Bob");
+  check("a clean name is untouched", cleanName("Maria Santos"), "Maria Santos");
+  check("a clean file reports nothing cleaned",
+    adaptAttendanceCsv("member,date\nMaria Santos,2026-08-01\n", "America/New_York").namesCleaned, 0);
+}
+{
+  /* THIS REMOVES WHAT CANNOT BE A NAME, NOT WHAT IS UNFAMILIAR. The
+   * zero-width non-joiner and joiner are ordinary letters-in-context in
+   * Persian and Devanagari; stripping them would corrupt real names, which
+   * is the mirror of the bug above. */
+  const ZWNJ = String.fromCodePoint(0x200c);
+  const ZWJ = String.fromCodePoint(0x200d);
+  const keep: ReadonlyArray<[string, string]> = [
+    ["王伟", "a Chinese name"],
+    ["Ann-Marie O'Brien", "a hyphen and an apostrophe"],
+    [`با${ZWNJ}هم`, "Persian using a zero-width NON-joiner"],
+    [`क${ZWJ}ष`, "Devanagari using a zero-width joiner"],
+    ["José Ñuñez", "accents and a tilde"],
+  ];
+  const changed = keep.filter(([name]) => cleanName(name) !== name);
+  check("every legitimate name passes through untouched", changed.length, 0);
 }
 
 /* IS THAT COLUMN IDENTIFYING PEOPLE, OR ROWS? The file cannot say, so this

@@ -192,6 +192,16 @@ a real date under exactly one reading settles the order for every other row
 read month-first, and then the page says so. A file containing proof of both
 orders fits no single reading and says that instead of picking one.
 
+**Names are cleaned of what cannot be in a name**, and the count is stated.
+A zero-width space makes `Bob` and `Bo<ZWSP>b` render identically and count
+as two members — the same history-splitting false flag as a half-filled
+identifier column, except nobody could diagnose it from the screen. A
+right-to-left override reverses how the rest of a name displays and reaches
+the member in a drafted note. Control characters are never a name at all.
+Deliberately kept: the zero-width non-joiner and joiner, which are ordinary
+letters-in-context in Persian, Devanagari and other scripts. This removes
+what cannot be a name, not what is unfamiliar.
+
 **Identity** is stated when it splits. If the identifier column is filled on
 some of a member's rows and blank on others, that member is read as two
 people, their visits divided between them — and the half holding the older

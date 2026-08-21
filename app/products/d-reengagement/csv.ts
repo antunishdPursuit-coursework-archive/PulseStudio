@@ -39,6 +39,11 @@ export interface CsvImport {
   identityMethod: string;
   /** True when identity fell back to the member's name. */
   identityIsName: boolean;
+  /** How many names had characters removed that cannot be part of a name —
+   *  zero-width spaces, bidi overrides, control characters. Counted because
+   *  silently editing somebody's name would be exactly the quiet correction
+   *  this product refuses everywhere else. */
+  namesCleaned: number;
   /** True when the identity column is distinct on every row while names
    *  repeat — indistinguishable from a per-visit row number. Stated, never
    *  acted on: guessing either way splits or merges real people. */
@@ -280,6 +285,33 @@ export function normalizeStatus(value: string): Attendance["attendance_status"] 
   return "unknown";
 }
 
+/* CHARACTERS THAT CANNOT BE PART OF A NAME, and why this is not tidiness.
+ *
+ * A zero-width space makes "Bob" and "Bo<ZWSP>b" two different members that
+ * render identically. That is the same history-splitting failure as a
+ * half-filled identifier column — one person read as two, each half looking
+ * quieter than the whole — except invisible, so nobody could ever diagnose
+ * it from the screen. A right-to-left override reverses how the rest of a
+ * name displays, which is the old filename-spoofing trick and lands here in
+ * a note a staff member is about to send to that member. Control characters
+ * break downstream tools for no benefit at all.
+ *
+ * Stripped, therefore, and COUNTED, because silently editing somebody's
+ * name is the kind of quiet correction this product refuses everywhere
+ * else. Deliberately NOT stripped: U+200C and U+200D, the zero-width
+ * non-joiner and joiner, which are ordinary letters-in-context in Persian,
+ * Hindi and other scripts, and every combining mark. This removes what
+ * cannot be a name, not what is unfamiliar. */
+const NOT_IN_A_NAME =
+  // C0 controls (tab, newline and carriage return are handled by the parser),
+  // DEL, bidi embeddings and overrides, isolates, zero-width space, the
+  // directional marks, and a byte-order mark that wandered into the text.
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/gu;
+
+export function cleanName(value: string): string {
+  return value.replace(NOT_IN_A_NAME, "").trim();
+}
+
 /** Readable id fragment only — NEVER identity. Identity is keyed on the
  *  name as written; this just makes ids nicer to read when it can. */
 function slug(value: string): string {
@@ -322,6 +354,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const attendance: Attendance[] = [];
   const skipped: string[] = [];
   const idsSeenPerName = new Map<string, Set<string>>();
+  let namesCleaned = 0;
 
   /* Decided ONCE from the whole file, before any row is read: one row with
    * a first component above 12 settles the order for every other row. */
@@ -390,7 +423,9 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
 
   for (let r = 1; r < rows.length; r += 1) {
     const { cells, line } = rows[r] ?? { cells: [], line: 0 };
-    const name = (cells[memberCol] ?? "").trim();
+    const rawName = (cells[memberCol] ?? "").trim();
+    const name = cleanName(rawName);
+    if (name !== rawName) namesCleaned += 1;
     const date = normalizeDate(cells[dateCol] ?? "", dateOrder);
     if (name === "") {
       skipped.push(`line ${line}: empty member name`);
@@ -502,6 +537,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     memberCount: members.length,
     skipped,
     splitIdentities,
+    namesCleaned,
     dateOrder,
     identityIsName,
     identityMethod: identityIsName
