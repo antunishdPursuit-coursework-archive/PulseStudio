@@ -58,6 +58,11 @@ the legacy contract) is what all four products speak.
   the pre-knob generator; ignored in edge-cases mode. Added for the
   capacity dashboard; proven by the "fill knob" block in
   `synthetic/tests.html`.
+- **The studio's rhythms are CALIBRATED, not invented** — see
+  `synthetic/CALIBRATION.md`. Slot priority comes from published real-gym
+  check-in distributions (a morning peak and a bigger evening peak). It is
+  a 2024 SNAPSHOT and nothing about it is live: the engine forbids network
+  calls and clock reads, and no surface may claim otherwise.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for

@@ -44,6 +44,29 @@ const SLOT_TIMES: readonly string[] = [
   "06:30", "08:00", "09:30", "12:00", "16:00", "17:30", "19:00", "20:30",
 ];
 
+/** WHICH slots a studio opens first, when it does not open all of them.
+ *
+ *  This order is CALIBRATED — see app/shared/synthetic/CALIBRATION.md. Real
+ *  gym check-in times are bimodal: a morning peak and a bigger evening
+ *  peak, with the middle of the afternoon the quietest hour of the working
+ *  day. Opening slots in clock order instead gave a small studio a
+ *  schedule that started at 06:30 and DIED AT 16:00 — no evening classes
+ *  at all, which is the opposite of how a real studio fills.
+ *
+ *  Chronological order is restored before the day is written, so the
+ *  schedule still reads top-to-bottom by time; only WHICH times exist
+ *  changes with the studio's size. */
+const SLOT_PRIORITY: readonly string[] = [
+  "17:30", // the evening peak — the busiest hour in a real studio
+  "08:00", // the morning peak — before work
+  "19:00", // second evening class
+  "09:30", // mid-morning
+  "12:00", // lunch
+  "06:30", // early birds
+  "20:30", // late evening
+  "16:00", // the afternoon lull, opened last
+];
+
 /** Parallel rooms per time slot. One room for a boutique studio; up to six
  *  for a big-box gym, so seat supply grows with the customer base while
  *  concurrent occupancy stays far below the facility ceiling. */
@@ -74,6 +97,10 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
     SLOT_TIMES.length,
     Math.max(4, 4 + Math.floor(config.memberCount / 60)),
   );
+  /* Take the most-used times first, then put them back in clock order. */
+  const openSlots: readonly string[] = SLOT_PRIORITY.slice(0, slotsPerDay)
+    .slice()
+    .sort((a, b) => a.localeCompare(b));
 
   const rooms = roomsPerSlot(config.memberCount);
   const asOfDay = dayNumberOf(config.asOfDate);
@@ -86,7 +113,7 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
   for (let day = firstDay; day <= lastDay; day += 1) {
     const date = dateOfDayNumber(day);
     const todays: SyntheticClassSession[] = [];
-    for (let slot = 0; slot < slotsPerDay; slot += 1) {
+    for (let slot = 0; slot < openSlots.length; slot += 1) {
       for (let room = 0; room < rooms; room += 1) {
         const type = classTypes[(day + slot + room * 2) % classTypes.length];
         const instructor = instructors[(day * 2 + slot + room) % instructors.length];
@@ -99,7 +126,7 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
           id: makeId("class-session", n),
           classTypeId: type.id,
           instructorId: instructor.id,
-          startsAt: `${date}T${SLOT_TIMES[slot] ?? "12:00"}:00`,
+          startsAt: `${date}T${openSlots[slot] ?? "12:00"}:00`,
           durationMinutes: type.durationMinutes,
           capacity: type.capacity,
           status: canceled ? "canceled" : day < asOfDay ? "completed" : "scheduled",
