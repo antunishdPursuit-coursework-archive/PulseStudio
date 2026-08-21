@@ -38,6 +38,7 @@ import {
 import {
   dataQualityLine,
   dayNumberFromIso,
+  actorNote,
   attendanceCoverage,
   coverageWarning,
   findQuietMembers,
@@ -482,6 +483,27 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("draft has no unfilled placeholders", /[{}$]/.test(text), false);
   check("draft keeps the three ways back even without an invite",
     text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
+}
+
+/* ADAPT, NEVER GATE. The audience law lets a surface change its words for
+ * whoever is signed in and forbids it hiding or blocking a route, because
+ * the browser session is convenience and not access control. A member who
+ * lands on the staff view should not be left wondering why the studio is
+ * showing them a list of other people. */
+{
+  const url = "https://studio.invalid/";
+  check("a signed-in member is told what this page is",
+    actorNote("member", url)?.includes("staff view"), true);
+  check("...and pointed at their own pages",
+    actorNote("member", url)?.includes("products/a-booking/"), true);
+  check("...and told none of it is about their account",
+    actorNote("member", url)?.includes("Nothing here is about your account"), true);
+  check("staff are told nothing — the page was built for them",
+    actorNote("staff", url), null);
+  check("a signed-out visitor is told nothing either",
+    actorNote(null, url), null);
+  check("the note carries the configured studio url, not a hard-coded one",
+    actorNote("member", "https://other.invalid/")?.includes("https://other.invalid/products/a-booking/"), true);
 }
 
 /* A MAILTO LINK THAT WOULD BE TRUNCATED MUST NOT BE OFFERED. Mail clients

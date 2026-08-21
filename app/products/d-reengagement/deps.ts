@@ -28,6 +28,16 @@ export { STUDIO_NAME } from "../../shared/brand.js";
  * re-engagement reads the same trail the rest of the studio writes.
  * A standalone port re-points these two lines. */
 export { sharedStudio } from "../../shared/auth/studio.js";
+
+/* WHO IS SIGNED IN, read but never obeyed as a gate. The audience law is
+ * explicit that a surface may ADAPT to the signed-in actor and may never
+ * hide or block a route — the browser session is convenience, not access
+ * control, and pretending otherwise would be a lie about what protects this
+ * data. This page uses it for one thing: to say plainly, to a member who
+ * has landed on a staff tool, that this is the staff view and where their
+ * own pages are. A standalone port re-points this line or drops it. */
+export { readPulseSession, onSessionChange } from "../../shared/auth/session.js";
+export type { PulseSession } from "../../shared/auth/session.js";
 export type { SyntheticDataset } from "../../shared/synthetic/contracts.js";
 
 /* The shared synthetic studio engine (team-owned, contract PROPOSED). Used

@@ -596,3 +596,36 @@ export function recentBookingActivity(
   }
   return disclosed;
 }
+
+/* ------------------------------------------------------------------ */
+/* Speaking to whoever is actually reading                              */
+/* ------------------------------------------------------------------ */
+
+/** What this staff page should say to the person signed in, or null when
+ *  there is nothing worth saying.
+ *
+ *  THIS IS NOT A GATE, and it must never become one. The audience law says
+ *  a surface may ADAPT to the signed-in actor and may never hide or block a
+ *  route, because the browser session is convenience and not access
+ *  control. Pretending otherwise would be a lie about what protects this
+ *  data — the honest answer is that a staff page holding member risk
+ *  information belongs behind a real sign-in, which this studio does not
+ *  have yet.
+ *
+ *  What it CAN do is stop a member wondering why the studio is showing them
+ *  a list of other people. A member who lands here by link or by URL is
+ *  told plainly what this page is and where their own pages are. Staff are
+ *  told nothing, because a page that explains itself to the people it was
+ *  built for is a page they stop reading. */
+export function actorNote(
+  actorType: "member" | "staff" | null,
+  studioUrl: string,
+): string | null {
+  if (actorType !== "member") return null;
+  return (
+    "You're signed in as a member, and this is the studio's staff view — it lists members " +
+    "who have gone quiet so the team can reach out. Nothing here is about your account. " +
+    `Your classes and bookings are at ${studioUrl}products/a-booking/, and questions go to ` +
+    `${studioUrl}products/c-chatbot/.`
+  );
+}

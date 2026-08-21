@@ -10,6 +10,7 @@
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { GENERIC_CLASS_TYPE, adaptAttendanceCsv } from "./csv.js";
+import { onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
@@ -23,6 +24,7 @@ import {
   summaryLine,
   attendanceCoverage,
   coverageWarning,
+  actorNote,
   nobodyFlaggedLine,
   todayDayNumber,
   todayIsoInZone,
@@ -166,6 +168,7 @@ const flaggedEl = requiredElement<HTMLElement>("#flagged");
 const footerEl = requiredElement<HTMLParagraphElement>("#footer-note");
 const backEl = requiredElement<HTMLAnchorElement>("#back-link");
 const sourceEl = requiredElement<HTMLParagraphElement>("#source");
+const actorNoteEl = requiredElement<HTMLParagraphElement>("#actor-note");
 const csvInput = requiredElement<HTMLInputElement>("#csv-input");
 const csvReset = requiredElement<HTMLButtonElement>("#csv-reset");
 const generateBtn = requiredElement<HTMLButtonElement>("#generate");
@@ -728,3 +731,17 @@ generateBtn.addEventListener("click", () => {
 csvReset.addEventListener("click", loadSharedRecords);
 
 loadSharedRecords();
+
+/* ADAPT, NEVER GATE. A member who reaches this staff page by link or URL is
+ * told what it is and where their own pages are; the page itself is
+ * unchanged, because the session is convenience and not access control. It
+ * re-reads on every session change so signing out clears the note in the
+ * same tab it happened in. */
+function renderActorNote(): void {
+  const session = readPulseSession();
+  const note = actorNote(session === null ? null : session.actor_type, brand.studioUrl);
+  actorNoteEl.textContent = note ?? "";
+  actorNoteEl.hidden = note === null;
+}
+renderActorNote();
+onSessionChange(() => renderActorNote());
