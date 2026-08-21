@@ -648,6 +648,65 @@ export function draftFactsFor(
   };
 }
 
+/* THE EVIDENCE A STAFF MEMBER JUDGES THE FLAG BY.
+ *
+ * Same placeholders, opposite handling from the draft. The draft drops
+ * what the records do not say, because a member should never read around
+ * a gap. Staff need the gap NAMED — the truth law asks a screen to say
+ * what it checked, and "Last attended: class with the team" says the
+ * opposite of that. It reads like a class called "class", taught by
+ * somebody called "the team", which is a fact the records never carried.
+ *
+ * So the unknown parts are left out of the sentence and stated once at
+ * the end, where a staff member can see the flag rests on a date and a
+ * count and nothing else. */
+export function evidenceLine(f: FlaggedMember, priorWindowDays: number): string {
+  const classKnown =
+    f.lastSession.class_type !== GENERIC_CLASS_TYPE && f.lastSession.class_type.trim() !== "";
+  const instructorKnown =
+    f.lastInstructorName !== GENERIC_INSTRUCTOR && f.lastInstructorName.trim() !== "";
+
+  const attended = classKnown && instructorKnown
+    ? `${f.lastSession.class_type} with ${f.lastInstructorName}`
+    : classKnown
+      ? f.lastSession.class_type
+      : instructorKnown
+        ? `a class with ${f.lastInstructorName}`
+        : "";
+
+  const cadence =
+    `${f.priorCount} classes in the prior ${priorWindowDays} days ` +
+    `(≈${weeklyCadence(f.priorCount, priorWindowDays)}/week)`;
+
+  const usualClassKnown =
+    f.usualClassType !== GENERIC_CLASS_TYPE && f.usualClassType.trim() !== "";
+  const usualInstructorKnown =
+    f.usualInstructorName !== GENERIC_INSTRUCTOR && f.usualInstructorName.trim() !== "";
+  const usual = usualClassKnown && usualInstructorKnown
+    ? `usually ${f.usualClassType} with ${f.usualInstructorName}`
+    : usualClassKnown
+      ? `usually ${f.usualClassType}`
+      : usualInstructorKnown
+        ? `usually with ${f.usualInstructorName}`
+        : "";
+
+  /* Named once, at the end, rather than twice inside the sentence. */
+  const missing =
+    !classKnown && !instructorKnown
+      ? "the import recorded no class type and no instructor"
+      : !classKnown
+        ? "the import recorded no class type"
+        : !instructorKnown
+          ? "the import recorded no instructor"
+          : "";
+
+  const head = attended === ""
+    ? `Last attended: ${longDate(f.lastSession.starts_at)}`
+    : `Last attended: ${attended} on ${longDate(f.lastSession.starts_at)}`;
+
+  return [head, cadence, usual, missing].filter((part) => part !== "").join(" · ");
+}
+
 /** The note a staff member reads before deciding to send it. */
 export function draftTextFor(
   f: FlaggedMember,

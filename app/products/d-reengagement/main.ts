@@ -18,6 +18,7 @@ import {
   dayNumberFromIso,
   findQuietMembers,
   draftTextFor,
+  evidenceLine,
   firstNameOf,
   recentBookingActivity,
   summaryLine,
@@ -29,13 +30,13 @@ import {
   todayIsoInZone,
   longDate,
   upcomingReservedNextClassDates,
-  weeklyCadence,
   type FlaggedMember,
 } from "./logic.js";
 import {
   forgetOutreach,
   keepOutreachRecords,
   mailtoHref,
+  workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
   lapseKeyOf,
@@ -245,12 +246,7 @@ function renderFlagged(
 
   const evidence = document.createElement("p");
   evidence.className = "evidence";
-  evidence.textContent =
-    `Last attended: ${f.lastSession.class_type} with ${f.lastInstructorName} ` +
-    `on ${longDate(f.lastSession.starts_at)} · ` +
-    `${f.priorCount} classes in the prior ${proposedRules.priorWindowDays} days ` +
-    `(≈${weeklyCadence(f.priorCount, proposedRules.priorWindowDays)}/week) · ` +
-    `usually ${f.usualClassType} with ${f.usualInstructorName}`;
+  evidence.textContent = evidenceLine(f, proposedRules.priorWindowDays);
   card.append(head, evidence);
 
   // Booking without attending since the last visit is a DIFFERENT story
@@ -278,14 +274,7 @@ function renderFlagged(
   if (state.kind !== "ready") {
     const line = document.createElement("p");
     line.className = "workflow-state";
-    line.textContent =
-      state.kind === "disabled"
-        ? "Outreach workflow is off — this studio has not opted in."
-        : state.kind === "suppressed"
-          ? `Do not contact — suppressed ${state.since}.`
-          : state.kind === "outsideConsent"
-            ? `Outside the ${outreachPolicy.consentWindowDays}-day consent window (${state.days} days quiet) — no draft offered.`
-            : `Already reached for this lapse (${state.channel}, ${state.takenAt}). A new lapse re-arms.`;
+    line.textContent = workflowStateLine(state, outreachPolicy);
     card.append(line);
     if (state.kind === "suppressed") {
       const un = document.createElement("button");

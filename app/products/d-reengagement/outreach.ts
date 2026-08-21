@@ -318,6 +318,32 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
  * config.ts is explicitly the file a reseller rewrites, and a longer voice,
  * a longer studio name, or longer links all push the same number up with
  * nothing to notice. 1800 leaves room under the lowest known ceiling. */
+/* WHICH RULE SPOKE, IN A SENTENCE.
+ *
+ * Five outcomes, four of which stop a draft being offered. It lived as a
+ * nested conditional inside the card renderer, where nothing could reach
+ * it: main.ts touches the DOM at import, so a headless suite cannot load
+ * it. These are the lines that tell a staff member WHY the studio is not
+ * writing to somebody, which is the moment they most need the reason to
+ * be exact. */
+export function workflowStateLine(
+  state: OutreachState,
+  policy: OutreachPolicy,
+): string {
+  switch (state.kind) {
+    case "ready":
+      return "";
+    case "disabled":
+      return "Outreach workflow is off — this studio has not opted in.";
+    case "suppressed":
+      return `Do not contact — suppressed ${state.since}.`;
+    case "outsideConsent":
+      return `Outside the ${policy.consentWindowDays}-day consent window (${state.days} days quiet) — no draft offered.`;
+    case "alreadyReached":
+      return `Already reached for this lapse (${state.channel}, ${state.takenAt}). A new lapse re-arms.`;
+  }
+}
+
 /* THE DRAFT AS A LINK THE STAFF MEMBER'S OWN MAIL CLIENT WILL OPEN.
  *
  * Nothing here sends: the product law is draft-only, and this hands the

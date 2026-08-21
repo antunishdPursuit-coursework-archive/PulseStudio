@@ -27,6 +27,7 @@ import {
   forgetOutreach,
   keepOutreachRecords,
   mailtoHref,
+  workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
   lapseKeyOf,
@@ -48,6 +49,7 @@ import {
   firstNameOf,
   draftFactsFor,
   draftTextFor,
+  evidenceLine,
   inviteWording,
   recentBookingActivity,
   remainingSpots,
@@ -2277,6 +2279,85 @@ check("clean records produce no data-quality line",
     check("...with no bare LF left beside them",
       /%0A/.test(href.replace(/%0D%0A/g, "")), false);
   }
+}
+
+/* THE EVIDENCE LINE — where the placeholders must be NAMED, not dropped.
+ *
+ * The draft hides what the records do not say, because a member should
+ * never read around a gap. Staff need the opposite: the flag rests on
+ * this line, so a gap in it has to be visible. The old line printed the
+ * placeholders raw, which read as a class called "class" taught by
+ * somebody called "the team" — a fact no import ever carried. */
+{
+  const signInSheet = [
+    "Member,Date",
+    "Maria Delgado,2026-06-27",
+    "Maria Delgado,2026-07-11",
+    "Maria Delgado,2026-07-25",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(signInSheet, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  if (only) {
+    const line = evidenceLine(only, proposedRules.priorWindowDays);
+    check("a sign-in sheet never invents a class called 'class'",
+      line.includes("class with the team"), false);
+    check("...nor claims 'the team' taught it",
+      line.toLowerCase().includes("the team"), false);
+    check("...it names the gap instead",
+      line.includes("the import recorded no class type and no instructor"), true);
+    check("...while still carrying the date the flag rests on",
+      line.includes("July 25, 2026"), true);
+    check("...and the count behind it",
+      line.includes("3 classes in the prior 60 days"), true);
+  }
+}
+
+{
+  const fullExport = [
+    "Member,Date,Class,Instructor",
+    "Maria Delgado,2026-06-27,yoga,Ana Reyes",
+    "Maria Delgado,2026-07-11,yoga,Ana Reyes",
+    "Maria Delgado,2026-07-25,yoga,Ana Reyes",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(fullExport, "America/New_York");
+  const today = dayNumberFromIso("2026-08-21");
+  const only = findQuietMembers(imported.records, today, proposedRules).flagged[0];
+  if (only) {
+    const line = evidenceLine(only, proposedRules.priorWindowDays);
+    check("a full export reads as a sentence about a real class",
+      line.startsWith("Last attended: yoga with Ana Reyes on July 25, 2026"), true);
+    check("...and says nothing about anything missing",
+      line.includes("the import recorded no"), false);
+    check("...and still names the usual pattern",
+      line.includes("usually yoga with Ana Reyes"), true);
+  }
+}
+
+/* WHICH RULE SPOKE. Four of the five outcomes stop a draft being offered,
+ * and each is the moment a staff member most needs the reason to be
+ * exact. They were a nested conditional inside the card renderer, which
+ * no headless check can load. */
+{
+  check("a ready member gets no state line at all",
+    workflowStateLine({ kind: "ready" }, outreachPolicy), "");
+  check("a studio that has not opted in says so",
+    workflowStateLine({ kind: "disabled" }, outreachPolicy),
+    "Outreach workflow is off — this studio has not opted in.");
+  check("a suppressed member names the date they were suppressed",
+    workflowStateLine({ kind: "suppressed", since: "2026-07-01" }, outreachPolicy),
+    "Do not contact — suppressed 2026-07-01.");
+  check("outside the consent window names the window AND the gap",
+    workflowStateLine({ kind: "outsideConsent", days: 400 }, outreachPolicy),
+    `Outside the ${outreachPolicy.consentWindowDays}-day consent window (400 days quiet) — no draft offered.`);
+  check("already reached names the channel and when",
+    workflowStateLine({ kind: "alreadyReached", channel: "email", takenAt: "2026-08-01" }, outreachPolicy),
+    "Already reached for this lapse (email, 2026-08-01). A new lapse re-arms.");
+  check("...and every one of the four stop-states says something",
+    (["disabled", "suppressed", "outsideConsent", "alreadyReached"] as const)
+      .map((kind) => workflowStateLine(
+        { kind, since: "x", days: 1, channel: "email", takenAt: "x" } as never, outreachPolicy))
+      .every((line) => line.length > 20), true);
 }
 
 const passed = results.filter((r) => r.passed).length;
