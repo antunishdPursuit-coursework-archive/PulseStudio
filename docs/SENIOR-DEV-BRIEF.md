@@ -295,7 +295,8 @@ npm run start      # serves app/ at http://localhost:4173
 Then `http://localhost:4173/products/d-reengagement/` and its `tests.html`.
 
 **`npm run check` is not `tsc --noEmit`,** which this page used to say. It is
-`tsc` — which EMITS — followed by four gates and the three suites:
+`tsc` — which EMITS — followed by every gate `package.json` lists and the
+three suites:
 
 | | what it fails on |
 | --- | --- |

@@ -96,7 +96,9 @@ instead of doing it.
 
 - Gate before every commit: `npm run check` must pass. It is `tsc` — which
   EMITS, so the suites run the code you just changed rather than the last
-  build — then four gates and the three suites. Each prints the count it
+  build — then every gate `package.json` lists and the three suites. (The
+  gates are named there and not counted here: this sentence said "four"
+  from the day a fifth was added.) Each prints the count it
   actually reached, never a silent pass; read the count there, not from
   prose. Several of the laws above are no longer only stated:
 

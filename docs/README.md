@@ -32,11 +32,19 @@ cost somebody a day:
   should be able to fail when the rule is broken — a gate, a test, a
   script. `styling.md` has `scripts/check-styles.mjs`.
 
-  Four of the repo's laws now have one, and the reason the last two were
-  added is the standard proving itself: the language law and the
-  no-attribution law were stated in six files each and enforced by nobody,
-  so `npm run check` printed 314 checks and 0 failures while the root data
-  contract used a banned word on line 162.
+  The table below is the list of which laws have one. It is a table and not
+  a number in this sentence because the number has changed every time
+  somebody read this page, and a count in prose is a second thing to keep
+  true — the standard two bullets down says so.
+
+  The reason the language and no-attribution laws got gates is the standard
+  proving itself: both were stated in six files each and enforced by
+  nobody, so `npm run check` printed 314 checks and 0 failures while the
+  root data contract used a banned word on line 162. The lane law's reason
+  is the same shape but worse, because that law is the one holding the
+  four-person model up: on 2026-08-20 a single commit edited three other
+  developers' product folders, and the only thing that had ever stood
+  between the repo and that was good manners.
 
   | Law | Stated in | Enforced by |
   | --- | --- | --- |
@@ -45,6 +53,7 @@ cost somebody a day:
   | The shared vocabulary the records must speak | root `SHARED_DATA_CONTRACT.md` | `scripts/check-fixtures.mjs` |
   | The shared fixture still demonstrates what it claims to | the product briefs' acceptance checks | `scripts/check-fixtures.mjs` (the one place that reads the real clock, on purpose — it prints the countdown every run) |
   | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
+  | Nobody edits another developer's folder | root `CLAUDE.md` (the lane law) | `scripts/check-lanes.mjs` (reads only what this branch adds to `origin/main`, skips merges, and counts team-owned changes it cannot judge) |
 
   Each runs inside `npm run check`, each carries `--self-test`, and each
   states the counts it actually reached rather than passing in silence.

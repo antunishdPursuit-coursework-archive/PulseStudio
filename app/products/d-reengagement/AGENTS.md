@@ -60,13 +60,14 @@ Product A's and is READ ONLY here.
 ## Gate — before every commit
 
 ```
-npm run check     # tsc (EMITS) + 4 gates + 3 suites, must exit 0
+npm run check     # tsc (EMITS) + every gate in package.json + 3 suites
 npm run build     # emits the .js the browser runs (gitignored by design)
 ```
 
 `npm run check` is NOT `tsc --noEmit`, whatever a doc tells you. It runs
-`tsc`, which emits, then check-styles, check-contrast, check-language and
-check-fixtures, then all three suites headlessly. Verifying a change with
+`tsc`, which emits, then every gate the `check` script in `package.json`
+names — read them there rather than from a list here, which is how this
+sentence came to omit one — then all three suites headlessly. Verifying a change with
 `--noEmit` compiles nothing, so the suites re-run the PREVIOUS build and
 report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They
