@@ -1461,6 +1461,29 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   check("...keeping all of that member's visits", imported.records.attendance.length, 3);
   check("...and the cleaning is counted, never silent", imported.namesCleaned, 1);
 
+  /* PER NAME, NOT PER ROW. One member with a zero-width space and twenty
+   * visits is ONE name cleaned. Counting rows reported twenty — twenty
+   * times the truth, stated with total confidence, in the disclosure
+   * written to warn staff about invisible characters. */
+  const manyVisits = ["member,date,class",
+    ...Array.from({ length: 20 }, (_, i) =>
+      `Mar${ZWSP}ia Santos,2026-07-${String(i + 1).padStart(2, "0")},yoga`)].join("\n") + "\n";
+  const many = adaptAttendanceCsv(manyVisits, "America/New_York");
+  check("one member across twenty rows is ONE name cleaned", many.namesCleaned, 1);
+  check("...and is still one member", many.memberCount, 1);
+
+  /* A name that is ENTIRELY invisible cleans to nothing, produces no
+   * member, and is already reported as an empty name. Counting it here as
+   * well would report one row under two disclosures and count a member who
+   * does not exist. */
+  const allGone = `member,date\n${ZWSP}${NUL},2026-08-01\nMaria Santos,2026-08-02\n`;
+  const gone = adaptAttendanceCsv(allGone, "America/New_York");
+  check("a name that cleans to nothing is not counted as a cleaned name",
+    gone.namesCleaned, 0);
+  check("...it is reported as an empty name instead",
+    gone.skipped.some((n) => n.includes("empty member name")), true);
+  check("...and invents no member", gone.memberCount, 1);
+
   check("a null byte is not part of a name", cleanName(`Mar${NUL}ia`), "Maria");
   check("a right-to-left override is removed", cleanName(`Ann${RTL}exe.png`), "Annexe.png");
   check("a zero-width space is removed", cleanName(`Bo${ZWSP}b`), "Bob");

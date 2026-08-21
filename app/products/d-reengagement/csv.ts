@@ -48,10 +48,12 @@ export interface CsvImport {
   /** True when the file carried no class column, which is what makes the
    *  count above ambiguous rather than merely a duplicate. */
   classColumnMissing: boolean;
-  /** How many names had characters removed that cannot be part of a name —
-   *  zero-width spaces, bidi overrides, control characters. Counted because
-   *  silently editing somebody's name would be exactly the quiet correction
-   *  this product refuses everywhere else. */
+  /** How many DISTINCT names had characters removed that cannot be part of
+   *  a name — zero-width spaces, bidi overrides, control characters.
+   *  Counted because silently editing somebody's name would be exactly the
+   *  quiet correction this product refuses everywhere else, and counted per
+   *  NAME rather than per row because one member with twenty visits is one
+   *  name, not twenty. */
   namesCleaned: number;
   /** True when the identity column is distinct on every row while names
    *  repeat — indistinguishable from a per-visit row number. Stated, never
@@ -363,7 +365,13 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const attendance: Attendance[] = [];
   const skipped: string[] = [];
   const idsSeenPerName = new Map<string, Set<string>>();
-  let namesCleaned = 0;
+  /* DISTINCT NAMES, NOT ROWS. Counting rows made one member with a
+   * zero-width space in her name and twenty visits report "20 names had
+   * invisible characters removed" — twenty times the truth, stated to staff
+   * with total confidence, in the disclosure written to warn them about
+   * invisible characters. The cleaned name is what identifies the person,
+   * so that is what is counted. */
+  const cleanedNames = new Set<string>();
   /* Same member, same session, more than once. With a class column that is
    * a duplicated row; without one it is indistinguishable from a second
    * class that day, and the file cannot say which. Counted either way. */
@@ -439,7 +447,11 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     const { cells, line } = rows[r] ?? { cells: [], line: 0 };
     const rawName = (cells[memberCol] ?? "").trim();
     const name = cleanName(rawName);
-    if (name !== rawName) namesCleaned += 1;
+    /* A row whose name was ENTIRELY invisible cleans to nothing, produces
+     * no member, and is already reported as "empty member name" below.
+     * Counting it here too would report the same row twice under two
+     * different disclosures — and would count a member who does not exist. */
+    if (name !== rawName && name !== "") cleanedNames.add(name.toLowerCase());
     const date = normalizeDate(cells[dateCol] ?? "", dateOrder);
     if (name === "") {
       skipped.push(`line ${line}: empty member name`);
@@ -554,7 +566,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     memberCount: members.length,
     skipped,
     splitIdentities,
-    namesCleaned,
+    namesCleaned: cleanedNames.size,
     sameDayRepeats,
     classColumnMissing: classCol === -1,
     dateOrder,

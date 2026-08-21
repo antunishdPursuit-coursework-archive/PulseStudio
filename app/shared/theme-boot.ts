@@ -121,6 +121,13 @@ function customColors(): CustomColors {
 function bestToneFor(background: string): { tone: "light" | "dark"; ratio: number } {
   const previous = root.dataset["customTone"];
   let best: { tone: "light" | "dark"; ratio: number } = { tone: "light", ratio: -1 };
+  /* THE PROBE MUTATES THE LIVE PAGE, so it puts it back no matter what.
+   * Measuring means setting the tone, reading the accent the cascade
+   * resolves, and setting the other — with the page in a half-measured
+   * state in between. Anything throwing in the middle would leave the whole
+   * studio rendering the wrong tone, which is a worse bug than the one this
+   * function exists to fix, and would be invisible in the source. */
+  try {
   for (const tone of ["light", "dark"] as const) {
     root.dataset["customTone"] = tone;
     /* READ IT OFF THE BODY, NOT THE ROOT. The accent tokens are scoped by
@@ -135,8 +142,10 @@ function bestToneFor(background: string): { tone: "light" | "dark"; ratio: numbe
     const ratio = contrast(accent, background);
     if (ratio > best.ratio) best = { tone, ratio };
   }
-  if (previous === undefined) delete root.dataset["customTone"];
-  else root.dataset["customTone"] = previous;
+  } finally {
+    if (previous === undefined) delete root.dataset["customTone"];
+    else root.dataset["customTone"] = previous;
+  }
   /* No product accent on this page: fall back to matching the background's
    * own tone, which is right for the built-in tokens and harmless here. */
   if (best.ratio < 0) {
