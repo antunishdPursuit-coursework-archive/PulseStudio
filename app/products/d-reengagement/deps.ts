@@ -1,20 +1,27 @@
 /* Product D — the ONE file that touches anything outside this folder.
  *
  * THE PORTABILITY SEAM: every other .ts file in this product imports its
- * shared types and its record loader from HERE, never from ../../shared
+ * shared types and its record source from HERE, never from ../../shared
  * directly. To run this product inside a different host — another studio
- * clone, a booking platform, a standalone deploy — edit THIS file alone:
- * point the type re-exports at your host's contract and loadFixtures() at
- * whatever produces records in that shape. The engine (logic.ts), the brand
- * seam (config.ts), the UI (main.ts), and every unit check carry over
- * without a single edit.
+ * clone, a booking platform, a standalone deploy — edit THIS file alone.
+ * The engine (logic.ts), the brand seam (config.ts), the UI (main.ts), and
+ * every unit check carry over without a single edit.
+ *
+ * WHAT A PORTER ACTUALLY RE-POINTS, corrected 2026-08-21 because this
+ * paragraph named the wrong function for a while: `sharedStudio` below, and
+ * the contract types. This product builds its default records from
+ * sharedStudio() through live-studio.ts, and its other two doors from a
+ * staff member's own CSV and from its own generator. It does NOT call
+ * loadFixtures(); that export sat here as the documented seam while nothing
+ * in the product used it, so a porter following the instruction would have
+ * re-pointed a function that is never called and found the page unchanged.
+ * The export is gone. Product B imports loadFixtures straight from
+ * app/shared/data.ts, which is unaffected.
  *
  * The only tethers deps.ts does not carry are presentation-level, by
  * design: the shared theme.css tokens and theme-boot.js script tags in the
  * two HTML files — swap those for your host's stylesheet when porting.
  */
-
-export { loadFixtures } from "../../shared/data.js";
 
 /* The studio's identity — the shared clone seam. This product's brand
  * (config.ts) sources its studioName from here, so renaming the studio is

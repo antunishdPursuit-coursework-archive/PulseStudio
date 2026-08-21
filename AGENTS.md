@@ -97,11 +97,25 @@ instead of doing it.
 
 ## The git law
 
-- Gate before every commit: `npm run check` must pass. It compiles every
-  `.ts`, checks for style drift, and runs every unit check from the three
-  suites (synthetic engine, session contract, re-engagement) headlessly — the
-  same checks the `tests.html` pages show in a browser. It prints the count it
-  actually ran, never a silent pass — read the count there, not from prose.
+- Gate before every commit: `npm run check` must pass. It is `tsc` — which
+  EMITS, so the suites run the code you just changed rather than the last
+  build — then four gates and the three suites. Each prints the count it
+  actually reached, never a silent pass; read the count there, not from
+  prose. Several of the laws above are no longer only stated:
+
+  | What runs | Which law it holds |
+  | --- | --- |
+  | `tsc` | types, and it writes the `.js` the next step runs |
+  | `scripts/check-styles.mjs` | where styles live — a product may not restyle what the shared theme owns |
+  | `scripts/check-contrast.mjs` | the colour law — a NEW pairing below WCAG AA fails |
+  | `scripts/check-language.mjs` | the language law and "no AI is ever a contributor" |
+  | `scripts/check-fixtures.mjs` | the data law — every reference resolves, and the fixture has not aged out |
+  | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
+
+  Every gate carries `--self-test`, which plants known-bad input and proves
+  it still catches it. Run one if you ever doubt a green. And note what none
+  of them do: **a green gate does not open a browser.** Look at the pages
+  your change could affect.
 - One branch per product change, plain commit messages anyone can read.
   Merge to `main` through a PR using the template.
 - The AI is NEVER a contributor: no Claude or AI names, no `Co-Authored-By`,

@@ -133,8 +133,11 @@ This folder is a standalone re-engagement engine that happens to live inside
 one app. Every outside dependency flows through `deps.ts` — so plugging it
 into a different host is two moves:
 
-1. **Re-point `deps.ts`** at your host's types and record source. That is the
-   only code file that changes.
+1. **Re-point `deps.ts`** at your host's types and record source — in
+   practice `sharedStudio` (what the default door builds its records from,
+   through `live-studio.ts`) and the contract type re-exports. That is the
+   only code file that changes. The other two doors take a staff member's
+   own CSV and this product's own generator, and need nothing.
 2. **Feed the engine records in the contract shape.** If your system can
    produce these, you get flags, evidence, ranked saves, drafts, and the
    full proof suite for free:
