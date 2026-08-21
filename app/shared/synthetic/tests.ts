@@ -16,7 +16,7 @@ import { attendanceCsv, csvField } from "./csv-export.js";
 import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn } from "./lifecycle.js";
-import { dateOfTimestamp, dayNumberOf, weekdayOf } from "./normalize.js";
+import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
 interface CheckResult {
@@ -974,6 +974,47 @@ for (const file of ENGINE_SOURCES) {
       shouldFire,
     );
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* The two gatekeepers every timestamp passes through                   */
+/* ------------------------------------------------------------------ */
+
+/* isStrictTimestamp decides whether a session's start time is usable at
+ * all — the CSV export drops any row that fails it. Neither it nor
+ * isStrictDate had a single check. Mutation found the shape of the hole:
+ * the three time-component bounds could each be loosened to <= with
+ * nothing noticing, which accepts hour 24, minute 60 and second 60 as
+ * real times. */
+{
+  check("a real time passes", isStrictTimestamp("2026-08-21T12:30:00"), true);
+  check("midnight passes", isStrictTimestamp("2026-08-21T00:00:00"), true);
+  check("the last second of the day passes", isStrictTimestamp("2026-08-21T23:59:59"), true);
+  check("hour 24 is not a time", isStrictTimestamp("2026-08-21T24:00:00"), false);
+  check("minute 60 is not a time", isStrictTimestamp("2026-08-21T12:60:00"), false);
+  check("second 60 is not a time, leap seconds included",
+    isStrictTimestamp("2026-08-21T12:59:60"), false);
+  check("a timestamp on an impossible date is refused",
+    isStrictTimestamp("2026-02-30T12:00:00"), false);
+  check("a date alone is not a timestamp", isStrictTimestamp("2026-08-21"), false);
+  check("an offset is not this format, which is studio-local by contract",
+    isStrictTimestamp("2026-08-21T12:00:00-04:00"), false);
+  check("a single-digit hour is refused rather than guessed at",
+    isStrictTimestamp("2026-08-21T9:00:00"), false);
+
+  check("a real date passes", isStrictDate("2026-08-21"), true);
+  check("the 30th of February is not a date, whatever the regex says",
+    isStrictDate("2026-02-30"), false);
+  check("the 29th of February is not a date in a common year",
+    isStrictDate("2026-02-29"), false);
+  check("...but it is in a leap year", isStrictDate("2024-02-29"), true);
+  check("...and not in 1900, which the four-year rule alone would allow",
+    isStrictDate("1900-02-29"), false);
+  check("...while 2000 is a leap year, which the hundred-year rule alone would deny",
+    isStrictDate("2000-02-29"), true);
+  check("month 13 is not a month", isStrictDate("2026-13-01"), false);
+  check("day 0 is not a day", isStrictDate("2026-08-00"), false);
+  check("a two-digit year is refused rather than guessed at", isStrictDate("26-08-21"), false);
 }
 
 /* ------------------------------------------------------------------ */

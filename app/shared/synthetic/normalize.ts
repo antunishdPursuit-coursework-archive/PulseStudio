@@ -22,16 +22,6 @@ export function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-/** Exact match against the documented values after trim/case-fold.
- *  Returns null for anything else — never a guess. */
-export function canonicalizeEnum(
-  raw: string,
-  allowed: readonly string[],
-): string | null {
-  const v = raw.trim().toLowerCase();
-  for (const a of allowed) if (a.toLowerCase() === v) return a;
-  return null;
-}
 
 /** Strict YYYY-MM-DD that also survives the real calendar (2026-02-30 is
  *  not a date, whatever the regex says). */
