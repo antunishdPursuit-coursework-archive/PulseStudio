@@ -713,15 +713,65 @@ const ENGINE_SOURCES = [
   "lifecycle.js", "schedule.js", "scenarios.js", "generate.js",
   "validate.js", "serialize.js", "csv-export.js",
 ];
+/* WHAT THE ENGINE MAY NOT CONTAIN, and the two holes this list used to have.
+ *
+ * UNSEEDED RANDOMNESS WAS NOT ON THE LIST AT ALL. Every promise this engine
+ * makes rests on being reproducible from a seed — the answer key only means
+ * something because the same seed builds the same studio — and the grep that
+ * enforces purity never once looked for Math.random. The byte-identical
+ * checks would catch it wherever it changed observed output; a call in a
+ * branch those configurations do not reach would have sat there indefinitely.
+ *
+ * The clock pattern only caught `new Date()` with empty parens, which let
+ * `new Date` (no parens at all — same current-date object) and a bare
+ * `Date()` call through, along with performance.now(). `new Date(value)`
+ * stays LEGAL and is used twice in normalize.ts: round-tripping a calendar
+ * date through the real calendar is arithmetic, not a clock read, and
+ * forbidding it would forbid checking that a date exists. */
 const FORBIDDEN: ReadonlyArray<[string, RegExp]> = [
   ["a product import", /from\s+["'][^"']*products\//],
-  ["a network call", /\bfetch\s*\(|XMLHttpRequest|WebSocket/],
-  ["a clock read", /Date\.now\s*\(|new Date\(\)/],
+  ["a network call", /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/],
+  ["a clock read", /Date\.now\s*\(|\bDate\s*\(\s*\)|new\s+Date\s*(?!\s*\()|performance\.now\s*\(/],
+  ["unseeded randomness", /Math\.random\s*\(|crypto\.getRandomValues|randomUUID/],
 ];
 for (const file of ENGINE_SOURCES) {
   const source = await (await fetch(`./${file}`)).text();
   for (const [label, pattern] of FORBIDDEN) {
     check(`${file} contains no ${label}`, pattern.test(source), false);
+  }
+}
+
+/* A GREP THAT ONLY EVER PASSES IS INDISTINGUISHABLE FROM A BROKEN ONE, and
+ * twelve clean files passing four patterns says nothing about whether the
+ * patterns work. Each is fired at the text it exists to catch, and at the
+ * legal text nearest to it. */
+{
+  const find = (label: string): RegExp =>
+    FORBIDDEN.find(([l]) => l === label)?.[1] ?? /$^/;
+  const planted: ReadonlyArray<[string, string, boolean]> = [
+    ["unseeded randomness", "const r = Math.random();", true],
+    ["unseeded randomness", "const id = crypto.randomUUID();", true],
+    ["unseeded randomness", "const r = stream.chance(0.02);", false],
+    ["a clock read", "const t = Date.now();", true],
+    ["a clock read", "const t = new Date();", true],
+    ["a clock read", "const t = new Date;", true],
+    ["a clock read", "const t = performance.now();", true],
+    // The legal one, used twice in normalize.ts: round-tripping a calendar
+    // date is arithmetic, not a clock read.
+    ["a clock read", "const round = new Date(Date.UTC(y, m - 1, d));", false],
+    ["a network call", "await fetch(url);", true],
+    ["a network call", "navigator.sendBeacon(url, body);", true],
+    ["a network call", "new EventSource(url);", true],
+    ["a network call", "const fetched = cache.get(key);", false],
+    ["a product import", 'import { x } from "../../products/d-reengagement/logic.js";', true],
+    ["a product import", 'import { x } from "./random.js";', false],
+  ];
+  for (const [label, text, shouldFire] of planted) {
+    check(
+      `the ${label} grep ${shouldFire ? "catches" : "allows"} ${JSON.stringify(text)}`,
+      find(label).test(text),
+      shouldFire,
+    );
   }
 }
 

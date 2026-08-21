@@ -12,10 +12,10 @@ the legacy contract) is what all four products speak.
 | --- | --- |
 | `theme.css` + `theme-boot.ts` | The appearance rules as code: built-in `--bg` light/dark stays white/black, an accessible custom background/text pair is allowed, and four developer accents are scoped by `body.product-a\|b\|c\|d`; the boot persists theme preferences AND auto-mounts the session chip into any `.topnav`/`.page-head`/`.topbar` (opt out: `<body data-no-session>`) |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
-| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, 27 browser checks in `auth/tests.html`), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
+| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
 | `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control) — each documented in `components/README.md` |
-| `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, ~130 browser checks in `synthetic/tests.html` |
+| `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
 
 ## The load-bearing facts (each one has bitten or will)
@@ -29,9 +29,17 @@ the legacy contract) is what all four products speak.
   sign-in roster shifts with the real calendar and a remembered
   `member_id` can go stale overnight — `readPulseSession()` then signs
   out silently by design. The pure engine itself never reads the clock;
-  `synthetic/tests.ts` greps the shipped sources to enforce it (adding
-  `new Date(`, `fetch(`, `Date.now(` — even in a comment — fails the
-  suite).
+  `synthetic/tests.ts` greps the shipped sources to enforce it. What it
+  actually forbids, corrected 2026-08-21 because this line overstated it:
+  a product import, a network call (`fetch(`, `XMLHttpRequest`,
+  `WebSocket`, `EventSource`, `sendBeacon`), a clock read (`Date.now(`,
+  `Date()`, `new Date()`, `new Date` with no parens, `performance.now(`),
+  and unseeded randomness (`Math.random(`, `crypto.getRandomValues`,
+  `randomUUID`) — even in a comment. `new Date(value)` is LEGAL and
+  `normalize.ts` uses it twice: round-tripping a calendar date is
+  arithmetic, not a clock read. Unseeded randomness was added to that list
+  the same day; before then nothing checked for it, in an engine whose
+  every promise rests on being reproducible from a seed.
 - **Product A consumes the compatibility view** (`currentSession()` /
   `onSessionChange()`, reading `.role` and `.member_id`). Do not remove
   those exports until Kerrian migrates in his own lane.

@@ -140,11 +140,25 @@
     <p class="note">All three also run on every push: <code>npm run check</code>
     runs them headlessly and the build fails on a single red check. Before
     2026-08-21 they ran only when somebody opened these pages.</p>
+    <!-- THE NUMBERS THAT USED TO BE HERE WERE WRONG WITHIN A DAY.
+         This board carried "32 / 32", "122 / 122" and "160 / 160", typed by
+         hand. Two of the three went stale the first time a suite grew, and a
+         readiness board showing a confidently wrong number is worse than one
+         showing none — it is exactly the "never write a count you cannot keep
+         true" rule in docs/README.md, broken on the page most likely to be
+         read out loud in a room.
+         "All green" is kept because it is the one claim something enforces:
+         the gate fails the build on a single red check, so nothing red
+         reaches this page's own deploy. The COUNT is stated live by each
+         suite, on the page you land on when you follow the link. -->
     <div class="proofs">
-      <a href="./auth/tests.html"><strong>32 / 32</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
-      <a href="../products/d-reengagement/tests.html"><strong>122 / 122</strong>Re-engagement — rules, CSV door, live trail, outreach discipline, the closed loop<span></span></a>
-      <a href="./synthetic/tests.html"><strong>160 / 160</strong>Studio engine — determinism, truth key, fill knob, scale<span></span></a>
+      <a href="./auth/tests.html"><strong>all green</strong>Session contract — hostile storage, two actors, cross-tab<span></span></a>
+      <a href="../products/d-reengagement/tests.html"><strong>all green</strong>Re-engagement — rules, CSV door, live trail, outreach discipline, the closed loop<span></span></a>
+      <a href="./synthetic/tests.html"><strong>all green</strong>Studio engine — determinism, truth key, fill knob, scale<span></span></a>
     </div>
+    <p class="note">Each suite states its own count when you open it — the
+    numbers are not repeated here, because a number in prose goes stale and
+    nothing would catch it.</p>
 
     <h2 class="sect">Still open (red is red — say it in the room)</h2>
     <ul class="open">
