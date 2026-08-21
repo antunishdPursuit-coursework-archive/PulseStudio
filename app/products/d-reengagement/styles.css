@@ -12,8 +12,8 @@
 .page-head {
   box-shadow: 0 6px 30px color-mix(in srgb, var(--accent) 35%, transparent);
 }
-/* .home-brand styling lives ONCE in shared/theme.css now. */
-.page-head .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
+/* The shared header pieces — .home-brand and .role — are styled ONCE in
+   shared/theme.css. Nothing about them belongs in this file. */
 
 .status {
   font-size: 1.05rem;
