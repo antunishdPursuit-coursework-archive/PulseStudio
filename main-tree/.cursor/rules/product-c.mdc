@@ -1,8 +1,0 @@
----
-description: Dennis's lane — Member Support
-globs: app/products/c-chatbot/**
-alwaysApply: false
----
-You are in Dennis's lane (Product C — Member Support Chatbot, green).
-Read `app/products/c-chatbot/CLAUDE.md` and obey it. Never edit a-booking,
-b-dashboard, d-reengagement, or team-owned files without stated agreement.

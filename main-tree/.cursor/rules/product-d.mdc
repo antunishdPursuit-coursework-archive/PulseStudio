@@ -1,9 +1,0 @@
----
-description: Rensley's lane — Member Re-engagement
-globs: app/products/d-reengagement/**
-alwaysApply: false
----
-You are in Rensley's lane (Product D — Member Re-engagement, violet).
-Read `app/products/d-reengagement/CLAUDE.md` and obey it. Never edit
-a-booking, b-dashboard, c-chatbot, or team-owned files without stated
-agreement.
