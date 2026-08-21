@@ -191,6 +191,10 @@ export function unsuppress(
  * good rows survive, bad rows are COUNTED, and the page states the count —
  * the same accounting attendance rows already get. */
 
+/* keepOutreachRecords / keepSuppressionRecords are the whole API here. The
+ * two row predicates behind them stay private: a caller that reached past
+ * the keepers would get a filtered array with no dropped-count, which is
+ * the one thing the page has to state. */
 export interface KeptRows<T> {
   kept: T[];
   /** Rows that could not be read. Stated, never silently dropped. */
@@ -202,7 +206,7 @@ function isIsoDate(value: unknown): value is string {
   return Number.isFinite(dayNumberFromIso(value));
 }
 
-export function isOutreachRecord(row: unknown): row is OutreachRecord {
+function isOutreachRecord(row: unknown): row is OutreachRecord {
   if (typeof row !== "object" || row === null) return false;
   const r = row as Record<string, unknown>;
   return (
@@ -215,7 +219,7 @@ export function isOutreachRecord(row: unknown): row is OutreachRecord {
   );
 }
 
-export function isSuppressionRecord(row: unknown): row is SuppressionRecord {
+function isSuppressionRecord(row: unknown): row is SuppressionRecord {
   if (typeof row !== "object" || row === null) return false;
   const r = row as Record<string, unknown>;
   return (
