@@ -272,7 +272,7 @@
         </ul>
       </section>
       <section class="off">
-        <h2><span class="state">Red — 1 waiting</span></h2>
+        <h2><span class="state">Red — 2 waiting</span></h2>
         <ul>
           <li><strong><span class="chip a">A</span> → <span class="chip b">B</span>, the road that looks built and is not:</strong>
           the Dashboard reads Booking's reservation log, but it builds its OWN
@@ -281,6 +281,12 @@
           class ids out of 75. A member books, the meter never moves. The fix is
           one config line in Manny's lane: drop the private seed and read the
           same studio everyone else does.</li>
+          <li><strong><span class="chip c">C</span> talks through Haiku locally:</strong>
+          member support can answer from the current safe schedule, policies,
+          and live browser reservations when the local server has an Anthropic
+          key. The deployed GitHub Pages site cannot run that conversation yet
+          because it has no backend service where the key can stay secret. That
+          hosted endpoint is Product C's only remaining deployment blocker.</li>
         </ul>
       </section>
     </div>

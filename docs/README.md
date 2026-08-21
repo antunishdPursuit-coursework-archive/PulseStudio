@@ -8,6 +8,7 @@ Process documents for the people building Pulse Studio. These sit OUTSIDE
 | --- | --- |
 | [styling.md](./styling.md) | Where every style lives (shared vs your folder), why we do not use Sass, when a comment is required — enforced by `scripts/check-styles.mjs` at the gate |
 | [styles-baseline.json](./styles-baseline.json) | The style duplication that existed the day the gate landed, with the owner who can delete each one. This list only shrinks. |
+| [member-support-haiku.md](./member-support-haiku.md) | How Product C runs with Haiku locally, plus the marked member-safe guidance the local server reads on every question |
 | [REQUESTFOR-A-B-C.md](./REQUESTFOR-A-B-C.md) | What Product D needs from A, B and C, and what D gives back — one section per teammate, each ending in ONE ask |
 | [SENIOR-DEV-BRIEF.md](./SENIOR-DEV-BRIEF.md) | The whole of Product D in one file: what it does, how it is proven, and every open question — written to be read start to finish by someone new |
 
