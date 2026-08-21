@@ -21,6 +21,8 @@ import {
   recentBookingActivity,
   suggestedSession,
   summaryLine,
+  attendanceCoverage,
+  coverageWarning,
   nobodyFlaggedLine,
   todayDayNumber,
   todayIsoInZone,
@@ -525,6 +527,16 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
     calm.textContent = nobodyFlaggedLine(result, proposedRules) ?? "";
     flaggedEl.append(calm);
     return;
+  }
+  /* SAID ABOVE THE NAMES, not below them: if the records themselves have
+   * gone quiet, every flag underneath is suspect and staff need to know
+   * that before they read the first one. */
+  const warning = coverageWarning(attendanceCoverage(data, today, proposedRules), result, proposedRules);
+  if (warning !== null) {
+    const el = document.createElement("p");
+    el.className = "status";
+    el.textContent = warning;
+    flaggedEl.append(el);
   }
   result.flagged.forEach((f, i) => flaggedEl.append(renderFlagged(f, i + 1, data, today)));
 }

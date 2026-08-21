@@ -36,6 +36,8 @@ import {
 import {
   dataQualityLine,
   dayNumberFromIso,
+  attendanceCoverage,
+  coverageWarning,
   findQuietMembers,
   nobodyFlaggedLine,
   firstNameOf,
@@ -378,6 +380,52 @@ check("when somebody IS flagged there is nothing to explain",
   nobodyFlaggedLine(
     findQuietMembers(recordsFor([{ id: "m1", name: "Quiet One", status: "active", attended: ["2026-08-01"] }]), TODAY, proposedRules),
     proposedRules), null);
+
+/* A STUDIO THAT STOPS RECORDING LOOKS EXACTLY LIKE A STUDIO EVERYBODY LEFT.
+ * From inside one member's history the two are identical, which is why the
+ * whole record set has to be asked when anyone last attended anything. */
+{
+  const stillRunning = recordsFor([
+    { id: "m1", name: "Quiet One", status: "active", attended: ["2026-08-01"] },
+    { id: "m2", name: "Regular", status: "active", attended: ["2026-08-18"] },
+  ]);
+  const cov = attendanceCoverage(stillRunning, TODAY, proposedRules);
+  check("a studio still recording has current coverage", cov.recordsHaveGoneQuiet, false);
+  check("the last recorded day is found", cov.daysSinceAnyAttendance, 0);
+  check("...and no warning is printed over a healthy record set",
+    coverageWarning(cov, findQuietMembers(stillRunning, TODAY, proposedRules), proposedRules), null);
+}
+{
+  // The clipboard broke on 2026-08-01. Everyone still comes; nobody is recorded.
+  const clipboardBroke = recordsFor([
+    { id: "m1", name: "Still Coming", status: "active", attended: ["2026-08-01"] },
+    { id: "m2", name: "Also Coming", status: "active", attended: ["2026-07-30"] },
+  ]);
+  const cov = attendanceCoverage(clipboardBroke, TODAY, proposedRules);
+  const result = findQuietMembers(clipboardBroke, TODAY, proposedRules);
+  check("both members are flagged — the rule cannot tell from inside", result.flagged.length, 2);
+  check("but the records are recognised as having gone quiet", cov.recordsHaveGoneQuiet, true);
+  const warn = coverageWarning(cov, result, proposedRules);
+  check("...and the page says the flags are suspect", warn !== null, true);
+  check("...naming how long the records have been silent",
+    warn?.includes("17 days"), true);
+  check("...and why it matters",
+    warn?.includes("stopped RECORDING"), true);
+}
+{
+  // No flags, no warning: nothing to be suspicious ABOUT.
+  const empty = recordsFor([{ id: "m1", name: "Recent", status: "active", attended: ["2026-08-18"] }]);
+  check("a quiet record set with nothing flagged prints no warning",
+    coverageWarning(attendanceCoverage(empty, TODAY, proposedRules),
+      findQuietMembers(empty, TODAY, proposedRules), proposedRules), null);
+}
+{
+  const never = recordsFor([{ id: "m1", name: "Brand New", status: "active", attended: [] }]);
+  const cov = attendanceCoverage(never, TODAY, proposedRules);
+  check("records with no attendance at all report null, not day zero",
+    [cov.lastRecordedDay, cov.daysSinceAnyAttendance], [null, null]);
+  check("...and never claim the records went quiet", cov.recordsHaveGoneQuiet, false);
+}
 
 check("paused member is NOT flagged",
   run(recordsFor([{ id: "m1", name: "Paused Person", status: "paused", attended: ["2026-07-29"] }])).flagged.length, 0);

@@ -290,6 +290,78 @@ export function findQuietMembers(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Does the tool know when the SILENCE IS ITS OWN?                      */
+/* ------------------------------------------------------------------ */
+
+export interface AttendanceCoverage {
+  /** Day number of the most recent attended class anywhere in the records,
+   *  or null when nothing was ever recorded. */
+  lastRecordedDay: number | null;
+  /** How many days ago that was, or null. */
+  daysSinceAnyAttendance: number | null;
+  /** True when the records themselves have gone quiet — nothing recorded
+   *  recently enough for a flag to mean what it usually means. */
+  recordsHaveGoneQuiet: boolean;
+}
+
+/** THE FAILURE THIS EXISTS TO CATCH: a studio that stops RECORDING
+ *  attendance looks exactly like a studio everybody left. If the front desk
+ *  stops scanning people in on the 1st, then by the 16th every single active
+ *  member's last attended class is more than fourteen days old and the page
+ *  fills with flags — every one of them false, every one of them evidence of
+ *  nothing but a broken clipboard. The rule cannot tell the difference from
+ *  inside a single member's history, because from there the two are
+ *  identical.
+ *
+ *  From OUTSIDE it is obvious: a working studio records somebody attending
+ *  most days. So the whole record set is asked one question — when did
+ *  anyone last attend anything? — and if the answer is older than the quiet
+ *  threshold itself, the silence is at least as likely to be the recorder's
+ *  as the members'. The page says so instead of presenting a page of names
+ *  as a finding. */
+export function attendanceCoverage(
+  data: FixtureSet,
+  today: number,
+  rules: QuietRules,
+): AttendanceCoverage {
+  const sessionById = new Map(data.class_sessions.map((s) => [s.session_id, s]));
+  let lastRecordedDay: number | null = null;
+  for (const a of data.attendance) {
+    if (a.attendance_status !== "attended") continue;
+    const session = sessionById.get(a.session_id);
+    if (!session) continue;
+    const day = dayNumberFromIso(session.starts_at);
+    if (!Number.isFinite(day) || day > today) continue;
+    if (lastRecordedDay === null || day > lastRecordedDay) lastRecordedDay = day;
+  }
+  const daysSinceAnyAttendance = lastRecordedDay === null ? null : today - lastRecordedDay;
+  return {
+    lastRecordedDay,
+    daysSinceAnyAttendance,
+    recordsHaveGoneQuiet:
+      daysSinceAnyAttendance !== null && daysSinceAnyAttendance > rules.minDaysQuiet,
+  };
+}
+
+/** The warning to print above the flags, or null when the records are
+ *  current. Named separately so the suite holds the wording to a known
+ *  answer and the page cannot quietly soften it. */
+export function coverageWarning(
+  coverage: AttendanceCoverage,
+  result: FlagResult,
+  rules: QuietRules,
+): string | null {
+  if (!coverage.recordsHaveGoneQuiet) return null;
+  if (result.flagged.length === 0) return null;
+  return (
+    `These records show nobody attending anything for ${coverage.daysSinceAnyAttendance} days — ` +
+    `longer than the ${rules.minDaysQuiet}-day rule itself. That makes every flag below suspect: ` +
+    `a studio that stopped RECORDING attendance looks exactly like a studio everybody left. ` +
+    `Check that attendance is still being taken before sending any of these.`
+  );
+}
+
 /** Why nobody was flagged, in the studio's own terms. "0 flagged" is four
  *  different situations wearing one number, and only one of them is good
  *  news: the page must never read the studio where everybody left three
