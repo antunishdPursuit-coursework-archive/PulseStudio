@@ -132,6 +132,10 @@
   margin-left: 8px;
 }
 
+/* Booking-without-attending: engagement worth seeing at full strength,
+   unlike the muted metadata around it. */
+.evidence.activity { color: var(--fg); }
+
 /* The discipline line: which policy rule spoke, when a draft is withheld.
    Muted on purpose — it is a state, not an alarm. */
 .workflow-state {

@@ -35,6 +35,13 @@ it is enforced by `outreach.ts`, not by memory:
   own opt-in. It is reversible, and the card says when it was set.
 - **Consent ages.** Beyond the policy window the tool refuses to draft at
   all, by name — silence that old is a different conversation.
+- **Booking without attending is its own story.** A member who booked since
+  their last visit — even a canceled booking — reached for the studio and
+  something got in the way. The card discloses it (`recentBookingActivity`),
+  and it never counts as a visit or shrinks the quiet-days count.
+- **Coming back is stated with the date.** A quiet member already holding an
+  upcoming reserved spot is left alone and named with the day they return —
+  a cue for staff to say "good to see you back" on the right morning.
 - **The invitation is concrete.** The draft names a real upcoming class
   matching the member's own pattern — their usual class with their usual
   instructor first — and falls back to an open offer rather than inventing

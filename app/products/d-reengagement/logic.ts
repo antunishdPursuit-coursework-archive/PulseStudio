@@ -316,18 +316,63 @@ export function firstNameOf(displayName: string): string {
  *  spot, and never counts. A quiet member in this set is already coming
  *  back on their own: they are stated and left alone, never nagged. */
 export function upcomingReservedMemberIds(data: FixtureSet, today: number): Set<string> {
+  // Derived from the dated map below so the two views can never drift:
+  // same reading of the trail, one implementation.
+  return new Set(upcomingReservedNextClassDates(data, today).keys());
+}
+
+/** Per coming-back member, the DATE of their earliest upcoming reserved
+ *  class — so the page can say not just that they are coming back, but
+ *  when. Same reservation reading as above: last row wins, waitlisted is
+ *  hope not a hold, only classes dated after "today" count. */
+export function upcomingReservedNextClassDates(
+  data: FixtureSet,
+  today: number,
+): Map<string, string> {
   const latest = new Map<string, Reservation>();
   for (const r of data.reservations) {
     latest.set(`${r.member_id}|${r.session_id}`, r);
   }
-  const sessionDay = new Map(
-    data.class_sessions.map((s) => [s.session_id, dayNumberFromIso(s.starts_at)]),
+  const sessionStart = new Map(
+    data.class_sessions.map((s) => [s.session_id, s.starts_at]),
   );
-  const ids = new Set<string>();
+  const nextDate = new Map<string, string>();
   for (const r of latest.values()) {
     if (r.reservation_status !== "reserved") continue;
-    const day = sessionDay.get(r.session_id);
-    if (day !== undefined && day > today) ids.add(r.member_id);
+    const startsAt = sessionStart.get(r.session_id);
+    if (startsAt === undefined) continue;
+    const day = dayNumberFromIso(startsAt);
+    if (!Number.isFinite(day) || day <= today) continue;
+    const date = startsAt.split("T")[0] ?? startsAt;
+    const prior = nextDate.get(r.member_id);
+    if (prior === undefined || date < prior) nextDate.set(r.member_id, date);
   }
-  return ids;
+  return nextDate;
+}
+
+/** Most recent booking ACTION since the member's last visit — booked,
+ *  maybe canceled, never attended — or null. Booking without attending is
+ *  a different story from silence, and staff should see the difference:
+ *  disclosed on the card, never silently merged into "activity", and it
+ *  NEVER shrinks the quiet-days count (only attendance is a visit). */
+export function recentBookingActivity(
+  memberId: string,
+  data: FixtureSet,
+  lastDay: number,
+  today: number,
+): string | null {
+  let disclosed: string | null = null;
+  let recentActionDay = -Infinity;
+  for (const r of data.reservations) {
+    if (r.member_id !== memberId) continue;
+    const actionDate = r.reserved_at.split("T")[0] ?? r.reserved_at;
+    const actionDay = dayNumberFromIso(actionDate);
+    if (!Number.isFinite(actionDay) || actionDay <= lastDay || actionDay > today) continue;
+    if (actionDay > recentActionDay) {
+      recentActionDay = actionDay;
+      disclosed =
+        r.reservation_status === "canceled" ? `${actionDate} (canceled)` : actionDate;
+    }
+  }
+  return disclosed;
 }
