@@ -43,6 +43,8 @@ import {
   suggestedSession,
   summaryLine,
   todayDayNumber,
+  todayIsoInZone,
+  longDate,
   upcomingReservedMemberIds,
   upcomingReservedNextClassDates,
   weeklyCadence,
@@ -296,6 +298,34 @@ check("an empty string is not a day",
   Number.isFinite(dayNumberFromIso("")), false);
 check("a full timestamp still reads its date part",
   dayNumberFromIso("2026-08-19T18:30:00"), dayNumberFromIso("2026-08-19"));
+
+/* ONE PAGE, ONE TODAY. The thresholds were always computed in the studio's
+ * zone; the ledger stamp, the suppression stamp and the "as of" line were
+ * not — they read UTC or the viewer's clock. At 8pm in New York those
+ * disagree with the studio by a whole day, which is enough to report a
+ * member who came back as still quiet. */
+{
+  // 2026-08-19, 23:30 in New York — already the 20th in UTC.
+  const lateEvening = new Date("2026-08-20T03:30:00Z");
+  check("the studio's date is used, not UTC",
+    todayIsoInZone("America/New_York", lateEvening), "2026-08-19");
+  check("a viewer further east still gets the studio's date",
+    todayIsoInZone("America/New_York", new Date("2026-08-19T13:00:00Z")), "2026-08-19");
+  check("the day number and the date text agree",
+    todayDayNumber("America/New_York", lateEvening),
+    dayNumberFromIso(todayIsoInZone("America/New_York", lateEvening)));
+  check("a studio in another zone gets its own date",
+    todayIsoInZone("Australia/Sydney", lateEvening), "2026-08-20");
+}
+{
+  check("a date is spelled out from its text, never from a viewer's clock",
+    longDate("2026-08-19"), "August 19, 2026");
+  check("the first of January reads correctly", longDate("2026-01-01"), "January 1, 2026");
+  check("the last of December reads correctly", longDate("2026-12-31"), "December 31, 2026");
+  check("an unreadable date is shown as-is, never prettified into a lie",
+    longDate("not-a-date"), "not-a-date");
+  check("an impossible date is not spelled out", longDate("2026-02-30"), "2026-02-30");
+}
 
 check("today is computed in the studio timezone",
   todayDayNumber("America/New_York", new Date(Date.UTC(2026, 7, 19, 2, 30))),

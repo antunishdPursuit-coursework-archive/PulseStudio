@@ -22,6 +22,8 @@ import {
   suggestedSession,
   summaryLine,
   todayDayNumber,
+  todayIsoInZone,
+  longDate,
   upcomingReservedNextClassDates,
   weeklyCadence,
   type FlaggedMember,
@@ -142,7 +144,17 @@ function persist(): void {
     }
   }
 }
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
+/* THE STUDIO'S DAY, NOT THE VIEWER'S AND NOT UTC.
+ *
+ * This used to be new Date().toISOString().slice(0, 10), which is UTC. The
+ * studio runs in America/New_York, so a note taken at 8pm on a Wednesday
+ * was stamped Thursday — and outreachResults() only counts a visit AFTER
+ * the note, so a member who came back Thursday morning was reported as
+ * still quiet. The thresholds were already computed in the studio's zone
+ * (todayDayNumber); the stamps were not, and one page cannot have two
+ * different todays. */
+let recordsTimezone = brand.timeZone;
+const studioToday = (): string => todayIsoInZone(recordsTimezone);
 
 const statusEl = requiredElement<HTMLParagraphElement>("#status");
 const ruleEl = requiredElement<HTMLParagraphElement>("#rule");
@@ -322,7 +334,7 @@ function renderFlagged(
     navigator.clipboard.writeText(draft).then(
       () => {
         copyBtn.textContent = "Copied ✓";
-        ledger = recordOutreach(ledger, f, "copy", todayIso());
+        ledger = recordOutreach(ledger, f, "copy", studioToday());
         persist();
         setTimeout(rerender, 900);
       },
@@ -339,7 +351,7 @@ function renderFlagged(
   mailLink.addEventListener("click", () => {
     // Opening the mail client IS taking the draft — the note is in the
     // staff member's hands from here.
-    ledger = recordOutreach(ledger, f, "email", todayIso());
+    ledger = recordOutreach(ledger, f, "email", studioToday());
     persist();
     setTimeout(rerender, 900);
   });
@@ -349,7 +361,7 @@ function renderFlagged(
   suppressBtn.type = "button";
   suppressBtn.textContent = "Do not contact";
   suppressBtn.addEventListener("click", () => {
-    suppressions = suppress(suppressions, f.member.member_id, todayIso());
+    suppressions = suppress(suppressions, f.member.member_id, studioToday());
     persist();
     rerender();
   });
@@ -443,6 +455,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   // "Today" is the record set's declared timezone — the shared fixture
   // states the studio's; an import uses the staff member's, since they are
   // at the studio. Either way thresholds never shift with a viewer's zone.
+  recordsTimezone = data.timezone;
   const today = todayDayNumber(data.timezone);
   const result = findQuietMembers(data, today, proposedRules);
 
@@ -457,11 +470,7 @@ function renderRecords(data: FixtureSet, sourceNote: string): void {
   );
   result.flagged = result.flagged.filter((f) => !nextClassDates.has(f.member.member_id));
 
-  const asOf = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const asOf = longDate(todayIsoInZone(data.timezone));
 
   // The result line states what was found; the data-quality line states
   // what could not be judged. Reporting only the first would let unusable
@@ -573,9 +582,9 @@ csvInput.addEventListener("change", () => {
  * the page on the same day sees the same studio — and it never goes stale,
  * because the history is generated relative to today. */
 generateBtn.addEventListener("click", () => {
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const seed = Number(todayIso.replace(/-/g, ""));
-  const studio = generateStudio(seed, todayIso);
+  const anchor = todayIsoInZone(recordsTimezone);
+  const seed = Number(anchor.replace(/-/g, ""));
+  const studio = generateStudio(seed, anchor);
   renderRecords(
     studio.records,
     `Data: a generated studio (seed ${studio.seed}) — ${studio.memberCount} members, ` +

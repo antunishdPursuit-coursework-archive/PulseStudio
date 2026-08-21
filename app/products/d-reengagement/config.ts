@@ -23,6 +23,12 @@ export interface StudioBrand {
   /** The studio's public web address, used in draft links so a member can
    *  book, ask, or browse straight from the note. Ends with a slash. */
   studioUrl: string;
+  /** The IANA zone the studio's calendar runs in. Every day boundary this
+   *  product computes — the 14/60 thresholds, the date a note was taken,
+   *  the "as of" line — resolves here, so a staff member reading from
+   *  another timezone sees the STUDIO's day. It is the fallback used when
+   *  a record set does not declare its own; a set that does always wins. */
+  timeZone: string;
 }
 
 import { STUDIO_NAME } from "./deps.js";
@@ -38,6 +44,7 @@ export const brand: StudioBrand = {
      draft BCC follow — the only edit needed. */
   studioEmail: null,
   studioUrl: "https://antunishdpursuit.github.io/PulseStudio/",
+  timeZone: "America/New_York",
 };
 
 /** The quiet-member rule, PROPOSED — the team has not ratified these

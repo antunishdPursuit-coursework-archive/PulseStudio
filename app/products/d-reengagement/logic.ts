@@ -89,14 +89,34 @@ export function dayNumberFromIso(iso: string): number {
  *  time must get the studio's answer, or every threshold boundary shifts by
  *  a day. en-CA formatting yields YYYY-MM-DD, the same shape the fixture
  *  dates use. */
-export function todayDayNumber(timeZone: string, now: Date = new Date()): number {
-  const studioDate = new Intl.DateTimeFormat("en-CA", {
+export function todayIsoInZone(timeZone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  return dayNumberFromIso(studioDate);
+}
+
+export function todayDayNumber(timeZone: string, now: Date = new Date()): number {
+  return dayNumberFromIso(todayIsoInZone(timeZone, now));
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "2026-08-19" as "August 19, 2026". Formatted from the DATE TEXT, never
+ *  from a Date object read in the viewer's zone: the page's "as of" line
+ *  has to name the studio's day, and building a Date to format it was how
+ *  a staff member in another timezone got yesterday's date beside today's
+ *  numbers. Returns the input unchanged when it is not a real date, so an
+ *  unreadable value is visible rather than silently prettified. */
+export function longDate(iso: string): string {
+  if (!Number.isFinite(dayNumberFromIso(iso))) return iso;
+  const [y, m, d] = (iso.split("T")[0] ?? iso).split("-").map(Number);
+  return `${MONTH_NAMES[(m ?? 1) - 1] ?? ""} ${d}, ${y}`;
 }
 
 /* ------------------------------------------------------------------ */
