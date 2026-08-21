@@ -73,7 +73,10 @@ the legacy contract) is what all four products speak.
   the population can't support the injection. Copy that discipline for
   any new injection.
 - **The chip mounts by header class**: renaming `.topnav`, `.page-head`,
-  or `.topbar` in a product silently removes sign-in from that page.
+  or `.topbar` in a product silently removes sign-in from that page. The
+  selector is in `theme-boot.ts`, NOT in `components/topbar.ts` — topbar
+  exports `mountSessionControl(host)` and theme-boot is what finds the host.
+  Worth naming, because looking for it in the obvious file finds nothing.
 - Shared infrastructure pages carry NO product color — black, white, and
   neutrals only; only product pages set `product-a|b|c|d`.
 
