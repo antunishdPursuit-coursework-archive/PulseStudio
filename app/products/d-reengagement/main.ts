@@ -563,18 +563,45 @@ csvInput.addEventListener("change", () => {
         imported.skipped.length === 0
           ? "0 rows skipped"
           : `${imported.skipped.length} rows skipped: ${imported.skipped.join("; ")}`;
+      /* A SPLIT PERSON IS A FALSE FLAG WAITING TO HAPPEN, so it is said
+       * beside the count rather than left for staff to notice. */
+      const splitNote =
+        imported.splitIdentities.length === 0
+          ? ""
+          : ` ${imported.splitIdentities.join(" ")}`;
+      /* Which number was the month. Said only when the file did NOT settle
+       * it — a disclosure that always appears teaches staff to ignore it. */
+      const dateNote =
+        imported.dateOrder === "day-first"
+          ? " Slash dates were read day-first, which this file's own values prove."
+          : imported.dateOrder === "ambiguous"
+            ? " Slash dates were read month-first; no value in this file settles which number is the month, so use YYYY-MM-DD if that is wrong."
+            : "";
       renderRecords(
         imported.records,
         `Data: ${file.name} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
-          `Members matched by ${imported.identityMethod}. ` +
+          `Members matched by ${imported.identityMethod}.${dateNote}${splitNote} ` +
           `Everyone in the file is treated as an active member. ` +
           `This data never left your browser.`,
       );
       csvReset.hidden = false;
     })
     .catch((error: unknown) => {
+      /* A FAILED IMPORT MUST NOT LEAVE THE LAST RESULT STANDING. Writing
+       * the error into the provenance line alone left the previous source's
+       * flagged members on screen directly beneath it, so the page read as
+       * though those names had come out of the file that just failed —
+       * a clean answer attributed to evidence the tool never read. */
       const message = error instanceof Error ? error.message : String(error);
       sourceEl.textContent = `Could not read that file: ${message}`;
+      statusEl.textContent = "Nothing was checked — no records were read from that file.";
+      flaggedEl.replaceChildren();
+      const note = document.createElement("p");
+      note.className = "status";
+      note.textContent =
+        "The last result was cleared so it cannot be mistaken for this file's. " +
+        "Fix the file and import again, or use the studio's own records.";
+      flaggedEl.append(note);
     })
     .finally(() => {
       // Allow re-selecting the same file after edits.

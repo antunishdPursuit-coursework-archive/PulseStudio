@@ -39,6 +39,15 @@ export interface CsvImport {
   identityMethod: string;
   /** True when identity fell back to the member's name. */
   identityIsName: boolean;
+  /** How a slash date was read, and whether the file settled it. */
+  dateOrder: SlashDateOrder;
+  /** Names that were read as MORE THAN ONE person, each naming the name and
+   *  how many people it became. A split member's visits are divided between
+   *  two records, so either half can look quiet when the whole person is
+   *  not — a false flag built from a spreadsheet gap, which is exactly the
+   *  kind of quiet miscount this product exists to prevent. Stated, never
+   *  merged: merging on a shared name would be inventing identity. */
+  splitIdentities: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,11 +172,60 @@ function findColumn(headers: string[], names: readonly string[]): number {
   return -1;
 }
 
-/** Normalize a date cell to YYYY-MM-DD. Accepts ISO (padded or not) and
- *  the common US export shape M/D/YYYY — then round-trips the value
- *  through the real calendar, so an impossible date (month 13, Feb 30)
- *  returns null and becomes a stated skip instead of a guessed visit. */
-export function normalizeDate(value: string): string | null {
+/* WHICH NUMBER IS THE MONTH? A slash date is not self-describing, and
+ * guessing wrong is the worst kind of wrong here because it is quiet. Read
+ * as month-first, a European export dated 05/03/2026 (the 5th of March)
+ * becomes the 3rd of May — a visit moved two months, silently — while
+ * 25/03/2026 has "month 25" and is skipped. Half the file misdated, half
+ * discarded, and a member's last visit landing wherever the arithmetic
+ * dropped it.
+ *
+ * The file itself usually answers the question. A first component above 12
+ * cannot be a month, so one such row proves the whole file is day-first;
+ * a second component above 12 proves month-first the same way. Only a file
+ * where NEITHER position ever exceeds 12 is genuinely ambiguous, and then
+ * the page says which reading it used rather than pretending it knew. */
+export type SlashDateOrder = "month-first" | "day-first" | "ambiguous" | "contradictory";
+
+export function detectSlashDateOrder(values: readonly string[]): SlashDateOrder {
+  /* ONLY A DATE THAT IS VALID UNDER EXACTLY ONE READING IS EVIDENCE.
+   * Counting "some number above 12" is close but not right: 2/30/2026 has a
+   * 30 in the second position, yet it is not a real date either way — the
+   * 30th month does not exist any more than the 30th of February does. A
+   * row that is impossible in both readings votes for neither; it is simply
+   * a bad row, and it gets skipped by name further down. */
+  let onlyDayFirst = false;
+  let onlyMonthFirst = false;
+  for (const value of values) {
+    const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m === null) continue;
+    const [a, b, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const monthFirstWorks = isRealYmd(y, a, b);
+    const dayFirstWorks = isRealYmd(y, b, a);
+    if (dayFirstWorks && !monthFirstWorks) onlyDayFirst = true;
+    if (monthFirstWorks && !dayFirstWorks) onlyMonthFirst = true;
+  }
+  if (onlyDayFirst && onlyMonthFirst) return "contradictory";
+  if (onlyDayFirst) return "day-first";
+  if (onlyMonthFirst) return "month-first";
+  return "ambiguous";
+}
+
+/** A real calendar date, checked by round-trip — Date.UTC rolls over. */
+function isRealYmd(y: number, m: number, d: number): boolean {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const round = new Date(Date.UTC(y, m - 1, d));
+  return (
+    round.getUTCFullYear() === y && round.getUTCMonth() === m - 1 && round.getUTCDate() === d
+  );
+}
+
+/** Normalize a date cell to YYYY-MM-DD. Accepts ISO (padded or not) and the
+ *  slash shape, read in the order the file proved (see above; an ambiguous
+ *  file is read month-first and the page says so) — then round-trips the
+ *  value through the real calendar, so an impossible date (month 13, Feb
+ *  30) returns null and becomes a stated skip instead of a guessed visit. */
+export function normalizeDate(value: string, order: SlashDateOrder = "month-first"): string | null {
   const v = value.trim();
   let y: number;
   let m: number;
@@ -180,8 +238,9 @@ export function normalizeDate(value: string): string | null {
     d = Number(iso[3]);
   } else if (us) {
     y = Number(us[3]);
-    m = Number(us[1]);
-    d = Number(us[2]);
+    const dayFirst = order === "day-first";
+    m = Number(dayFirst ? us[2] : us[1]);
+    d = Number(dayFirst ? us[1] : us[2]);
   } else {
     return null;
   }
@@ -251,8 +310,21 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const instructorIdByName = new Map<string, string>();
   const attendance: Attendance[] = [];
   const skipped: string[] = [];
+  const idsSeenPerName = new Map<string, Set<string>>();
+
+  /* Decided ONCE from the whole file, before any row is read: one row with
+   * a first component above 12 settles the order for every other row. */
+  const dateOrder = detectSlashDateOrder(
+    rows.slice(1).map((r) => r.cells[dateCol] ?? ""),
+  );
 
   /* Said FIRST, because it explains every other number on the page. */
+  if (dateOrder === "contradictory") {
+    skipped.push(
+      "the date column contains both DD/MM and MM/DD rows — some value above 12 appears in each position, " +
+        "so no single reading fits the file. Convert the dates to YYYY-MM-DD and import again.",
+    );
+  }
   if (unterminatedQuoteAtLine !== null) {
     skipped.push(
       `line ${unterminatedQuoteAtLine}: a quote opens here and never closes, so everything after it ` +
@@ -263,7 +335,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   for (let r = 1; r < rows.length; r += 1) {
     const { cells, line } = rows[r] ?? { cells: [], line: 0 };
     const name = (cells[memberCol] ?? "").trim();
-    const date = normalizeDate(cells[dateCol] ?? "");
+    const date = normalizeDate(cells[dateCol] ?? "", dateOrder);
     if (name === "") {
       skipped.push(`line ${line}: empty member name`);
       continue;
@@ -296,6 +368,18 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       memberIdByName.set(nameKey, memberId);
       members.push({ member_id: memberId, display_name: name, membership_status: "active" });
     }
+    /* A HALF-FILLED IDENTIFIER COLUMN SPLITS A PERSON IN TWO. One row
+     * carries the id and keys on "id:123"; the next leaves the cell blank
+     * and keys on "name:maria santos". Same human, two records, visits
+     * divided between them — and the half with the older last visit can
+     * cross the quiet threshold and be flagged while the whole person has
+     * been coming in all along. Recorded per name so the page can say it. */
+    let idsForName = idsSeenPerName.get(name.toLowerCase());
+    if (idsForName === undefined) {
+      idsForName = new Set<string>();
+      idsSeenPerName.set(name.toLowerCase(), idsForName);
+    }
+    idsForName.add(memberId);
 
     let instructorId = "";
     if (instructorName !== "") {
@@ -347,11 +431,22 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   };
 
   const identityIsName = identityCol === -1;
+  const splitIdentities: string[] = [];
+  for (const [lowered, ids] of idsSeenPerName) {
+    if (ids.size < 2) continue;
+    const shown = members.find((m) => m.display_name.toLowerCase() === lowered)?.display_name ?? lowered;
+    splitIdentities.push(
+      `${shown} was read as ${ids.size} different people — the identifier column is filled on some of their rows and blank on others, so their visits are split and a flag for either half may be wrong.`,
+    );
+  }
+
   return {
     records,
     rowCount: rows.length - 1,
     memberCount: members.length,
     skipped,
+    splitIdentities,
+    dateOrder,
     identityIsName,
     identityMethod: identityIsName
       ? "member name (add a member id or email column for exact matching)"

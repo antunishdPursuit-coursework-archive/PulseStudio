@@ -17,7 +17,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { adaptAttendanceCsv, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
+import { adaptAttendanceCsv, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
@@ -738,6 +738,64 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
 }
 
 // 16. Status vocabulary maps to the contract's three values.
+/* WHICH NUMBER IS THE MONTH. Read month-first, a European export dated
+ * 05/03/2026 becomes the 3rd of May instead of the 5th of March — a visit
+ * moved two months in silence — while 25/03/2026 has "month 25" and is
+ * skipped outright. Half the file misdated, half discarded. The file itself
+ * settles it: a first component above 12 cannot be a month. */
+{
+  check("a value above 12 in the first position proves day-first",
+    detectSlashDateOrder(["05/03/2026", "25/03/2026"]), "day-first");
+  check("a value above 12 in the second position proves month-first",
+    detectSlashDateOrder(["03/25/2026", "05/03/2026"]), "month-first");
+  check("a file where neither position ever exceeds 12 is ambiguous",
+    detectSlashDateOrder(["05/03/2026", "04/06/2026"]), "ambiguous");
+  check("a file with both above 12 fits no single reading",
+    detectSlashDateOrder(["25/03/2026", "03/25/2026"]), "contradictory");
+  check("ISO dates never make a file ambiguous either way",
+    detectSlashDateOrder(["2026-08-19", "2026-08-20"]), "ambiguous");
+  check("a day-first file reads the day first",
+    normalizeDate("05/03/2026", "day-first"), "2026-03-05");
+  check("the same text read month-first is a different day",
+    normalizeDate("05/03/2026", "month-first"), "2026-05-03");
+  check("a day-first date that month-first would SKIP is now read",
+    normalizeDate("25/03/2026", "day-first"), "2026-03-25");
+  check("month-first still refuses the impossible", normalizeDate("25/03/2026", "month-first"), null);
+  check("the default reading is month-first, unchanged", normalizeDate("05/03/2026"), "2026-05-03");
+}
+{
+  // End to end: a European export used to lose half its rows.
+  const european = "member,date\nMaria Santos,05/03/2026\nMaria Santos,25/03/2026\nJames Okafor,14/03/2026\n";
+  const imported = adaptAttendanceCsv(european, "America/New_York");
+  check("a European export reads every row instead of skipping half",
+    imported.skipped.length, 0);
+  check("...and says which reading its own values proved", imported.dateOrder, "day-first");
+  check("...and dates them in March, not May",
+    imported.records.class_sessions.every((c) => c.starts_at.startsWith("2026-03")), true);
+}
+{
+  // A half-filled identifier column splits one person into two.
+  const split = "member id,member,date\n123,Maria Santos,2026-08-01\n,Maria Santos,2026-08-05\n";
+  const imported = adaptAttendanceCsv(split, "America/New_York");
+  check("a half-filled identifier column is caught", imported.splitIdentities.length, 1);
+  check("...and the split is stated by name",
+    imported.splitIdentities[0]?.includes("Maria Santos"), true);
+  check("...and it really did become two members", imported.memberCount, 2);
+}
+{
+  const consistent = "member id,member,date\n123,Maria Santos,2026-08-01\n123,Maria Santos,2026-08-05\n";
+  const imported = adaptAttendanceCsv(consistent, "America/New_York");
+  check("a consistently-filled identifier column states no split",
+    imported.splitIdentities.length, 0);
+  check("...and keeps one person as one person", imported.memberCount, 1);
+}
+{
+  const twoPeople = "member,date\nMaria Santos,2026-08-01\nJames Okafor,2026-08-05\n";
+  const imported = adaptAttendanceCsv(twoPeople, "America/New_York");
+  check("two genuinely different names are not a split",
+    imported.splitIdentities.length, 0);
+}
+
 check("no-show vocabulary maps to no_show", normalizeStatus("No-Show"), "no_show");
 check("unrecognized status maps to unknown, never attended", normalizeStatus("maybe?"), "unknown");
 
@@ -874,12 +932,23 @@ check("clean records produce no data-quality line",
 }
 
 // 20. Impossible calendar dates are stated skips, never guessed visits.
-//     13/1/2026 looks European; 2/30/2026 is a typo — neither may become a
-//     fabricated future date that silently un-flags a quiet member.
+//     2/30/2026 is a typo and is impossible in EVERY reading, so it is
+//     skipped by name. 13/1/2026 used to be skipped alongside it, because
+//     the parser assumed month-first and month 13 does not exist. It is not
+//     an impossible date — it is the 13th of January, and the file says so:
+//     a 13 in the first position can only be a day. Now that the file
+//     settles the order (detectSlashDateOrder above), reading it is not a
+//     guess, and skipping a date the file explained would be the error.
 {
   const imp = adaptAttendanceCsv("name,date\nMaria Santos,13/1/2026\nJose Reyes,2/30/2026\n", "America/New_York");
-  check("impossible dates are skipped with reasons", imp.skipped.length, 2);
-  check("impossible dates import zero records", imp.memberCount, 0);
+  check("a date impossible in every reading is still skipped", imp.skipped.length, 1);
+  check("...and the readable one is read as the file's own order proves",
+    imp.records.class_sessions.some((c) => c.starts_at.startsWith("2026-01-13")), true);
+  // Maria's row is readable now, so she is a member; Jose's is not, so he
+  // is not invented. One in, one stated as skipped — never a silent drop.
+  check("only the member whose row could be read is imported", imp.memberCount, 1);
+  check("the unreadable row invents nobody",
+    imp.records.members.some((m) => m.display_name === "Jose Reyes"), false);
 }
 
 // 21. Identity is the name as written — non-Latin names are distinct
