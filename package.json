@@ -2,11 +2,12 @@
   "name": "pulse-studio",
   "private": true,
   "version": "0.1.0",
-  "description": "Pulse Studio — one boutique fitness studio, four products, four developers.",
+  "description": "Pulse Studio \u2014 one boutique fitness studio, four products, four developers.",
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && node scripts/check-styles.mjs",
     "build": "tsc",
-    "start": "python3 -m http.server 4173 --directory app"
+    "start": "python3 -m http.server 4173 --directory app",
+    "check:styles": "node scripts/check-styles.mjs"
   },
   "devDependencies": {
     "typescript": "^5.5.0"
