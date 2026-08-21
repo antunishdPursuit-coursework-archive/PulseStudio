@@ -125,6 +125,33 @@ jointly held.
 
 ---
 
+## Dennis — Product C has no brief in the root (2026-08-21)
+
+Not urgent and not a defect — a gap the docs had stopped mentioning in two
+of the three places they should.
+
+`CLAUDE.md` says "Each product's brief (`PRODUCT_<X>_*.md` in the repo root)
+defines its scope", and lists the product briefs as part of what somebody
+who just cloned this needs in the first thirty seconds. Three exist: A, B
+and D. `README.md` was already honest about the fourth — it says the Product
+C brief will be added when its owner is ready. `CLAUDE.md` and
+`SHARED_DATA_CONTRACT.md` were not: the contract's last line linked only A
+and B, omitting D as well.
+
+Both corrected to say what is actually there. Until a brief exists, Product
+C's scope is defined by `app/products/c-chatbot/CLAUDE.md` and by your row
+in the shared contract's review worksheet — which currently reads TBD for
+required fields, fields created, and open questions.
+
+**The ask, whenever it suits:** the worksheet row is the smaller half and
+would help Product D directly. I read `class_session` and `instructor`
+display fields to personalise a draft; knowing which of those you also read,
+and whether you expect `studio_policy` to stay read-only, tells me whether
+we ever contend over the same records. The brief itself can wait for your
+increment.
+
+Nothing in `c-chatbot/` was touched.
+
 ## The studio mailbox (affects everyone)
 
 The studio's record mailbox is configuration, and for this studio it is
