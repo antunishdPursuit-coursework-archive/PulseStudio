@@ -485,6 +485,37 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
     text.includes("products/a-booking/") && text.includes("products/c-chatbot/"), true);
 }
 
+/* THE CONSENT WINDOW IS DORMANT, AND THAT IS A MEASURED FACT.
+ *
+ * outreachStateFor's outsideConsent branch works — there is a check for it
+ * above, built from a FlaggedMember constructed by hand. What that check
+ * cannot show is that findQuietMembers can never PRODUCE such a member:
+ * the rule caps daysSince at maxDaysQuiet, so with a consent window larger
+ * than that ceiling the branch is unreachable in the real pipeline. It was
+ * being described in the README as something that happens. */
+{
+  check("the consent window sits above the rule's own ceiling, so it cannot fire today",
+    outreachPolicy.consentWindowDays >= proposedRules.maxDaysQuiet, true);
+
+  // Nothing the rule can produce reaches it, over a whole generated studio.
+  const studio = generateStudio(20260818, "2026-08-18");
+  const result = findQuietMembers(studio.records, TODAY, proposedRules);
+  const kinds = new Set(
+    result.flagged.map((f) => outreachStateFor(f, outreachPolicy, [], []).kind),
+  );
+  check("no member the rule flags is ever outside the consent window",
+    kinds.has("outsideConsent"), false);
+  check("...and the quietest of them is inside it",
+    Math.max(...result.flagged.map((f) => f.daysSince)) <= outreachPolicy.consentWindowDays, true);
+
+  // And it is not dead code: lower the window under the ceiling and it speaks.
+  const tight = { ...outreachPolicy, consentWindowDays: 20 };
+  const someone = result.flagged.find((f) => f.daysSince > 20);
+  check("a window inside the rule's ceiling DOES fire — the branch is alive, just dormant",
+    someone === undefined ? "outsideConsent" : outreachStateFor(someone, tight, [], []).kind,
+    "outsideConsent");
+}
+
 /* ADAPT, NEVER GATE. The audience law lets a surface change its words for
  * whoever is signed in and forbids it hiding or blocking a route, because
  * the browser session is convenience and not access control. A member who

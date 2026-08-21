@@ -33,8 +33,14 @@ it is enforced by `outreach.ts`, not by memory:
 - **"No" is remembered.** *Do not contact* puts a member on a suppression
   list (`pulse-suppressions`) that outranks everything except the studio's
   own opt-in. It is reversible, and the card says when it was set.
-- **Consent ages.** Beyond the policy window the tool refuses to draft at
-  all, by name — silence that old is a different conversation.
+- **Consent ages — a backstop, dormant at these numbers.** Beyond the
+  policy window (730 days) the tool refuses to draft at all, by name. With
+  the proposed thresholds that can never happen: the rule only flags members
+  between 14 and 60 days quiet, so the oldest silence reaching this check is
+  60 days. The rule's own 60-day ceiling is what actually says "silence that
+  old is a different conversation" today. The backstop stays for the day the
+  team ratifies different numbers, and the suite pins the relationship so
+  raising the ceiling past 730 turns it live loudly rather than quietly.
 - **Booking without attending is its own story.** A member who booked since
   their last visit — even a canceled booking — reached for the studio and
   something got in the way. The card discloses it (`recentBookingActivity`),

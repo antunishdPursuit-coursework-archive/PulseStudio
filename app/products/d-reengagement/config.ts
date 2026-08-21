@@ -82,6 +82,22 @@ export const outreachPolicy: OutreachPolicy = {
   /* This studio's recorded yes. A clone that has not asked its members
      ships with false and the workflow stays off. */
   enabled: true,
+  /* A BACKSTOP THAT IS DORMANT TODAY, AND SAYING SO IS THE POINT.
+   *
+   * outreachStateFor refuses to draft when a member's silence is older than
+   * this. With the proposed thresholds it can never speak: findQuietMembers
+   * only flags members between 14 and 60 days quiet, so the largest
+   * daysSince that ever reaches this branch is 60, against a 730-day
+   * trigger. Measured over the running studio, every flagged member comes
+   * back "ready" and not one is ever "outsideConsent".
+   *
+   * It stays because it is a real safeguard the day the team ratifies
+   * different numbers — the brief says both thresholds are still open — and
+   * because maxDaysQuiet doing the same job today is a coincidence of
+   * configuration, not a guarantee. What it must not do is be DESCRIBED as
+   * something that happens. The suite pins the relationship, so raising
+   * maxDaysQuiet past this number turns the backstop live and says so
+   * instead of changing behaviour quietly. */
   consentWindowDays: 730,
   oncePerLapse: true,
 };
