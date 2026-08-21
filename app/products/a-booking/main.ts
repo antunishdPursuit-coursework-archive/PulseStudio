@@ -2,8 +2,10 @@
    Shared studio records come from sharedStudio() — the same generator and
    member ids the top-bar sign-in lists. Runtime reservations are stored in
    localStorage under pulse-reservations-a and never written back into
-   shared fixtures. Members see only their own reservation records.
-   Sign-in is the shared pulse-session; this page never keeps a second key. */
+   shared fixtures. The log is append-only: member book / waitlist / cancel
+   only — this page never seeds occupancy on load. Members see only their
+   own reservation records. Sign-in is the shared pulse-session; this page
+   never keeps a second key. */
 
 import type { Reservation } from "../../shared/contract.js";
 import { currentSession, onSessionChange } from "../../shared/auth/session.js";
@@ -49,20 +51,19 @@ function newReservationId(): string {
   return `res-a-${Date.now()}-${reservationSeq}`;
 }
 
-function shuffled<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapWith = Math.floor(Math.random() * (index + 1));
-    const current = copy[index];
-    const other = copy[swapWith];
-    if (current === undefined || other === undefined) continue;
-    copy[index] = other;
-    copy[swapWith] = current;
-  }
-  return copy;
-}
-
 const dataset = sharedStudio();
+
+/* Studio-local wall times: dataset timestamps carry no offset, so append
+ * "Z" and format in UTC — prints them exactly as written, immune to DST.
+ * (The old hardcoded -04:00 was an hour wrong every winter.) The dataset
+ * is generated for today in the studio's timezone, so meta.asOfDate IS
+ * the studio's today. */
+const TODAY_ISO = dataset.meta.asOfDate;
+const TOMORROW_ISO = (() => {
+  const d = new Date(`${TODAY_ISO}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+})();
 
 const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]));
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
@@ -144,29 +145,34 @@ function sessionsOnDay(day: string): SyntheticClassSession[] {
 }
 
 function formatDayChip(day: string): string {
+  if (day === TODAY_ISO) return "Today";
+  if (day === TOMORROW_ISO) return "Tomorrow";
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-    timeZone: dataset.meta.timezone,
-  }).format(new Date(`${day}T12:00:00-04:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${day}T12:00:00Z`));
 }
 
 function formatDayTitle(day: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+  const full = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
-    timeZone: dataset.meta.timezone,
-  }).format(new Date(`${day}T12:00:00-04:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${day}T12:00:00Z`));
+  if (day === TODAY_ISO) return `Today — ${full}`;
+  if (day === TOMORROW_ISO) return `Tomorrow — ${full}`;
+  return full;
 }
 
 function formatTime(session: SyntheticClassSession): string {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: dataset.meta.timezone,
-  }).format(new Date(`${session.startsAt}-04:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${session.startsAt}Z`));
 }
 
 function formatWhen(session: SyntheticClassSession): string {
@@ -179,10 +185,6 @@ function sessionLabel(session: SyntheticClassSession): { name: string; instructo
     instructor: instructorById.get(session.instructorId)?.displayName ?? "studio staff",
     level: classTypeById.get(session.classTypeId)?.level ?? "all levels",
   };
-}
-
-function activeMembers(): SyntheticMember[] {
-  return dataset.members.filter((member) => member.currentStatusSnapshot === "active");
 }
 
 function bookingMember(): SyntheticMember | undefined {
@@ -261,55 +263,6 @@ function joinWaitlist(memberId: string, session: SyntheticClassSession): Reserva
   };
   appendReservation(reservation);
   return reservation;
-}
-
-function nextOpenMember(pool: SyntheticMember[], cursor: { value: number }, sessionId: string): SyntheticMember | undefined {
-  for (let attempt = 0; attempt < pool.length; attempt += 1) {
-    const member = pool[cursor.value % pool.length];
-    cursor.value += 1;
-    if (!member) continue;
-    if (memberHoldsSpot(member.id, sessionId) || memberWaitlisted(member.id, sessionId)) continue;
-    return member;
-  }
-  return undefined;
-}
-
-/** Spread reserved and waitlisted rows from active members across upcoming classes. */
-function spreadReservationsAcrossStudio(): { reserved: number; waitlisted: number } {
-  const pool = shuffled(activeMembers());
-  const cursor = { value: 0 };
-  let reserved = 0;
-  let waitlisted = 0;
-  for (const session of upcomingSessions()) {
-    const left = remainingSpots(session);
-    const fillAll = left > 0 && Math.random() < 0.18;
-    const minTake = left <= 0 ? 0 : Math.min(left, Math.max(1, Math.ceil(left * 0.4)));
-    const toBook = left <= 0 ? 0 : fillAll ? left : minTake + Math.floor(Math.random() * (left - minTake + 1));
-    for (let count = 0; count < toBook; count += 1) {
-      const member = nextOpenMember(pool, cursor, session.id);
-      if (!member) break;
-      try {
-        bookSession(member.id, session);
-        reserved += 1;
-      } catch {
-        break;
-      }
-    }
-    if (remainingSpots(session) <= 0 && Math.random() < 0.45) {
-      const queued = 1 + Math.floor(Math.random() * 2);
-      for (let count = 0; count < queued; count += 1) {
-        const member = nextOpenMember(pool, cursor, session.id);
-        if (!member) break;
-        try {
-          joinWaitlist(member.id, session);
-          waitlisted += 1;
-        } catch {
-          break;
-        }
-      }
-    }
-  }
-  return { reserved, waitlisted };
 }
 
 function promoteWaitlist(sessionId: string): void {
@@ -503,7 +456,13 @@ function renderMine(memberId: string): void {
     mineEl.innerHTML = `<p class="status">${upcomingSessions().length} scheduled classes checked, 0 reserved under your name.</p>`;
     return;
   }
-  mineEl.innerHTML = held
+  const next = held.find(({ status }) => status === "reserved");
+  const nextLine = next
+    ? `<p class="next-class">Your next class: <strong>${escapeHtml(sessionLabel(next.session).name)}</strong> — ${escapeHtml(formatWhen(next.session))} with ${escapeHtml(sessionLabel(next.session).instructor)}.</p>`
+    : "";
+  mineEl.innerHTML =
+    nextLine +
+    held
     .map(({ session, status }) => {
       const label = sessionLabel(session);
       const state = status === "waitlisted" ? "Waitlisted" : "Reserved";
@@ -564,22 +523,4 @@ onSessionChange(() => {
   render();
 });
 
-function fillParamPresent(): boolean {
-  const params = new URLSearchParams(location.search);
-  return params.get("fill-reservations") === "1" || params.has("fill-reservations=1");
-}
-
-function stripFillParam(): void {
-  const url = new URL(location.href);
-  url.searchParams.delete("fill-reservations");
-  url.searchParams.delete("fill-reservations=1");
-  history.replaceState({}, "", url);
-}
-
-const alreadyFilled = loadRuntimeReservations().length > 0;
-const filled = alreadyFilled ? null : spreadReservationsAcrossStudio();
-if (fillParamPresent()) stripFillParam();
 render();
-if (filled) {
-  statusEl.textContent = `${filled.reserved} reservations added across upcoming classes. ${filled.waitlisted} waitlisted. ${statusEl.textContent}`;
-}
