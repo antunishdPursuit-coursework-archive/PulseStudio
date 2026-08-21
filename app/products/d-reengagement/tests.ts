@@ -887,6 +887,60 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     imported.splitIdentities.length, 0);
 }
 
+/* IS THAT COLUMN IDENTIFYING PEOPLE, OR ROWS? The file cannot say, so this
+ * product does not guess. Every value distinct while a name repeats is what
+ * a per-visit row number looks like — and EXACTLY what two people sharing a
+ * name look like, which this product already promises to read as two
+ * people. A guess either splits one member into many or merges two into
+ * one. It is stated instead, and identity still wins. */
+{
+  const rowIds = [
+    "ID,member,date",
+    "1001,Maria Santos,2026-08-01",
+    "1002,Maria Santos,2026-08-04",
+    "1003,Maria Santos,2026-08-08",
+    "1004,James Okafor,2026-08-02",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(rowIds, "America/New_York");
+  check("an id that might be counting visits is flagged as ambiguous",
+    imported.identityMayCountRows, true);
+  check("...and the file says what it could not tell apart",
+    imported.skipped.some((n) => n.includes("cannot tell them apart")), true);
+  check("...and names the consequence if it is a row number",
+    imported.skipped.some((n) => n.includes("nobody here will look like a regular")), true);
+  check("...but identity still wins, because guessing is worse",
+    imported.identityIsName, false);
+}
+{
+  // Two people who really do share a name: the documented, deliberate case.
+  const sameName = "member id,name,date\nm-100,John Smith,2026-08-01\nm-200,John Smith,2026-08-16\n";
+  const imported = adaptAttendanceCsv(sameName, "America/New_York");
+  check("two people sharing a name stay two people", imported.memberCount, 2);
+  check("...and the ambiguity is disclosed rather than resolved",
+    imported.identityMayCountRows, true);
+}
+{
+  const realIds = [
+    "member id,member,date",
+    "M1,Maria Santos,2026-08-01",
+    "M1,Maria Santos,2026-08-04",
+    "M2,James Okafor,2026-08-02",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(realIds, "America/New_York");
+  check("an id that repeats across a member's visits is unambiguous",
+    imported.identityMayCountRows, false);
+  check("...and nothing is said about it",
+    imported.skipped.length, 0);
+  check("...reading two people", imported.memberCount, 2);
+}
+{
+  const oneEach = "member id,member,date\nM1,Maria Santos,2026-08-01\nM2,James Okafor,2026-08-02\n";
+  const imported = adaptAttendanceCsv(oneEach, "America/New_York");
+  check("one row per person is unambiguous — both readings agree",
+    imported.identityMayCountRows, false);
+  check("...and reads two people either way", imported.memberCount, 2);
+}
+
 check("no-show vocabulary maps to no_show", normalizeStatus("No-Show"), "no_show");
 check("unrecognized status maps to unknown, never attended", normalizeStatus("maybe?"), "unknown");
 

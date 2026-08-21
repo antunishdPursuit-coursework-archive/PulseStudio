@@ -39,6 +39,10 @@ export interface CsvImport {
   identityMethod: string;
   /** True when identity fell back to the member's name. */
   identityIsName: boolean;
+  /** True when the identity column is distinct on every row while names
+   *  repeat — indistinguishable from a per-visit row number. Stated, never
+   *  acted on: guessing either way splits or merges real people. */
+  identityMayCountRows: boolean;
   /** How a slash date was read, and whether the file settled it. */
   dateOrder: SlashDateOrder;
   /** Names that were read as MORE THAN ONE person, each naming the name and
@@ -325,7 +329,52 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     rows.slice(1).map((r) => r.cells[dateCol] ?? ""),
   );
 
+  /* IS THAT COLUMN IDENTIFYING PEOPLE, OR ROWS? THE FILE CANNOT SAY.
+   *
+   * "id" is in the identity synonyms because plenty of exports name their
+   * member key exactly that. Plenty of others use it for the ATTENDANCE
+   * ROW — one number per visit — and reading that as identity costs a lot:
+   * a member with three visits becomes three members with one visit each,
+   * so she never looks like a regular, her prior-attendance ranking
+   * collapses, and a four-row file for two people reports four members.
+   *
+   * The tempting fix is to detect it: every value distinct while some name
+   * repeats looks exactly like row numbering. It is also EXACTLY what two
+   * different people who share a name look like — "m-100 John Smith" and
+   * "m-200 John Smith" is the shape this product already promises to read
+   * as two people, on purpose, because names are not identity. The counts
+   * cannot separate the two cases, and a guess here either splits one
+   * member into many or merges two members into one.
+   *
+   * So it is not guessed. The identity column keeps winning, which is the
+   * documented team decision, and the ambiguity is STATED — the same rule
+   * this product applies to every other thing it cannot be sure of. */
+  const identityMayCountRows = ((): boolean => {
+    if (identityCol === -1) return false;
+    const body = rows.slice(1);
+    const ids = new Set<string>();
+    const names = new Set<string>();
+    let filled = 0;
+    for (const r of body) {
+      const id = (r.cells[identityCol] ?? "").trim().toLowerCase();
+      const name = (r.cells[memberCol] ?? "").trim().toLowerCase();
+      if (id === "" || name === "") continue;
+      filled += 1;
+      ids.add(id);
+      names.add(name);
+    }
+    return filled > 0 && ids.size === filled && names.size < filled;
+  })();
+
   /* Said FIRST, because it explains every other number on the page. */
+  if (identityMayCountRows) {
+    skipped.push(
+      `the "${headers[identityCol]}" column holds a different value on every row while the same names repeat. ` +
+        `That is what two people sharing a name looks like, and also what a per-visit row number looks like — ` +
+        `this file cannot tell them apart. It was read as identity, so if that column numbers VISITS rather than ` +
+        `members, each visit became its own member and nobody here will look like a regular.`,
+    );
+  }
   if (dateOrder === "contradictory") {
     skipped.push(
       "the date column contains both DD/MM and MM/DD rows — some value above 12 appears in each position, " +
@@ -458,5 +507,6 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     identityMethod: identityIsName
       ? "member name (add a member id or email column for exact matching)"
       : `the "${headers[identityCol]}" column`,
+    identityMayCountRows,
   };
 }
