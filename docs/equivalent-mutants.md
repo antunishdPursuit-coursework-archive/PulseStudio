@@ -46,6 +46,17 @@ and defensive; the generated corpus simply never produces the input.
   comment-only. The brief already says "read the comment before fixing";
   mutation confirms the block is inert, which is evidence *for* that note.
 
+**A heuristic where any answer works.**
+
+- `generate.ts` — the two `attendedHere < s.capacity - 1` helpers, and the
+  filter picking a "victim" attendance row in edge-cases mode. These choose
+  WHICH session or row to plant a defect in. Changing the choice changes
+  which one is picked, and edge-cases mode still reconciles exactly —
+  every declared defect found, nothing undeclared — because that promise is
+  about the reconciliation, not about which victim was chosen. Loosening
+  the capacity helper to `<=` still cannot exceed capacity: it leaves one
+  seat and fills it.
+
 **A boundary nothing lands on.**
 
 - `schedule.ts`, `validate.ts`, `generate.ts` — the `<` deciding whether
@@ -72,6 +83,11 @@ and defensive; the generated corpus simply never produces the input.
   that `endRow()` discards as an empty row, so the parsed cells are
   identical. The same skip INSIDE quotes is NOT equivalent — it eats the
   next character of a name — and has a check.
+- `color.ts` — `contrast(...) >= 4.5` in `themeToApply`. No 8-bit colour
+  lands exactly on 4.5 — every grey was searched — so `>=` and `>` cannot be
+  told apart by anything a person can pick. The pair either side of the line
+  is what the checks use instead: `#767676` at 4.5422 and `#777777` at
+  4.4781, with a third check asserting they really do straddle it.
 - `random.ts` — `next() < probability`. `<` and `<=` differ only when a draw
   lands exactly on the boundary: about one in four billion for a float built
   from a 32-bit integer.
