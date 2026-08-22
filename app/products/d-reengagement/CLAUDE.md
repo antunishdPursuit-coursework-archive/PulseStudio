@@ -96,6 +96,14 @@ individual bad ROWS are dropped and counted while the survivors stay,
 which is why `clear` is reported separately from the warning instead of
 inferred from it. 18 checks, and every mutation of it is caught.
 
+And again the same day, for the reason that makes this rule worth
+keeping: the welcome-back cue was written in `main.ts` as
+`(${o.daysToReturn} days)`, so a member who answered a note by coming in
+the NEXT DAY — the best outcome this tool produces — was reported to the
+front desk as "(1 days)". Every other count in the product goes through
+`counted()`; that one could not, because nothing could load the module it
+was in. It is `returnedLine` in `outreach.ts` now.
+
 What is left in `main.ts` is plumbing: read the key, apply the answer,
 state it. Keep it that way.
 

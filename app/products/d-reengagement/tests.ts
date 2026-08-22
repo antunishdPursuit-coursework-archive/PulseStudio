@@ -38,6 +38,7 @@ import {
   mailtoIsTooLong,
   keepSuppressionRecords,
   recoverStoredList,
+  returnedLine,
   lapseKeyOf,
   outreachResults,
   outreachStateFor,
@@ -2566,6 +2567,49 @@ check("clean records produce no data-quality line",
   check("the warning names the list it is about",
     recoverStoredList("{ not json", "outreach-ledger", keepOutreachRecords).warning,
     " The stored outreach-ledger was unreadable and was reset.");
+}
+
+// 30e. "1 days" — the welcome-back cue, which nothing could check.
+//
+//      This sentence was built inside main.ts, which no check can load, so
+//      it was the one count in Product D not going through counted(). A
+//      member who answered a note by coming in THE NEXT DAY — the best
+//      outcome this tool can produce — was reported to the front desk as
+//      "(1 days)".
+{
+  const records = recordsFor([
+    { id: "m1", name: "Next Day", status: "active", attended: ["2026-07-20", "2026-08-13"] },
+    { id: "m2", name: "Five Days Later", status: "active", attended: ["2026-07-20", "2026-08-17"] },
+    { id: "m3", name: "Stayed Quiet", status: "active", attended: ["2026-07-20"] },
+  ]);
+  const noted = (memberId: string) =>
+    ({ memberId, lapseKey: `${memberId}|a`, takenAt: "2026-08-12", channel: "copy" as const });
+  const nameOf = (id: string) =>
+    records.members.find((m) => m.member_id === id)?.display_name ?? id;
+
+  const one = outreachResults([noted("m1")], records, TODAY);
+  check("a member who came back the next day is one day, not one days",
+    returnedLine(one, nameOf), "Came back after a note — worth a hello at the front desk: Next Day (1 day)");
+
+  const seven = outreachResults([noted("m2")], records, TODAY);
+  check("...and five days is plural",
+    returnedLine(seven, nameOf), "Came back after a note — worth a hello at the front desk: Five Days Later (5 days)");
+
+  const both = outreachResults([noted("m1"), noted("m2")], records, TODAY);
+  check("two people who came back are both named",
+    returnedLine(both, nameOf),
+    "Came back after a note — worth a hello at the front desk: Next Day (1 day) · Five Days Later (5 days)");
+
+  /* Nobody back yet is not an empty sentence — there is no cue to give,
+   * and the page shows nothing rather than a bare heading. */
+  check("nobody back yet gives no line at all",
+    returnedLine(outreachResults([noted("m3")], records, TODAY), nameOf), null);
+  check("and no notes at all gives no line either",
+    returnedLine(outreachResults([], records, TODAY), nameOf), null);
+  /* The name comes from the caller, and a member the page cannot name
+   * falls back to their id rather than to nothing. */
+  check("a member the page cannot name is still named by id",
+    returnedLine(one, (id) => id), "Came back after a note — worth a hello at the front desk: m1 (1 day)");
 }
 
 // 31. The open offer belongs to the CSV door, and is not a bug there.

@@ -400,6 +400,35 @@ export function recoverStoredList<T>(
  * inline in the renderer, which no headless check can load, and it
  * carries four clauses, two pluralisations and a median that is null
  * until somebody actually comes back. */
+/* THE WELCOME-BACK CUE, and the one number on this panel that is good
+ * news. It lived inside main.ts until 2026-08-22, written as
+ * `(${o.daysToReturn} days)` with no plural — so a member who answered a
+ * note by coming in the NEXT DAY, the best outcome this tool can produce,
+ * was reported to the front desk as "(1 days)". Every other count in this
+ * product goes through counted(); this one could not, because nothing
+ * could load the module it was in.
+ *
+ * daysToReturn is at least 1 for a returned outcome — a same-day visit is
+ * deliberately not counted as a return, see the comment in
+ * outreachResults — so the null branch here is unreachable through that
+ * path and exists because the type allows it, not because it happens.
+ *
+ * Returns null, not an empty string, when nobody has come back: there is
+ * no cue to give, and the page shows nothing rather than an empty line. */
+export function returnedLine(
+  results: OutreachResults,
+  nameFor: (memberId: string) => string,
+): string | null {
+  const returned = results.outcomes.filter((o) => o.result === "returned");
+  if (returned.length === 0) return null;
+  const names = returned.map(
+    (o) =>
+      `${nameFor(o.record.memberId)}` +
+      `${o.daysToReturn === null ? "" : ` (${counted(o.daysToReturn, "day")})`}`,
+  );
+  return `Came back after a note — worth a hello at the front desk: ${names.join(" · ")}`;
+}
+
 export function outcomesLine(results: OutreachResults): string {
   const total = results.outcomes.length + results.notEvaluable;
   const median =

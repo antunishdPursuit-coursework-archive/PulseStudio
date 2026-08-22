@@ -47,6 +47,7 @@ import {
   mailtoIsTooLong,
   keepSuppressionRecords,
   recoverStoredList,
+  returnedLine,
   lapseKeyOf,
   outreachResults,
   outreachStateFor,
@@ -406,20 +407,15 @@ function renderOutcomes(data: FixtureSet, today: number): void {
   outcomesEl.append(line);
 
   const memberName = new Map(data.members.map((m) => [m.member_id, m.display_name]));
-  const returned = results.outcomes.filter((o) => o.result === "returned");
-  if (returned.length > 0) {
-    // The welcome-back cue: these members answered a note with a visit.
-    // The save is only finished when someone at the studio says so.
+  /* The welcome-back cue: these members answered a note with a visit. The
+   * save is only finished when someone at the studio says so. The sentence
+   * is built in outreach.ts so a check can read it — it used to be written
+   * here and said "(1 days)". */
+  const cue = returnedLine(results, (id) => memberName.get(id) ?? id);
+  if (cue !== null) {
     const list = document.createElement("p");
     list.className = "evidence";
-    list.textContent =
-      "Came back after a note — worth a hello at the front desk: " +
-      returned
-        .map(
-          (o) =>
-            `${memberName.get(o.record.memberId) ?? o.record.memberId} (${o.daysToReturn} days)`,
-        )
-        .join(" · ");
+    list.textContent = cue;
     outcomesEl.append(list);
   }
   const logBtn = document.createElement("button");
