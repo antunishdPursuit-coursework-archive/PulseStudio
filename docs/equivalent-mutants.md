@@ -57,6 +57,17 @@ and defensive; the generated corpus simply never produces the input.
   the capacity helper to `<=` still cannot exceed capacity: it leaves one
   seat and fills it.
 
+**A boundary that LOOKS unreachable and is not.** Worth its own heading,
+because it is the one that gets waved away. `generate.ts` clamps a
+member's visits to the day they joined with `day < joinedDay`. Tightening
+it to `<=` throws away a class attended ON the join date, which is an
+ordinary first class, and the mutation survived. The tempting reading is
+"nobody joins and attends the same day". Measured: 17 do, across twenty
+seeds — but only ONE at seed 7, and none at the other two seeds the
+checks were using. A three-seed check would have passed while the code
+was broken. Sweep the boundary before calling it unreachable; the cost
+here was 21ms for twenty studios.
+
 **A boundary nothing lands on.**
 
 - `schedule.ts`, `validate.ts`, `generate.ts` — the `<` deciding whether

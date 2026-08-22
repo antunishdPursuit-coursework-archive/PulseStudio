@@ -2465,6 +2465,50 @@ check("clean records produce no data-quality line",
   }
 }
 
+// 30c. The join day itself counts, and only members book.
+//
+//      Two more survivors, both real once measured rather than assumed.
+//
+//      The clamp that stops a member attending before they joined uses
+//      `day < joinedDay`. Tightening it to `<=` throws away a class
+//      attended ON the join day, which is a perfectly ordinary first
+//      class — 17 of them across twenty seeds. The boundary looked
+//      unreachable and is not, so it is swept rather than sampled: one
+//      seed carries a single instance and three carry none, which is
+//      exactly the shape of a check that passes while the code is broken.
+//
+//      And a canceled or paused membership cannot hold a seat in a class
+//      that has not happened yet. Only the regulars book, and flipping
+//      that condition seats the people this whole tool exists to notice.
+{
+  let attendedOnJoinDay = 0;
+  let attendedBeforeJoining = 0;
+  let heldByNonMember = 0;
+  const SEEDS = 20;
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    const records = generateStudio(seed, "2026-08-18").records;
+    const joinedBy = new Map(records.memberships.map((m) => [m.member_id, m.started_on]));
+    const statusBy = new Map(records.memberships.map((m) => [m.member_id, m.status]));
+    const sessionById = new Map(records.class_sessions.map((c) => [c.session_id, c]));
+    for (const a of records.attendance) {
+      const joined = joinedBy.get(a.member_id);
+      const day = sessionById.get(a.session_id)?.starts_at.slice(0, 10);
+      if (joined === undefined || day === undefined) continue;
+      if (day === joined) attendedOnJoinDay += 1;
+      if (day < joined) attendedBeforeJoining += 1;
+    }
+    for (const r of records.reservations) {
+      if (statusBy.get(r.member_id) !== "active") heldByNonMember += 1;
+    }
+  }
+  check(`across ${SEEDS} studios, a class on the join day is kept`,
+    attendedOnJoinDay > 0, true);
+  check(`across ${SEEDS} studios, no class predates its member`,
+    attendedBeforeJoining, 0);
+  check(`across ${SEEDS} studios, no paused or canceled member holds a seat`,
+    heldByNonMember, 0);
+}
+
 // 31. The open offer belongs to the CSV door, and is not a bug there.
 //
 //     A studio's own attendance export is HISTORY: it has no upcoming
