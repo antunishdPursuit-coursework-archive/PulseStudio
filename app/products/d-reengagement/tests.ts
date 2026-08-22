@@ -1702,6 +1702,24 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     oneLine.includes("1 name had") && !oneLine.includes("1 names had"), true);
   check("one duplicate row reads 'row was'", oneLine.includes("1 duplicate row was"), true);
 
+  /* THE SPLIT-IDENTITY NOTE, WHICH EVERY CASE HERE LEFT EMPTY.
+   *
+   * splitIdentities carries the sentence that tells staff a file half
+   * filled its id column, so some rows matched by id and some by name —
+   * the one warning that explains why a member might appear twice. The
+   * import path is checked for producing it; this sentence was only ever
+   * built with the list EMPTY, so the test deciding whether to include it
+   * could be inverted and nothing would notice: the note would vanish
+   * exactly when it is needed and appear as a stray space when it is not. */
+  const split = { ...one, splitIdentities: ["Maria Santos appears under two identities."] };
+  const splitLine = importProvenance(split, "f.csv");
+  check("a split identity is carried into the sentence",
+    splitLine.includes("Maria Santos appears under two identities."), true);
+  check("...and the file with none says nothing about identities",
+    oneLine.includes("appears under two identities"), false);
+  check("...and leaves no stray gap where the note would have gone",
+    /  +/.test(oneLine), false);
+
   const many = { ...one, namesCleaned: 3, sameDayRepeats: 4 };
   const manyLine = importProvenance(many, "f.csv");
   check("three cleaned names read 'names had'", manyLine.includes("3 names had"), true);
@@ -3056,6 +3074,19 @@ check("clean records produce no data-quality line",
     name, "Ada\nRowe");
   check("...and the draft still greets a person, not a line break",
     firstNameOf(name), "Ada");
+
+  /* A LONE CARRIAGE RETURN INSIDE THE QUOTES.
+   *
+   * The branch handling a newline inside a quoted field accepts a bare
+   * \r as well as \r\n, because an old Mac export uses one. Nothing
+   * tested that, and the mutation is not a crash: it consumes the
+   * character AFTER the return, so "Ada\rRowe" arrives as "Ada\nowe" and
+   * a member's name loses a letter on the way to a note addressed to
+   * them. Silent corruption is the worst kind. */
+  const loneCr = adaptAttendanceCsv('Member,Date\r\n"Ada\rRowe",2026-07-01\r\n', "America/New_York");
+  check("a bare carriage return inside quotes keeps every letter of the name",
+    loneCr.records.members[0]?.display_name, "Ada\nRowe");
+  check("...and still reads as a single row", loneCr.rowCount, 1);
 }
 
 const passed = results.filter((r) => r.passed).length;

@@ -63,6 +63,15 @@ and defensive; the generated corpus simply never produces the input.
   one after it: an impossible month falls through to `d > daysInMonth(y, m)`,
   where a missing month length is `0` and any day exceeds it. One of them is
   unreachable outright and exists only to satisfy `noUncheckedIndexedAccess`.
+- `csv.ts` — the range guard `m < 1 || m > 12 || d < 1 || d > 31` in
+  `isRealYmd`, and the second round-trip in `normalizeDate`. Both are belt
+  and braces: disabling the range guard entirely still rejects 2026-13-01,
+  2026-02-30, 2026-08-00 and 2026-08-32, because `Date.UTC` rolls over and
+  the round-trip after it notices.
+- `csv.ts` — the CRLF skip OUTSIDE quotes. Dropping it leaves a stray `\n`
+  that `endRow()` discards as an empty row, so the parsed cells are
+  identical. The same skip INSIDE quotes is NOT equivalent — it eats the
+  next character of a name — and has a check.
 - `random.ts` — `next() < probability`. `<` and `<=` differ only when a draw
   lands exactly on the boundary: about one in four billion for a float built
   from a 32-bit integer.
