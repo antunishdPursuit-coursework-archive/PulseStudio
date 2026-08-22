@@ -10,11 +10,12 @@ first; this file adds what is true about THIS folder.
 ## What this product is (proven in code, not aspiration)
 
 A client-side booking page over the shared deterministic synthetic studio:
-the member-facing H1 is "Book a class" (Kerrian's owner badge stays; blue
-is the color-law signature). Signed-in members see "Your classes" above
-the public schedule, with a next-class line when they hold a reserved
-spot. Day chips say Today / Tomorrow. Book / waitlist / cancel with a full
-guard chain, automatic waitlist promotion, and `?session=<id>` deep links.
+the member-facing H1 is "Book a class" (blue is the color-law signature;
+the builder's name stays off the page). Signed-in members see "Your
+classes" above the public schedule, with a next-class line when they hold
+a reserved spot. Day chips say Today / Tomorrow. Book / waitlist / cancel
+with a full guard chain, automatic waitlist promotion, and `?session=<id>`
+deep links.
 Occupancy is the generator's own bookings plus rows the signed-in member
 (or waitlist promotion) writes — never a random fill on first open. No
 server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
