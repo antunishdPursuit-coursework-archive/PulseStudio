@@ -2191,6 +2191,37 @@ check("clean records produce no data-quality line",
     imp.skipped.length, 0);
   check("identity matched on the stable member id column", imp.identityIsName, false);
 
+  /* AND ABSENCE SURVIVES THE CROSSING.
+   *
+   * The engine's brief says it exports in this product's import
+   * vocabulary, which has to include the thing neither side can name. A
+   * session whose class type cannot be resolved leaves an empty class
+   * cell, and this door reads an empty cell as "the records did not say"
+   * — the same marker it uses for a file with no class column at all.
+   * Both sides used to write the word "class" there, which arrived here
+   * as a class genuinely called that. */
+  const broken = generateSharedStudio({
+    ...SYNTHETIC_DEFAULT_CONFIG,
+    seed: "door-proof-0001",
+    asOfDate: "2026-08-18",
+    memberCount: 60,
+    mode: "clean",
+  });
+  const attended = broken.dataset.attendance.find((a) => a.status === "attended");
+  const orphanType = broken.dataset.classSessions.find((c) => c.id === attended?.classSessionId);
+  if (orphanType) orphanType.classTypeId = "class-type:does-not-exist";
+  const brokenCsv = attendanceCsv(broken.dataset);
+  const brokenImport = adaptAttendanceCsv(brokenCsv, "America/New_York");
+
+  check("an unresolvable class type exports as an empty cell, not a word",
+    brokenCsv.split("\n").some((l) => (l.split(",")[4] ?? "x") === ""), true);
+  check("...which this door reads as the records not having said",
+    brokenImport.records.class_sessions.some((c) => c.class_type === NOT_RECORDED), true);
+  check("...and never as a class actually called 'class'",
+    brokenImport.records.class_sessions.some((c) => c.class_type === "class"), false);
+  check("...and the row is still imported rather than skipped",
+    brokenImport.skipped.length, 0);
+
   const r = findQuietMembers(imp.records, TODAY, proposedRules);
   // Map adapter members back to synthetic ids by replaying the adapter's
   // own rule: member N is the Nth NEW identity cell in row order. (The
