@@ -2429,6 +2429,42 @@ check("clean records produce no data-quality line",
     true);
 }
 
+// 30b. A generated studio's records have to be possible.
+//
+//      Two invariants nothing was checking, both found by mutation:
+//      flipping the membership-status conditions hands a canceled member a
+//      renewal date and an active one a cancellation date, and the visit
+//      walk stepped back past the day the member joined — 18 of 461
+//      attendance rows at seed 7 were classes attended before their own
+//      member existed. Read over several seeds, because one seed proves
+//      one studio.
+{
+  for (const seed of [7, 42, 20260821]) {
+    const records = generateStudio(seed, "2026-08-18").records;
+    const startedBy = new Map(records.memberships.map((m) => [m.member_id, m.started_on]));
+    const sessionById = new Map(records.class_sessions.map((c) => [c.session_id, c]));
+
+    check(`seed ${seed}: an active membership renews and was never canceled`,
+      records.memberships.every((m) =>
+        m.status !== "active" || (m.renews_on !== null && m.canceled_on === null)), true);
+    check(`seed ${seed}: a canceled membership has a cancellation date and no renewal`,
+      records.memberships.every((m) =>
+        m.status !== "canceled" || (m.canceled_on !== null && m.renews_on === null)), true);
+    check(`seed ${seed}: nobody attended a class before they joined`,
+      records.attendance.filter((a) => {
+        const joined = startedBy.get(a.member_id);
+        const session = sessionById.get(a.session_id);
+        return joined !== undefined && session !== undefined
+          && session.starts_at.slice(0, 10) < joined;
+      }).length, 0);
+    /* Not vacuous: the studio has to have records for the line above to
+     * mean anything, and a member whose history was entirely trimmed away
+     * would pass it by holding nothing. */
+    check(`seed ${seed}: there are attendance records to judge`,
+      records.attendance.length > 0, true);
+  }
+}
+
 // 31. The open offer belongs to the CSV door, and is not a bug there.
 //
 //     A studio's own attendance export is HISTORY: it has no upcoming

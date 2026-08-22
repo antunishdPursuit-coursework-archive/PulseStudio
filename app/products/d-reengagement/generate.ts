@@ -258,8 +258,21 @@ export function generateStudio(
       const visitCount =
         archetype === "newcomer" ? intBetween(random, 2, 5) : intBetween(random, 4, 14);
 
+      /* NOBODY ATTENDED A CLASS BEFORE THEY JOINED. The visits walk
+       * backwards from the last one, a few days at a time, and used to
+       * walk straight past the day the membership started: 18 of 461
+       * attendance rows at seed 7 were dated before their own member had
+       * joined the studio. A newcomer who joined 10 days ago with five
+       * visits reached back a month. The walk stops at the join date now.
+       *
+       * The visit that decides a flag is the FIRST one — the most recent —
+       * and every archetype's last visit falls after its own start, so no
+       * flag moves; what changes is how many earlier classes a member is
+       * credited with, which is the number staff read as evidence. */
+      const joinedDay = today - startedDaysAgo;
       for (let v = 0; v < visitCount; v += 1) {
         const day = today - lastVisitDaysAgo - v * intBetween(random, 2, 6);
+        if (day < joinedDay) break;
         const classType = random() < 0.75 ? favouriteClass : pick(random, CLASS_TYPES);
         const instructor = random() < 0.8 ? usualInstructor : pick(random, instructors);
         const sessionId = sessionOn(day, classType, instructor.instructor_id);
@@ -276,6 +289,12 @@ export function generateStudio(
       // the trap that matters: a no-show must never reset days-quiet.
       if (random() < 0.35) {
         const missedDay = today - Math.max(1, lastVisitDaysAgo - intBetween(random, 2, 8));
+        /* The same join date binds the missed class. It sits after the
+         * last real visit, so it looked safe — but a member whose last
+         * visit already predates their joining keeps none of those visits
+         * and was left holding a no-show alone, dated before they joined.
+         * One row at seed 7, and the only one the visit clamp missed. */
+        if (missedDay < joinedDay) continue;
         const sessionId = sessionOn(missedDay, favouriteClass, usualInstructor.instructor_id);
         attendance.push({
           attendance_id: `${ns}_a_${attendance.length + 1}`,

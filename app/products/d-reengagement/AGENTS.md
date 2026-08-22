@@ -64,6 +64,17 @@ reading a screen as evidence:
   wrong one — a fixture bent until it shows a chosen answer is not
   evidence of anything. Both halves are pinned by checks; they are just
   not on the same screen.
+- **A generated studio's records have to be POSSIBLE**, and two ways they
+  were not went unnoticed until mutation found them. The visit walk
+  stepped back a few days at a time from a member's last class with no
+  regard for when they joined — 18 of 461 attendance rows at seed 7 were
+  classes attended before their own member existed, and a member whose
+  history was entirely before their join date was left holding a single
+  missed class dated the same way. Both walks stop at the join date now.
+  Separately, the membership-status conditions could be flipped to hand a
+  canceled member a renewal date and an active one a cancellation date
+  with no check objecting. All four are pinned, across three seeds,
+  because one seed proves one studio.
 - **Nothing generated is dated on the as-of date**, and a check now says
   so. `app/shared/CLAUDE.md` records that the engine's validator skips
   attendance dated today while `findQuietMembers` counts it — a latent
