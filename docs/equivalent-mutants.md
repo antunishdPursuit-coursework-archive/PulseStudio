@@ -217,6 +217,19 @@ is the durable part — the individual fixes are just where it landed.
   answered "Ana" or "Kim" depending which row came first, through the front
   door with an ordinary file. It compares the instructor's NAME now.
 
+  **And a third time, in the flagged ranking.** Its tie-break was
+  `member_id`, and the CSV door mints those from row position too
+  (`csv_m_1_ada_reyes`), so re-exporting the same data in a different order
+  changed who a staff member reads first — which is precisely what that
+  comparator's own comment said it existed to prevent. It compares the
+  display name now.
+
+  The check there could never have failed. It reversed the members ARRAY,
+  and ids are minted by the door before that array exists, so shuffling it
+  afterwards cannot move a tie-break that reads them. **Reversing a
+  derived collection is not reversing the input.** Reverse the thing the
+  door actually reads.
+
   Why the existing check missed it is the part worth keeping: that check
   ties on DIFFERENT class types, so the class comparison decides and the
   next tie-break is never reached. **A tie-break chain needs a case per

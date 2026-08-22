@@ -349,7 +349,7 @@ export function findQuietMembers(
     });
   }
 
-  /* MOST EVIDENCE FIRST, THEN LONGEST QUIET, THEN BY ID.
+  /* MOST EVIDENCE FIRST, THEN LONGEST QUIET, THEN BY NAME.
    *
    * The third key is not decoration. Two members with the same prior count
    * and the same days quiet are common — this list is short and both keys
@@ -358,18 +358,26 @@ export function findQuietMembers(
    * same file with its rows shuffled, or the live trail merging Booking's
    * log, then changed who a staff member reads first.
    *
-   * member_id is unique, so this is a total order: the same members always
-   * rank the same way, whatever produced them. Same reasoning as the
-   * shared CSV export's comparator. */
+   * IT WAS member_id, AND THAT DID NOT ACHIEVE WHAT THIS COMMENT CLAIMS.
+   * The CSV door mints member ids from row position — csv_m_1_ada_reyes,
+   * csv_m_2_bo_nakamura — so shuffling the file renumbers everybody and the
+   * tie-break shuffles with it. Measured: reversing the rows of a
+   * four-line file swapped the two flagged members. The check that was
+   * supposed to catch this reversed the members ARRAY instead of the file,
+   * and ids are minted before that array exists, so it could never have
+   * failed.
+   *
+   * The display name is content — it comes from the file rather than from
+   * where in the file. member_id stays last to keep the order total; two
+   * members sharing a name AND both evidence keys are indistinguishable to
+   * this list anyway. Same correction the last-attended comparator needed,
+   * for the same reason. */
   flagged.sort(
     (a, b) =>
       b.priorCount - a.priorCount ||
       b.daysSince - a.daysSince ||
-      (a.member.member_id < b.member.member_id
-        ? -1
-        : a.member.member_id > b.member.member_id
-          ? 1
-          : 0),
+      compareText(a.member.display_name, b.member.display_name) ||
+      compareText(a.member.member_id, b.member.member_id),
   );
 
   return {

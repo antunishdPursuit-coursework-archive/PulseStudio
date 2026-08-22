@@ -4120,6 +4120,30 @@ check("clean records produce no data-quality line",
   const forward = rank(fx.records);
   const reversed = rank({ ...fx.records, members: [...fx.records.members].reverse() });
 
+  /* REVERSING THE ARRAY IS NOT REVERSING THE FILE, and for years this check
+   * only did the first. The CSV door mints member ids from row position, so
+   * the ids are already fixed by the time that array exists — shuffling it
+   * afterwards cannot change a tie-break that reads them. The check looked
+   * like a proof of order-independence and could not have failed.
+   *
+   * Reversing the ROWS renumbers everybody, which is what a studio actually
+   * does when it re-exports. Measured before the fix: Ada and Bo swapped
+   * places, so whoever staff read first depended on the export's row order. */
+  const rankRows = (rows: readonly string[]): string =>
+    rank(adaptAttendanceCsv(["Member,Date", ...rows].join("\n"), "America/New_York").records);
+  const rows = [
+    "Ada Reyes,2026-06-27", "Ada Reyes,2026-07-25",
+    "Bo Nakamura,2026-06-27", "Bo Nakamura,2026-07-25",
+  ];
+  check("the ids really are renumbered when the file is reordered",
+    adaptAttendanceCsv(["Member,Date", ...rows].join("\n"), "America/New_York")
+      .records.members[0]?.member_id
+    === adaptAttendanceCsv(["Member,Date", ...[...rows].reverse()].join("\n"), "America/New_York")
+      .records.members[0]?.member_id, false);
+  check("the flagged order survives the FILE being reordered, not just the array",
+    rankRows(rows), rankRows([...rows].reverse()));
+  check("...and it is the name that decides", rankRows(rows), "Ada Reyes,Bo Nakamura");
+
   check("two members really can tie on both sort keys",
     findQuietMembers(fx.records, T, proposedRules).flagged
       .map((f) => `${f.priorCount}|${f.daysSince}`).join(" ") === "2|27 2|27", true);
