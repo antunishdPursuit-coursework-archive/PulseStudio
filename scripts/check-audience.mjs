@@ -82,22 +82,38 @@ const PRODUCT_LETTERS = /\bProduct\s+[ABCD]\b/g;
  * Roughly what a reader sees: script and style blocks removed first (a
  * CSS variable named after a developer is not copy), then tags, which
  * takes attributes with them.
+ *
+ * BLANKED IN PLACE, NOT DELETED. Every removed stretch is replaced by the
+ * same number of characters, and its newlines are kept, so a line number
+ * counted afterwards is still the line number in the original file. The
+ * caller needs that: it reports the line a builder's name sits on.
+ *
+ * That mattered more than it sounds. This used to be handed ONE LINE at a
+ * time, and a `<script>` block spanning several lines has its opening and
+ * closing tags on different ones — so the pattern never matched and the
+ * script's contents were read as copy. A page with `const author =
+ * "Kerrian";` inside a script was reported as showing a member the
+ * builder's name. The function was right; being called per line defeated
+ * it. The same held for a multi-line HTML comment.
  */
 export function visibleText(html) {
+  const blank = (match) => match.replace(/[^\n]/g, " ");
   return html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&[a-z]+;/gi, " ");
+    .replace(/<script\b[\s\S]*?<\/script>/gi, blank)
+    .replace(/<style\b[\s\S]*?<\/style>/gi, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/<[^>]*>/g, blank)
+    .replace(/&[a-z]+;/gi, blank);
 }
 
 /** Every builder name and product letter in copy, with the line it is on. */
 export function audienceHits(html) {
   const hits = [];
-  const lines = html.split("\n");
+  /* THE WHOLE DOCUMENT FIRST, then split. Splitting first hands every
+   * multi-line construct to a pattern that cannot match it. */
+  const lines = visibleText(html).split("\n");
   for (let i = 0; i < lines.length; i += 1) {
-    const text = visibleText(lines[i] ?? "");
+    const text = lines[i] ?? "";
     for (const name of BUILDERS) {
       const re = new RegExp(`\\b${name}\\b`, "g");
       if (re.test(text)) hits.push({ line: i + 1, found: name });
@@ -123,8 +139,32 @@ function selfTest() {
     { label: "a class attribute naming a product does not", html: '<body class="product-d">', want: 0 },
     { label: "ordinary member copy passes", html: "<h1>Book a class</h1><p>There is a spot with your name on it.</p>", want: 0 },
     { label: "a builder name in a heading fails", html: "<h2>Built by Rensley</h2>", want: 1 },
+    /* MULTI-LINE, which is how these actually appear in a file. Every case
+     * above sits on one line, so the stripping was only ever tested where
+     * it already worked — a script or comment spanning lines was read as
+     * copy and reported a builder's name to its owner as a failure. */
+    { label: "a builder name inside a multi-line script is not copy",
+      html: ["<p>Book a class</p>", "<script>", '  const author = "Kerrian";', "</script>"].join("\n"), want: 0 },
+    { label: "...nor inside a multi-line comment",
+      html: ["<p>Book a class</p>", "<!--", "  written by Rensley", "-->"].join("\n"), want: 0 },
+    { label: "...nor inside a multi-line style block",
+      html: ["<style>", "  .chip { background: var(--manny); }", "</style>"].join("\n"), want: 0 },
+    /* And the line number still points at the real line, which is the
+     * reason the stripping blanks rather than deletes. */
+    { label: "real copy after a multi-line script is still caught",
+      html: ["<p>Book</p>", "<script>", '  const a = "Kerrian";', "</script>", "<p>Kerrian built this</p>"].join("\n"), want: 1 },
   ];
   let failed = 0;
+  /* The line a name sits on is what the gate prints, so it has to survive
+   * the blanking. */
+  const numbered = audienceHits(
+    ["<p>Book</p>", "<script>", '  const a = "Kerrian";', "</script>", "<p>Kerrian built this</p>"].join("\n"),
+  );
+  if (numbered[0]?.line !== 5) {
+    failed += 1;
+    console.error(`  self-test MISS — the reported line survives stripping: wanted 5, got ${numbered[0]?.line}`);
+  }
+
   for (const c of planted) {
     const got = audienceHits(c.html).length;
     if (got !== c.want) {
@@ -133,7 +173,7 @@ function selfTest() {
     }
   }
   console.log(
-    `self-test: ${planted.length} planted cases, ${planted.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + 1} planted cases, ${planted.length + 1 - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
