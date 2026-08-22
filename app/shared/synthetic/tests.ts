@@ -725,6 +725,28 @@ for (const n of [1, 2, 5, 12]) {
     csvField("\tTabbed"), "'\tTabbed");
 
   check("an ordinary name is untouched", csvField("Maria Santos"), "Maria Santos");
+
+  /* AND THE EXPORTER ACTUALLY APPLIES IT.
+   *
+   * Everything above tests the FUNCTION. The comment on this block used to
+   * say it was "proven here once", which is true of csvField and says
+   * nothing about attendanceCsv — a file that stopped calling it would
+   * pass every check above. That is the same parts-versus-assembly gap
+   * that put a double space in Product D's status line: each piece
+   * correct, the line that joins them wrong.
+   *
+   * The generated names are fictional and none of them start with a
+   * formula character, so this plants one. */
+  const planted = parseBundle(serializeBundle(first));
+  const victim = planted.dataset.members[0];
+  if (victim) victim.displayName = "=cmd()|calc";
+  const plantedCsv = attendanceCsv(planted.dataset);
+  check("a formula-shaped name never starts a cell in the export",
+    /(^|,)=/.test(plantedCsv), false);
+  check("...it is carried through as text with its quote prefix",
+    plantedCsv.includes("'=cmd()|calc"), true);
+  check("...and the row is otherwise intact, not dropped",
+    plantedCsv.split("\n").some((l) => l.includes("'=cmd()|calc") && l.split(",").length === 6), true);
   check("a non-Latin name is untouched", csvField("王伟"), "王伟");
   check("a name with an apostrophe INSIDE it is not a formula",
     csvField("O'Brien"), "O'Brien");

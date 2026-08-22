@@ -120,6 +120,23 @@ not reliably.
   fires: five sessions that day, roughly one seed in ten. Probabilistic
   coverage is not deterministic coverage.
 
+## Bug classes swept whole
+
+Three families turned up more than once, so each was searched for
+exhaustively rather than waited for. Worth knowing which, because the sweep
+is the durable part — the individual fixes are just where it landed.
+
+- **`typeof null === "object"`.** Every typeof-object guard in the repo,
+  checked wherever it reads untrusted input. Found in `serialize.ts`,
+  `outreach.ts` and `session.ts`; `live-studio.ts` was already covered.
+- **`JSON.parse` as a trust boundary.** Every parse site. All were covered
+  except `theme-boot.ts`, and following it turned up the duplicated WCAG
+  formula that became `color.ts`.
+- **Formula injection in anything a spreadsheet opens.** Both producers —
+  Product D's outreach log and the synthetic attendance export. The log was
+  escaping one column of six; the exporter escaped all of them but had no
+  check that it still called the escaper.
+
 ## What is genuinely uncovered
 
 `app/shared/synthetic/page.ts` scores zero, and no check in the suite can
