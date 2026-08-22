@@ -297,6 +297,37 @@ These cost real time. They are the most valuable part of this brief.
   all of them every run; the other three are baselined against their owners,
   who are the only people who may change them.
 
+Raised since, each in `docs/REQUESTFOR-A-B-C.md` and each belonging to
+somebody else — none is mine to close:
+
+- **A member booking a class reads a builder's name.** Kerrian's page
+  header carries an `.owner-badge` reading "Kerrian", measured in a browser
+  at 74x26 pixels. The audience law says authorship is carried by the
+  builder's COLOUR, which his blue already does on every screen of Product
+  A. Baselined so `check-audience.mjs` reports it rather than failing the
+  build for everybody.
+- **Dennis's dotenv template is named after a banned word.** The language
+  gate no longer objects — a path is a name, not the word — but whether the
+  repo should hold that filename is his call, and `.env.fixture` would
+  satisfy the law and still read naturally.
+- **The contract's product map understates every product**, mine included
+  until I corrected my own row. Three rows still name fewer records than
+  their product reads. No data-law breach in any of them; the risk is that
+  a new teammate reads the table to learn what they may touch.
+
+And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
+
+- **`synthetic/page.ts` has no checks and cannot have any** from the
+  suites — it reads `document` at module load. Proven by breaking it
+  syntactically and watching every synthetic check pass. `tsc` still
+  catches type and syntax errors.
+- **The engine and this product disagree about "today", latently.**
+  `validate.ts` skips attendance dated on the as-of date; `findQuietMembers`
+  counts a class attended today. They have never disagreed because the
+  generator schedules no attended record on that date — measured 0 at 60
+  members and 0 at 300 — but if that changes, a member who came in this
+  morning reads as quiet to the answer key and recent to this product.
+
 ## 9. How to run, gate, and commit
 
 ```
@@ -319,10 +350,25 @@ three suites:
 | `check-contrast.mjs` | a NEW colour pairing below WCAG AA |
 | `check-language.mjs` | a banned word in use, or an assistant credited |
 | `check-fixtures.mjs` | a broken shared record, or one that has aged out |
+| `check-lanes.mjs` | a commit touching another developer's product folder |
+| `check-published.mjs` | a NEW file under `app/` that the website would never ask for |
+| `check-audience.mjs` | a builder name or product letter in copy a member reads |
+| `check-secrets.mjs` | credential material in any tracked file |
 | `run-suites.mjs` | any of the three browser suites, run headlessly |
 
 Each gate carries `--self-test`, which plants known-bad input and proves it
-still catches it — run one if you ever doubt a green.
+still catches it — run one if you ever doubt a green. Do not read the list
+above as complete either: `package.json` is where the `check` script names
+them, and it is the only place that cannot drift.
+
+`npm run mutate` is the other half and is deliberately NOT in the gate. It
+changes one token in a compiled module, reruns a suite, and puts the file
+back; whatever the suite still passes is a way that module could be wrong
+with nobody hearing about it. Read the survivors, not the percentage —
+[equivalent-mutants.md](./equivalent-mutants.md) lists the ones nobody can
+close, and why. It found the greeting that used a member's whole name, the
+CSV export whose byte order rested on sort stability, and a check in this
+product that could not fail at all.
 
 That distinction is not pedantry. Verifying a fix with `tsc --noEmit`
 compiles nothing, so the suites re-run the PREVIOUS build and report a clean
