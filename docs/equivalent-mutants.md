@@ -190,6 +190,29 @@ is the durable part — the individual fixes are just where it landed.
   decide whether the records spoke. `?? "class"` was a **marker**, read to
   decide exactly that. Only markers must be uncollidable.
 
+- **A branch that no screen can reach.** Not a guard — OUTPUT. Product D's
+  `generate.ts` scored lowest of its modules, and one survivor was
+  `session_status: day <= today ? "completed" : "scheduled"`: the
+  "scheduled" half could not be told from the "completed" half because
+  that door built a session only where somebody had already attended one,
+  so every session it made was in the past. Following it found the real
+  defect underneath. Drafts come in two shapes — name the upcoming class,
+  or make an open offer — and through the button whose stated purpose is
+  letting the drafts "be seen doing their job", 8 members were flagged and
+  0 had a class to be invited to. Half the job, invisible, on the screen
+  built to show it.
+
+  The correction has its own trap, which is the durable part. Giving that
+  door a schedule flipped it to 8 concrete and 0 open offers — the same
+  blind spot mirrored. The temptation then is to shrink capacity until a
+  class fills and both shapes appear on one screen; that is a fixture bent
+  until it shows a chosen answer, and it proves nothing. The honest
+  finding was that the fallback already has a door: an attendance export
+  is history, so the CSV door cannot name an upcoming class and every
+  draft there makes the open offer. Both halves are pinned now, on
+  different screens. **Measure where a branch is reachable before
+  arranging for it to be reachable where you happen to be looking.**
+
 ## What is genuinely uncovered
 
 `app/shared/synthetic/page.ts` scores zero, and no check in the suite can

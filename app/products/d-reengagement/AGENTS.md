@@ -36,6 +36,40 @@ own log. `upcomingReservedMemberIds()` (logic.ts) then keeps a quiet member
 who already booked back in OUT of the outreach list, stated by name. The
 CSV door and the generated studio remain the other two doors, unchanged.
 
+## Which door shows which draft (2026-08-21)
+
+A draft either NAMES an upcoming class ("Kim teaches yoga on Saturday at
+5:30 — want us to save you a spot?") or falls back to the OPEN OFFER
+("Dara still teaches strength every week"). Which one you see is a
+property of the DOOR, not of the member, and that is worth knowing before
+reading a screen as evidence:
+
+- **The CSV door always makes the open offer.** A studio's attendance
+  export is history; there are no upcoming classes in it and none can be
+  invented. This is the correct note there, not a degraded one — and it is
+  the first door a real studio uses, so it is the fallback that gets read
+  most.
+- **The generated and live doors name the class**, because both carry a
+  schedule.
+- **The generated door showed the fallback for everything until
+  2026-08-21**, because it built a session only where somebody had already
+  attended one — so every session it made was in the past. 8 flagged, 0
+  with a class to invite to, on a button whose whole purpose is showing
+  the drafts do their job. It carries a ten-day schedule and its regulars'
+  bookings now.
+- **No generated class fills**, measured rather than assumed: 32 seats
+  held across 50 classes, 0 full, at all three seeds the checks use. So
+  the "class is full" path to the open offer is not reachable through that
+  door. Shrinking capacity until one filled was the obvious fix and is the
+  wrong one — a fixture bent until it shows a chosen answer is not
+  evidence of anything. Both halves are pinned by checks; they are just
+  not on the same screen.
+- **Nothing generated is dated on the as-of date**, and a check now says
+  so. `app/shared/CLAUDE.md` records that the engine's validator skips
+  attendance dated today while `findQuietMembers` counts it — a latent
+  disagreement that holds only while that boundary stays unreachable.
+  Adding a schedule was exactly the change that could have started it.
+
 ## Storage keys this product writes
 
 `pulse-outreach-ledger` (notes taken, once per lapse), `pulse-suppressions`

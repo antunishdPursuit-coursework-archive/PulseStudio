@@ -2343,6 +2343,98 @@ check("clean records produce no data-quality line",
   check("every generated member has a distinct name", names.size, studio.memberCount);
 }
 
+// 30. Each door shows the draft shape it can honestly produce.
+//
+//     A note either names a real upcoming class or falls back to the open
+//     offer. Until 2026-08-21 the generated door built a session only where
+//     somebody had already attended one, so every session it made was in
+//     the past, every draft took the fallback, and the half of the job the
+//     button offers to show was invisible through it: 8 flagged, 0 with a
+//     class to invite to. It carries a schedule now, so the invitation is
+//     what it shows. The open offer is pinned at the CSV door below, which
+//     is where it genuinely belongs.
+{
+  const studio = generateStudio(20260821, "2026-08-21");
+  const today = dayNumberFromIso("2026-08-21");
+  const sessions = studio.records.class_sessions;
+  const upcoming = sessions.filter((s) => dayNumberFromIso(s.starts_at) > today);
+  const past = sessions.filter((s) => dayNumberFromIso(s.starts_at) < today);
+
+  check("the generated door schedules classes ahead of today",
+    upcoming.length > 0, true);
+  check("it still holds the history the flags are read from",
+    past.length > 0, true);
+  check("every class ahead of today is scheduled",
+    upcoming.every((s) => s.session_status === "scheduled"), true);
+  check("every class before today is completed",
+    past.every((s) => s.session_status === "completed"), true);
+
+  /* NOTHING ON THE AS-OF DATE, deliberately. app/shared/CLAUDE.md records
+   * that the engine's validator skips attendance dated today while D's
+   * findQuietMembers counts it — a disagreement that has never fired
+   * because no generated class lands there. Adding a schedule is exactly
+   * the change that could have started it, so the boundary is pinned
+   * rather than left to hold by accident. */
+  check("no generated class is dated on the as-of date",
+    sessions.some((s) => dayNumberFromIso(s.starts_at) === today), false);
+  const scheduledIds = new Set(
+    sessions.filter((s) => s.session_status === "scheduled").map((s) => s.session_id),
+  );
+  check("no attendance was recorded against a class that has not happened",
+    studio.records.attendance.some((a) => scheduledIds.has(a.session_id)), false);
+
+  const flagged = findQuietMembers(studio.records, today, proposedRules).flagged;
+  /* The tie has to EXIST before anything is proven about it. A door with
+   * nobody flagged would pass every line below by having nothing to
+   * check. */
+  check("this door flags somebody to draft for", flagged.length > 0, true);
+  const invited = flagged.map((f) => suggestedSession(f, studio.records, today));
+  check("every flagged member has a real class to be invited to",
+    invited.filter((s) => s !== null).length, flagged.length);
+  check("each invitation is to the class that member used to come to",
+    flagged.every((f, i) => invited[i]?.class_type === f.usualClassType), true);
+  check("each invitation is inside the ten days the offer covers",
+    invited.every((s) => {
+      const day = s === null ? -1 : dayNumberFromIso(s.starts_at);
+      return day > today && day <= today + 10;
+    }), true);
+  check("a draft from this door names the class rather than falling back",
+    flagged.every((f) =>
+      draftTextFor(f, studio.records, today, brand.studioName).includes("save you a spot")),
+    true);
+}
+
+// 31. The open offer belongs to the CSV door, and is not a bug there.
+//
+//     A studio's own attendance export is HISTORY: it has no upcoming
+//     classes in it, and none can be invented from it. So every draft the
+//     CSV door produces falls back to the open offer, and that is the
+//     correct note rather than a degraded one — this is also the first door
+//     a real studio uses, so it is the fallback that gets read most.
+//
+//     Pinned because the generated door stopped producing it on
+//     2026-08-21, and a branch no screen reaches is one somebody deletes.
+{
+  const rows = [["member name", "date", "class", "instructor", "status"]];
+  for (const day of ["01", "08", "15", "22"]) {
+    rows.push(["Ada Lovelace", `2026-07-${day}`, "yoga", "Kim Lee", "attended"]);
+  }
+  const imported = adaptAttendanceCsv(rows.map((r) => r.join(",")).join("\n"), brand.timeZone);
+  const today = dayNumberFromIso("2026-08-21");
+
+  check("an attendance export carries no upcoming class",
+    imported.records.class_sessions.filter((s) => s.session_status === "scheduled").length, 0);
+  const flagged = findQuietMembers(imported.records, today, proposedRules).flagged;
+  check("the CSV door still flags somebody to draft for", flagged.length > 0, true);
+  check("no draft from an export can name a class that is not in it",
+    flagged.every((f) => suggestedSession(f, imported.records, today) === null), true);
+  check("so every draft from the CSV door makes the open offer",
+    flagged.every((f) => {
+      const text = draftTextFor(f, imported.records, today, brand.studioName);
+      return text.includes("still teaches") && !text.includes("save you a spot");
+    }), true);
+}
+
 /* ------------------------------------------------------------------ */
 /* Render the stated verdict                                           */
 /* ------------------------------------------------------------------ */

@@ -26,6 +26,7 @@ import type {
   Instructor,
   Member,
   MembershipStatus,
+  Reservation,
 } from "./deps.js";
 
 /* ------------------------------------------------------------------ */
@@ -177,6 +178,8 @@ export function generateStudio(
   const sessions: ClassSession[] = [];
   const sessionIdByKey = new Map<string, string>();
   const attendance: Attendance[] = [];
+  const reservations: Reservation[] = [];
+  const regulars: Array<{ memberId: string; favouriteClass: string }> = [];
   const usedNames = new Set<string>();
 
   /** One class on a given day, shared by everyone who attended it. */
@@ -215,6 +218,11 @@ export function generateStudio(
       const memberId = `${ns}_m_${memberNumber}`;
       const favouriteClass = pick(random, CLASS_TYPES);
       const usualInstructor = pick(random, instructors);
+      /* Who books ahead. Kept here because the archetype is only in scope
+       * inside this loop, and the upcoming schedule is built after it. */
+      if (archetype === "loyal" || archetype === "newcomer") {
+        regulars.push({ memberId, favouriteClass });
+      }
 
       const status: MembershipStatus =
         archetype === "paused" ? "paused" : archetype === "left" ? "canceled" : "active";
@@ -280,6 +288,74 @@ export function generateStudio(
     }
   }
 
+  /* NEXT WEEK, AND SOMEBODY ALREADY BOOKED IT.
+   *
+   * A note either names a real upcoming class — "Kim teaches yoga on
+   * Saturday at 5:30, want us to save you a spot?" — or falls back to the
+   * open offer. Until 2026-08-21 this door built a session only where
+   * somebody had already attended one, so every session it made was in the
+   * past, every draft took the fallback, and the half of the job the
+   * button offers to show was invisible through it: 8 members flagged, 0
+   * with a class to be invited to.
+   *
+   * Ten days is the window suggestedSession looks in, so that is what gets
+   * scheduled and no more. The bookings are here because a studio with a
+   * schedule and nobody booked into it is not a studio.
+   *
+   * WHAT THIS DOOR STILL DOES NOT SHOW, measured rather than assumed: no
+   * class fills, so the open-offer fallback never fires here — 32 seats
+   * held across 50 classes, 0 full, at all three seeds the checks use.
+   * That was tempting to fix by shrinking capacity until one filled, and
+   * that would have been a fixture bent until it showed a chosen answer,
+   * which is not evidence of anything. The fallback has a door of its own:
+   * a studio importing its own attendance export has no upcoming classes
+   * at all — an export is history — so EVERY draft from the CSV door takes
+   * it. Both halves are on screen; they are just not on the same screen,
+   * and both are pinned by checks. */
+  for (let ahead = 1; ahead <= 10; ahead += 1) {
+    const day = today + ahead;
+    for (const classType of CLASS_TYPES) {
+      const instructor = instructors[(ahead + CLASS_TYPES.indexOf(classType)) % instructors.length];
+      if (instructor === undefined) continue;
+      sessionOn(day, classType, instructor.instructor_id);
+    }
+  }
+
+  /* Booked the evening before, the way the shared engine books its own
+   * upcoming classes. Every regular takes the soonest class of the kind
+   * they come for; a seat is only taken while one is left, so capacity is
+   * never exceeded and a class that fills simply stops accepting. */
+  const heldBySession = new Map<string, number>();
+  const upcomingByType = new Map<string, ClassSession[]>();
+  for (const session of sessions) {
+    if (session.session_status !== "scheduled") continue;
+    const forType = upcomingByType.get(session.class_type) ?? [];
+    forType.push(session);
+    upcomingByType.set(session.class_type, forType);
+  }
+  for (const list of upcomingByType.values()) {
+    list.sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0));
+  }
+  let reservationNumber = 0;
+  for (const regular of regulars) {
+    for (const session of upcomingByType.get(regular.favouriteClass) ?? []) {
+      const held = heldBySession.get(session.session_id) ?? 0;
+      if (held >= session.capacity) continue;
+      heldBySession.set(session.session_id, held + 1);
+      reservationNumber += 1;
+      const eveningBefore = isoFromDay(dayNumber(session.starts_at.slice(0, 10)) - 1);
+      reservations.push({
+        reservation_id: `${ns}_r_${reservationNumber}`,
+        member_id: regular.memberId,
+        session_id: session.session_id,
+        reservation_status: "reserved",
+        reserved_at: `${eveningBefore}T19:00:00`,
+        canceled_at: null,
+      });
+      break;
+    }
+  }
+
   const records: FixtureSet = {
     timezone: timeZone,
     note: "A generated studio — every member is fictional.",
@@ -287,7 +363,7 @@ export function generateStudio(
     memberships,
     instructors,
     class_sessions: sessions,
-    reservations: [],
+    reservations,
     attendance,
     studio_policies: [],
   };
