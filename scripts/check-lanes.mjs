@@ -52,14 +52,16 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { isCommand } from "./is-command.mjs";
 
 /* Importing this file must never RUN the gate — the self-test and any
  * future check import the pure functions directly. */
-const IS_COMMAND =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+/* Ten gates carried their own copy of this test and all ten were wrong the
+ * same way: reached through a symlink the guard went false and the gate
+ * exited 0 having checked nothing. See scripts/is-command.mjs. */
+const IS_COMMAND = isCommand(import.meta.url);
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 

@@ -1715,7 +1715,22 @@ check("no visits in a real window is a real answer, not an absent one",
   let findQuietMembersCount = 0;
   const run = (): void => {
   // Everything the page does to a record set, in the order it does it.
-  const today = todayDayNumber(data.timezone);
+  /* PINNED, like every other check in this file, and it was not.
+   *
+   * This read the REAL clock while the records it judges are pinned to
+   * 2026-08-18. The two drifted apart: on 2026-10-17 the studio's newest
+   * class fell out of the 60-day window, nobody was flagged, and the
+   * "it actually found somebody, so the run was real" check below went red
+   * — in a suite whose own heading promises that verdicts never drift with
+   * the real clock. Found by running the whole gate under a frozen clock
+   * rather than by waiting for it.
+   *
+   * todayDayNumber is still CALLED, because reading the clock is one of
+   * the things the page does to a record set and this block exists to
+   * prove none of them mutates a frozen one. Its value just no longer
+   * decides a verdict. */
+  todayDayNumber(data.timezone);
+  const today = TODAY;
   const result = findQuietMembers(data, today, proposedRules);
   findQuietMembersCount = result.flagged.length;
   attendanceCoverage(data, today, proposedRules);

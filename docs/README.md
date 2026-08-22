@@ -65,6 +65,16 @@ cost somebody a day:
 
   Each runs inside `npm run check`, each carries `--self-test`, and each
   states the counts it actually reached rather than passing in silence.
+
+  All ten decide "was I run, or imported?" through
+  [`scripts/is-command.mjs`](../scripts/is-command.mjs), which is one copy
+  on purpose. They each carried their own, and all ten were wrong the same
+  way: `import.meta.url` is the file's REAL path while `process.argv[1]` is
+  whatever the caller typed, so a symlink anywhere in that path made the
+  guard false and the gate exit 0 having checked nothing — no output, no
+  failure, and `--self-test` silenced identically. macOS makes `/tmp` a
+  symlink, so this was easy to hit locally; GitHub's workspace is not
+  symlinked, which is why CI never showed it.
 - **Prove the check can fail.** A check that only ever passes is
   indistinguishable from a broken one. Every gate here carries a
   self-test that plants a known-bad case (`--self-test`), and was run
