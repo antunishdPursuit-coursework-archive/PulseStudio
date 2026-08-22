@@ -117,8 +117,11 @@ the legacy contract) is what all four products speak.
 - **`synthetic/page.ts` is not covered by any check, and the suite cannot
   cover it.** It is the reporting UI's entry module, loaded only by
   `synthetic/index.html` in a browser, so nothing in `synthetic/tests.ts`
-  imports it — proven, not assumed: breaking the compiled `page.js`
-  syntactically leaves all 294 synthetic checks passing. `tsc` still
+  imports it — proven twice over: breaking the compiled `page.js`
+  syntactically leaves every synthetic check passing, and `npm run mutate`
+  scores it 0% caught, 10 of 10 mutations surviving. (It read 80% before
+  the runner stopped counting its own timeouts as detections, which is a
+  good illustration of why that mattered.) `tsc` still
   compiles the TypeScript, so type and syntax errors are caught at the
   gate; what is unproven is its runtime behaviour. Same shape as Product
   D's `main.ts`, and the same remedy applies — anything in it that becomes
