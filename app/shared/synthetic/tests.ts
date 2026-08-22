@@ -490,6 +490,31 @@ check("the answer key states which generation it answers for",
   check("an outcome hung on a canceled booking is caught",
     validateBundle(ghosted).problems.some((pr) => pr.code === "attendance-on-canceled-booking"), true);
 
+  /* THE ID CHECK ITSELF HAD NEVER BEEN PLANTED.
+   *
+   * malformed-id had no mention anywhere in this suite, in the one block
+   * whose stated discipline is that every validator check is proven able
+   * to fire. Mutation found the consequence: the condition is
+   * `!ID_PATTERN.test(id) || !id.startsWith(kind + ":")`, and turning the
+   * `||` into `&&` requires an id to fail BOTH before it is reported —
+   * so a perfectly well-formed id under the WRONG namespace walks
+   * through. That is the interesting failure, not a garbled string: it is
+   * what a copy-paste between collections actually produces. */
+  const misnamespaced = plant();
+  const swapped = misnamespaced.dataset.members[0];
+  if (swapped) swapped.id = "instructor:000001";
+  check("a well-formed id in the wrong namespace is caught",
+    validateBundle(misnamespaced).problems.some((pr) => pr.code === "malformed-id"), true);
+
+  const garbled = plant();
+  const broken = garbled.dataset.members[1];
+  if (broken) broken.id = "member:1";
+  check("...and so is an id that does not match the shape at all",
+    validateBundle(garbled).problems.some((pr) => pr.code === "malformed-id"), true);
+
+  check("...while the untouched studio reports no malformed id",
+    validateBundle(first).problems.some((pr) => pr.code === "malformed-id"), false);
+
   const leaky = plant();
   const card = leaky.dataset.members[0];
   if (card) card.displayName = "Pat 4111111111111111 Doe";
