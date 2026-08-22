@@ -73,6 +73,14 @@ const SUITE_BY_PREFIX = [
    * reporting page; its checks are in D's suite, so asking the synthetic
    * one reports 0% for the wrong reason — the suite never loads it. */
   ["app/shared/text.", "reengagement"],
+  /* app/shared/today.ts is the same case: three modules had written "what
+   * day is it where the studio is" and one was UTC, so there is one copy
+   * now and Product D reaches it through deps.ts. Its checks — late
+   * evening, another zone, both DST nights, the year roll — are in D's
+   * suite, so that is the suite that can judge it. Added late, because the
+   * module was created without this line and the tool answered "no suite
+   * covers it", which reads like "nothing checks this" and was not true. */
+  ["app/shared/today.", "reengagement"],
 ];
 /* A sample, for a module too large to sweep whole. --stride=4 tries every
  * fourth site (1 in 4). It is deterministic — every Nth, never random — so the same
@@ -287,11 +295,23 @@ for (const rel of TARGETS) {
   }
 
   const caught = applied - survivors.length;
-  const pct = applied === 0 ? 0 : Math.round((caught / applied) * 100);
   console.log(`\nmutate-suite: ${rel} — judged by the "${suite}" suite`);
-  console.log(
-    `mutate-suite: ${applied} single-token mutations — ${caught} caught, ${survivors.length} survived (${pct}% caught).`,
-  );
+  if (applied === 0) {
+    /* NOT 0% — that reads as total failure, and this is the opposite: there
+     * was nothing here to swap. app/shared/today.js is one Intl call with
+     * no comparison and no boolean operator in it, so every swap this tool
+     * knows finds no site. A percentage over zero attempts is not a low
+     * score, it is not a score. */
+    console.log(
+      "mutate-suite: no single-token swap this tool knows has anywhere to land in this module — " +
+        "nothing was tried, so there is no score. That is a fact about the code's shape, not about its checks.",
+    );
+  } else {
+    const pct = Math.round((caught / applied) * 100);
+    console.log(
+      `mutate-suite: ${applied} single-token mutations — ${caught} caught, ${survivors.length} survived (${pct}% caught).`,
+    );
+  }
   if (timedOut > 0) {
     console.log(
       `mutate-suite: ${timedOut} run${timedOut === 1 ? "" : "s"} hit the ${Math.round(budgetMs / 1000)}s budget and are counted as caught — treat that many of the caught as unproven.`,
