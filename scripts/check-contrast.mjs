@@ -49,6 +49,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { isCommand } from "./is-command.mjs";
+import { nodeTooOldNote } from "./node-floor.mjs";
 
 /* Ten gates carried their own copy of this test and all ten were wrong the
  * same way: reached through a symlink the guard went false and the gate
@@ -101,7 +102,26 @@ const {
   parseCustomColors,
   DEFAULT_CUSTOM,
   themeToApply,
-} = await import(pathToFileURL(COLOR_MODULE).href);
+} = await importColorModule();
+
+/* The import above is the one place this gate touches compiled output, and
+ * it fails two ways that look identical and are not: the module is missing
+ * (run `npm run build`), or Node is too old to read a `.js` file that says
+ * `export` (see scripts/node-floor.mjs). The raw error for the second is
+ * `SyntaxError: Unexpected token 'export'`, which reads as a broken build
+ * and sends people to rebuild something that is already correct. */
+async function importColorModule() {
+  try {
+    return await import(pathToFileURL(COLOR_MODULE).href);
+  } catch (error) {
+    const tooOld = nodeTooOldNote();
+    if (tooOld !== null) {
+      console.error(`check-contrast: ${tooOld}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
 export { contrast, relativeLuminance };
 
 /** Read `--name: #rrggbb;` declarations out of a CSS block. */
