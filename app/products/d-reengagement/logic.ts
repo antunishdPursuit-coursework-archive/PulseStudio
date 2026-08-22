@@ -13,7 +13,7 @@
 import { counted } from "./deps.js";
 import type { ClassSession, FixtureSet, Member, Reservation } from "./deps.js";
 import type { DraftFacts, QuietRules } from "./config.js";
-import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, draftMessage } from "./config.js";
+import { NOT_RECORDED, draftMessage } from "./config.js";
 
 /** One flagged member with the evidence for why — no flag without evidence. */
 export interface FlaggedMember {
@@ -298,11 +298,11 @@ export function findQuietMembers(
       member,
       lastSession,
       lastInstructorName:
-        instructorById.get(lastSession.instructor_id) ?? GENERIC_INSTRUCTOR,
+        instructorById.get(lastSession.instructor_id) ?? NOT_RECORDED,
       daysSince,
       priorCount: priorSessions.length,
       usualClassType,
-      usualInstructorName: usualInstructorName || GENERIC_INSTRUCTOR,
+      usualInstructorName: usualInstructorName || NOT_RECORDED,
     });
   }
 
@@ -623,7 +623,7 @@ export function firstNameOf(displayName: string): string {
 /* WHAT THE RECORDS DO NOT SAY, TURNED INTO WHAT THE VOICE CAN SAY.
  *
  * Two placeholders exist because the contract's fields are not nullable:
- * GENERIC_INSTRUCTOR when no instructor record matched, GENERIC_CLASS_TYPE
+ * NOT_RECORDED when no instructor record matched, NOT_RECORDED
  * when the import never had a class column at all — which is every
  * sign-in sheet, the plainest supported file there is.
  *
@@ -648,8 +648,8 @@ export function draftFactsFor(
   return {
     firstName: firstNameOf(f.member.display_name),
     daysSince: f.daysSince,
-    usualClassType: known(f.usualClassType, GENERIC_CLASS_TYPE) ? f.usualClassType : null,
-    usualInstructorFirstName: known(f.usualInstructorName, GENERIC_INSTRUCTOR)
+    usualClassType: known(f.usualClassType, NOT_RECORDED) ? f.usualClassType : null,
+    usualInstructorFirstName: known(f.usualInstructorName, NOT_RECORDED)
       ? firstNameOf(f.usualInstructorName)
       : null,
     studioName,
@@ -716,9 +716,9 @@ export function joinSentence(
  * count and nothing else. */
 export function evidenceLine(f: FlaggedMember, priorWindowDays: number): string {
   const classKnown =
-    f.lastSession.class_type !== GENERIC_CLASS_TYPE && f.lastSession.class_type.trim() !== "";
+    f.lastSession.class_type !== NOT_RECORDED && f.lastSession.class_type.trim() !== "";
   const instructorKnown =
-    f.lastInstructorName !== GENERIC_INSTRUCTOR && f.lastInstructorName.trim() !== "";
+    f.lastInstructorName !== NOT_RECORDED && f.lastInstructorName.trim() !== "";
 
   const attended = classKnown && instructorKnown
     ? `${f.lastSession.class_type} with ${f.lastInstructorName}`
@@ -733,9 +733,9 @@ export function evidenceLine(f: FlaggedMember, priorWindowDays: number): string 
     `(≈${weeklyCadence(f.priorCount, priorWindowDays)}/week)`;
 
   const usualClassKnown =
-    f.usualClassType !== GENERIC_CLASS_TYPE && f.usualClassType.trim() !== "";
+    f.usualClassType !== NOT_RECORDED && f.usualClassType.trim() !== "";
   const usualInstructorKnown =
-    f.usualInstructorName !== GENERIC_INSTRUCTOR && f.usualInstructorName.trim() !== "";
+    f.usualInstructorName !== NOT_RECORDED && f.usualInstructorName.trim() !== "";
   const usual = usualClassKnown && usualInstructorKnown
     ? `usually ${f.usualClassType} with ${f.usualInstructorName}`
     : usualClassKnown

@@ -23,7 +23,7 @@ import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, 
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
-import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { NOT_RECORDED, brand, classPhrase, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import {
   MAILTO_SAFE_LENGTH,
   forgetOutreach,
@@ -2476,9 +2476,9 @@ check("clean records produce no data-quality line",
   const only = flagged[0];
   if (only) {
     check("...and the records carry the placeholder, because the field cannot be null",
-      only.usualClassType, GENERIC_CLASS_TYPE);
+      only.usualClassType, NOT_RECORDED);
     check("...and the instructor placeholder too",
-      only.usualInstructorName, GENERIC_INSTRUCTOR);
+      only.usualInstructorName, NOT_RECORDED);
 
     const facts = draftFactsFor(only, imported.records, today, brand.studioName);
     check("the draft turns the class placeholder back into 'we do not know'",
@@ -3305,6 +3305,53 @@ check("clean records produce no data-quality line",
     check("...and the evidence beside it agrees",
       evidenceLine(fresh, wide.priorWindowDays).includes("1 classes"), false);
   }
+}
+
+/* A STUDIO WHOSE CLASS REALLY IS CALLED "class".
+ *
+ * The markers for "the records did not say" used to be the words "class"
+ * and "the team". Both are ordinary English a studio can genuinely have
+ * in its own export — a class column that simply reads "class", a group
+ * session credited to "the team" — and the page then told staff "the
+ * import recorded no class type and no instructor" about a file that had
+ * named both. Asserting a negative that is false is worse than the
+ * doubled word this replaced.
+ *
+ * Empty is the marker now, because no real class and no real person can
+ * be called nothing. */
+{
+  const T = dayNumberFromIso("2026-08-21");
+  const named = adaptAttendanceCsv([
+    "Member,Date,Class,Instructor",
+    "Pat Rivera,2026-06-27,class,the team",
+    "Pat Rivera,2026-07-11,class,the team",
+    "Pat Rivera,2026-07-25,class,the team",
+  ].join("\n"), "America/New_York");
+  const f = findQuietMembers(named.records, T, proposedRules).flagged[0];
+  if (f) {
+    const line = evidenceLine(f, proposedRules.priorWindowDays);
+    check("a class genuinely called 'class' is kept, not read as missing",
+      line.includes("Last attended: class with the team"), true);
+    check("...and the page does not claim the import said nothing",
+      line.includes("the import recorded no"), false);
+    check("...and an instructor genuinely called 'the team' is kept too",
+      f.usualInstructorName, "the team");
+
+    const note = draftTextFor(f, named.records, T, brand.studioName);
+    check("...while the note still does not double the word",
+      note.includes("class class"), false);
+    check("...reading as one class instead",
+      note.includes("since your last class, and we've missed"), true);
+  }
+
+  /* The voice that makes that possible, on its own. */
+  check("a named class gains the word", classPhrase("yoga"), "yoga class");
+  check("a class already called class does not", classPhrase("class"), "class");
+  check("...whatever its capitalisation", classPhrase("Class"), "Class");
+  check("a studio that already writes 'spin class' is left alone",
+    classPhrase("spin class"), "spin class");
+  check("a Masterclass is still a Masterclass class, because it is one",
+    classPhrase("Masterclass"), "Masterclass class");
 }
 
 const passed = results.filter((r) => r.passed).length;

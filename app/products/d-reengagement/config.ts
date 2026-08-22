@@ -48,23 +48,23 @@ export const brand: StudioBrand = {
   timeZone: "America/New_York",
 };
 
-/* WHAT A CLASS IS CALLED WHEN THE RECORDS NEVER SAID.
+/* WHAT THE RECORDS SAY WHEN THEY DID NOT SAY.
  *
- * A sign-in sheet is a name and a date; it does not know what the person
- * came to. The value has to be SOMETHING, because the contract's class_type
- * is a string and not nullable — so it is this, and the draft assembly maps
- * it back to "unknown" rather than letting it reach a sentence. Left in a
- * sentence it reads "your last class class", which is what it did on the
- * supported sign-in-sheet path until this branch.
+ * The contract's class_type and an instructor's display_name are strings
+ * and not nullable, so "the export never told us" has to be SOME string.
+ * It used to be the words "class" and "the team", and that was a real
+ * defect rather than an ugly one: both are ordinary English a studio can
+ * genuinely have in its own export. A file whose class column read
+ * "class", taught by "the team", produced the sentence "the import
+ * recorded no class type and no instructor" — a page telling staff the
+ * records are silent about something the records had actually named.
+ * An in-band marker a real value can equal is not a marker.
  *
- * It lives here rather than in csv.ts because it is vocabulary, and because
- * both the door that writes it and the voice that must never print it need
- * to agree on one spelling. */
-export const GENERIC_CLASS_TYPE = "class";
-
-/* The placeholder for an instructor the records do not name. Same rule:
- * the draft maps it to unknown rather than writing "The team teaches". */
-export const GENERIC_INSTRUCTOR = "the team";
+ * Empty is the one string no real class and no real person can be called,
+ * which is what makes it safe here. A blank cell already arrives this way,
+ * and it means the same thing.
+ */
+export const NOT_RECORDED = "";
 
 /** The quiet-member rule, PROPOSED — the team has not ratified these
  *  numbers yet (see PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md). They live in
@@ -146,18 +146,35 @@ export interface DraftFacts {
  *  person sends another. A reseller rewrites ONLY this function to change
  *  the voice. Every value is filled from real records before render;
  *  the unit checks prove no unfilled placeholder can reach a screen. */
+/* "yoga" becomes "yoga class"; "class" stays "class".
+ *
+ * The voice appends the word to whatever the records call the class type,
+ * which reads correctly for every studio whose classes have names — and
+ * produced "your last class class" for one whose export simply says
+ * "class" in that column, which is a shape a real export takes. Studios
+ * that already write "spin class" get the same treatment for the same
+ * reason. Compared case-insensitively on the last word only, so a
+ * "Masterclass" is still a Masterclass class. */
+export function classPhrase(classType: string): string {
+  const lastWord = classType.trim().split(/\s+/).pop() ?? "";
+  return lastWord.toLowerCase() === "class" ? classType.trim() : `${classType} class`;
+}
+
 export function draftMessage(f: DraftFacts): string {
   /* The invitation names a REAL class when the schedule holds one — a
    * specific "yes" is easier to say than a vague one — and falls back to
    * the open offer rather than inventing a session that does not exist. */
   const named = f.usualClassType !== null;
+  /* Computed once, and narrowed here rather than at each use: `named` is a
+   * boolean, which does not narrow the field for the compiler. */
+  const classText = f.usualClassType === null ? "" : classPhrase(f.usualClassType);
   const taught = f.usualInstructorFirstName !== null;
   let invite: string;
   if (f.suggestedInvite !== null) {
     invite = named && taught
       ? `${f.usualInstructorFirstName} teaches ${f.usualClassType} ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
       : named
-        ? `There's a ${f.usualClassType} class ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
+        ? `There's a ${classText} ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`
         : `There's a class ${f.suggestedInvite} — want us to save you a spot? Just reply and it's done.`;
   } else if (named && taught) {
     invite = `${f.usualInstructorFirstName} still teaches ${f.usualClassType} every week, and there's a spot with your name on it. Want us to hold one for you? Just reply and it's done.`;
@@ -171,7 +188,7 @@ export function draftMessage(f: DraftFacts): string {
    * only door. The links come from config (the reseller seam). */
   return [
     named
-      ? `Hi ${f.firstName} — it's been ${counted(f.daysSince, "day")} since your last ${f.usualClassType} class, and we've missed seeing you.`
+      ? `Hi ${f.firstName} — it's been ${counted(f.daysSince, "day")} since your last ${classText}, and we've missed seeing you.`
       : `Hi ${f.firstName} — it's been ${counted(f.daysSince, "day")} since your last class, and we've missed seeing you.`,
     invite,
     `Or come back your own way:\n· Book a class: ${brand.studioUrl}products/a-booking/\n· Ask us anything: ${brand.studioUrl}products/c-chatbot/\n· See what's new this week: ${brand.studioUrl}`,

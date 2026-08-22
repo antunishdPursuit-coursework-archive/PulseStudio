@@ -27,8 +27,8 @@
 
 import { counted } from "./deps.js";
 import type { Attendance, ClassSession, FixtureSet, Member } from "./deps.js";
-import { GENERIC_CLASS_TYPE } from "./config.js";
-export { GENERIC_CLASS_TYPE };
+import { NOT_RECORDED } from "./config.js";
+export { NOT_RECORDED };
 
 export interface CsvImport {
   records: FixtureSet;
@@ -469,7 +469,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       skipped.push(`line ${line}: unreadable or impossible date "${(cells[dateCol] ?? "").trim()}" (use YYYY-MM-DD or M/D/YYYY)`);
       continue;
     }
-    const classType = classCol === -1 ? GENERIC_CLASS_TYPE : (cells[classCol] ?? "").trim() || GENERIC_CLASS_TYPE;
+    const classType = classCol === -1 ? NOT_RECORDED : (cells[classCol] ?? "").trim() || NOT_RECORDED;
     const instructorName = instructorCol === -1 ? "" : (cells[instructorCol] ?? "").trim();
 
     // Identity: the stable identifier when the export carries one, the
