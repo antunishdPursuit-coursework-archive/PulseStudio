@@ -79,6 +79,30 @@ here was 21ms for twenty studios.
   if the generator ever fills today's classes those two definitions start
   disagreeing. See [../app/shared/CLAUDE.md](../app/shared/CLAUDE.md).
 
+**The gates can be measured too, and one of them had a real gap.**
+`--judge` makes a gate's own `--self-test` the judge, so the question every
+gate asks of the code — would anything notice if this were wrong? — can be
+asked of the gate. `check-secrets.mjs` answered 45%.
+
+The survivor that mattered was its definition of a credential-shaped
+value: it required the value to mix digits with letters. That missed a
+password whose value is a run of lowercase words, an api key of twenty
+letters, and a secret of twenty digits — and a passphrase is the ordinary
+way people write a password down.
+
+The old rule's comment said all-letters is "prose, a path, or a CSS
+token". Prose was never being excluded by the mixing test: the pattern
+needs sixteen characters with NO WHITESPACE, which is what keeps
+`password: this is not set here` out. Mixing was doing less work than it
+looked like. Twenty unbroken characters on a credential-named field now
+qualifies on length alone — checked against all 154 tracked files first,
+zero newly flagged.
+
+The rest of that gate's survivors are in its `run()` rather than its rule,
+which the self-test does not exercise. They are not worth chasing: an
+inverted pass/fail there makes the gate fail on a clean repo, which the
+next CI run says immediately.
+
 **The judge does not have to be a suite.** `npm run mutate` routed every
 module to one of the three browser suites, so anything they cannot reach
 reported "no suite covers this" and stopped. `app/shared/color.ts` was in

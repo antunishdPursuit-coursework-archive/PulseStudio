@@ -101,11 +101,36 @@ export function secretHits(line) {
   const assigned = line.match(ASSIGNED);
   if (assigned !== null) {
     const value = assigned[2] ?? "";
-    /* A value has to look random to be a credential. All-one-case letters
-     * with no digits is prose, a path, or a CSS token — the thing that
-     * makes a key a key is that it mixes. */
+    /* WHAT MAKES A VALUE LOOK LIKE A CREDENTIAL.
+     *
+     * Mixing digits and letters was the whole test, and it missed three
+     * shapes that are plainly secrets: a password whose value is a run of
+     * lowercase words with no digits, an api key of twenty letters, and a
+     * secret of twenty digits. A passphrase is the ordinary way people
+     * write a password down, so that was not a narrow miss.
+     *
+     * Those three are spelled out in the self-test below, ASSEMBLED from
+     * pieces — and describing them in words here rather than writing them
+     * is the same rule. This gate scans its own source, and the first
+     * draft of this comment made it fail on itself, which is exactly the
+     * lesson the header already records about test data.
+     *
+     * The comment for the old rule said all-letters is "prose, a path, or a
+     * CSS token" — and prose is already excluded by the pattern above,
+     * which needs sixteen characters with NO WHITESPACE in them. That is
+     * what keeps `password: this is not set here` out, not the mixing test.
+     * Mixing was doing less work than it appeared to.
+     *
+     * So length qualifies too: twenty unbroken characters on a
+     * credential-named field is a secret whatever it is made of. Checked
+     * against every tracked file before loosening it — zero lines in this
+     * repo are newly flagged, so this buys the passphrase case without
+     * spending anything. Found by mutating this gate against its own
+     * self-test, which is the same question the gate asks of everything
+     * else. */
     const mixes = /[0-9]/.test(value) && /[A-Za-z]/.test(value);
-    if (mixes && !PLACEHOLDER.test(value)) {
+    const longUnbrokenRun = value.length >= 20;
+    if ((mixes || longUnbrokenRun) && !PLACEHOLDER.test(value)) {
       hits.push({ code: "assigned-credential", vendor: "unknown" });
     }
   }
@@ -140,6 +165,19 @@ function selfTest() {
     { label: "a long random value on a credential name fails", input: assignedValue, want: true },
     { label: "a css custom property is not a credential", input: "--accent-strong: #743df5;", want: false },
     { label: "a lockfile integrity hash is not a credential", input: '"integrity": "sha512-abc123DEF456ghi789JKL012mno345PQR678stu901"', want: false },
+    /* THE PASSPHRASE SHAPES, missed until 2026-08-22 because they do not
+     * mix digits with letters. Assembled so this file carries no
+     * credential-shaped line of its own — the same reason the keys above
+     * are built from pieces. */
+    { label: "an all-letter passphrase is a credential", input: "password: " + "correcthorse" + "batterystaple", want: true },
+    { label: "an all-letter api key is one too", input: 'api_key = "' + "abcdefghij" + 'klmnopqrst"', want: true },
+    { label: "an all-digit secret is one too", input: "secret: " + "84713094" + "871309487130", want: true },
+    /* And the reasons the loosening is safe. Prose never had to rely on
+     * the mixing test: the pattern needs sixteen characters with no
+     * whitespace, which a sentence does not have. */
+    { label: "a sentence on a credential name is still prose", input: "password: this is not set here", want: false },
+    { label: "a short unmixed value is still not a credential", input: "secret: shortish", want: false },
+    { label: "a long placeholder is still a placeholder", input: "password: " + "REPLACE" + "_ME_BEFORE_DEPLOYING", want: false },
   ];
 
   let failed = 0;
