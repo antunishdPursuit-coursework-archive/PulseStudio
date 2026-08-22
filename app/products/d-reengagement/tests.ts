@@ -2834,6 +2834,77 @@ check("clean records produce no data-quality line",
     splitAccented.splitIdentities[0]?.startsWith(NFD) || splitAccented.splitIdentities[0]?.startsWith(NFC), true);
 }
 
+// 30i. A value made of spaces is not a recorded value.
+//
+//      Five places ask "was this actually recorded?" the same way:
+//      `value !== NOT_RECORDED && value.trim() !== ""`. Mutation turned
+//      every one of those `&&` into `||` and none was caught, because the
+//      second half only matters for a value that is blank WITHOUT being the
+//      marker — spaces, a tab — and no door produces one. The CSV import
+//      trims, so "   " arrives as the marker itself; the generated and live
+//      studios use real names.
+//
+//      These functions take a FixtureSet from anywhere, though, and the
+//      guard is right: a class called "   " is not a class anybody can be
+//      reminded of. Unreachable is not the same as correct, and a door that
+//      forgets to trim is a plausible future — so the records are handed in
+//      directly rather than through a door that would clean them first.
+{
+  const markerT = dayNumberFromIso("2026-08-18");
+  const withValues = (classType: string, instructor: string): FixtureSet => ({
+    timezone: "America/New_York",
+    note: "",
+    members: [{ member_id: "m1", display_name: "Ada Lovelace", membership_status: "active" }],
+    memberships: [],
+    instructors: [{ instructor_id: "i1", display_name: instructor }],
+    class_sessions: [{ session_id: "s1", class_type: classType, level: "all levels", instructor_id: "i1",
+      starts_at: "2026-08-01T09:00:00", ends_at: "2026-08-01T10:00:00", capacity: 12, session_status: "completed" }],
+    reservations: [],
+    attendance: [{ attendance_id: "a1", member_id: "m1", session_id: "s1",
+      attendance_status: "attended", recorded_at: "2026-08-01T10:05:00" }],
+    studio_policies: [],
+  });
+  const readingOf = (classType: string, instructor: string) => {
+    const records = withValues(classType, instructor);
+    const flagged = findQuietMembers(records, markerT, proposedRules).flagged[0];
+    return {
+      evidence: flagged === undefined ? "" : evidenceLine(flagged, proposedRules.priorWindowDays),
+      draft: flagged === undefined ? "" : draftTextFor(flagged, records, markerT, brand.studioName),
+    };
+  };
+
+  /* The recorded case, so the lines below are a contrast and not a
+   * function that says "not recorded" about everything. */
+  const named = readingOf("yoga", "Kim Lee");
+  check("a recorded class and instructor are named", named.evidence.includes("yoga with Kim Lee"), true);
+  check("...and the draft uses them", named.draft.includes("Kim still teaches yoga"), true);
+
+  const blank = readingOf("   ", "  ");
+  /* PINNED WHOLE, not by a substring. Checking only that the line CONTAINS
+   * "the import recorded no" let three of the five guards keep failing
+   * quietly: flipping the one behind lastInstructorName printed "a class
+   * with    on August 1" and the substring was still there, and flipping
+   * the two behind the USUAL class and instructor appended a "usually …"
+   * clause with nothing in it. A whole line is the only assertion that
+   * notices something arriving that should not be there at all. */
+  check("a whitespace class and instructor read as nothing recorded, whole line",
+    blank.evidence,
+    "Last attended: August 1, 2026 · 1 class in the prior 60 days (≈0.1/week) · "
+      + "the import recorded no class type and no instructor");
+  check("a class made of spaces is not a class",
+    blank.evidence.includes("the import recorded no"), true);
+  check("...and is never printed as one", blank.evidence.includes("Last attended:    "), false);
+  check("...so the draft makes the open offer without naming anybody",
+    blank.draft.includes("still teaches"), false);
+  check("...and does not leave a gap where a name should be",
+    blank.draft.includes("  still") || blank.draft.includes(" teaches  "), false);
+
+  /* A tab is whitespace too, and is the shape a spreadsheet export
+   * actually produces. */
+  const tabbed = readingOf("\t", "\t");
+  check("a tab is not a class either", tabbed.evidence.includes("the import recorded no"), true);
+}
+
 // 31. The open offer belongs to the CSV door, and is not a bug there.
 //
 //     A studio's own attendance export is HISTORY: it has no upcoming

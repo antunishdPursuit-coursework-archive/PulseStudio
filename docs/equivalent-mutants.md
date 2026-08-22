@@ -127,6 +127,22 @@ here was 21ms for twenty studios.
   never disagree.
 - Several loop bounds guarded by `if (!x) continue` on the next line.
 
+**A substring assertion that let three guards keep failing.** `logic.ts` asks
+"was this actually recorded?" in five places as
+`value !== NOT_RECORDED && value.trim() !== ""`. All five `&&` survived,
+because the second half only matters for a value that is blank WITHOUT
+being the marker — spaces or a tab — and no door produces one: the CSV
+import trims, and the other two studios use real names. The guard is still
+right, so the records were handed to the functions directly.
+
+The first attempt closed two of the five and looked finished. The check
+asserted the evidence line CONTAINED "the import recorded no", and three
+mutations kept that substring while corrupting the rest of the line —
+printing "a class with    on August 1", or appending a "usually …" clause
+with nothing in it. Pinning the whole line closed all five. **A substring
+notices something missing; only a whole line notices something arriving
+that should not be there at all.**
+
 **A guard whose boundary needs two of something.** `csv.ts` — the identity
 heuristic counts only rows where BOTH the id and the name are present, and
 turning that `||` into `&&` survived. The reason it looked equivalent is
