@@ -158,6 +158,25 @@ the legacy contract) is what all four products speak.
   offset for each shifted value through `Intl`, and the alternative
   (offset-free local times, as the generated door uses) changes what
   `new Date(value)` means for any consumer. Decide it deliberately.
+- **"Today" is the STUDIO's today, and there is one implementation of it.**
+  `app/shared/today.ts`. Three modules had written this rule and one was
+  wrong: `synthetic/page.ts` prefilled the as-of date with
+  `new Date().toISOString().slice(0, 10)`, which is UTC, so somebody in New
+  York opening it after 8pm generated a studio as of a day that had not
+  happened where the studio is. `auth/studio.ts` and Product D were both
+  correct and both had their own copy — the same shape that made
+  `color.ts`. D re-exports it through its `deps.ts` seam, so D's existing
+  timezone checks (late evening, another zone, both DST nights, the year
+  roll) now cover the implementation `auth/` and the synthetic page use,
+  which had none of their own.
+
+  A grep in `synthetic/tests.ts` keeps the antipattern from coming back in
+  any module allowed to read the clock. It strips comments first, unlike
+  the engine audit beside it, and the difference is deliberate: the engine
+  may not read a clock even in a comment, but here the comment is the
+  RECORD of the fixed bug and the check failed on it the first time it ran.
+  The pattern needs EMPTY parens — `new Date(day * 86_400_000)
+  .toISOString()` is how a day number becomes a date and is correct.
 - **A stated UTC offset is checked against the studio's real one.** Added
   the same day, because the roll-forward above is the routine edit that
   breaks it: moving dates across the March or November transition without

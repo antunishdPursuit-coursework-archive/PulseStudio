@@ -1043,6 +1043,59 @@ for (const file of ENGINE_SOURCES) {
   }
 }
 
+/* THE MODULES THAT ARE ALLOWED TO READ THE CLOCK STILL HAVE TO READ IT IN
+ * THE STUDIO'S ZONE.
+ *
+ * The engine may not read the clock at all — that is the audit above. Three
+ * shared modules may, and one of them got it wrong: page.ts prefilled the
+ * as-of date with `new Date().toISOString().slice(0, 10)`, which is UTC, so
+ * somebody in New York opening it after 8pm generated a studio as of a day
+ * that had not happened where the studio is. Product D's brief already
+ * records the same mistake costing it a misread return.
+ *
+ * The pattern is deliberately `new Date().toISOString()` with EMPTY parens,
+ * not `toISOString` on its own: `new Date(day * 86_400_000).toISOString()`
+ * is how a day NUMBER becomes a date and is correct, and appears in
+ * generate.ts and normalize.ts. Catching those would be a false alarm that
+ * teaches people to ignore this check. */
+{
+  const CLOCK_READERS = ["../today.ts", "../auth/studio.ts", "./page.ts"];
+  const UTC_TODAY = /new Date\(\)\s*\.\s*toISOString\s*\(/;
+  /* COMMENTS STRIPPED FIRST, unlike the engine audit above — and the
+   * difference is deliberate. The engine may not read the clock even in a
+   * comment, because there the words are a proposal somebody will act on.
+   * Here the words are a RECORD: page.ts now carries the old broken line
+   * quoted in the comment that explains why it changed, and this check
+   * failed on that comment the first time it ran. Deleting the explanation
+   * to satisfy a grep would trade the reason for the rule. */
+  const withoutComments = (text: string): string =>
+    text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/.*$/gm, " ");
+  for (const file of CLOCK_READERS) {
+    const source = withoutComments(await (await fetch(file)).text());
+    check(`${file} does not take today's date from UTC`, UTC_TODAY.test(source), false);
+    /* Non-vacuous: a fetch that quietly returned a 404 page would pass the
+     * line above by containing no JavaScript at all. */
+    check(`${file} was actually read`, source.length > 200, true);
+  }
+
+  /* Fired at the text it exists to catch, and at the legal text nearest it. */
+  const planted: ReadonlyArray<[string, string, boolean]> = [
+    ["the UTC-today antipattern", "dateEl.value = new Date().toISOString().slice(0, 10);", true],
+    ["...with spacing", "const t = new Date() . toISOString ();", true],
+    ["a day number becoming a date is legal", "return new Date(day * 86_400_000).toISOString().slice(0, 10);", false],
+    ["a parsed date becoming a string is legal", "return new Date(value).toISOString();", false],
+    ["reading the clock in a zone is the whole point", 'todayIsoInZone("America/New_York")', false],
+    /* And the stripper itself, since the check now leans on it. */
+    ["the antipattern quoted inside a block comment",
+      "/* this used to be new Date().toISOString().slice(0, 10) */", false],
+    ["the antipattern quoted after a line comment",
+      "// was: new Date().toISOString()", false],
+  ];
+  for (const [label, text, want] of planted) {
+    check(`the UTC-today grep catches ${label}`, UTC_TODAY.test(withoutComments(text)), want);
+  }
+}
+
 /* A GREP THAT ONLY EVER PASSES IS INDISTINGUISHABLE FROM A BROKEN ONE, and
  * twelve clean files passing four patterns says nothing about whether the
  * patterns work. Each is fired at the text it exists to catch, and at the

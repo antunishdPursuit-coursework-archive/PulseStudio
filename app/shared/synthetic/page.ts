@@ -6,6 +6,7 @@
  */
 
 import { counted } from "../text.js";
+import { todayIsoInZone } from "../today.js";
 import {
   DEFAULT_CONFIG,
   GENERATOR_VERSION,
@@ -35,9 +36,19 @@ const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 const downloadBtn = requiredElement<HTMLButtonElement>("#download");
 const downloadCsvBtn = requiredElement<HTMLButtonElement>("#download-csv");
 
-// UI-layer clock read: prefill today's date. The engine itself only ever
-// sees the date as data.
-dateEl.value = new Date().toISOString().slice(0, 10);
+/* UI-layer clock read: prefill today's date. The engine itself only ever
+ * sees the date as data — that is what this file is allowed to do and the
+ * engine is not.
+ *
+ * IN THE STUDIO'S ZONE, NOT UTC. This was
+ * `new Date().toISOString().slice(0, 10)`, which is UTC, so somebody in
+ * New York opening this page after 8pm was handed TOMORROW's date and
+ * generated a studio as of a day that had not happened where the studio
+ * is. Product D's brief already records the same mistake costing it a
+ * misread return — "a note taken at 8pm on a Wednesday was stamped
+ * Thursday". Three modules wrote this rule and this was the one that got
+ * it wrong; there is one implementation now. */
+dateEl.value = todayIsoInZone(DEFAULT_CONFIG.timezone);
 
 let lastSerialized: string | null = null;
 let lastCsv: string | null = null;

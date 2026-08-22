@@ -28,6 +28,7 @@
  * ONE shared file (app/shared/brand.ts); a standalone port re-points this
  * line at its own name. */
 export { STUDIO_NAME } from "../../shared/brand.js";
+export { todayIsoInZone } from "../../shared/today.js";
 
 /* The RUNNING studio — the same cached dataset Booking books against and
  * the top-bar sign-in lists (shared/auth/studio.ts). This product's

@@ -116,19 +116,12 @@ function daysInMonth(year: number, month: number): number {
   return DAYS_IN_MONTH[month - 1] ?? 0;
 }
 
-/** Whole-day number of the CURRENT date in the studio's timezone — not the
- *  viewer's. A staff member checking from another timezone at 11:30pm studio
- *  time must get the studio's answer, or every threshold boundary shifts by
- *  a day. en-CA formatting yields YYYY-MM-DD, the same shape the fixture
- *  dates use. */
-export function todayIsoInZone(timeZone: string, now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
+/* todayIsoInZone MOVED to app/shared/today.ts and is re-exported here, so
+ * every caller and every check keeps its import. Three modules had written
+ * their own and one of them was UTC — see that file. This product reaches
+ * shared ground through deps.ts, which is where the import lives. */
+import { todayIsoInZone } from "./deps.js";
+export { todayIsoInZone };
 
 export function todayDayNumber(timeZone: string, now: Date = new Date()): number {
   return dayNumberFromIso(todayIsoInZone(timeZone, now));
