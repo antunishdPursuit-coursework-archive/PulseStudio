@@ -3489,6 +3489,51 @@ check("clean records produce no data-quality line",
     rank(mixed.records), "Zoe Adams,Al Baker");
 }
 
+/* WHICH CLASS WAS "LAST" WHEN THE SHEET NEVER RECORDED A TIME.
+ *
+ * A sign-in sheet is a name and a date, so this door times every class on
+ * a date at midnight — two different classes the same day therefore carry
+ * the SAME timestamp. Whichever won the tie became "last attended", and
+ * that decides the class and instructor on the evidence line AND in the
+ * note sent to the member. It was decided by row order.
+ *
+ * Which one genuinely came later is unknowable from a sheet with no clock
+ * in it. Answering the same way every time is what is owed; guessing
+ * differently per import is not. */
+{
+  const T = dayNumberFromIso("2026-08-21");
+  const lastClassFor = (sameDayRows: readonly string[]): string => {
+    const fx = adaptAttendanceCsv(
+      ["Member,Date,Class,Instructor", ...sameDayRows, "Pat Rivera,2026-06-27,yoga,Ana"].join("\n"),
+      "America/New_York");
+    const f = findQuietMembers(fx.records, T, proposedRules).flagged[0];
+    return f ? `${f.lastSession.class_type}/${f.lastInstructorName}` : "none";
+  };
+
+  const yogaFirst = lastClassFor(["Pat Rivera,2026-07-25,yoga,Ana", "Pat Rivera,2026-07-25,HIIT,Kim"]);
+  const hiitFirst = lastClassFor(["Pat Rivera,2026-07-25,HIIT,Kim", "Pat Rivera,2026-07-25,yoga,Ana"]);
+
+  check("two classes on one day really do share a timestamp here",
+    adaptAttendanceCsv(["Member,Date,Class", "P,2026-07-25,yoga", "P,2026-07-25,HIIT"].join("\n"),
+      "America/New_York").records.class_sessions
+      .map((c) => c.starts_at).every((t, _i, all) => t === all[0]), true);
+  check("the same day's classes give the same answer whichever row came first",
+    yogaFirst, hiitFirst);
+  check("...and the answer is chosen by the class itself, not its position",
+    yogaFirst, "HIIT/Kim");
+
+  /* A real time still wins over the tie-break, or the fix would have
+   * replaced "whichever row" with "whichever name sorts first". */
+  const timed = adaptAttendanceCsv([
+    "Member,Date,Class,Instructor",
+    "Pat Rivera,2026-06-27,yoga,Ana",
+    "Pat Rivera,2026-07-25,yoga,Ana",
+  ].join("\n"), "America/New_York");
+  const timedFlag = findQuietMembers(timed.records, T, proposedRules).flagged[0];
+  check("a genuinely later date still outranks any tie-break",
+    timedFlag?.lastSession.starts_at.slice(0, 10), "2026-07-25");
+}
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 

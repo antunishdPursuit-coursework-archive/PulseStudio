@@ -174,6 +174,12 @@ function mostCommon(valuesMostRecentFirst: string[]): string {
   return best;
 }
 
+/** Plain ascending comparison, for tie-breaks that must not depend on the
+ *  order records arrived in. */
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /** Apply the quiet-member rule to the shared records.
  *
  *  Flags a member when ALL of these hold:
@@ -267,7 +273,36 @@ export function findQuietMembers(
         const day = dayNumberFromIso(s.starts_at);
         return Number.isFinite(day) && day <= today;
       })
-      .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+      /* NEWEST FIRST, AND THEN BY ID SO THE ANSWER IS ALWAYS THE SAME.
+       *
+       * A sign-in sheet has no clock in it, so this door times every
+       * class on a date at midnight — which means two different classes
+       * the same day carry the SAME timestamp. Without the second key the
+       * one that became "last attended" was whichever row the file
+       * listed first, so the identical records in a different order gave
+       * "Last attended: yoga with Ana" or "Last attended: HIIT with Kim",
+       * and the type and instructor feed the note sent to the member.
+       *
+       * Which of the two was genuinely later is unknowable from a sheet
+       * that never recorded a time. Answering the same way every time is
+       * the part that is owed; guessing differently on each import is
+       * not. Session ids are unique, so this is a total order — the same
+       * rule suggestedSession's comparator already follows.
+       *
+       * The tie-break is on CONTENT, and that correction cost a round:
+       * breaking the tie on session_id looked right and changed nothing,
+       * because this door mints ids from row position — csv_s_1, csv_s_2 —
+       * so reversing the rows reverses the ids too. A key derived from the
+       * order cannot rescue an order-dependent answer. Class type and
+       * instructor are properties of the class itself; session_id stays
+       * last only to keep the comparator total. */
+      .sort(
+        (a, b) =>
+          Date.parse(b.starts_at) - Date.parse(a.starts_at) ||
+          compareText(a.class_type, b.class_type) ||
+          compareText(a.instructor_id, b.instructor_id) ||
+          compareText(a.session_id, b.session_id),
+      );
 
     const lastSession = attendedSessions[0];
     if (!lastSession) {
