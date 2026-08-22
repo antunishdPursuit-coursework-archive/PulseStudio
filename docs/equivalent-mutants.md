@@ -14,7 +14,7 @@ check is added, so a number written down is wrong within the week — the
 standard in [README.md](./README.md) says where a number matters, say where
 to read it live. Run the tool.
 
-## The instrument was wrong three times first
+## The instrument was wrong five times
 
 Every one of these inflated a score that had already been reported, so treat
 a fresh number as provisional until a survivor has been read.
@@ -27,6 +27,22 @@ a fresh number as provisional until a survivor has been read.
 
 The clock is now derived from a clean run (5×, floor 30s) and a run that
 still hits it is reported separately, never folded into "caught".
+
+**Two more on 2026-08-22, and they compound.** A survey writes to the
+compiled file and puts it back in a `finally` — which a SIGNAL does not
+run. Node's default SIGINT and SIGTERM exit without unwinding, so an
+interrupted survey left the last mutation on disk. The header claimed it
+restored "including on Ctrl-C", naming the exact case it did not handle.
+Surveys take minutes, so interrupting one is the normal case.
+
+Then the second: nothing checked that the judge PASSED before anything was
+mutated. With a stale mutation left in place, every suite run failed before
+it read anything, every mutation read as caught, and `scenarios.js` scored
+**97% in 22 seconds** — where the true answer is **78% and takes seven
+minutes**. A fast, flattering number is the hardest kind to distrust, and
+it briefly convinced me the earlier 78% had been the artefact rather than
+the answer. The clean run was already happening to derive the clock; it
+just was not being read. Both fixed.
 
 ## Survivors that cannot be closed
 

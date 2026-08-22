@@ -251,8 +251,28 @@ for (const rel of TARGETS) {
    * not allowed to be counted as caught for being slower. */
   {
     const started = Date.now();
-    runSuite(suite);
+    const clean = runSuite(suite);
     budgetMs = Math.max(30_000, (Date.now() - started) * 5);
+
+    /* A BROKEN BASELINE MAKES EVERY MUTATION LOOK CAUGHT, and the score
+     * comes out HIGH rather than obviously wrong. Measured: with a stale
+     * mutation left in the compiled file, scenarios.js scored 97% in 22
+     * seconds — the judge was failing before it read anything — where the
+     * true answer is 78% and takes seven minutes. A fast, flattering number
+     * is the hardest kind to distrust.
+     *
+     * The clean run was already happening for the clock; it was just
+     * thrown away. Now it decides whether the survey means anything. */
+    if (clean.failed !== 0) {
+      console.error(
+        `mutate-suite: the judge does not pass BEFORE anything is mutated ` +
+          `(${clean.failed === -1 ? "no readable result" : `${clean.failed} failing`}). ` +
+          "Every mutation would read as caught and the score would come out high and meaningless. " +
+          "Run `npm run build` — a previous survey interrupted by a signal used to leave a mutated " +
+          "file behind, and the compiled output is gitignored, so nothing else will tell you.",
+      );
+      process.exit(1);
+    }
   }
 
   /* Collect every site first, then walk them with the stride, so the
@@ -267,6 +287,42 @@ for (const rel of TARGETS) {
   }
   allSites.sort((a, b) => a[2] - b[2]);
   const chosen = allSites.filter((_, i) => i % STRIDE === 0);
+
+  /* A SIGNAL DOES NOT RUN `finally`, AND THIS SURVEY WRITES TO DISK.
+   *
+   * The comment below used to say the file is put back "including on
+   * Ctrl-C", and that was simply untrue: Node's default SIGINT and SIGTERM
+   * handling exits the process without unwinding, so `finally` never runs
+   * and the last mutation stays on disk. A survey of one module takes
+   * minutes, so interrupting one is the normal case, not the rare one.
+   *
+   * What that costs, measured rather than imagined: a run killed at a
+   * ten-minute limit left scenarios.js mutated, the synthetic suite then
+   * reported 20 failures at every attempt, and the NEXT survey scored the
+   * same module at 78% against a baseline that was already broken — a
+   * number that looked like a finding and was an artefact. `npm run check`
+   * would have failed for a reason nothing on disk explained, because the
+   * compiled file is gitignored and `git status` says nothing about it.
+   *
+   * Restored on the way out now, then the handler is removed so a second
+   * signal behaves normally. */
+  const putItBack = () => {
+    try {
+      writeFileSync(path, original);
+    } catch {
+      /* Nothing better to do while dying; the message below still prints. */
+    }
+  };
+  const onSignal = (signal) => {
+    putItBack();
+    console.error(
+      `\nmutate-suite: interrupted (${signal}) — ${rel} has been put back. ` +
+        "Run `npm run build` if you are unsure; the compiled file is gitignored, so nothing else will tell you.",
+    );
+    process.exit(130);
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   try {
     {
@@ -289,9 +345,12 @@ for (const rel of TARGETS) {
       }
     }
   } finally {
-    /* Always put it back, including on Ctrl-C or a throw. Leaving a
-     * mutated build behind would make the next `npm run check` lie. */
-    writeFileSync(path, original);
+    /* Always put it back. A throw unwinds through here; a signal does not,
+     * which is what the handlers above are for. Leaving a mutated build
+     * behind would make the next `npm run check` lie. */
+    putItBack();
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
   }
 
   const caught = applied - survivors.length;
