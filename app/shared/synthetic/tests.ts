@@ -1518,6 +1518,76 @@ for (const file of ENGINE_SOURCES) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Injected defects need an id no real record has — and six digits      */
+/* ------------------------------------------------------------------ */
+
+/* An id is `kind:NNNNNN` and ID_PATTERN wants EXACTLY six digits. The
+ * injector used to mint its phantom ids by adding 900001 to the collection
+ * length, which is fine for a studio of sixty and wrong for a large one:
+ * past 99,998 rows the sum needs a seventh digit. At the largest settings
+ * the shipped form offers — 2000 members, five years, edge-cases —
+ * attendance reaches about 168,000 rows and thirty ids came out malformed,
+ * so the report read as a data defect when the fault was in the id.
+ *
+ * That full-scale run takes thirteen seconds, which is most of this
+ * suite's budget for one case, so it is not run here. What IS run is the
+ * property that distinguishes the two schemes at any size: phantom ids are
+ * now minted DOWNWARD from the top of the six-digit space, so they sit at
+ * 999999 and below rather than a little past the collection length. At
+ * sixty members that is 999982..999999 where the old scheme gave ~900776.
+ */
+{
+  const bundle = generateStudio({
+    ...DEFAULT_CONFIG,
+    seed: "phantom-ids",
+    asOfDate: "2026-08-22",
+    memberCount: 60,
+    historyDays: 180,
+    mode: "edge-cases",
+  });
+  const d = bundle.dataset;
+
+  const everyId = [
+    ...d.attendance.map((r) => r.id),
+    ...d.bookings.map((r) => r.id),
+    ...d.classSessions.map((r) => r.id),
+  ];
+  check("every id an edge-cases run mints is still a six-digit id",
+    everyId.every((id) => ID_PATTERN.test(id)), true);
+
+  /* The phantoms are the ids above the real range, which runs 1..length. */
+  const numberOf = (id: string): number => Number(id.split(":")[1]);
+  const phantomAttendance = d.attendance
+    .map((r) => numberOf(r.id))
+    .filter((n) => n > d.attendance.length);
+  /* Non-vacuous: edge-cases mode must actually have injected something,
+   * or every line below would pass by having nothing to look at. */
+  check("edge-cases mode injected rows with phantom ids",
+    phantomAttendance.length > 0, true);
+  check("...and every one is minted downward from the top of the range",
+    phantomAttendance.every((n) => n >= 999_000 && n <= 999_999), true);
+  check("...so none of them collides with a real row",
+    phantomAttendance.every((n) => n > d.attendance.length), true);
+  check("...and each phantom is used once",
+    new Set(phantomAttendance).size, phantomAttendance.length);
+
+  /* The guard underneath it all: makeId refuses a seventh digit outright
+   * rather than emitting an id the validator would later call malformed. */
+  let refused = "";
+  try {
+    makeId("attendance", 1_000_000);
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error);
+  }
+  check("a seventh digit is refused at the source", refused.includes("six digits"), true);
+  check("...and the last six-digit id is still allowed",
+    makeId("attendance", 999_999), "attendance:999999");
+
+  const report = validateBundle(bundle);
+  check("an edge-cases bundle validates clean, ids included", report.ok, true);
+}
+
+/* ------------------------------------------------------------------ */
 /* Render the stated verdict                                            */
 /* ------------------------------------------------------------------ */
 

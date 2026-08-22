@@ -666,10 +666,30 @@ function injectEdgeCases(
   asOfDay: number,
 ): DeclaredViolation[] {
   const declared: DeclaredViolation[] = [];
-  const nextAttendanceId = (): string =>
-    makeId("attendance", dataset.attendance.length + 900001);
-  const nextBookingId = (): string =>
-    makeId("booking", dataset.bookings.length + 900001);
+
+  /* PHANTOM IDS COUNT DOWN, they do not count up past the end.
+   *
+   * An injected defect needs an id no real record has. This used to make
+   * one by adding 900001 to the collection length, which is fine for a
+   * studio of sixty and wrong for a large one: ids are `kind:NNNNNN` and
+   * ID_PATTERN wants EXACTLY six digits, so once a collection passes 99,998
+   * rows the sum needs seven and the id is malformed. At the largest
+   * settings the shipped form offers — 2000 members, five years,
+   * edge-cases — attendance reaches about 168,000 rows, and the generator
+   * minted thirty ids the validator then rejected as malformed-id. The
+   * report read as a data defect; the fault was in the id.
+   *
+   * Counting down from the top of the six-digit space keeps every phantom
+   * six digits and keeps it clear of the real ids, which run 1..length.
+   * The two ranges cannot meet until a collection holds nearly a million
+   * rows, and makeId's own guard is waiting there. */
+  let phantomsMinted = 0;
+  const nextPhantomId = (kind: "attendance" | "booking" | "class-session"): string => {
+    phantomsMinted += 1;
+    return makeId(kind, 1_000_000 - phantomsMinted);
+  };
+  const nextAttendanceId = (): string => nextPhantomId("attendance");
+  const nextBookingId = (): string => nextPhantomId("booking");
 
   const attendedRows = dataset.attendance.filter((a) => a.status === "attended");
   const sessionById = new Map(dataset.classSessions.map((s) => [s.id, s]));
@@ -909,7 +929,7 @@ function injectEdgeCases(
       const template = dataset.classTypes[0];
       if (anchorSession && template) {
         const overlapping: SyntheticClassSession = {
-          id: makeId("class-session", dataset.classSessions.length + 900001),
+          id: nextPhantomId("class-session"),
           classTypeId: template.id,
           instructorId: anchorSession.instructorId,
           startsAt: anchorSession.startsAt,

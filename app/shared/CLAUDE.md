@@ -163,6 +163,21 @@ the legacy contract) is what all four products speak.
   covers the arithmetic itself now, including `nearestReadable`, which is
   what accepts or adjusts a person's chosen colours and previously had no
   checks anywhere.
+- **Injected defects mint their phantom ids DOWNWARD from 999999**, and
+  that is load-bearing at scale. An id is `kind:NNNNNN` and `ID_PATTERN`
+  wants exactly six digits. The injector used to add 900001 to the
+  collection length, which is correct for a studio of sixty and wrong past
+  99,998 rows, where the sum needs a seventh digit. At the largest
+  settings the shipped form offers — 2000 members, five years, edge-cases
+  — attendance reaches about 168,000 rows and thirty ids came out
+  malformed, so the validation report read as a data defect when the fault
+  was in the id. Counting down from the top keeps every phantom six digits
+  and clear of the real ids, which run 1..length. Found 2026-08-22 by
+  `makeId`'s own pad guard, which turned a silent malformed bundle into a
+  refusal that named the cause. The full-scale run takes thirteen seconds
+  and is NOT in the suite; what the suite pins is the property that tells
+  the two schemes apart at sixty members, where phantoms sit at
+  999982..999999 and the old scheme gave ~900776.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
