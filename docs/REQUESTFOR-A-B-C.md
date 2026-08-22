@@ -49,6 +49,11 @@ confirmed from the fixture regardless of what runtime adds.
 **THE ONE ASK:** reply with the runtime-reservation storage decision so I can
 take it to the team as agreed-by-both.
 
+**Kerrian, 22 Aug 2026:** Runtime reservations are `localStorage` key
+`pulse-reservations-a` (append-only, last-row-wins,
+`reserved | waitlisted | canceled`). Deep link is `?session=<session_id>`.
+D already reads both. Treat that as agreed.
+
 ---
 
 ## For Manny (Product B — Staff Scheduling Dashboard)
