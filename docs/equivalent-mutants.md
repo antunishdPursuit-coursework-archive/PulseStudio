@@ -88,6 +88,10 @@ and defensive; the generated corpus simply never produces the input.
   told apart by anything a person can pick. The pair either side of the line
   is what the checks use instead: `#767676` at 4.5422 and `#777777` at
   4.4781, with a third check asserting they really do straddle it.
+- `color.ts` — the saturation denominator in `hexToHsl`. It is zero only
+  when lightness is 0 or 1, and either forces max and min equal, which the
+  `delta === 0` test above it has already caught. Safe by construction, not
+  by luck.
 - `random.ts` — `next() < probability`. `<` and `<=` differ only when a draw
   lands exactly on the boundary: about one in four billion for a float built
   from a 32-bit integer.
@@ -141,6 +145,15 @@ is the durable part — the individual fixes are just where it landed.
   thresholds — "1 classes in the prior 60 days" on the line staff judge a
   flag by — and two existing checks were pinning the wrong grammar as the
   expected answer.
+- **Arithmetic that can reach a screen as Infinity or NaN.** Every division
+  in a display or decision path, in Product D and in shared. `weeklyCadence`
+  divided by a configurable window with no guard, so a zero-day window
+  printed "≈Infinity/week" on the line staff judge a flag by. Most of the
+  rest divide by constants. Two do not and are contained rather than
+  guarded: `theme-boot` divides by an element width, which is zero before
+  layout, and the resulting `"#NaNNaNNaN"` is rejected by `isHexColor` at
+  every consumer — so a bad value degrades to the readable default instead
+  of one layer silently repairing it into a third colour nobody chose.
 - **In-band markers a real value can equal.** "The records did not say" was
   encoded as the words `"class"` and `"the team"`, both of which a studio can
   genuinely have in its own export. A file naming both produced "the import

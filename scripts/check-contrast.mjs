@@ -258,6 +258,28 @@ function selfTest() {
       contrast("#ffffff", "#767676") >= AA_TEXT && contrast("#ffffff", "#777777") < AA_TEXT, true],
     ["...and the plainly unreadable pair is refused too",
       contrast("#ffffff", "#bbbbbb") < AA_TEXT, true],
+
+    /* WHAT A ZERO-WIDTH CANVAS PRODUCES, AND WHY IT GOES NO FURTHER.
+     *
+     * theme-boot divides a pointer position by the editor's width, and an
+     * element that has not been laid out has a width of zero — so NaN can
+     * reach the colour maths from the DOM side. hslToHex then returns the
+     * string "#NaNNaNNaN", which is not a colour.
+     *
+     * It is contained rather than prevented, deliberately: every consumer
+     * rejects it instead of one of them silently repairing it, so a bad
+     * value degrades to the readable default rather than becoming some
+     * third colour nobody chose. These pin that containment, which was
+     * true and unproven. */
+    ["a non-finite colour is not a hex colour",
+      isHexColor(hslToHex({ hue: Number.NaN, saturation: Number.NaN, lightness: Number.NaN })), false],
+    ["...so a stored one falls back to the readable default",
+      JSON.stringify(parseCustomColors('{"background":"#NaNNaNNaN","text":"#0a0a0a"}')),
+      JSON.stringify(DEFAULT_CUSTOM)],
+    ["...and an Infinite lightness is refused the same way",
+      isHexColor(hslToHex({ hue: 0, saturation: 0, lightness: Number.POSITIVE_INFINITY })), false],
+    ["...while a NaN contrast never reads as passing AA",
+      contrast("#NaNNaNNaN", "#ffffff") >= AA_TEXT, false],
   ];
   let failed = 0;
   for (const [label, got, want] of cases) {
