@@ -105,6 +105,73 @@ check("valid JSON with the wrong shape reads as null", () => {
   return eq(readPulseSession(), null);
 });
 
+/* EVERY OTHER SHAPE JSON CAN HOLD.
+ *
+ * The array above was the only non-object ever stored here, and it exits
+ * through `Array.isArray`. The literal `null` exits through a different
+ * clause, and it is the one that catches people out: `typeof null` is
+ * "object", so without the explicit `value === null` the reader walks
+ * straight into dereferencing it. Mutation showed that clause could be
+ * turned inside out with the whole suite still green — this key is
+ * written by four products and read on every page load, so a throw here
+ * is a blank page, not a lost session. */
+
+/* AN EMPTY STORE THAT REALLY IS EMPTY.
+ *
+ * readPulseSession trusts an empty store only when the browser would have
+ * KEPT a write — otherwise the emptiness is a refusal, not a sign-out, and
+ * the page's own memory is the better answer. That is two conditions, and
+ * mutation showed they could be joined the other way with everything
+ * still green: memory would then be served whenever the store was empty,
+ * for any reason, and a key cleared out from under this tab would be
+ * quietly resurrected. Nothing had ever set memory and emptied the store
+ * independently, because the fixture's own reset clears both. */
+
+check("a key cleared under a working store reads as signed out, not from memory", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  if (readPulseSession() === null) return "the fixture never signed in";
+  localStorage.removeItem(KEY); // another tab signed out; no event delivered here
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view says the same", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  localStorage.removeItem(KEY);
+  return eq(currentSession(), null);
+});
+
+check("a stored null reads as null rather than throwing", () => {
+  fresh();
+  localStorage.setItem(KEY, "null");
+  return eq(readPulseSession(), null);
+});
+
+check("a stored bare string reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, JSON.stringify("front-desk"));
+  return eq(readPulseSession(), null);
+});
+
+check("a stored number reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, "42");
+  return eq(readPulseSession(), null);
+});
+
+check("a stored boolean reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, "true");
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view agrees, so Product A sees signed out", () => {
+  fresh();
+  localStorage.setItem(KEY, "null");
+  return eq(currentSession(), null);
+});
+
 check("a missing version reads as null (the v0 shape is not guessed at)", () => {
   fresh();
   localStorage.setItem(
