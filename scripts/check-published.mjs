@@ -89,6 +89,34 @@ export function classifyPublished(files) {
   return { web, sources, other };
 }
 
+/* HAS THIS PAGE DECIDED WHETHER IT WANTS TO BE FOUND?
+ *
+ * Every page under app/ is at a public URL. There are exactly two honest
+ * positions: it is in sitemap.xml because people should find it, or it
+ * carries `<meta name="robots" content="noindex">` because they should not.
+ * A page that is NEITHER has not been thought about, and on this site that
+ * is how a staff surface ends up quietly indexable.
+ *
+ * robots.txt cannot help. It says so itself at length: this is a GitHub
+ * Pages PROJECT site, so the file a crawler reads is the USER site's
+ * robots.txt in another repository entirely, and /PulseStudio/robots.txt is
+ * never fetched. `Disallow` would be the wrong tool anyway — it blocks
+ * CRAWLING, so a disallowed page can still be listed from links pointing at
+ * it, and a crawler that may not fetch the page can never see its noindex.
+ * The tag is the only thing that actually works, which is why the
+ * re-engagement tool carries one and stays crawlable.
+ *
+ * BOTH AT ONCE is the other failure, and it is a contradiction rather than
+ * an omission: advertising a page in the sitemap while telling crawlers to
+ * drop it. Neither is a security control. A staff page holding real member
+ * data belongs behind a sign-in. */
+export function indexingChoice(html, listedInSitemap) {
+  const noindex = /<meta[^>]+name=["']robots["'][^>]*noindex/i.test(html);
+  if (noindex && listedInSitemap) return "contradicted";
+  if (!noindex && !listedInSitemap) return "undecided";
+  return "decided";
+}
+
 /* ---------- the self-test ---------- */
 
 function selfTest() {
@@ -102,7 +130,30 @@ function selfTest() {
     { label: "the incident that started this — an internal note under app/", file: "app/products/d-reengagement/SENIOR-DEV-BRIEF.md", want: "other" },
     { label: "a shell script under app/ is NOT the website", file: "app/products/d-reengagement/bundle.sh", want: "other" },
   ];
-  let failed = 0;
+  /* THE INDEXING DECISION, at each of its corners. */
+  const NOINDEX = '<meta name="robots" content="noindex, nofollow">';
+  const indexingCases = [
+    ["a page in the sitemap and not noindex has decided", "<head></head>", true, "decided"],
+    ["a noindex page absent from the sitemap has decided", NOINDEX, false, "decided"],
+    ["a page that is neither has not decided", "<head><title>x</title></head>", false, "undecided"],
+    ["a page that is both contradicts itself", NOINDEX, true, "contradicted"],
+    /* Single quotes and extra attributes are ordinary HTML, not a reason to
+     * miss the tag and call a staff page undecided. */
+    ["single quotes are still a noindex", "<meta name='robots' content='noindex'>", false, "decided"],
+    /* A different meta tag that merely mentions the word must not count. */
+    ["a description mentioning noindex is not a robots tag",
+      '<meta name="description" content="how noindex works">', false, "undecided"],
+  ];
+  let failedIndexing = 0;
+  for (const [label, html, listed, want] of indexingCases) {
+    const got = indexingChoice(html, listed);
+    if (got !== want) {
+      failedIndexing += 1;
+      console.error(`  self-test MISS — ${label}: wanted ${want}, got ${got}`);
+    }
+  }
+
+  let failed = failedIndexing;
   for (const c of planted) {
     const { web, sources, other } = classifyPublished([c.file]);
     const got = web.length ? "web" : sources.length ? "sources" : "other";
@@ -112,7 +163,7 @@ function selfTest() {
     }
   }
   console.log(
-    `self-test: ${planted.length} planted cases, ${planted.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + indexingCases.length} planted cases, ${planted.length + indexingCases.length - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
@@ -143,6 +194,53 @@ function run() {
       `${web.length} the website asks for, ${sources.length} TypeScript sources beside the modules they compile to, ` +
       `${other.length} neither.`,
   );
+
+  /* Second pass: every page's indexing decision. */
+  const sitemapPath = join(ROOT, "app/sitemap.xml");
+  const sitemap = existsSync(sitemapPath) ? readFileSync(sitemapPath, "utf8") : "";
+  const knownIndexing = new Map((baseline.indexing ?? []).map((e) => [e.file, e]));
+  const undecided = [];
+  const contradicted = [];
+  let pages = 0;
+  for (const file of tracked) {
+    if (!file.endsWith(".html")) continue;
+    pages += 1;
+    const urlPath = file.replace(/^app/, "").replace(/index\.html$/, "");
+    const listed = sitemap.includes(`PulseStudio${urlPath}`);
+    const verdict = indexingChoice(readFileSync(join(ROOT, file), "utf8"), listed);
+    if (verdict === "undecided") undecided.push(file);
+    if (verdict === "contradicted") contradicted.push(file);
+  }
+  const freshUndecided = undecided.filter((f) => !knownIndexing.has(f));
+  console.log(
+    `check-published: ${pages} published pages read for an indexing decision — ` +
+      `${undecided.length} neither listed nor noindex (${undecided.length - freshUndecided.length} known), ` +
+      `${contradicted.length} both at once.`,
+  );
+  for (const file of undecided.filter((f) => knownIndexing.has(f))) {
+    const e = knownIndexing.get(file);
+    console.log(`  known · ${file} · ${e.why} (owner: ${e.owner})`);
+  }
+  for (const file of contradicted) {
+    console.error(
+      `  ${file} · is listed in sitemap.xml AND carries a noindex tag. One of those is wrong: ` +
+        "the sitemap invites crawlers, the tag turns them away.",
+    );
+  }
+  for (const file of freshUndecided) {
+    console.error(
+      `  ${file} · is published at a public URL but is neither listed in sitemap.xml nor marked ` +
+        '`<meta name="robots" content="noindex">`. Decide which it is. robots.txt cannot do this job — ' +
+        "read its own comment: on a Pages project site the crawler never fetches it, and Disallow " +
+        "blocks crawling rather than indexing, which stops a noindex tag from ever being seen.",
+    );
+  }
+  if (contradicted.length > 0 || freshUndecided.length > 0) {
+    console.error(
+      `check-published: ${contradicted.length + freshUndecided.length} page(s) with no honest indexing decision. FAIL`,
+    );
+    process.exit(1);
+  }
 
   const isNew = other.filter((f) => !allowed.has(f));
   const gone = [...allowed.keys()].filter((f) => !other.includes(f));
