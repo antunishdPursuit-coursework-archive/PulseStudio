@@ -8,14 +8,14 @@
  */
 
 import { ID_PATTERN, makeId } from "./contracts.js";
-import type { GeneratedStudioBundle } from "./contracts.js";
+import type { GeneratedStudioBundle, MembershipPeriod } from "./contracts.js";
 import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
 import { attendanceCsv, csvField } from "./csv-export.js";
 import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
-import { deriveStatusOn } from "./lifecycle.js";
+import { deriveStatusOn, periodProblems } from "./lifecycle.js";
 import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
@@ -522,6 +522,42 @@ check("serialize -> parse -> serialize is byte-identical",
     message.includes("missing"), true);
 }
 
+/* WHAT parseBundle IS HANDED WHEN THE FILE IS WRONG.
+ *
+ * It reads JSON from outside, so every shape JSON can hold is reachable —
+ * including the one that catches people out: JSON.parse("null") returns
+ * null, and typeof null is "object". The three guards that spell that out
+ * (`typeof x !== "object" || x === null`) could each be turned into `&&`
+ * with the whole suite still green, because only a bundle missing FIELDS
+ * had ever been parsed here, never one that was null. */
+{
+  const reasonFor = (text: string): string => {
+    try {
+      parseBundle(text);
+      return "did not throw";
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+  const goodText = serializeBundle(first);
+  const good = JSON.parse(goodText) as Record<string, unknown>;
+
+  check("a top-level null is refused, not treated as an empty bundle",
+    reasonFor("null"), "not a bundle: top level is not an object");
+  check("...and so is a bare number",
+    reasonFor("42"), "not a bundle: top level is not an object");
+  check("an array is refused for what it is actually missing",
+    reasonFor("[]"), "not a bundle: missing dataset, truth");
+  check("text that is not JSON says so first",
+    reasonFor("{oops").startsWith("not JSON:"), true);
+  check("a null dataset is named, not dereferenced",
+    reasonFor(JSON.stringify({ ...good, dataset: null })), "not a bundle: missing dataset");
+  check("a null truth is named too",
+    reasonFor(JSON.stringify({ ...good, truth: null })), "not a bundle: missing truth");
+  check("...while the real thing still parses, so none of this is refusing everything",
+    serializeBundle(parseBundle(goodText)) === goodText, true);
+}
+
 /* ------------------------------------------------------------------ */
 /* The bands the adversarial sweep broke — pinned forever               */
 /* ------------------------------------------------------------------ */
@@ -990,6 +1026,67 @@ for (const file of ENGINE_SOURCES) {
       shouldFire,
     );
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* periodProblems — the membership history checker                      */
+/* ------------------------------------------------------------------ */
+
+/* validate.ts runs this over every member, and it decides whether a
+ * membership history is coherent — which is upstream of derived status,
+ * which is what Product D means by "active member". It had no direct
+ * checks: it was only ever reached through generated data, which is
+ * coherent by construction, so every branch that reports a PROBLEM went
+ * unexercised. Mutation found the boundary — a period ending the same day
+ * it starts could stop being reported with nothing noticing. */
+{
+  const period = (
+    id: string,
+    startsOn: string,
+    endsOn: string | null,
+  ): MembershipPeriod => ({
+    id,
+    memberId: "member:000001",
+    state: "active",
+    startsOn,
+    endsOn,
+    planName: "monthly",
+  });
+  const joined = "2026-01-01";
+  const problemsFor = (ps: MembershipPeriod[]): string[] => periodProblems(ps, joined);
+
+  check("one open period starting the day they joined is coherent",
+    problemsFor([period("membership:000001", joined, null)]).length, 0);
+  check("a closed period followed by an open one is coherent",
+    problemsFor([
+      period("membership:000001", joined, "2026-03-01"),
+      period("membership:000002", "2026-03-01", null),
+    ]).length, 0);
+
+  check("no periods at all is reported",
+    problemsFor([]).join("|"), "no membership periods");
+  check("a period ending the SAME day it starts is reported, by id",
+    problemsFor([period("membership:000001", joined, joined), period("membership:000002", joined, null)])
+      .some((x) => x === "period membership:000001 ends on or before its start"), true);
+  check("...and so is one ending before it starts",
+    problemsFor([period("membership:000001", "2026-06-01", "2026-02-01"), period("membership:000002", "2026-06-01", null)])
+      .some((x) => x.endsWith("ends on or before its start")), true);
+  check("a history that does not start when the member joined is reported",
+    problemsFor([period("membership:000001", "2026-05-05", null)])
+      .some((x) => x.includes("history starts 2026-05-05, member joined 2026-01-01")), true);
+  check("a gap between two periods is reported with both ids",
+    problemsFor([
+      period("membership:000001", joined, "2026-03-01"),
+      period("membership:000002", "2026-04-01", null),
+    ]).some((x) => x === "gap or overlap between membership:000001 and membership:000002"), true);
+  check("an open period that is not last is reported",
+    problemsFor([
+      period("membership:000001", joined, null),
+      period("membership:000002", "2026-03-01", null),
+    ]).some((x) => x.includes("is open but not last")), true);
+  check("a history with no open period at all is reported",
+    problemsFor([period("membership:000001", joined, "2026-03-01")])
+      .some((x) => x === "expected exactly 1 open period, found 0"), true);
 }
 
 /* ------------------------------------------------------------------ */
