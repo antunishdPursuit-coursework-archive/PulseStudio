@@ -562,6 +562,21 @@ Check: open the page, look at the console.
   `staff-dashboard.js` instead. Which of the two is the real dashboard is
   yours to say. Check: `node scripts/check-reachable.mjs`.
 
+**And one for the whole team, found the same day.** The repo root holds a
+second, older copy of the site — `index.html` linking to
+`member-dashboard.html` and `staff-dashboard.html`, with their own CSS and
+JavaScript. GitHub Pages publishes `path: app`, so **none of it is
+served**: somebody who clones this and opens the root `index.html` is
+looking at a site the studio does not run. The root `staff-dashboard.js`
+has also diverged from `app/products/b-dashboard/staff-dashboard.js`,
+which is what a duplicate nobody deleted eventually costs.
+
+The filing law's own answer is to delete anything that fails all four of
+its questions, and these fail all four. But they have owners and they are
+recent, so whether they are history worth keeping is a team call rather
+than one lane's. They are baselined, not failing anything. Check:
+`node scripts/check-published.mjs`.
+
 **One consequence that is the team's, not yours.** Because `main.ts` is the
 only importer of `app/shared/data.ts`, `loadFixtures()` and
 `fixtures.json` are read by nothing the site serves. `check-fixtures.mjs`

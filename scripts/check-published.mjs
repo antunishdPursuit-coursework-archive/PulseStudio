@@ -117,6 +117,34 @@ export function indexingChoice(html, listedInSitemap) {
   return "decided";
 }
 
+/* WHAT THE ROOT IS ALLOWED TO HOLD.
+ *
+ * The filing law names it exactly: "Does somebody who just cloned this and
+ * knows nothing need it in the first 30 seconds? → the root. The contract:
+ * README.md, CLAUDE.md, package.json, tsconfig.json, the product briefs."
+ * Everything else answers one of the other three questions and belongs in
+ * app/, scripts/ or docs/ — or the law's own conclusion applies: "If the
+ * answer to all four is no, delete it — do not file it."
+ *
+ * The root drifted anyway, which is why this is a rule and not a sentence.
+ * It holds a second, older copy of the site — an index.html linking to
+ * member-dashboard.html and staff-dashboard.html, with their own CSS and
+ * JavaScript. Pages publishes `path: app`, so none of it is served: a
+ * person who clones this and opens the root index.html is looking at a
+ * site the studio does not run.
+ *
+ * Deleting it is not this gate's call and not mine — those files have
+ * owners, and whether they are history worth keeping is a team question.
+ * The gate's job is that nobody has to rediscover them. */
+export function belongsAtRoot(file) {
+  if (file.includes("/")) return true; // not a root file; someone else's question
+  if (/^PRODUCT_[A-Z]_.*\.md$/.test(file)) return true; // a product brief
+  return [
+    "README.md", "CLAUDE.md", "AGENTS.md", "SHARED_DATA_CONTRACT.md",
+    "package.json", "package-lock.json", "tsconfig.json", ".gitignore",
+  ].includes(file);
+}
+
 /* DOES THIS PAGE SAY WHERE ITS ICON IS?
  *
  * A browser given no `<link rel="icon">` asks the server for /favicon.ico
@@ -161,6 +189,32 @@ function selfTest() {
     ["a description mentioning noindex is not a robots tag",
       '<meta name="description" content="how noindex works">', false, "undecided"],
   ];
+  const rootCases = [
+    ["the readme belongs at the root", "README.md", true],
+    ["so does the brief", "CLAUDE.md", true],
+    ["and its mirror", "AGENTS.md", true],
+    ["and the manifest", "package.json", true],
+    ["and the lockfile beside it", "package-lock.json", true],
+    ["and a product brief", "PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md", true],
+    ["and the shared contract the data law names", "SHARED_DATA_CONTRACT.md", true],
+    ["a page does not", "index.html", false],
+    ["nor a stylesheet", "staff-dashboard.css", false],
+    ["nor a script", "staff-dashboard.js", false],
+    /* Anything in a folder is another question's business — this rule is
+     * about the root only, and must not start judging app/ or scripts/. */
+    ["a file in app/ is not this rule's business", "app/index.html", true],
+    ["nor one in scripts/", "scripts/check-published.mjs", true],
+    ["nor one in docs/", "docs/README.md", true],
+  ];
+  let failedRoot = 0;
+  for (const [label, file, want] of rootCases) {
+    const got = belongsAtRoot(file);
+    if (got !== want) {
+      failedRoot += 1;
+      console.error(`  self-test MISS — ${label}: wanted ${want}, got ${got}`);
+    }
+  }
+
   const iconCases = [
     ["a plain icon link counts", '<link rel="icon" href="/favicon.svg">', true],
     ["with a type and other attributes too",
@@ -175,7 +229,7 @@ function selfTest() {
     ["a preload of the icon is not a declaration",
       '<link rel="preload" href="/favicon.svg" as="image">', false],
   ];
-  let failedIcons = 0;
+  let failedIcons = failedRoot;
   for (const [label, html, want] of iconCases) {
     const got = declaresIcon(html);
     if (got !== want) {
@@ -203,7 +257,7 @@ function selfTest() {
     }
   }
   console.log(
-    `self-test: ${planted.length + indexingCases.length + iconCases.length} planted cases, ${planted.length + indexingCases.length + iconCases.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + indexingCases.length + iconCases.length + rootCases.length} planted cases, ${planted.length + indexingCases.length + iconCases.length + rootCases.length - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
@@ -222,6 +276,9 @@ function run() {
     encoding: "utf8",
   })
     .split("\n").map((f) => f.trim()).filter((f) => f !== "");
+  /* The root pass needs the WHOLE list; the passes above are scoped to app/. */
+  const tracked0 = execFileSync("git", ["-C", ROOT, "ls-files"], { encoding: "utf8" })
+    .split("\n").map((f) => f.trim()).filter((f) => f !== "");
 
   const { web, sources, other } = classifyPublished(tracked);
 
@@ -236,6 +293,31 @@ function run() {
       `${web.length} the website asks for, ${sources.length} TypeScript sources beside the modules they compile to, ` +
       `${other.length} neither.`,
   );
+
+  /* Fourth pass: the root holds only the contract. */
+  const knownRoot = new Map((baseline.root ?? []).map((e) => [e.file, e]));
+  const strays = tracked0.filter((f) => !belongsAtRoot(f));
+  const freshStrays = strays.filter((f) => !knownRoot.has(f));
+  console.log(
+    `check-published: ${tracked0.filter((f) => !f.includes("/")).length} tracked files at the repo root — ` +
+      `${strays.length} that the filing law does not name (${strays.length - freshStrays.length} known).`,
+  );
+  for (const file of strays.filter((f) => knownRoot.has(f))) {
+    const entry = knownRoot.get(file);
+    console.log(`  known · ${file} · ${entry.why} (owner: ${entry.owner})`);
+  }
+  for (const file of freshStrays) {
+    console.error(
+      `  ${file} · sits at the repo root, which the filing law reserves for what a new cloner needs in the ` +
+        "first 30 seconds: README, CLAUDE.md, package.json, tsconfig.json and the product briefs. Ask the " +
+        "law's four questions — a browser at a URL means app/, a human or CI running it means scripts/, a " +
+        `teammate reading it before writing code means docs/ — and if all four are no, delete it rather than file it.`,
+    );
+  }
+  if (freshStrays.length > 0) {
+    console.error(`check-published: ${freshStrays.length} file(s) at the root that the filing law does not name. FAIL`);
+    process.exit(1);
+  }
 
   /* Third pass: every page points at the icon this site ships. */
   const knownIcons = new Map((baseline.icons ?? []).map((e) => [e.file, e]));

@@ -142,5 +142,53 @@
       "owner": "Dennis",
       "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
     }
+  ],
+  "rootNote": "Tracked files at the repo root that the filing law does not name. The law reserves the root for what a new cloner needs in the first 30 seconds — README.md, CLAUDE.md, package.json, tsconfig.json and the product briefs — and says of anything answering no to all four of its questions: delete it rather than file it. Recorded 2026-08-22. Seven of these are a second, older copy of the site: an index.html linking to member-dashboard.html and staff-dashboard.html with their own CSS and JavaScript. GitHub Pages publishes `path: app`, so NONE of it is served — somebody who clones this and opens the root index.html is looking at a site the studio does not run. Whether that is history worth keeping is a team question, not this gate's and not one lane's. This list is meant to SHRINK.",
+  "root": [
+    {
+      "file": ".env.example",
+      "owner": "Dennis",
+      "why": "the template for the Haiku server's ANTHROPIC_API_KEY. A setup file a human reads before running something, which the filing law would put in docs/ or beside the script that needs it — Dennis's call, and the naming was already his to make"
+    },
+    {
+      "file": "index.html",
+      "owner": "Manny and the repo owner",
+      "why": "the older site's front door, linking to member-dashboard.html and staff-dashboard.html. Not published: Pages serves app/, and app/index.html is the front door the studio runs"
+    },
+    {
+      "file": "member-booking.html",
+      "owner": "Manny and the repo owner",
+      "why": "part of the older root site; Product A's booking page is app/products/a-booking/"
+    },
+    {
+      "file": "member-dashboard.html",
+      "owner": "Manny and the repo owner",
+      "why": "part of the older root site"
+    },
+    {
+      "file": "member-dashboard.css",
+      "owner": "Manny and the repo owner",
+      "why": "part of the older root site"
+    },
+    {
+      "file": "member-dashboard.js",
+      "owner": "Manny and the repo owner",
+      "why": "part of the older root site"
+    },
+    {
+      "file": "staff-dashboard.html",
+      "owner": "Manny",
+      "why": "part of the older root site; the staff dashboard the studio runs is app/products/b-dashboard/"
+    },
+    {
+      "file": "staff-dashboard.css",
+      "owner": "Manny",
+      "why": "part of the older root site"
+    },
+    {
+      "file": "staff-dashboard.js",
+      "owner": "Manny",
+      "why": "part of the older root site, and NOT the same file as app/products/b-dashboard/staff-dashboard.js — the two have diverged, which is the cost of a duplicate nobody deleted"
+    }
   ]
 }
