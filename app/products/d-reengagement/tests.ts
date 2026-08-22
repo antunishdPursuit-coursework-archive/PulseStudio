@@ -1299,6 +1299,33 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
     keepOutreachRecords([{ ...good, takenAt: "2026-02-30" }]).dropped, 1);
   check("an unknown channel is dropped — only copy and email exist",
     keepOutreachRecords([{ ...good, channel: "sms" }]).dropped, 1);
+
+  /* WHAT localStorage CAN ACTUALLY HAND BACK.
+   *
+   * This ledger is JSON.parse of a browser key, so every shape JSON can
+   * hold reaches these readers — including the one that catches people
+   * out. `[null]` is valid JSON, and typeof null is "object", which is
+   * exactly why the guard reads `typeof row !== "object" || row === null`.
+   * Turn that `||` into `&&` and the reader dereferences null and throws,
+   * taking the whole page down on a corrupt key. Every case above passes
+   * a well-formed OBJECT, so nothing noticed.
+   *
+   * The date guard has the same shape: a non-string reaching
+   * dayNumberFromIso throws on .split. */
+  check("a null row is dropped, not dereferenced",
+    keepOutreachRecords([null] as unknown as object[]).dropped, 1);
+  check("...and the survivors around it are still kept",
+    keepOutreachRecords([null, good] as unknown as object[]).kept.length, 1);
+  check("an array pretending to be a record is dropped",
+    keepOutreachRecords([[] as unknown as object]).dropped, 1);
+  check("a bare string is dropped",
+    keepOutreachRecords(["m1"] as unknown as object[]).dropped, 1);
+  check("a numeric takenAt is dropped rather than split",
+    keepOutreachRecords([{ ...good, takenAt: 20260101 }] as unknown as object[]).dropped, 1);
+  check("a null suppression row is dropped too",
+    keepSuppressionRecords([null] as unknown as object[]).dropped, 1);
+  check("...and a suppression with a numeric date",
+    keepSuppressionRecords([{ memberId: "m1", suppressedOn: 20260101 }] as unknown as object[]).dropped, 1);
   check("an empty member id is dropped, never treated as a member",
     keepOutreachRecords([{ ...good, memberId: "" }]).dropped, 1);
   check("null and strings among the rows are dropped, not read",
@@ -2972,6 +2999,50 @@ check("clean records produce no data-quality line",
   const earlier = outreachResults(note("2026-06-25"), attended.records, today);
   check("the FIRST visit past the note is the one measured, not the latest",
     earlier.medianDaysToReturn, dayNumberFromIso("2026-07-04") - dayNumberFromIso("2026-06-25"));
+
+  /* A RETURN TODAY IS STILL A RETURN.
+   *
+   * Future rows are filtered out of the attended set, and the comparison
+   * drawing that line could shift by a day — which would stop a member who
+   * walked in this morning counting as having come back. The panel would
+   * read "0 came back" on the day the note worked. */
+  const attendedToday = adaptAttendanceCsv([
+    "Member,Date",
+    "Robin Vale,2026-06-20", "Robin Vale,2026-08-21",
+  ].join("\n"), "America/New_York");
+  const todayId = attendedToday.records.members[0]?.member_id ?? "";
+  const returnedToday = outreachResults(
+    [{ memberId: todayId, lapseKey: `${todayId}|2026-06-20`, takenAt: "2026-08-20", channel: "copy" as const }],
+    attendedToday.records,
+    dayNumberFromIso("2026-08-21"),
+  );
+  check("a class attended today counts as coming back", returnedToday.returned, 1);
+  check("...measured as one day after the note", returnedToday.medianDaysToReturn, 1);
+
+  /* AN ATTENDANCE ROW POINTING AT A SESSION THAT IS NOT HERE.
+   *
+   * Realistic whenever a different data source is loaded: the ledger names
+   * a member, the records hold an outcome, and the session it refers to is
+   * absent. The guard skips it. Without the guard the date lookup returns
+   * undefined and dayNumberFromIso splits it, taking the page down rather
+   * than dropping one row. */
+  const orphaned = adaptAttendanceCsv([
+    "Member,Date", "Robin Vale,2026-06-20", "Robin Vale,2026-07-04",
+  ].join("\n"), "America/New_York");
+  const orphanId = orphaned.records.members[0]?.member_id ?? "";
+  orphaned.records.attendance.push({
+    attendance_id: "a_orphan", member_id: orphanId, session_id: "session-that-is-not-here",
+    attendance_status: "attended", recorded_at: "2026-07-10T09:00:00",
+  });
+  const withOrphan = outreachResults(
+    [{ memberId: orphanId, lapseKey: `${orphanId}|2026-06-20`, takenAt: "2026-06-25", channel: "copy" as const }],
+    orphaned.records,
+    dayNumberFromIso("2026-08-21"),
+  );
+  check("an outcome whose session is missing is skipped, not split",
+    withOrphan.outcomes.length, 1);
+  check("...and the real visit beside it is still measured",
+    withOrphan.returned, 1);
 }
 
 /* WINDOWS LINE ENDINGS — the format a real studio actually exports.

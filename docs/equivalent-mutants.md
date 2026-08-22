@@ -84,6 +84,13 @@ and defensive; the generated corpus simply never produces the input.
 - `logic.ts` — `day > lastRecordedDay` and the `isFinite` half of the guard
   beside it: an unreadable date is `NaN`, and every comparison against `NaN`
   is false, so letting it through changes nothing.
+- `outreach.ts` — `isIsoDate`'s `typeof value !== "string" || !regex.test(value)`.
+  Making it `&&` only differs for a non-string whose coercion matches a date,
+  which means an object with a date-shaped `toString` — and this input comes
+  from `JSON.parse` of a browser key, which never produces one.
+- `outreach.ts` — the `isFinite` half of the future-row filter. An unreadable
+  date is `NaN`, and every later comparison against `NaN` is false, so
+  letting one through changes no answer.
 - `identity.ts` — `nameKind === "shared" && sharedNameGroup !== null`.
   `scenarios.ts` sets both together and only for that cohort, so they can
   never disagree.
