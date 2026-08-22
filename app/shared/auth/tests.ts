@@ -9,6 +9,7 @@
    identity. */
 
 import {
+  currentSession,
   FRONT_DESK,
   clearPulseSession,
   readPulseSession,
@@ -102,6 +103,73 @@ check("valid JSON with the wrong shape reads as null", () => {
   fresh();
   localStorage.setItem(KEY, JSON.stringify([1, 2, 3]));
   return eq(readPulseSession(), null);
+});
+
+/* EVERY OTHER SHAPE JSON CAN HOLD.
+ *
+ * The array above was the only non-object ever stored here, and it exits
+ * through `Array.isArray`. The literal `null` exits through a different
+ * clause, and it is the one that catches people out: `typeof null` is
+ * "object", so without the explicit `value === null` the reader walks
+ * straight into dereferencing it. Mutation showed that clause could be
+ * turned inside out with the whole suite still green — this key is
+ * written by four products and read on every page load, so a throw here
+ * is a blank page, not a lost session. */
+
+/* AN EMPTY STORE THAT REALLY IS EMPTY.
+ *
+ * readPulseSession trusts an empty store only when the browser would have
+ * KEPT a write — otherwise the emptiness is a refusal, not a sign-out, and
+ * the page's own memory is the better answer. That is two conditions, and
+ * mutation showed they could be joined the other way with everything
+ * still green: memory would then be served whenever the store was empty,
+ * for any reason, and a key cleared out from under this tab would be
+ * quietly resurrected. Nothing had ever set memory and emptied the store
+ * independently, because the fixture's own reset clears both. */
+
+check("a key cleared under a working store reads as signed out, not from memory", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  if (readPulseSession() === null) return "the fixture never signed in";
+  localStorage.removeItem(KEY); // another tab signed out; no event delivered here
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view says the same", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  localStorage.removeItem(KEY);
+  return eq(currentSession(), null);
+});
+
+check("a stored null reads as null rather than throwing", () => {
+  fresh();
+  localStorage.setItem(KEY, "null");
+  return eq(readPulseSession(), null);
+});
+
+check("a stored bare string reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, JSON.stringify("front-desk"));
+  return eq(readPulseSession(), null);
+});
+
+check("a stored number reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, "42");
+  return eq(readPulseSession(), null);
+});
+
+check("a stored boolean reads as null", () => {
+  fresh();
+  localStorage.setItem(KEY, "true");
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view agrees, so Product A sees signed out", () => {
+  fresh();
+  localStorage.setItem(KEY, "null");
+  return eq(currentSession(), null);
 });
 
 check("a missing version reads as null (the v0 shape is not guessed at)", () => {
@@ -265,6 +333,50 @@ check("a cross-tab storage event reaches subscribers", () => {
     : "the staff session did not survive the event";
 });
 
+/* WHICH KEYS THE LISTENER WAKES FOR.
+ *
+ * Every cross-tab check above dispatches the session key, so the filter
+ * that decides WHICH keys matter was never exercised — mutation could
+ * invert it and all of them stayed green. This matters across lanes:
+ * app/shared/CLAUDE.md records that Product D writes and deletes
+ * `pulse-storage-probe` to find out whether this browser saves site data,
+ * and that the shared listener must not wake for it. A listener that woke
+ * on every key would re-render four products every time any of them
+ * touched storage. */
+
+check("a storage event for another product's key is ignored", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-storage-probe" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-reservations-a" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-theme" }));
+  stop();
+  return eq(woke, 0);
+});
+
+check("...while the session key still wakes it, so the filter is not simply off", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: "pulse-storage-probe" }));
+  window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+  stop();
+  return eq(woke, 1);
+});
+
+check("a cleared storage (key null) wakes it, because that clears the session too", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  let woke = 0;
+  const stop = subscribeToPulseSession(() => { woke += 1; });
+  window.dispatchEvent(new StorageEvent("storage", { key: null }));
+  stop();
+  return eq(woke, 1);
+});
+
 check("a same-tab change reports origin this-tab", () => {
   fresh();
   const seen: string[] = [];
@@ -338,6 +450,75 @@ check("a throwing storage keeps the page usable: the choice still holds in-memor
   return eq(got.actor_type, "staff");
 });
 
+/* THE REAL PRIVATE-MODE SHAPE: reads work, writes are refused. Storage that
+ * throws on everything is the obvious case and was already covered; this is
+ * the one several browsers actually implement, and it used to sign a person
+ * out the instant they signed in. */
+const readOnlyStorage = {
+  getItem(): string | null { return null; },
+  setItem(): void { throw new Error("storage is full or blocked"); },
+  removeItem(): void { /* accepted, nothing kept */ },
+};
+
+check("a store that reads fine but refuses writes still holds the sign-in", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the sign-in was thrown away by the first read after it";
+  return eq(got.actor_type, "staff");
+});
+
+check("...and holds it across repeated reads, not just the first", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  readPulseSession();
+  readPulseSession();
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the session survived one read and then vanished";
+  return eq(got.actor_type, "staff");
+});
+
+check("...and signing out in a write-refusing browser really does sign out", () => {
+  fresh();
+  setStorageForChecks(readOnlyStorage);
+  writePulseSession(FRONT_DESK);
+  clearPulseSession();
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  return eq(got, null);
+});
+
+/* A store that ACCEPTS writes and refuses deletes is not a store that
+ * refuses writes. The probe used to wrap both in one try, so this reported
+ * "nothing can be saved" about a store that had just saved something. */
+const writesButNeverDeletes = {
+  values: new Map<string, string>(),
+  getItem(key: string): string | null { return this.values.get(key) ?? null; },
+  setItem(key: string, value: string): void { this.values.set(key, String(value)); },
+  removeItem(): void { throw new Error("delete refused"); },
+};
+
+check("a store that writes but refuses deletes still round-trips a session", () => {
+  fresh();
+  setStorageForChecks(writesButNeverDeletes);
+  writesButNeverDeletes.values.clear();
+  writePulseSession(FRONT_DESK);
+  const got = readPulseSession();
+  setStorageForChecks(null);
+  if (got === null) return "the session was lost by a store that had just accepted it";
+  return eq(got.actor_type, "staff");
+});
+
+check("an empty WORKING store still means nobody is signed in", () => {
+  fresh();
+  const got = readPulseSession();
+  return eq(got, null);
+});
+
 check("clearing with a throwing storage still signs the page out", () => {
   fresh();
   setStorageForChecks(throwingStorage);
@@ -349,6 +530,85 @@ check("clearing with a throwing storage still signs the page out", () => {
 });
 
 /* ---------- run ---------- */
+
+/* ---------- the compatibility view Product A reads ---------- */
+
+/* THE ONE SHAPE ANOTHER PRODUCT DEPENDS ON.
+ *
+ * app/shared/CLAUDE.md names this as load-bearing: "Product A consumes the
+ * compatibility view (currentSession() / onSessionChange(), reading .role
+ * and .member_id). Do not remove those exports until Kerrian migrates."
+ * It had no checks at all — mutation found that flipping one comparison in
+ * currentSession hands a MEMBER role "staff" and a null member_id, which
+ * would show a member the staff view and lose their identity, inside
+ * somebody else's lane, with nothing here to notice. */
+
+check("a signed-in member reads as role member, with their id kept", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  const view = currentSession();
+  if (view === null) return "compatibility view returned null";
+  if (view.role !== "member") return `role ${view.role}`;
+  return eq(view.member_id, m1.id);
+});
+
+check("...and carries the name the header shows", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  return eq(currentSession()?.display_name, m1.displayName);
+});
+
+check("a signed-in staff person reads as role staff", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.role, "staff");
+});
+
+check("...and carries NO member_id, so no member's data can be keyed off it", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.member_id, null);
+});
+
+check("signed out reads as null, not as an empty member", () => {
+  fresh();
+  return eq(currentSession(), null);
+});
+
+check("the two roles are never the same value", () => {
+  fresh();
+  writePulseSession(memberSession(m1.id, m1.displayName));
+  const asMember = currentSession()?.role;
+  fresh();
+  writePulseSession(FRONT_DESK);
+  const asStaff = currentSession()?.role;
+  return asMember === asStaff ? `both read as ${asMember}` : true;
+});
+
+/* THE SESSION THAT GOES STALE OVERNIGHT.
+ *
+ * studio.ts dates the studio to TODAY, so a remembered member_id can name
+ * somebody who is no longer in the roster. The read side clears that
+ * session by design — shared/CLAUDE.md says so — and nothing checked it.
+ * Mutation could invert the condition and every check stayed green. */
+
+check("a session naming a member who is not in the roster is cleared", () => {
+  fresh();
+  writePulseSession(memberSession("member:gone-yesterday", "Someone Who Left"));
+  return eq(readPulseSession(), null);
+});
+
+check("...and the compatibility view reports it as signed out, not as a ghost", () => {
+  fresh();
+  writePulseSession(memberSession("member:gone-yesterday", "Someone Who Left"));
+  return eq(currentSession(), null);
+});
+
+check("...while a staff session survives, having no member to go stale", () => {
+  fresh();
+  writePulseSession(FRONT_DESK);
+  return eq(currentSession()?.role, "staff");
+});
 
 const results = checks.map(({ name, run }) => {
   let verdict: string | true;

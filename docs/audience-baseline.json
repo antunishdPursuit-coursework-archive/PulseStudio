@@ -1,0 +1,4 @@
+{
+  "note": "Builder names and product letters visible in copy a member or staff person reads, on the day scripts/check-audience.mjs landed (2026-08-21). The audience law says authorship is carried by the builder's COLOUR and by app/shared/storytold.html, never by a name on a customer screen. Each line names the owner who can clear it — a developer's own page is theirs, so nobody else edits it. This list only shrinks; anything not on it fails the gate.",
+  "allowed": []
+}

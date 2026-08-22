@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <title>Unit checks — shared session contract</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light dark">
@@ -22,6 +23,13 @@
     <p id="summary" class="status" aria-live="polite">Running the checks…</p>
     <section id="results" aria-label="Check results"></section>
   </main>
+  <!-- The appearance choice follows a person onto every page in the studio,
+       and this was the one page it did not: it opted out of the session chip
+       (right — this page writes and clears sessions for a living) but never
+       loaded theme-boot at all, so light, dark and a custom pair simply did
+       not apply here. data-no-session above still keeps the chip off; the
+       other two proof pages have always done exactly this pair. -->
+  <script type="module" src="../theme-boot.js"></script>
   <script type="module" src="./tests.js"></script>
 </body>
 </html>

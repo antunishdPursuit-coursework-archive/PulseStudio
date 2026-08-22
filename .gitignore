@@ -15,17 +15,26 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Local configuration and secrets
+# Local configuration and secrets. Every env file is ignored with no
+# exceptions: the un-ignore line that used to sit here named a file this
+# repo has never contained, and its name broke the language law.
 .env
 .env.*
-!.env.example
 
 # Operating-system and editor files
 .DS_Store
 Thumbs.db
 .vscode/
 
-# Per-developer AI tool settings. The team's rules are tracked (CLAUDE.md,
-# AGENTS.md, .cursor/rules), but which MCP servers you personally enable is
-# yours and should never land in a shared commit.
+# Per-developer AI tool state. The team's rules are tracked (CLAUDE.md,
+# AGENTS.md, .cursor/rules), but which MCP servers you personally enable —
+# and anything a tool writes about YOUR session — is yours and should never
+# land in a shared commit.
+#
+# This was pinned to one exact filename, `.claude/settings.local.json`, and
+# a rule that names one file only stops that file. A second local file
+# appeared (loop state carrying a machine-specific session id) and was
+# committed without anything objecting. The `.local.` convention is what the
+# rule was always about, so that is what it matches now.
+.claude/*.local.*
 .claude/settings.local.json

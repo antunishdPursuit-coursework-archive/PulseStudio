@@ -15,6 +15,10 @@ a static site — no server, no member data leaving the browser.
   every product.
 - [Member Booking](https://antunishdpursuit.github.io/PulseStudio/products/a-booking/): a
   member views the week's classes and reserves a spot.
+- [How this studio's software flows](https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html):
+  the story of how one member's tap becomes a booking, a filled class, an
+  answered question and — when they go quiet — a note a person writes. It is
+  about the software, not about any member, and no member data appears on it.
 - [Member Support](https://antunishdpursuit.github.io/PulseStudio/products/c-chatbot/):
   answers member questions from the studio's real schedule and current
   written policies, and says plainly when it has no answer rather than

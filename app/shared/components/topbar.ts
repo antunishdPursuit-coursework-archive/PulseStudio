@@ -28,6 +28,7 @@
    Claiming a login is "secure" on a static page would break the truth law;
    we say what it is instead. */
 
+import { counted } from "../text.js";
 import type { SyntheticMember } from "../synthetic/contracts.js";
 import {
   clearPulseSession,
@@ -134,7 +135,7 @@ async function openDialog(): Promise<void> {
     state.textContent =
       members.length === 0
         ? "0 members in the shared studio — there is nobody to sign in as."
-        : `${members.length} members in the shared studio. Pick who you are:`;
+        : `${counted(members.length, "member")} in the shared studio. Pick who you are:`;
     for (const member of members) rows.appendChild(memberRow(member));
     rows.appendChild(staffRow());
   } catch (error) {

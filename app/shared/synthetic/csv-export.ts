@@ -15,9 +15,29 @@
 import type { SyntheticDataset } from "./contracts.js";
 import { dateOfTimestamp, isStrictTimestamp } from "./normalize.js";
 
-/** Quote a field only when it needs it (commas, quotes, line breaks). */
-function csvField(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+/* A CELL THAT STARTS WITH = + - @ IS A FORMULA, NOT A NAME.
+ *
+ * Quoting solves CSV STRUCTURE — commas, quotes, newlines — and does
+ * nothing about what a spreadsheet does with the text afterwards. Excel,
+ * LibreOffice and Sheets all evaluate a cell beginning with =, +, - or @,
+ * so a person called `=HYPERLINK("http://a-studio.invalid","Your refund")` in an export
+ * becomes a clickable lure the moment somebody opens the file, and
+ * `=cmd|'/c calc'!A1` is the older, worse version of the same trick. The
+ * file never has to be malicious to matter: this is a studio's own member
+ * list, exported, mailed around, and opened by whoever needs it.
+ *
+ * The fix is the standard one: a leading apostrophe, which every
+ * spreadsheet strips on display and treats as "this is text". It changes
+ * the bytes for the handful of names that begin with those characters, and
+ * that is the trade — a name shown correctly beats a formula run silently.
+ * TAB and CR are included because both can carry a cell into the next one. */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/** Quote a field when the format needs it, and defuse it when a spreadsheet
+ *  would otherwise run it. */
+export function csvField(value: string): string {
+  const defused = FORMULA_LEAD.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(defused) ? `"${defused.replaceAll('"', '""')}"` : defused;
 }
 
 const STATUS_WORDS: Record<string, string> = {
@@ -46,13 +66,44 @@ export function attendanceCsv(dataset: SyntheticDataset): string {
       member.displayName,
       dateOfTimestamp(session.startsAt),
       STATUS_WORDS[a.status] ?? "unknown",
-      typeById.get(session.classTypeId) ?? "class",
+      /* Empty, not the word "class". A row whose type cannot be resolved
+       * is one this file cannot describe, and Product D's import reads a
+       * blank class cell as exactly that. Writing "class" would hand the
+       * importer a class genuinely named "class", which is a real shape
+       * and would be indistinguishable from the truth. */
+      typeById.get(session.classTypeId) ?? "",
       instructorById.get(session.instructorId) ?? "",
     ]);
   }
-  rows.sort((x, y) =>
-    x[2] === y[2] ? (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0) : x[2] < y[2] ? -1 : 1,
-  );
+  /* A TOTAL ORDER, not a partial one.
+   *
+   * This sorted by date then member id and returned 0 for anything still
+   * equal — but a member can attend two classes on the same day, and in a
+   * 300-member year that happens. Those pairs were left in whatever order
+   * the attendance list happened to hold, which is deterministic only
+   * because Array.prototype.sort is specified stable and the input is
+   * itself sorted. The brief promises this export is byte-for-byte
+   * reproducible; resting that on sort stability is a weaker promise than
+   * the one being made, and nothing here noticed when a mutation reordered
+   * exactly those rows.
+   *
+   * Comparing every column in turn makes the order a property of the
+   * ROWS, so the same records produce the same bytes whatever order they
+   * arrive in. */
+  /* Date, then member id — the order this export has always had — and then
+   * every remaining column, so nothing is left tied. The columns are
+   * [member id, name, date, status, class, instructor], hence 2 and 0
+   * first. Getting this wrong reorders a studio's whole export silently,
+   * which is what the first attempt at this fix did. */
+  const ORDER = [2, 0, 1, 3, 4, 5] as const;
+  rows.sort((x, y) => {
+    for (const i of ORDER) {
+      const a = x[i] ?? "";
+      const b = y[i] ?? "";
+      if (a !== b) return a < b ? -1 : 1;
+    }
+    return 0;
+  });
 
   const lines = ["member id,member,date,status,class,instructor"];
   for (const row of rows) lines.push(row.map(csvField).join(","));

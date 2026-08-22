@@ -1,0 +1,50 @@
+{
+  "note": "Readable pairings that were below WCAG AA 4.5:1 on the day scripts/check-contrast.mjs landed. Each is a developer accent used as text, and each belongs to the owner named — a developer colour is theirs to change, so nobody else clears these. THIS LIST ONLY SHRINKS: when an owner defines a --<name>-strong companion for their hue, the gate reports the line as cleared and it should be deleted in the same commit. Product D is deliberately absent: it was fixed rather than baselined, and app/shared/theme.css shows how.",
+  "known": [
+    {
+      "id": "kerrian/light/accent-as-text",
+      "owner": "Kerrian",
+      "product": "A",
+      "theme": "light",
+      "ratio": 3.68,
+      "colors": "#3b82f6 on #ffffff",
+      "detail": "Kerrian's accent as text on the light background"
+    },
+    {
+      "id": "kerrian/light/ink-on-accent",
+      "owner": "Kerrian",
+      "product": "A",
+      "theme": "light",
+      "ratio": 3.68,
+      "colors": "#ffffff on #3b82f6",
+      "detail": "Kerrian's button label on their own fill (light theme)"
+    },
+    {
+      "id": "manny/light/accent-as-text",
+      "owner": "Manny",
+      "product": "B",
+      "theme": "light",
+      "ratio": 2.15,
+      "colors": "#f59e0b on #ffffff",
+      "detail": "Manny's accent as text on the light background"
+    },
+    {
+      "id": "dennis/light/accent-as-text",
+      "owner": "Dennis",
+      "product": "C",
+      "theme": "light",
+      "ratio": 2.54,
+      "colors": "#10b981 on #ffffff",
+      "detail": "Dennis's accent as text on the light background"
+    },
+    {
+      "id": "kerrian/dark/ink-on-accent",
+      "owner": "Kerrian",
+      "product": "A",
+      "theme": "dark",
+      "ratio": 3.68,
+      "colors": "#ffffff on #3b82f6",
+      "detail": "Kerrian's button label on their own fill (dark theme)"
+    }
+  ]
+}

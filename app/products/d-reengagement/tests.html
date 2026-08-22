@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <title>Unit checks — Member Re-engagement</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="../../shared/theme.css">
   <style>
     /* Lane-local verdict styling. No fifth color: the color law allows this
-       product violet on black/white only, so failures shout with weight and
+       product violet over var(--bg), so failures shout with weight and
        the FAIL— text prefix instead of a hardcoded red. */
     #summary.all-good { border-left-color: var(--accent); }
     #summary.has-failures { border-left-color: var(--fg); font-weight: 800; text-decoration: underline; }

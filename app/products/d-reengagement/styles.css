@@ -1,7 +1,8 @@
 /* Product D — Member Re-engagement Tool. Rensley's lane.
  *
  * Everything here builds on the shared theme's tokens: backgrounds stay
- * var(--bg) (black or white only), and every splash of color is
+ * var(--bg) — white or black built in, or an accessible custom pair a
+ * person chose — and every splash of color is
  * var(--accent) — the violet assigned to this product. A reseller who
  * changes the accent token in the shared theme recolors this whole page
  * with zero edits here.
@@ -51,7 +52,9 @@
 }
 
 .quiet-pill {
-  background: var(--accent);
+  /* A fill carrying words: the readable companion, not the identity hex —
+     white on the brand violet is 4.23:1, under the 4.5:1 a person needs. */
+  background: var(--accent-strong, var(--accent));
   color: var(--accent-ink);
   border-radius: 999px;
   padding: 3px 14px;
@@ -83,12 +86,20 @@
 .draft {
   font: inherit;
   white-space: pre-wrap;
+  /* THE DRAFT ENDS IN THREE STUDIO URLS, and a URL has nothing a browser
+     will break on. pre-wrap wraps at spaces; with none inside a link, the
+     longest one sets the width of the block and the whole page scrolls
+     sideways — measured on a 375px phone, this box wanted 487px inside a
+     278px card. A staff member checking the Monday list at the front desk
+     is exactly who reads this on a phone. */
+  overflow-wrap: anywhere;
   border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line));
   border-radius: 10px;
   padding: 14px 16px;
   margin: 12px 0;
-  /* No tinted surface here: backgrounds are black or white ONLY (the
-     team's background law) — the dashed accent border marks ownership. */
+  /* No tinted surface here: the background is whatever var(--bg) resolves
+     to — white, black, or the accessible pair a person chose — never a
+     colour this file invents. The dashed accent border marks ownership. */
   background: var(--bg);
 }
 
@@ -104,7 +115,9 @@
 
 .btn-outline {
   background: transparent;
-  color: var(--accent);
+  /* The label is read, so it takes the companion; the border is a UI
+     boundary at 3:1, so it keeps the identity colour. */
+  color: var(--accent-strong, var(--accent));
   border: 2px solid var(--accent);
   text-decoration: none;
   display: inline-block;
@@ -121,6 +134,25 @@
   clip: rect(0 0 0 0);
 }
 .import .btn { cursor: pointer; }
+
+/* THE FOCUS RING HAS TO LAND SOMEWHERE A PERSON CAN SEE. The native file
+   input above is clipped to a 1px box so the labeled button can stand in
+   for it — which meant a keyboard user tabbing into the CSV door had the
+   ring drawn on something invisible and no way to tell they were there.
+   The ring is drawn on the label instead, which is the control they
+   actually see. */
+.import:has(input[type="file"]:focus-visible) .btn-outline {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* Focused by script after an action rebuilds the list, never in the tab
+   order — so nobody has to tab through a card to reach its buttons. */
+.member-card:focus-visible,
+#flagged:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 3px;
+}
 .btn-ghost {
   background: transparent;
   color: var(--muted);
@@ -157,8 +189,20 @@
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
-.footer-note a { color: var(--accent); }
+.footer-note a { color: var(--accent-strong, var(--accent)); }
 
 @media (max-width: 560px) {
   .member-head { flex-direction: column; align-items: flex-start; }
+}
+
+/* The note to a member who landed on a staff page. Bordered like .status
+   so it reads as the page speaking, not as a flagged member. */
+.actor-note {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 4px solid var(--accent);
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }

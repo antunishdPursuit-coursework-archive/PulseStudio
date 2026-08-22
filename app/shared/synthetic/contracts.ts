@@ -225,5 +225,26 @@ export function makeId(
     | "policy",
   n: number,
 ): string {
+  /* THE PAD IS THE SORT KEY, so overflowing it corrupts order in silence.
+   * Ids sort as TEXT — "attendance:1000000" sorts BEFORE "attendance:999999"
+   * — and "every collection ascending by id, byte-for-byte reproducible" is
+   * a stated contract that the validator checks and serialization relies on.
+   * Crossing six digits would break all of it with no error anywhere.
+   *
+   * It is not reachable today and this guard is not a fix for a live bug:
+   * validateConfig caps memberCount at 2000 and historyDays at 1900, and the
+   * largest collection those limits can produce is about 43,000 records in
+   * clean mode and about 173,000 in edge-cases mode. That is a 6x margin at
+   * its thinnest — comfortable, and exactly the kind of margin somebody
+   * raises a limit into without thinking about padding. A silent cliff with
+   * a guard on it is a loud one. */
+  if (!Number.isInteger(n) || n < 1 || n > 999_999) {
+    throw new RangeError(
+      `makeId("${kind}", ${n}): ids are zero-padded to six digits so they sort as text. ` +
+        `A seventh digit sorts BEFORE every six-digit id and silently breaks the ` +
+        `ascending-by-id contract. Widen the pad in makeId and re-baseline every id if ` +
+        `the studio really needs to be this large.`,
+    );
+  }
   return `${kind}:${String(n).padStart(6, "0")}`;
 }

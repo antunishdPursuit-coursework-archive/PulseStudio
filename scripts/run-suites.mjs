@@ -28,6 +28,7 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { nodeTooOldNote } from "./node-floor.mjs";
 
 // Repo-relative, like scripts/check-styles.mjs — never an absolute path from
 // somebody's home directory. A script a teammate cannot run is not tooling.
@@ -178,6 +179,13 @@ for (const suite of SUITES) {
     const why =
       (child.stderr || "").trim().split("\n").slice(-3).join("\n  ") || "no output";
     console.error(`run-suites: ${suite.key} (${suite.label}) DID NOT RUN\n  ${why}`);
+    /* NAME THE REAL CAUSE ONCE. A suite that will not load looks the same
+     * whether tsc has not emitted tests.js or Node is too old to read a
+     * `.js` file that says `import` — and in the second case Node's own
+     * advice ("set type: module in package.json") is wrong for this repo.
+     * Said once rather than per suite, because all three fail together. */
+    const tooOld = nodeTooOldNote();
+    if (tooOld !== null && brokenSuites === 1) console.error(`  ${tooOld}`);
     continue;
   }
 

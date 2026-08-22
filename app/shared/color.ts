@@ -1,0 +1,160 @@
+/* Pulse Studio — colour arithmetic. TEAM-OWNED.
+ *
+ * WHY THIS FILE EXISTS: the WCAG contrast formula was written twice. Once
+ * in `theme-boot.ts`, where it decides whether a person's chosen
+ * background and text pair is readable enough to accept, and once in
+ * `scripts/check-contrast.mjs`, where it decides whether the gate passes.
+ * Two implementations of the same standard, and nothing comparing them —
+ * so the gate could bless a palette the browser would reject, or the
+ * reverse, and the first anybody would know is a person staring at
+ * unreadable text the gate said was fine.
+ *
+ * They could not be merged where they were. `theme-boot.ts` reads
+ * `document` at module load, so Node cannot import it; the gate had no
+ * choice but its own copy. Moving the arithmetic somewhere with no DOM in
+ * it gives both sides the same code.
+ *
+ * NOTHING HERE TOUCHES THE DOM, reads the clock, or fetches anything. That
+ * is the whole point: it has to be loadable by a browser page, a headless
+ * check, and a build-time gate alike.
+ */
+
+export type Hsl = { hue: number; saturation: number; lightness: number };
+
+/** A six-digit hex colour, the only form this studio stores. */
+export function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+/** Relative luminance, WCAG 2.x. */
+export function luminance(color: string): number {
+  const parts = color.slice(1).match(/.{2}/g);
+  if (parts === null) return 0;
+  const channels = parts.map((part) => {
+    const channel = Number.parseInt(part, 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
+}
+
+/** Contrast ratio, 1..21. Order does not matter — the formula sorts them. */
+export function contrast(background: string, text: string): number {
+  const first = luminance(background);
+  const second = luminance(text);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+export function hslToHex({ hue, saturation, lightness }: Hsl): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const secondary = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const match = l - chroma / 2;
+  const channels =
+    hue < 60 ? [chroma, secondary, 0] : hue < 120 ? [secondary, chroma, 0] :
+    hue < 180 ? [0, chroma, secondary] : hue < 240 ? [0, secondary, chroma] :
+    hue < 300 ? [secondary, 0, chroma] : [chroma, 0, secondary];
+  return `#${channels.map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+export function hexToHsl(hex: string): Hsl {
+  const channels = hex.slice(1).match(/.{2}/g)?.map((part) => Number.parseInt(part, 16) / 255);
+  const red = channels?.[0] ?? 1;
+  const green = channels?.[1] ?? 1;
+  const blue = channels?.[2] ?? 1;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const delta = maximum - minimum;
+  const lightness = (maximum + minimum) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  let hue = 0;
+  if (delta !== 0) {
+    if (maximum === red) hue = 60 * (((green - blue) / delta) % 6);
+    else if (maximum === green) hue = 60 * ((blue - red) / delta + 2);
+    else hue = 60 * ((red - green) / delta + 4);
+  }
+  return { hue: (hue + 360) % 360, saturation: saturation * 100, lightness: lightness * 100 };
+}
+
+/** The nearest colour to `candidate` that reaches AA against `other`,
+ *  found by walking lightness outward in both directions. Returns the
+ *  candidate unchanged when nothing in range qualifies — a caller must
+ *  check the result rather than assume it succeeded. */
+export function nearestReadable(candidate: Hsl, other: string): Hsl {
+  if (contrast(hslToHex(candidate), other) >= 4.5) return candidate;
+  for (let step = 1; step <= 100; step += 1) {
+    for (const lightness of [candidate.lightness - step, candidate.lightness + step]) {
+      if (lightness < 0 || lightness > 100) continue;
+      const adjusted = { ...candidate, lightness };
+      if (contrast(hslToHex(adjusted), other) >= 4.5) return adjusted;
+    }
+  }
+  return candidate;
+}
+
+export type CustomColors = { background: string; text: string };
+
+/** The readable pair a studio falls back to when nothing valid is saved. */
+export const DEFAULT_CUSTOM: CustomColors = { background: "#ffffff", text: "#0a0a0a" };
+
+/* THE SAVED COLOUR PAIR, READ FROM A BROWSER KEY.
+ *
+ * `pulse-theme-custom` is written by this site and read on every page
+ * load, which means anything can be in it: another tab, a person with dev
+ * tools, a half-finished write. Every shape JSON can hold reaches here,
+ * including `null` — whose typeof is "object", which is why that clause is
+ * spelled out.
+ *
+ * A bad value is not an error to report; it is a preference that no longer
+ * makes sense, so the readable default takes over silently. What must NOT
+ * happen is a half-valid pair getting through: a saved background with a
+ * missing text colour would leave the page painting one and inheriting the
+ * other, which is how unreadable combinations appear without anyone
+ * choosing them. Both or neither. */
+export function parseCustomColors(raw: string | null): CustomColors {
+  if (raw === null) return DEFAULT_CUSTOM;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return DEFAULT_CUSTOM;
+  }
+  if (typeof parsed !== "object" || parsed === null) return DEFAULT_CUSTOM;
+  const record = parsed as Record<string, unknown>;
+  const background = record["background"];
+  const text = record["text"];
+  if (isHexColor(background) && isHexColor(text)) return { background, text };
+  return DEFAULT_CUSTOM;
+}
+
+export type Theme = "light" | "dark" | "custom";
+
+/** The AA threshold for body text, and the one number this file's
+ *  decisions turn on. */
+export const AA_TEXT = 4.5;
+
+/* WHICH THEME A SAVED PREFERENCE SHOULD PRODUCE, or none.
+ *
+ * It lives beside the arithmetic because the interesting half of the
+ * answer IS a measurement: a saved custom pair is honoured only while it
+ * is still readable. That guard matters because the pair and the
+ * threshold can drift apart without anybody touching the preference — a
+ * person saves a pair, the studio later tightens what counts as readable,
+ * and the stored choice becomes one the site would no longer let them
+ * make. Applying it anyway would hand somebody text they cannot read and
+ * a control they never used again.
+ *
+ * `null` means "nothing to apply": leave the page on its built-in
+ * default, which follows the operating system. An unrecognised value is
+ * not guessed at.
+ */
+export function themeToApply(
+  saved: string | null,
+  colors: CustomColors,
+): Theme | null {
+  if (saved === "light" || saved === "dark") return saved;
+  if (saved === "custom") {
+    return contrast(colors.background, colors.text) >= AA_TEXT ? "custom" : null;
+  }
+  return null;
+}

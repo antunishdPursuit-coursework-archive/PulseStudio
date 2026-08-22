@@ -23,9 +23,11 @@
 <body class="product-d">
   <header class="page-head">
     <a class="home-brand" id="back-link" href="../../index.html" aria-label="Return to Pulse Studio home"><span class="home-arrow" aria-hidden="true">←</span><span class="brand-word">PULSE<span>STUDIO</span></span></a>
-    <h1 class="role">Member Re-engagement</h1>
+    <h1 class="role">Member Re-engagement · staff</h1>
   </header>
   <main>
+    <!-- Adapts to whoever is signed in; never gates. Filled by main.ts. -->
+    <p class="actor-note" id="actor-note" hidden></p>
     <p class="status" id="status" aria-live="polite">Checking the member records…</p>
     <section class="import" aria-label="Choose which records to check">
       <label class="btn btn-outline" for="csv-input">Use your studio's attendance (CSV)</label>
@@ -36,7 +38,7 @@
     </section>
     <p id="rule"></p>
     <section id="outcomes" aria-label="What happened after each note" aria-live="polite"></section>
-    <section id="flagged" aria-label="Members who may need outreach"></section>
+    <section id="flagged" aria-label="Members who may need outreach" tabindex="-1"></section>
     <p class="footer-note" id="footer-note">
       Drafts only — staff review and send every message themselves; nothing on
       this page can send. <a href="./tests.html">Run the unit checks</a>

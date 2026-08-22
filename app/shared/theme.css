@@ -55,11 +55,24 @@
      the DISPLAY voice: heavy, condensed-feeling, uppercase, tight. Anything
      a person has to actually read speaks in the BODY voice: quiet, roomy,
      sentence case.
-     Both stacks resolve to faces already on the reader's machine — no font
-     is downloaded from anywhere, which keeps this site's promise that
-     nothing about a visitor leaves their browser, and keeps the page fast
-     on a phone in a locker room. */
+     Both faces are SELF-HOSTED from this origin (the two @font-face rules
+     at the top of this file). The promise that nothing about a visitor
+     leaves their browser holds because no third party is ever contacted —
+     no Google Fonts link, no CDN — and NOT, as this comment used to claim,
+     because "no font is downloaded from anywhere". Two are, from here. The
+     distinction is the whole point: a reader who believed the old sentence
+     and added a hosted-font link would think they were preserving a
+     property that self-hosting was preserving all along.
+
+     ANTON SHIPS ONE WEIGHT and it is already the heavy one, so asking for
+     800 or 900 makes a browser SYNTHESISE bold by smearing the glyphs —
+     worst on a condensed face at small sizes. The display-voice rules keep
+     their declared weight, because the fallback stack does have real bold
+     cuts, and set font-synthesis-weight: none so the real Anton is used
+     when Anton is what loaded. */
   --font-display: "Anton", "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
+  /* Never fake a weight Anton does not have; a fallback with a real bold
+     cut still uses it. Set wherever --font-display is applied. */
   --font-body: "Epilogue", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* one color per developer */
@@ -67,14 +80,50 @@
   --manny:   #f59e0b;  --manny-ink:   #0a0a0a;
   --dennis:  #10b981;  --dennis-ink:  #0a0a0a;
   --rensley: #8b5cf6;  --rensley-ink: #ffffff;
+
+  /* THE READABLE COMPANION, and why a second token instead of a new hex.
+   *
+   * Every accent above is a fine SURFACE colour and a poor TEXT colour on
+   * white. Measured against #ffffff: blue 3.68:1, amber 2.15:1, green
+   * 2.54:1, violet 4.23:1. WCAG AA wants 4.5:1 for body-size text, so all
+   * four fail as text and two of them fail as a button label on their own
+   * fill. The colour law fixes the identity hexes, and rightly — they are
+   * how anyone tells at a glance who built a screen — so the fix is not to
+   * change them but to give the identity a companion that is safe to read.
+   *
+   * --accent stays the identity and keeps every decorative job: fills,
+   * borders, rules, outlines. Those only need 3:1 as UI boundaries, which
+   * all four already clear. --accent-strong is the same hue moved to a
+   * lightness that clears 4.5:1, and it is used ONLY where a person has to
+   * read something. It falls back to --accent, so a product that has not
+   * defined one renders byte-for-byte as before.
+   *
+   * IT HAS TO BE THEME-AWARE. No single lightness of this hue clears 4.5:1
+   * against both white and black: at 64% it is 4.71 on white and 4.46 on
+   * black, and every step that helps one hurts the other. So the dark
+   * blocks below move it back up and flip the ink.
+   *
+   * Only Product D defines one today. The other three are recorded in
+   * docs/contrast-baseline.json with the owner who can clear them, because
+   * a developer's colour is theirs to change. */
+  --rensley-strong: #743df5;   /* 5.63:1 on white, white ink 5.63:1 */
 }
 
+/* CUSTOM OWNS ITS WHOLE PALETTE, so it opts out of this block entirely.
+   Without the :not, a person on a system set to dark who chose a LIGHT
+   custom background still got the dark-tuned accent: --bg and --fg are
+   redefined by the custom block below and win, but the accent companions
+   are only set here and in :root, so the media query kept them. Measured on
+   a warm cream background: 3.02:1, under the 4.5:1 a person needs, with the
+   tone correctly detected as light and nothing acting on it. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-theme="custom"]) {
     --bg: #000000;
     --fg: #ffffff;
     --line: #333333;
     --muted: #a3a3a3;
+    --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
+    --rensley-ink: #0a0a0a;
   }
 }
 
@@ -83,6 +132,8 @@
   --fg: #ffffff;
   --line: #333333;
   --muted: #a3a3a3;
+  --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
+  --rensley-ink: #0a0a0a;
 }
 
 :root[data-theme="custom"] {
@@ -91,6 +142,32 @@
   --fg: var(--custom-fg, #0a0a0a);
   --line: color-mix(in srgb, var(--fg) 24%, var(--bg));
   --muted: color-mix(in srgb, var(--fg) 68%, var(--bg));
+}
+
+/* A CUSTOM BACKGROUND STILL HAS A TONE, and the accent has to follow it.
+   Every accent companion is tuned to one background; the light-tuned violet
+   sits at about 3.7:1 on a dark custom background, under the 4.5:1 a person
+   needs to read it. Built-in light and dark redefine the companions per
+   theme, and custom cannot — the background is chosen at run time and CSS
+   cannot measure it. theme-boot measures it and stamps data-custom-tone, so
+   this is the same mechanism driven by a number instead of a media query.
+   A developer adding their own companion adds one line here. */
+:root[data-theme="custom"][data-custom-tone="dark"] {
+  --rensley-strong: #9e77f8;
+  --rensley-ink: #0a0a0a;
+}
+
+/* ANTON HAS ONE WEIGHT, so the browser must not invent the others: 800 and
+   900 on an already-heavy condensed face come out smeared, worst at small
+   sizes. Set once here and INHERITED, because the first attempt listed the
+   selectors by hand and missed one — .home .truths strong was still asking
+   for 800 and still getting it faked. A hand-kept list of everything that
+   speaks in the display voice is a list that goes stale; every face this
+   site actually ships or falls back to (Anton, variable Epilogue, and the
+   system stacks) has real cuts for the weights it claims, so nothing here
+   needs a fake one. */
+:root {
+  font-synthesis-weight: none;
 }
 
 * { box-sizing: border-box; }
@@ -104,7 +181,7 @@ body {
 
 main { padding: 24px; max-width: 960px; margin: 0 auto; }
 
-a { color: var(--accent, var(--fg)); }
+a { color: var(--accent-strong, var(--accent, var(--fg))); }
 
 /* THE DISPLAY VOICE — every page's name and every headline.
    Uppercase and heavy is the fitness-studio convention (walk into any
@@ -162,11 +239,11 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
 .product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink); }
 .product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink); }
-.product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); }
+.product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); --accent-strong: var(--rensley-strong); }
 
 /* shared building blocks — every control a developer ships uses their accent */
 .btn {
-  background: var(--accent);
+  background: var(--accent-strong, var(--accent));
   color: var(--accent-ink);
   border: 0;
   border-radius: 8px;
@@ -183,7 +260,7 @@ h1, h2, h3, .display, .page-head .role, .brand {
 
 .owner-badge {
   display: inline-block;
-  background: var(--accent);
+  background: var(--accent-strong, var(--accent));
   color: var(--accent-ink);
   border-radius: 999px;
   padding: 2px 12px;
@@ -259,12 +336,17 @@ h1, h2, h3, .display, .page-head .role, .brand {
   cursor: pointer;
 }
 .appearance-mode { width: 42px; font-size: 1.1rem; }
-.appearance-mode:disabled { color: var(--accent, var(--fg)); border-color: var(--accent, var(--line)); cursor: default; opacity: 1; }
+.appearance-mode:disabled { color: var(--accent-strong, var(--accent, var(--fg))); border-color: var(--accent, var(--line)); cursor: default; opacity: 1; }
 .appearance-editor { margin: 0 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .appearance-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: .8rem; }
 .appearance-color-value { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem; font-weight: 600; }
 .appearance-color-field { display: block; width: 100%; height: 104px; border: 2px solid var(--accent, var(--line)); border-radius: 7px; cursor: crosshair; }
-.appearance-hue { width: 100%; height: 12px; margin-top: 9px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
+/* 24px tall, not 12. WCAG 2.2 asks for a 24x24 minimum target (2.5.8),
+   and the exception for a control the browser sizes itself does not apply
+   once a stylesheet sets the height — which this line did. The track still
+   draws thin because a native range centres it in the box; what grew is
+   the area a finger or a shaky hand can actually land on. */
+.appearance-hue { width: 100%; height: 24px; margin-top: 5px; accent-color: var(--accent, var(--fg)); cursor: pointer; }
 .appearance-editor-note { margin: 6px 0 0; color: var(--muted); font-size: .74rem; }
 .appearance-custom { width: 100%; padding: 8px 10px; font-weight: 700; }
 .appearance-custom:not(:disabled):hover { border-color: var(--accent, var(--fg)); }
@@ -276,14 +358,14 @@ h1, h2, h3, .display, .page-head .role, .brand {
    (components/brand-header.ts, called by theme-boot); page markup holds
    only a pre-module placeholder. */
 .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
-.home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent, var(--fg)); }
+.home-brand .home-arrow, .home-brand .brand-word span { color: var(--accent-strong, var(--accent, var(--fg))); }
 .home-brand:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
 
 /* The label naming what a page IS, sitting beside the brand in the same
    header ("Book a class", "Member Re-engagement"). Every product header
    shows one, so it is styled ONCE here — a copy pasted into a product's
    own stylesheet is the drift this file exists to prevent. */
-.page-head .role { color: var(--accent, var(--fg)); font-size: 1.3rem; font-style: normal; }
+.page-head .role { color: var(--accent-strong, var(--accent, var(--fg))); font-size: 1.3rem; font-style: normal; }
 /* On a narrow screen the page's name takes its own line rather than
    squeezing whoever is signed in into a column of single words. */
 @media (max-width: 860px) {

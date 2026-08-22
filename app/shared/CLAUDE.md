@@ -11,11 +11,13 @@ the legacy contract) is what all four products speak.
 | Area | What it is |
 | --- | --- |
 | `theme.css` + `theme-boot.ts` | The appearance rules as code: built-in `--bg` light/dark stays white/black, an accessible custom background/text pair is allowed, and four developer accents are scoped by `body.product-a\|b\|c\|d`; the boot persists theme preferences AND auto-mounts the session chip into any `.topnav`/`.page-head`/`.topbar` (opt out: `<body data-no-session>`) |
+| `text.ts` | `counted(n, singular, plural?)` — the one place a number becomes a phrase. Product D writes "1 class in the prior 60 days"; the synthetic page writes "1 finding". A copy in either folder would be two rules to keep true, which is what `color.ts` exists to undo for contrast. Product D reaches it through its own `deps.ts` |
+| `color.ts` | The WCAG arithmetic — luminance, contrast ratio, hex/HSL, and `nearestReadable`. It has no DOM in it ON PURPOSE: `theme-boot.ts` reads `document` at module load, so nothing could import it, and `scripts/check-contrast.mjs` was carrying a second copy of the same formula. Both now import this one, so the gate measures the arithmetic the browser actually runs |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
-| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, 27 browser checks in `auth/tests.html`), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
+| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
 | `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control) — each documented in `components/README.md` |
-| `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, ~130 browser checks in `synthetic/tests.html` |
+| `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
 
 ## The load-bearing facts (each one has bitten or will)
@@ -29,21 +31,52 @@ the legacy contract) is what all four products speak.
   sign-in roster shifts with the real calendar and a remembered
   `member_id` can go stale overnight — `readPulseSession()` then signs
   out silently by design. The pure engine itself never reads the clock;
-  `synthetic/tests.ts` greps the shipped sources to enforce it (adding
-  `new Date(`, `fetch(`, `Date.now(` — even in a comment — fails the
-  suite).
+  `synthetic/tests.ts` greps the shipped sources to enforce it. What it
+  actually forbids, corrected 2026-08-21 because this line overstated it:
+  a product import, a network call (`fetch(`, `XMLHttpRequest`,
+  `WebSocket`, `EventSource`, `sendBeacon`), a clock read (`Date.now(`,
+  `Date()`, `new Date()`, `new Date` with no parens, `performance.now(`),
+  and unseeded randomness (`Math.random(`, `crypto.getRandomValues`,
+  `randomUUID`) — even in a comment. `new Date(value)` is LEGAL and
+  `normalize.ts` uses it twice: round-tripping a calendar date is
+  arithmetic, not a clock read. Unseeded randomness was added to that list
+  the same day; before then nothing checked for it, in an engine whose
+  every promise rests on being reproducible from a seed.
 - **Product A consumes the compatibility view** (`currentSession()` /
   `onSessionChange()`, reading `.role` and `.member_id`). Do not remove
-  those exports until Kerrian migrates in his own lane.
+  those exports until Kerrian migrates in his own lane. It had NO checks
+  until 2026-08-21: one flipped comparison inside `currentSession()` hands
+  a member `role: "staff"` and a null `member_id`, showing a member the
+  staff view and losing their identity, inside somebody else's product.
+  Six checks now, including that the two roles never read the same.
 - **Future-version `pulse-session` values are deliberately NOT deleted**
   ("not ours to destroy") — a cleanup that wipes unrecognized versions
   breaks the contract and its test.
 - **`writePulseSession()` does not member-validate writes** — the
   guard-looking if-block is comment-only; the READ side clears unknown
   members. Tests cover the read side. Read the comment before "fixing".
+  `npm run mutate` confirms it independently: the condition can be
+  inverted with no check noticing, because the block does nothing. That is
+  evidence FOR this note, not a gap to close.
+- **The session listener wakes only for `pulse-session`** (and for a
+  `null` key, which means storage was cleared). Every cross-tab check used
+  to dispatch the session key, so the filter itself went unexercised —
+  which matters across lanes, because Product D writes and deletes
+  `pulse-storage-probe`, and a listener that woke on every key would
+  re-render four products whenever any of them touched storage.
 - **Serialization order is contract**: every synthetic collection sorts
   ascending by id, byte-for-byte reproducible; the validator has an
   `unsorted-collection` check.
+- **A sort that returns 0 is not a reproducibility promise.**
+  `csv-export.ts` sorted by date then member id and returned 0 for
+  anything still equal — and a member CAN attend two classes in one day,
+  which the shared studio's own data does. Those rows kept whatever order
+  the input held, deterministic only because `Array.prototype.sort` is
+  specified stable. Every column breaks the tie now, so the same records
+  give the same bytes whatever order they arrive in. The check that proves
+  it feeds the rows in REVERSED order; the older "export is deterministic"
+  check could not, because it regenerates the same config twice and a
+  fault mutates both sides equally.
 - **The validator scans for leaks**: record keys matching
   `/^(cohort|group|expected|eligib|quiet)/i` fail (answer-label-leak), as
   do 13–19-digit or exact-9-digit runs in any string value
@@ -60,12 +93,155 @@ the legacy contract) is what all four products speak.
   check-in distributions (a morning peak and a bigger evening peak). It is
   a 2024 SNAPSHOT and nothing about it is live: the engine forbids network
   calls and clock reads, and no surface may claim otherwise.
+- **`overlapsAttended` in `generate.ts` is currently redundant**, in the
+  same way the comment-only block in `writePulseSession` is. It refuses to
+  record an attended class overlapping one the member already attended
+  that day — and disabling it in the compiled generator produces zero
+  overlaps anyway, because something upstream already stops a member being
+  offered two classes in one slot. Keep it (a scheduling change could make
+  it load-bearing again), but do not read the passing invariant check in
+  `synthetic/tests.ts` as proof that it works. Note also that the guard
+  applies ONLY to attended outcomes: a booked-but-unattended record MAY
+  overlap one the member attended, which is deliberate and realistic, and
+  there is a check pinning that so nobody "strengthens" the invariant into
+  something false.
+- **The engine and Product D disagree about "today", latently.**
+  `validate.ts` skips attendance on the as-of date (`day >= asOfDay
+  continue; // future rows are never evidence`), while D's
+  `findQuietMembers` counts a class attended today (`day <= today`). They
+  have never disagreed, because the generator schedules no ATTENDED record
+  on the as-of date — measured 0 at 60 members and 0 at 300 on
+  2026-08-21 — so the boundary is unreachable and mutation there is
+  equivalent. If the generator ever fills today's classes, a member who
+  attended this morning would read as quiet to the answer key and as
+  recent to D, and the disagreement would look like a bug in whichever one
+  you were reading second. Raise it before changing that.
+
+  **That warning has a check behind it now** (2026-08-22), in
+  `synthetic/tests.ts`. The boundary is TIGHT rather than comfortable: in
+  clean mode the newest attended class is exactly ONE day before the as-of
+  date, measured. One day nearer and the two products part company, so the
+  check asserts both halves — nothing attended on or after the as-of date,
+  AND that the newest visit is the day before, so it is standing on the
+  edge rather than admiring it from a distance. Today's classes DO exist
+  and are scheduled, and with `upcomingFillTarget` they are booked;
+  booked is not attended, and that distinction is the whole invariant.
+  Edge-cases mode is excluded deliberately, because it injects a
+  `future-attendance` defect on purpose — what is checked there is that
+  every such row is DECLARED.
+- **`synthetic/page.ts` is not covered by any check, and the suite cannot
+  cover it.** It is the reporting UI's entry module, loaded only by
+  `synthetic/index.html` in a browser, so nothing in `synthetic/tests.ts`
+  imports it — proven twice over: breaking the compiled `page.js`
+  syntactically leaves every synthetic check passing, and `npm run mutate`
+  scores it 0% caught, 10 of 10 mutations surviving. (It read 80% before
+  the runner stopped counting its own timeouts as detections, which is a
+  good illustration of why that mattered.) `tsc` still
+  compiles the TypeScript, so type and syntax errors are caught at the
+  gate; what is unproven is its runtime behaviour. Same shape as Product
+  D's `main.ts`, and the same remedy applies — anything in it that becomes
+  a RULE rather than markup should move to a module a check can load.
+  **That remedy was applied to `main.ts` on 2026-08-22 and found two bugs
+  in two extractions**, so it is not theoretical. Applied to THIS file the
+  same day it found none, which is worth recording so nobody re-derives
+  it: the form-reading path looks like the dangerous one — a raw
+  `Number(countEl.value)` straight off a text input — and every hostile
+  value was measured going in. Blank, `abc`, `0`, `-5`, `7.5`, `1e9` and
+  `Infinity` are all refused by `validateConfig` with a message naming the
+  field, the page shows it, and both download doors close on the stale
+  bytes. The mode and history casts land in the same validator. What is
+  left here really is markup, a clock read, and a local save.
+- **The shared fixture ages out on a clock, and rolling it forward is a
+  CHORE, not a fix.** `check-fixtures.mjs` fails once the newest attended
+  class is more than 60 days old, so the file has to be rolled forward
+  roughly every two months or the gate blocks every deploy. Rolled +4 days
+  on 2026-08-22 — which also repaired three sessions marked `scheduled`
+  that were already in the past — and the gate now passes through
+  2026-10-18 and fails on 2026-10-19. Measured by running the gate under a
+  frozen clock, not by reading the arithmetic.
+
+  **The durable fix is an anchor, and it is an OPEN TEAM DECISION**, not
+  something to slip in: give the file an `anchor_date` and resolve its
+  dates relative to today at load. What makes it more than a one-liner is
+  that these datetimes carry a real UTC offset — the file already spans
+  both `-04:00` and `-05:00` correctly — so a shift has to recompute the
+  offset for each shifted value through `Intl`, and the alternative
+  (offset-free local times, as the generated door uses) changes what
+  `new Date(value)` means for any consumer. Decide it deliberately.
+- **"Today" is the STUDIO's today, and there is one implementation of it.**
+  `app/shared/today.ts`. Three modules had written this rule and one was
+  wrong: `synthetic/page.ts` prefilled the as-of date with
+  `new Date().toISOString().slice(0, 10)`, which is UTC, so somebody in New
+  York opening it after 8pm generated a studio as of a day that had not
+  happened where the studio is. `auth/studio.ts` and Product D were both
+  correct and both had their own copy — the same shape that made
+  `color.ts`. D re-exports it through its `deps.ts` seam, so D's existing
+  timezone checks (late evening, another zone, both DST nights, the year
+  roll) now cover the implementation `auth/` and the synthetic page use,
+  which had none of their own.
+
+  A grep in `synthetic/tests.ts` keeps the antipattern from coming back in
+  any module allowed to read the clock. It strips comments first, unlike
+  the engine audit beside it, and the difference is deliberate: the engine
+  may not read a clock even in a comment, but here the comment is the
+  RECORD of the fixed bug and the check failed on it the first time it ran.
+  The pattern needs EMPTY parens — `new Date(day * 86_400_000)
+  .toISOString()` is how a day number becomes a date and is correct.
+- **A stated UTC offset is checked against the studio's real one.** Added
+  the same day, because the roll-forward above is the routine edit that
+  breaks it: moving dates across the March or November transition without
+  touching the offset leaves every affected value an hour out on every
+  screen that shows it. Checked through `Intl` rather than a table of
+  transition dates, since the table is the thing that goes stale.
+- **`loadFixtures()` and `fixtures.json` are reached by no page**, found
+  2026-08-22. The data law names `loadFixtures()` as the one shared
+  loader and that is still the rule — but its only importer is
+  `b-dashboard/main.ts`, and `b-dashboard/index.html` loads
+  `staff-dashboard.js` instead, a hand-written module with no TypeScript
+  source. So nothing the site serves reads the legacy fixture set.
+  `check-fixtures.mjs` still validates it against the contract and still
+  prints its staleness countdown, which is worth keeping — but read that
+  countdown as being about RECORDS aging, not about a screen going stale:
+  no screen shows them. Worth knowing before anyone spends a day rolling
+  those dates forward. Whether the legacy loader has a future is a team
+  question; `check-reachable.mjs` holds the fact so it cannot quietly stop
+  being true.
+- **`components/logo.ts` is called by nothing.** `components/README.md`
+  promises the pulse mark as a callable; every header draws its own
+  instead. Either a page should use it or the README should stop
+  promising it — also held by `check-reachable.mjs`.
+- **`check-contrast.mjs` needs a build, deliberately.** It imports
+  `app/shared/color.js` rather than reimplementing the contrast formula,
+  because it used to carry its own copy and nothing compared the two — the
+  gate could have blessed a palette the browser refuses. It exits 1 with a
+  clear message when the compiled module is missing. Its `--self-test`
+  covers the arithmetic itself now, including `nearestReadable`, which is
+  what accepts or adjusts a person's chosen colours and previously had no
+  checks anywhere.
+- **Injected defects mint their phantom ids DOWNWARD from 999999**, and
+  that is load-bearing at scale. An id is `kind:NNNNNN` and `ID_PATTERN`
+  wants exactly six digits. The injector used to add 900001 to the
+  collection length, which is correct for a studio of sixty and wrong past
+  99,998 rows, where the sum needs a seventh digit. At the largest
+  settings the shipped form offers — 2000 members, five years, edge-cases
+  — attendance reaches about 168,000 rows and thirty ids came out
+  malformed, so the validation report read as a data defect when the fault
+  was in the id. Counting down from the top keeps every phantom six digits
+  and clear of the real ids, which run 1..length. Found 2026-08-22 by
+  `makeId`'s own pad guard, which turned a silent malformed bundle into a
+  refusal that named the cause. The full-scale run takes thirteen seconds
+  and is NOT in the suite; what the suite pins is the property that tells
+  the two schemes apart at sixty members, where phantoms sit at
+  999982..999999 and the old scheme gave ~900776.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
   any new injection.
 - **The chip mounts by header class**: renaming `.topnav`, `.page-head`,
-  or `.topbar` in a product silently removes sign-in from that page.
+  or `.topbar` in a product silently removes sign-in from that page. The
+  selector is in `theme-boot.ts`, NOT in `components/topbar.ts` — topbar
+  exports `mountSessionControl(host)` and theme-boot is what finds the host.
+  Worth naming, because looking for it in the obvious file finds nothing.
 - Shared infrastructure pages carry NO product color — black, white, and
   neutrals only; only product pages set `product-a|b|c|d`.
 

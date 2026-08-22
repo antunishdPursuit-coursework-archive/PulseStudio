@@ -21,6 +21,9 @@ Manny, Dennis, or Rensley?" Then work only in their lane.
 | Rensley | D — Member Re-engagement Tool | `app/products/d-reengagement/` | Violet `#8b5cf6` |
 
 Each product's brief (`PRODUCT_<X>_*.md` in the repo root) defines its scope.
+Three of the four exist: A, B and D. Product C has none yet, so its scope
+lives in `app/products/c-chatbot/CLAUDE.md` and the shared contract's
+worksheet row until Dennis writes one.
 Do not build features from another product's brief.
 
 ## The lane law (why merges never conflict)
@@ -94,11 +97,27 @@ instead of doing it.
 
 ## The git law
 
-- Gate before every commit: `npm run check` must pass. It compiles every
-  `.ts`, checks for style drift, and runs every unit check from the three
-  suites (synthetic engine, session contract, re-engagement) headlessly — the
-  same checks the `tests.html` pages show in a browser. It prints the count it
-  actually ran, never a silent pass — read the count there, not from prose.
+- Gate before every commit: `npm run check` must pass. It is `tsc` — which
+  EMITS, so the suites run the code you just changed rather than the last
+  build — then every gate `package.json` lists and the three suites. (The
+  gates are named there and not counted here: this sentence said "four"
+  from the day a fifth was added.) Each prints the count it
+  actually reached, never a silent pass; read the count there, not from
+  prose. Several of the laws above are no longer only stated:
+
+  | What runs | Which law it holds |
+  | --- | --- |
+  | `tsc` | types, and it writes the `.js` the next step runs |
+  | `scripts/check-styles.mjs` | where styles live — a product may not restyle what the shared theme owns |
+  | `scripts/check-contrast.mjs` | the colour law — a NEW pairing below WCAG AA fails |
+  | `scripts/check-language.mjs` | the language law and "no AI is ever a contributor" |
+  | `scripts/check-fixtures.mjs` | the data law — every reference resolves, and the fixture has not aged out |
+  | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
+
+  Every gate carries `--self-test`, which plants known-bad input and proves
+  it still catches it. Run one if you ever doubt a green. And note what none
+  of them do: **a green gate does not open a browser.** Look at the pages
+  your change could affect.
 - One branch per product change, plain commit messages anyone can read.
   Merge to `main` through a PR using the template.
 - The AI is NEVER a contributor: no Claude or AI names, no `Co-Authored-By`,
@@ -163,13 +182,21 @@ each tool's native dialect, and THE CONTENT IS LAW, THE FILENAME IS NOT:
 
 - **CLAUDE.md** — the canonical file, read natively by Claude Code.
 - **AGENTS.md** — a byte-equivalent mirror of the sibling CLAUDE.md (after
-  each file's one-line header), read natively by OpenAI Codex and most
+  each file's two-line header and the blank line after it), read natively
+  by OpenAI Codex and most
   general agents. Regenerate it whenever CLAUDE.md changes:
   `bash scripts/sync-agent-briefs.sh`. If the two ever disagree, CLAUDE.md
   wins and the mirror needs regenerating.
-- **`.cursor/rules/*.mdc`** — thin Cursor rules that point at the
-  canonical files (one always-on team rule, one per-folder rule scoped by
-  glob). They carry no content of their own, so they cannot drift.
+- **`.cursor/rules/*.mdc`** — thin Cursor rules that point at the canonical
+  files (one always-on team rule, one per-folder rule scoped by glob). Each
+  states only which lane it is for and where to read the laws, so there is
+  almost nothing in them TO drift — a property that has to be maintained,
+  not assumed. The always-on team rule DID once carry its own copy of the
+  laws, and it drifted exactly as you would expect: it told every Cursor
+  user "backgrounds are black or white only" long after the colour law
+  started allowing an accessible custom pair, so the rule read on every
+  edit forbade what the law permitted. If you are tempted to paste a law
+  into a `.mdc` file, that is the story to remember.
 
 Whichever assistant you run: identify your developer, read the root brief
 plus the brief of the folder you are editing, and obey both.

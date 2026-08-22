@@ -5,6 +5,8 @@
  * proof suite audits the engine sources for exactly that.
  */
 
+import { counted } from "../text.js";
+import { todayIsoInZone } from "../today.js";
 import {
   DEFAULT_CONFIG,
   GENERATOR_VERSION,
@@ -34,9 +36,19 @@ const generateBtn = requiredElement<HTMLButtonElement>("#generate");
 const downloadBtn = requiredElement<HTMLButtonElement>("#download");
 const downloadCsvBtn = requiredElement<HTMLButtonElement>("#download-csv");
 
-// UI-layer clock read: prefill today's date. The engine itself only ever
-// sees the date as data.
-dateEl.value = new Date().toISOString().slice(0, 10);
+/* UI-layer clock read: prefill today's date. The engine itself only ever
+ * sees the date as data — that is what this file is allowed to do and the
+ * engine is not.
+ *
+ * IN THE STUDIO'S ZONE, NOT UTC. This was
+ * `new Date().toISOString().slice(0, 10)`, which is UTC, so somebody in
+ * New York opening this page after 8pm was handed TOMORROW's date and
+ * generated a studio as of a day that had not happened where the studio
+ * is. Product D's brief already records the same mistake costing it a
+ * misread return — "a note taken at 8pm on a Wednesday was stamped
+ * Thursday". Three modules wrote this rule and this was the one that got
+ * it wrong; there is one implementation now. */
+dateEl.value = todayIsoInZone(DEFAULT_CONFIG.timezone);
 
 let lastSerialized: string | null = null;
 let lastCsv: string | null = null;
@@ -78,7 +90,16 @@ generateBtn.addEventListener("click", () => {
     statusEl.textContent = `Generation refused: ${error instanceof Error ? error.message : String(error)}`;
     reportEl.replaceChildren();
     violationsEl.textContent = "";
+    /* BOTH doors close, not one. This hid the JSON download and left the CSV
+     * download standing, still holding the PREVIOUS studio's attendance — so
+     * a page saying "Generation refused" would hand a visitor a file from a
+     * run that is not the one in front of them, named after a seed they
+     * never asked for. The stale bytes go too, so nothing can be handed out
+     * by a later click either. */
     downloadBtn.hidden = true;
+    downloadCsvBtn.hidden = true;
+    lastSerialized = null;
+    lastCsv = null;
     return;
   }
   const t1 = performance.now();
@@ -103,7 +124,7 @@ generateBtn.addEventListener("click", () => {
     metric("Peak concurrent attendance", report.stats["peakConcurrentAttendance"] ?? 0, `facility capacity ${bundle.dataset.studio.facilityCapacity}`),
     metric("Cohorts", cohorts.size, [...cohorts.entries()].map(([k, v]) => `${k} ${v}`).join(" · ")),
     metric("Generation", `${Math.round(t1 - t0)}ms`, `validation ${Math.round(t2 - t1)}ms`),
-    metric("Validation", report.ok ? "PASSED" : "FAILED", `${report.problems.length} findings, ${bundle.truth.declaredViolations.length} declared`),
+    metric("Validation", report.ok ? "PASSED" : "FAILED", `${counted(report.problems.length, "finding")}, ${bundle.truth.declaredViolations.length} declared`),
   );
   violationsEl.textContent =
     bundle.truth.declaredViolations.length === 0

@@ -7,14 +7,18 @@
  * and measured 500-member performance.
  */
 
-import { ID_PATTERN } from "./contracts.js";
-import type { GeneratedStudioBundle } from "./contracts.js";
+import { ID_PATTERN, makeId } from "./contracts.js";
+import type { GeneratedStudioBundle, MembershipPeriod } from "./contracts.js";
 import { DEFAULT_CONFIG, organicMemberCount, validateConfig, type SyntheticStudioConfig } from "./config.js";
 import { generateStudio } from "./generate.js";
 import { validateBundle } from "./validate.js";
+import { attendanceCsv, csvField } from "./csv-export.js";
+import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
-import { deriveStatusOn } from "./lifecycle.js";
-import { dateOfTimestamp, dayNumberOf, weekdayOf } from "./normalize.js";
+import { deriveStatusOn, periodProblems } from "./lifecycle.js";
+import { demandFactor } from "./scenarios.js";
+import { buildSchedule, roomsPerSlot } from "./schedule.js";
+import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
 interface CheckResult {
@@ -95,6 +99,22 @@ check("every member id is namespaced",
   const duplicateGroups = [...byName.values()].filter((ids) => ids.length > 1);
   check("different members share a display name with DISTINCT ids",
     duplicateGroups.some((ids) => new Set(ids).size === ids.length && ids.length === 2), true);
+
+  /* THE PART THAT MAKES THE PAIR USEFUL.
+   *
+   * That they exist was checked. What they are FOR was not. scenarios.ts
+   * gives the two contrasting behaviour on purpose — "the pair Product D
+   * must tell apart" — and that is the half a consumer gets wrong: key
+   * off display_name instead of member_id and you either write to
+   * somebody who came in last week or stay silent about somebody who has
+   * been gone a month. Product D's CSV door was caught doing exactly that
+   * once, which is why the pair is here at all. */
+  const pair = duplicateGroups.find((ids) => ids.length === 2) ?? [];
+  check("...and the pair's re-engagement answers are OPPOSITE, which is the point",
+    pair.map((id) => first.truth.expectedReengagementEligibility[id]).sort().join(","),
+    "false,true");
+  check("...so anything keying off the name alone gets one of them wrong",
+    new Set(pair.map((id) => first.truth.expectedQuietDays[id])).size, 2);
 }
 check("unicode names survive verbatim",
   first.dataset.members.some((m) => m.displayName === "王伟") &&
@@ -135,6 +155,23 @@ check("clean mode validates with zero problems", cleanReport.problems.length, 0)
 check("clean mode declares zero violations", first.truth.declaredViolations.length, 0);
 check("clean serialization contains no injected ghost ids",
   serializeBundle(first).includes("member:999901"), false);
+/* THE VALIDATOR'S OWN COUNT, AGAINST THE ANSWER KEY.
+ *
+ * The re-engagement policy is computed twice on purpose: once by the
+ * generator, recorded in the truth key, and once by the validator from
+ * the finished records. They are meant to be independent — that is the
+ * whole value of an answer key — and nothing compared them.
+ *
+ * Mutation found it: changing `q > 14` to `q >= 14` in the validator's
+ * recomputation left every check green, because the number it produces
+ * was never read. The cohorts guarantee a member sitting at exactly 14
+ * quiet days, so that one flip silently moves the count by one. */
+check("the validator's eligible count matches the answer key's, computed independently",
+  cleanReport.stats["realizedEligible"] as number,
+  Object.values(first.truth.expectedReengagementEligibility).filter(Boolean).length);
+check("...and it is not zero, which would make the agreement meaningless",
+  (cleanReport.stats["realizedEligible"] as number) > 0, true);
+
 check("peak concurrent attendance respects the facility",
   cleanReport.stats["peakConcurrentAttendance"] as number <=
     first.dataset.studio.facilityCapacity, true);
@@ -321,14 +358,113 @@ check("edge mode reconciles as ok", edgeReport.ok, true);
       /,(attended|no-show|unknown),/.test(l)), true);
   check("the CSV export is deterministic",
     attendanceCsv(second.dataset) === csv, true);
+
+  /* THE ORDER IS A PROPERTY OF THE ROWS, NOT OF THE INPUT.
+   *
+   * The determinism check above regenerates the same config twice, so a
+   * fault in the sort mutates both sides equally and it passes anyway.
+   * Mutation found exactly that: one changed comparison in the comparator
+   * reordered real rows and produced different bytes, with every check
+   * here still green.
+   *
+   * The comparator sorted by date then member id and returned 0 for
+   * anything still equal — but a member CAN attend two classes in one
+   * day. Those pairs were left in whatever order the attendance list
+   * happened to hold, deterministic only because Array.prototype.sort is
+   * specified stable. This engine's brief promises byte-for-byte
+   * reproducibility, which is a stronger claim than sort stability makes.
+   *
+   * Feeding the same records in REVERSED order tells the two apart: a
+   * total order gives identical bytes, a partial one does not.
+   *
+   * It uses DEFAULT_CONFIG rather than BASE, and that is not incidental.
+   * Whether a member attends twice in one day is seed-dependent and rare —
+   * BASE produces none at any size tried, the shared studio's own config
+   * produces a handful — so the check asserts the tie EXISTS before
+   * relying on it. Without that first line the other two would pass
+   * vacuously, which is how this was caught: they did. */
+  const tieBundle = generateStudio(DEFAULT_CONFIG);
+  const tieCsv = attendanceCsv(tieBundle.dataset);
+  const sessionDay = new Map(
+    tieBundle.dataset.classSessions.map((c) => [c.id, c.startsAt.slice(0, 10)]),
+  );
+  const perMemberDay = new Map<string, number>();
+  for (const a of tieBundle.dataset.attendance) {
+    const key = `${a.memberId}|${sessionDay.get(a.classSessionId) ?? ""}`;
+    perMemberDay.set(key, (perMemberDay.get(key) ?? 0) + 1);
+  }
+  check("the shared studio really does contain a member attending twice in a day",
+    [...perMemberDay.values()].some((n) => n > 1), true);
+
+  const reversed = {
+    ...tieBundle.dataset,
+    attendance: [...tieBundle.dataset.attendance].reverse(),
+  };
+  check("...so the export must not depend on the order the rows arrive in",
+    attendanceCsv(reversed) === tieCsv, true);
+
+  const tieDates = tieCsv.trim().split("\n").slice(1).map((l) => l.split(",")[2] ?? "");
+  check("...while still reading oldest-first, the order it has always had",
+    tieDates.every((d, i) => i === 0 || (tieDates[i - 1] ?? "") <= d), true);
 }
 
 /* ------------------------------------------------------------------ */
 /* Specification alignment: defaults, echo, lifecycle, sensitive scan   */
 /* ------------------------------------------------------------------ */
+/* NOBODY IS IN TWO PLACES AT ONCE — and the exception that proves it.
+ *
+ * generate.ts refuses to record an ATTENDED class that overlaps one the
+ * member already attended that day. That invariant was never checked, and
+ * it is the kind that reads as obviously true right up until a scheduling
+ * change makes it quietly false.
+ *
+ * The second check is the more important one. The guard is applied ONLY
+ * when the outcome is attended (`outcome !== "attended" || !overlapsAttended(...)`),
+ * so a booked-but-not-attended record MAY overlap — which is realistic: a
+ * member books two things at noon and shows up to one. Without stating
+ * that, somebody strengthens the first check to "no member has two
+ * overlapping records at all", it fails on real generated data, and the
+ * fix looks like loosening a safety rule instead of restoring a
+ * deliberate one. */
+{
+  const wide = generateStudio({ ...DEFAULT_CONFIG, memberCount: 300, historyDays: 365 });
+  const sessionById = new Map(wide.dataset.classSessions.map((c) => [c.id, c]));
+  const minutesOf = (t: string): number =>
+    Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16));
+
+  const countOverlaps = (onlyAttended: boolean): number => {
+    const slots = new Map<string, Array<[number, number]>>();
+    let overlaps = 0;
+    for (const a of wide.dataset.attendance) {
+      if (onlyAttended && a.status !== "attended") continue;
+      const session = sessionById.get(a.classSessionId);
+      if (session === undefined) continue;
+      const start = minutesOf(session.startsAt);
+      const end = start + session.durationMinutes;
+      const key = `${a.memberId}|${session.startsAt.slice(0, 10)}`;
+      const taken = slots.get(key) ?? [];
+      for (const [from, to] of taken) if (start < to && end > from) overlaps += 1;
+      taken.push([start, end]);
+      slots.set(key, taken);
+    }
+    return overlaps;
+  };
+
+  /* STATED LIMIT, measured rather than assumed: disabling overlapsAttended
+   * in the compiled generator leaves this at 0 too. Something upstream
+   * already stops a member being offered two classes in one slot, so this
+   * check is a regression guard on the DATA and is NOT evidence that the
+   * guard works. Said plainly because a passing check that cannot fail
+   * reads exactly like one that can. */
+  check("no member is recorded as attending two classes at once",
+    countOverlaps(true), 0);
+  check("...while a booked-but-unattended class MAY overlap one they did attend, on purpose",
+    countOverlaps(false) > 0, true);
+}
 
 check("the default history covers at least twelve months",
   DEFAULT_CONFIG.historyDays >= 365, true);
+
 check("the answer key states which generation it answers for",
   [first.truth.generatorVersion, first.truth.seed, first.truth.asOfDate, first.truth.timezone],
   [BASE.generatorVersion, BASE.seed, BASE.asOfDate, BASE.timezone]);
@@ -353,6 +489,31 @@ check("the answer key states which generation it answers for",
   }
   check("an outcome hung on a canceled booking is caught",
     validateBundle(ghosted).problems.some((pr) => pr.code === "attendance-on-canceled-booking"), true);
+
+  /* THE ID CHECK ITSELF HAD NEVER BEEN PLANTED.
+   *
+   * malformed-id had no mention anywhere in this suite, in the one block
+   * whose stated discipline is that every validator check is proven able
+   * to fire. Mutation found the consequence: the condition is
+   * `!ID_PATTERN.test(id) || !id.startsWith(kind + ":")`, and turning the
+   * `||` into `&&` requires an id to fail BOTH before it is reported —
+   * so a perfectly well-formed id under the WRONG namespace walks
+   * through. That is the interesting failure, not a garbled string: it is
+   * what a copy-paste between collections actually produces. */
+  const misnamespaced = plant();
+  const swapped = misnamespaced.dataset.members[0];
+  if (swapped) swapped.id = "instructor:000001";
+  check("a well-formed id in the wrong namespace is caught",
+    validateBundle(misnamespaced).problems.some((pr) => pr.code === "malformed-id"), true);
+
+  const garbled = plant();
+  const broken = garbled.dataset.members[1];
+  if (broken) broken.id = "member:1";
+  check("...and so is an id that does not match the shape at all",
+    validateBundle(garbled).problems.some((pr) => pr.code === "malformed-id"), true);
+
+  check("...while the untouched studio reports no malformed id",
+    validateBundle(first).problems.some((pr) => pr.code === "malformed-id"), false);
 
   const leaky = plant();
   const card = leaky.dataset.members[0];
@@ -386,6 +547,42 @@ check("serialize -> parse -> serialize is byte-identical",
   }
   check("parsing a malformed bundle throws a named reason",
     message.includes("missing"), true);
+}
+
+/* WHAT parseBundle IS HANDED WHEN THE FILE IS WRONG.
+ *
+ * It reads JSON from outside, so every shape JSON can hold is reachable —
+ * including the one that catches people out: JSON.parse("null") returns
+ * null, and typeof null is "object". The three guards that spell that out
+ * (`typeof x !== "object" || x === null`) could each be turned into `&&`
+ * with the whole suite still green, because only a bundle missing FIELDS
+ * had ever been parsed here, never one that was null. */
+{
+  const reasonFor = (text: string): string => {
+    try {
+      parseBundle(text);
+      return "did not throw";
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+  const goodText = serializeBundle(first);
+  const good = JSON.parse(goodText) as Record<string, unknown>;
+
+  check("a top-level null is refused, not treated as an empty bundle",
+    reasonFor("null"), "not a bundle: top level is not an object");
+  check("...and so is a bare number",
+    reasonFor("42"), "not a bundle: top level is not an object");
+  check("an array is refused for what it is actually missing",
+    reasonFor("[]"), "not a bundle: missing dataset, truth");
+  check("text that is not JSON says so first",
+    reasonFor("{oops").startsWith("not JSON:"), true);
+  check("a null dataset is named, not dereferenced",
+    reasonFor(JSON.stringify({ ...good, dataset: null })), "not a bundle: missing dataset");
+  check("a null truth is named too",
+    reasonFor(JSON.stringify({ ...good, truth: null })), "not a bundle: missing truth");
+  check("...while the real thing still parses, so none of this is refusing everything",
+    serializeBundle(parseBundle(goodText)) === goodText, true);
 }
 
 /* ------------------------------------------------------------------ */
@@ -508,13 +705,159 @@ for (const n of [1, 2, 5, 12]) {
     report.problems.some((p) => p.code === "answer-label-leak"), true);
 }
 
+/* A CSV CELL THAT STARTS WITH = + - @ IS A FORMULA, NOT A NAME.
+ *
+ * Quoting solves CSV structure and nothing about what a spreadsheet does
+ * with the text afterwards. Excel, LibreOffice and Sheets all evaluate a
+ * cell beginning with those characters, so a member called
+ * =HYPERLINK("http://...","Your refund") in an export becomes a clickable
+ * lure the moment somebody opens the file — and this is a studio's own
+ * member list, exported and mailed around. Every CSV this repo writes goes
+ * through csvField, so it is proven here once. */
+{
+  const lure = '=HYPERLINK("http://not-a-real-host.invalid","Your refund")';
+  check("a formula cell is defused with a leading apostrophe",
+    csvField(lure).startsWith("\"'="), true);
+  check("a plus-leading cell is defused", csvField("+1234567890"), "'+1234567890");
+  check("an at-leading cell is defused", csvField("@SUM(A1:A9)"), "'@SUM(A1:A9)");
+  check("a minus-leading cell is defused", csvField("-5"), "'-5");
+  check("a tab-leading cell is defused — a tab can carry into the next cell",
+    csvField("\tTabbed"), "'\tTabbed");
+
+  check("an ordinary name is untouched", csvField("Maria Santos"), "Maria Santos");
+
+  /* AND THE EXPORTER ACTUALLY APPLIES IT.
+   *
+   * Everything above tests the FUNCTION. The comment on this block used to
+   * say it was "proven here once", which is true of csvField and says
+   * nothing about attendanceCsv — a file that stopped calling it would
+   * pass every check above. That is the same parts-versus-assembly gap
+   * that put a double space in Product D's status line: each piece
+   * correct, the line that joins them wrong.
+   *
+   * The generated names are fictional and none of them start with a
+   * formula character, so this plants one. */
+  const planted = parseBundle(serializeBundle(first));
+  const victim = planted.dataset.members[0];
+  if (victim) victim.displayName = "=cmd()|calc";
+  const plantedCsv = attendanceCsv(planted.dataset);
+  check("a formula-shaped name never starts a cell in the export",
+    /(^|,)=/.test(plantedCsv), false);
+  check("...it is carried through as text with its quote prefix",
+    plantedCsv.includes("'=cmd()|calc"), true);
+  check("...and the row is otherwise intact, not dropped",
+    plantedCsv.split("\n").some((l) => l.includes("'=cmd()|calc") && l.split(",").length === 6), true);
+  check("a non-Latin name is untouched", csvField("王伟"), "王伟");
+  check("a name with an apostrophe INSIDE it is not a formula",
+    csvField("O'Brien"), "O'Brien");
+  check("a comma still quotes the field", csvField("Santos, Maria"), '"Santos, Maria"');
+  check("a quote is still doubled", csvField('Say "hi"'), '"Say ""hi"""');
+  check("a newline still quotes the field", csvField("two\nlines"), '"two\nlines"');
+  check("an empty cell stays empty", csvField(""), "");
+}
+
+/* The export a studio actually gets must carry the defusal end to end. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const victim = doctored.dataset.members[0];
+  if (victim) victim.displayName = "=1+1";
+  const csv = attendanceCsv(doctored.dataset);
+  check("no line of a real export starts a cell with a bare formula",
+    csv.split("\n").some((line) => /(^|,)[=+@]/.test(line)), false);
+}
+
+/* THE LEAK THAT IS NOT ON RECORD ZERO. The scan above used to read only
+ * value[0] of every array, which catches a label that is on the TYPE and
+ * misses the one that is on a RECORD — a stray field on member 30, or on
+ * the single member an edge-case injection touched, walked straight past
+ * it. That is the shape this check most needs to catch. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const deep = doctored.dataset.members.length - 1;
+  (doctored.dataset.members[deep] as unknown as Record<string, unknown>)["cohortIntent"] = "fader";
+  const report = validateBundle(doctored);
+  check("an answer label on the LAST record is caught, not just the first",
+    report.problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+// Instructors and class types were outside the scan entirely.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  (doctored.dataset.instructors[0] as unknown as Record<string, unknown>)["expectedLoad"] = 3;
+  check("an answer label on an instructor is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "answer-label-leak"), true);
+}
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  (doctored.dataset.classTypes[0] as unknown as Record<string, unknown>)["quietRate"] = 0.2;
+  check("an answer label on a class type is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "answer-label-leak"), true);
+}
+
+// A label on the TYPE — every record carrying it — is ONE line, not one per
+// record: a report nobody can read is a report nobody reads.
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  for (const m of doctored.dataset.members) {
+    (m as unknown as Record<string, unknown>)["cohort"] = "regular";
+  }
+  const leaks = validateBundle(doctored).problems.filter((p) => p.code === "answer-label-leak");
+  check("a label on every record is reported once, with the count", leaks.length, 1);
+  check("...and the count is stated",
+    leaks[0]?.detail.includes(`${doctored.dataset.members.length} records carry it`), true);
+}
+
+/* ONE DEFECT, ONE CODE. The credential scan ran twice under two names, so a
+ * single planted value produced two problems — and the reconciliation matches
+ * declared against found on code + entityId, which meant declaring either one
+ * left the other undeclared and edge-cases mode could never balance. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  const victim = doctored.dataset.members[2];
+  if (victim) victim.displayName = "Card 4111111111111111";
+  const found = validateBundle(doctored).problems.filter(
+    (p) => p.code === "sensitive-pattern" || p.code === "real-pii-pattern",
+  );
+  check("one credential-shaped value raises exactly one problem", found.length, 1);
+  check("...under the surviving code", found[0]?.code, "sensitive-pattern");
+  check("...attributed to the record that owns it, so a declaration can name it",
+    found[0]?.entityId, victim?.id);
+}
+
+/* The pad is the sort key: a seventh digit sorts before every six-digit id. */
+{
+  let threw = "";
+  try { makeId("attendance", 1_000_000); } catch (e) { threw = (e as Error).name; }
+  check("an id past six digits refuses to be minted rather than mis-sorting", threw, "RangeError");
+  check("the last six-digit id is still fine", makeId("attendance", 999_999), "attendance:999999");
+  check("zero is not a record number", (() => {
+    try { makeId("member", 0); return ""; } catch (e) { return (e as Error).name; }
+  })(), "RangeError");
+}
+
+/* Every collection, because that is what the brief promises. */
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  // Reverse rather than index-swap: noUncheckedIndexedAccess makes every
+  // element possibly-undefined, and reverse() needs no indexing at all.
+  doctored.dataset.instructors.reverse();
+  check("instructors out of id order is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "unsorted-collection"), true);
+}
+{
+  const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
+  doctored.dataset.studioPolicies.reverse();
+  check("studioPolicies out of id order is caught",
+    validateBundle(doctored).problems.some((p) => p.code === "unsorted-collection"), true);
+}
+
 // A credential-shaped value anywhere must scream.
 {
   const doctored = JSON.parse(serializeBundle(first)) as GeneratedStudioBundle;
   const victim = doctored.dataset.members[1];
   if (victim) victim.displayName = "Card 4111111111111111";
   check("a credential-shaped value is caught by the decoded-value scan",
-    validateBundle(doctored).problems.some((p) => p.code === "real-pii-pattern"), true);
+    validateBundle(doctored).problems.some((p) => p.code === "sensitive-pattern"), true);
 }
 
 // A booking stamped after its class must scream.
@@ -611,7 +954,21 @@ for (const [label, bad] of [
   const t2 = performance.now();
   check("a thousand customers over five years generate", flagship.dataset.members.length, 1000);
   check("the five-year studio validates clean", flagshipReport.problems.length, 0);
-  check("five-year generation + validation stays under 30 seconds", t2 - t0 < 30_000, true);
+  /* A WALL-CLOCK SMOKE ALARM, NOT A PERFORMANCE BUDGET — and the ceiling is
+   * deliberately far above the real cost. The work here is about three
+   * seconds on an idle machine, and the old 30-second ceiling looked like
+   * ten times the headroom needed. It was not: this check failed twice on a
+   * machine running several builds at once, in a suite whose whole point is
+   * that it reports the same answer every time. A check that goes red
+   * because the machine was busy teaches people to re-run the gate until it
+   * is green, which costs more than the check was ever worth.
+   *
+   * What it is still here to catch is an ALGORITHMIC regression — somebody
+   * making generation quadratic in the member count, which would blow past
+   * this by an order of magnitude on any machine, loaded or not. It cannot
+   * catch a gradual slowdown, and it is not meant to. */
+  check("five-year generation + validation does not regress by an order of magnitude",
+    t2 - t0 < 120_000, true);
   check("arrivals spread across the years, not bunched at the end",
     flagship.dataset.members.some((m) => dayNumberOf(m.joinedOn) < dayNumberOf(BASE.asOfDate) - 1400), true);
   check("occupancy never approaches the 500-person ceiling",
@@ -658,16 +1015,501 @@ const ENGINE_SOURCES = [
   "lifecycle.js", "schedule.js", "scenarios.js", "generate.js",
   "validate.js", "serialize.js", "csv-export.js",
 ];
+/* WHAT THE ENGINE MAY NOT CONTAIN, and the two holes this list used to have.
+ *
+ * UNSEEDED RANDOMNESS WAS NOT ON THE LIST AT ALL. Every promise this engine
+ * makes rests on being reproducible from a seed — the answer key only means
+ * something because the same seed builds the same studio — and the grep that
+ * enforces purity never once looked for Math.random. The byte-identical
+ * checks would catch it wherever it changed observed output; a call in a
+ * branch those configurations do not reach would have sat there indefinitely.
+ *
+ * The clock pattern only caught `new Date()` with empty parens, which let
+ * `new Date` (no parens at all — same current-date object) and a bare
+ * `Date()` call through, along with performance.now(). `new Date(value)`
+ * stays LEGAL and is used twice in normalize.ts: round-tripping a calendar
+ * date through the real calendar is arithmetic, not a clock read, and
+ * forbidding it would forbid checking that a date exists. */
 const FORBIDDEN: ReadonlyArray<[string, RegExp]> = [
   ["a product import", /from\s+["'][^"']*products\//],
-  ["a network call", /\bfetch\s*\(|XMLHttpRequest|WebSocket/],
-  ["a clock read", /Date\.now\s*\(|new Date\(\)/],
+  ["a network call", /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/],
+  ["a clock read", /Date\.now\s*\(|\bDate\s*\(\s*\)|new\s+Date\s*(?!\s*\()|performance\.now\s*\(/],
+  ["unseeded randomness", /Math\.random\s*\(|crypto\.getRandomValues|randomUUID/],
+  /* THE MACHINE'S LANGUAGE IS OUTSIDE STATE TOO. localeCompare and
+   * Intl.Collator order text by the runtime's locale and ICU version, so a
+   * seed could produce one studio here and a different one on a colleague's
+   * laptop — the same failure a clock read or an unseeded draw would cause,
+   * arriving by a quieter route. schedule.ts sorted its slot times with
+   * localeCompare until 2026-08-22. It changed no byte of any bundle,
+   * verified across four configurations, because every locale agrees about
+   * the digits in "17:30" — but "it happens to agree" is what this engine
+   * refuses to rest on everywhere else. Plain < and > are locale-blind. */
+  ["locale-dependent ordering", /localeCompare\s*\(|Intl\.Collator/],
 ];
 for (const file of ENGINE_SOURCES) {
   const source = await (await fetch(`./${file}`)).text();
   for (const [label, pattern] of FORBIDDEN) {
     check(`${file} contains no ${label}`, pattern.test(source), false);
   }
+}
+
+/* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
+ *
+ * validate.ts skips attendance dated on the as-of date — `day >= asOfDay
+ * continue; // future rows are never evidence`. Product D's
+ * findQuietMembers counts a class attended today. Those definitions
+ * disagree, and have never disagreed in practice for one reason: no
+ * generated attendance row is ever dated there.
+ *
+ * app/shared/CLAUDE.md has warned about this in prose and asks whoever
+ * changes it to raise it first. This is that warning with a check behind
+ * it. If the generator ever fills today's classes, a member who attended
+ * this morning reads as quiet to the answer key and as recent to Product
+ * D, and it looks like a bug in whichever you read second.
+ *
+ * THE BOUNDARY IS TIGHT, WHICH IS WHY THIS IS WORTH CHECKING. The newest
+ * attended class in clean mode is exactly ONE day before the as-of date —
+ * measured, not assumed. One day nearer and the two products part company,
+ * so this is a check standing next to the edge rather than one admiring it
+ * from a distance.
+ *
+ * EDGE-CASES MODE IS EXCLUDED FROM THE RULE, ON PURPOSE. It injects a
+ * `future-attendance` defect deliberately, so it DOES hold a row against a
+ * later session. What matters there is the other half — that the row is
+ * DECLARED — and that is checked instead of pretending the mode is clean.
+ *
+ * The check is on the ATTENDANCE, not on the schedule: today's classes DO
+ * exist and are scheduled, and with `upcomingFillTarget` they are booked
+ * too. Booked is not attended, and that distinction is what keeps the two
+ * products agreeing. */
+{
+  const asOf = "2026-08-22";
+  const asOfDay = dayNumberOf(asOf);
+  const attendedDay = (bundle: GeneratedStudioBundle, sessionId: string): number => {
+    const session = bundle.dataset.classSessions.find((s) => s.id === sessionId);
+    return session === undefined ? Number.NaN : dayNumberOf(dateOfTimestamp(session.startsAt));
+  };
+  const build = (mode: SyntheticStudioConfig["mode"], fill?: number): GeneratedStudioBundle =>
+    generateStudio({
+      ...DEFAULT_CONFIG,
+      seed: "as-of-boundary",
+      asOfDate: asOf,
+      memberCount: 120,
+      historyDays: 365,
+      mode,
+      ...(fill === undefined ? {} : { upcomingFillTarget: fill }),
+    });
+
+  for (const [label, mode, fill] of [
+    ["clean", "clean", undefined],
+    ["clean, filled", "clean", 0.7],
+    ["scale", "scale", undefined],
+  ] as ReadonlyArray<[string, SyntheticStudioConfig["mode"], number | undefined]>) {
+    const bundle = build(mode, fill);
+    const days = bundle.dataset.attendance
+      .map((a) => attendedDay(bundle, a.classSessionId))
+      .filter((d) => Number.isFinite(d));
+
+    check(`${label}: there is a history to search`, days.length > 1000, true);
+    check(`${label}: nothing is attended on or after the as-of date`,
+      days.filter((d) => d >= asOfDay).length, 0);
+    /* The tie exists: the newest visit is the day before, so the rule above
+     * is standing on the boundary rather than far from it. */
+    check(`${label}: and the newest visit is the day before, so the edge is real`,
+      asOfDay - Math.max(...days), 1);
+    check(`${label}: today's classes still exist`,
+      bundle.dataset.classSessions.filter((s) => s.startsAt.slice(0, 10) === asOf).length > 0, true);
+  }
+
+  /* Booked is not attended — with the fill knob somebody has a seat in
+   * today's class, and still nobody has attended it. */
+  const filled = build("clean", 0.7);
+  check("with the fill knob, today's classes are booked",
+    filled.dataset.bookings.filter((b) => attendedDay(filled, b.classSessionId) === asOfDay).length > 0, true);
+
+  /* Edge-cases breaks the rule deliberately, and must DECLARE it. */
+  const edge = build("edge-cases");
+  const futureRows = edge.dataset.attendance.filter((a) => attendedDay(edge, a.classSessionId) >= asOfDay);
+  check("edge-cases does hold attendance against a later class", futureRows.length > 0, true);
+  const declaredIds = new Set(edge.truth.declaredViolations.map((v) => v.entityId));
+  check("...and every one of them is declared, not a surprise",
+    futureRows.every((a) => declaredIds.has(a.id)), true);
+}
+
+/* THE MODULES THAT ARE ALLOWED TO READ THE CLOCK STILL HAVE TO READ IT IN
+ * THE STUDIO'S ZONE.
+ *
+ * The engine may not read the clock at all — that is the audit above. Three
+ * shared modules may, and one of them got it wrong: page.ts prefilled the
+ * as-of date with `new Date().toISOString().slice(0, 10)`, which is UTC, so
+ * somebody in New York opening it after 8pm generated a studio as of a day
+ * that had not happened where the studio is. Product D's brief already
+ * records the same mistake costing it a misread return.
+ *
+ * The pattern is deliberately `new Date().toISOString()` with EMPTY parens,
+ * not `toISOString` on its own: `new Date(day * 86_400_000).toISOString()`
+ * is how a day NUMBER becomes a date and is correct, and appears in
+ * generate.ts and normalize.ts. Catching those would be a false alarm that
+ * teaches people to ignore this check. */
+{
+  const CLOCK_READERS = ["../today.ts", "../auth/studio.ts", "./page.ts"];
+  const UTC_TODAY = /new Date\(\)\s*\.\s*toISOString\s*\(/;
+  /* COMMENTS STRIPPED FIRST, unlike the engine audit above — and the
+   * difference is deliberate. The engine may not read the clock even in a
+   * comment, because there the words are a proposal somebody will act on.
+   * Here the words are a RECORD: page.ts now carries the old broken line
+   * quoted in the comment that explains why it changed, and this check
+   * failed on that comment the first time it ran. Deleting the explanation
+   * to satisfy a grep would trade the reason for the rule. */
+  const withoutComments = (text: string): string =>
+    text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/.*$/gm, " ");
+  for (const file of CLOCK_READERS) {
+    const source = withoutComments(await (await fetch(file)).text());
+    check(`${file} does not take today's date from UTC`, UTC_TODAY.test(source), false);
+    /* Non-vacuous: a fetch that quietly returned a 404 page would pass the
+     * line above by containing no JavaScript at all. */
+    check(`${file} was actually read`, source.length > 200, true);
+  }
+
+  /* Fired at the text it exists to catch, and at the legal text nearest it. */
+  const planted: ReadonlyArray<[string, string, boolean]> = [
+    ["the UTC-today antipattern", "dateEl.value = new Date().toISOString().slice(0, 10);", true],
+    ["...with spacing", "const t = new Date() . toISOString ();", true],
+    ["a day number becoming a date is legal", "return new Date(day * 86_400_000).toISOString().slice(0, 10);", false],
+    ["a parsed date becoming a string is legal", "return new Date(value).toISOString();", false],
+    ["reading the clock in a zone is the whole point", 'todayIsoInZone("America/New_York")', false],
+    /* And the stripper itself, since the check now leans on it. */
+    ["the antipattern quoted inside a block comment",
+      "/* this used to be new Date().toISOString().slice(0, 10) */", false],
+    ["the antipattern quoted after a line comment",
+      "// was: new Date().toISOString()", false],
+  ];
+  for (const [label, text, want] of planted) {
+    check(`the UTC-today grep catches ${label}`, UTC_TODAY.test(withoutComments(text)), want);
+  }
+}
+
+/* A GREP THAT ONLY EVER PASSES IS INDISTINGUISHABLE FROM A BROKEN ONE, and
+ * twelve clean files passing four patterns says nothing about whether the
+ * patterns work. Each is fired at the text it exists to catch, and at the
+ * legal text nearest to it. */
+{
+  const find = (label: string): RegExp =>
+    FORBIDDEN.find(([l]) => l === label)?.[1] ?? /$^/;
+  const planted: ReadonlyArray<[string, string, boolean]> = [
+    ["unseeded randomness", "const r = Math.random();", true],
+    ["unseeded randomness", "const id = crypto.randomUUID();", true],
+    ["unseeded randomness", "const r = stream.chance(0.02);", false],
+    ["locale-dependent ordering", "names.sort((a, b) => a.localeCompare(b));", true],
+    ["locale-dependent ordering", "const c = new Intl.Collator('en');", true],
+    /* The replacement must not read as a violation, or the rule would
+     * forbid its own fix. */
+    ["locale-dependent ordering", "slots.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));", false],
+    /* And a date formatter is not a collator — the engine never formats,
+     * but page.ts does, and a rule that cannot tell them apart would
+     * spread. */
+    ["locale-dependent ordering", "new Intl.DateTimeFormat('en-CA', { timeZone })", false],
+    ["a clock read", "const t = Date.now();", true],
+    ["a clock read", "const t = new Date();", true],
+    ["a clock read", "const t = new Date;", true],
+    ["a clock read", "const t = performance.now();", true],
+    // The legal one, used twice in normalize.ts: round-tripping a calendar
+    // date is arithmetic, not a clock read.
+    ["a clock read", "const round = new Date(Date.UTC(y, m - 1, d));", false],
+    ["a network call", "await fetch(url);", true],
+    ["a network call", "navigator.sendBeacon(url, body);", true],
+    ["a network call", "new EventSource(url);", true],
+    ["a network call", "const fetched = cache.get(key);", false],
+    ["a product import", 'import { x } from "../../products/d-reengagement/logic.js";', true],
+    ["a product import", 'import { x } from "./random.js";', false],
+  ];
+  for (const [label, text, shouldFire] of planted) {
+    check(
+      `the ${label} grep ${shouldFire ? "catches" : "allows"} ${JSON.stringify(text)}`,
+      find(label).test(text),
+      shouldFire,
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* buildSchedule — the timetable everything else is hung on             */
+/* ------------------------------------------------------------------ */
+
+/* This module reported 100% until the runner's clock was fixed; it is
+ * really 54%, and six of its comparisons could be changed with nothing
+ * noticing. They are not obscure: the horizon the schedule covers, how
+ * many sessions a day holds, and whether a class happening TODAY counts
+ * as finished.
+ *
+ * Two are left afterwards and are recorded rather than chased. The guard
+ * `if (!type || !instructor)` can never fire — both are looked up by
+ * modulo, so zero sessions in a whole schedule lack either — which makes
+ * it defensive code, not a hole. The other decides whether a class on the
+ * as-of date can be marked canceled, and the check below WOULD catch it,
+ * but only when the 2% cancellation draw actually fires: five sessions
+ * that day gives it about a 10% chance per seed. So it is covered
+ * probabilistically, not deterministically, and calling that "caught"
+ * would be the same overclaim the runner's clock was making. */
+{
+  const sch = buildSchedule(BASE);
+  const dates = [...sch.sessionsByDate.keys()].sort();
+
+  check("the schedule starts historyDays before the as-of date",
+    dates[0], "2026-02-19");
+  check("...and runs exactly fourteen days past it",
+    dates[dates.length - 1], "2026-09-01");
+  check("...covering every day in between with none missing",
+    dates.length, BASE.historyDays + 1 + 14);
+
+  const perDay = new Set([...sch.sessionsByDate.values()].map((v) => v.length));
+  check("every day holds the same number of sessions", perDay.size, 1);
+  check("...and that number is slots times rooms, with nothing extra",
+    [...perDay][0], 5 * roomsPerSlot(BASE.memberCount));
+  check("a boutique studio of sixty runs one room per slot",
+    roomsPerSlot(BASE.memberCount), 1);
+  check("...while a big-box gym is capped at six", roomsPerSlot(10_000), 6);
+
+  /* THE AS-OF DATE IS NOT THE PAST. A class today has not happened yet:
+   * it is scheduled, not completed, and it cannot already have been
+   * canceled as a historical fact. Both comparisons deciding that could
+   * be shifted by a day with nothing here to notice. */
+  const today = sch.sessionsByDate.get(BASE.asOfDate) ?? [];
+  check("the as-of date carries sessions at all", today.length > 0, true);
+  check("...and every one of them is scheduled, not completed",
+    today.every((c) => c.status === "scheduled"), true);
+
+  const dayOf = (c: { startsAt: string }): string => c.startsAt.slice(0, 10);
+  const future = sch.sessions.filter((c) => dayOf(c) > BASE.asOfDate);
+  const past = sch.sessions.filter((c) => dayOf(c) < BASE.asOfDate);
+  check("nothing in the future is marked completed",
+    future.some((c) => c.status === "completed"), false);
+  check("...nor canceled, which is a fact only the past can carry",
+    future.some((c) => c.status === "canceled"), false);
+  check("the past carries both completed and canceled",
+    ["completed", "canceled"].every((st) => past.some((c) => c.status === st)), true);
+  check("...and cancellation stays the small share it claims to be",
+    past.filter((c) => c.status === "canceled").length / past.length < 0.06, true);
+}
+
+/* ------------------------------------------------------------------ */
+/* demandFactor — the calibrated rhythm, finally measured               */
+/* ------------------------------------------------------------------ */
+
+/* CALIBRATION.md says this studio's rhythms come from published real-gym
+ * check-in distributions rather than invention, and demandFactor is where
+ * that claim lives: generate.ts asks it whether each member turns up on
+ * each day. Five of the six survivors in scenarios.ts sat on its one
+ * holiday line, because BASE reaches only 180 days back from August and
+ * December never falls inside it — so the year-end dip was modelled,
+ * shipped, and never once exercised.
+ *
+ * These use a longer span on purpose. The window means are compared
+ * rather than single days, because a single day also carries a weekday
+ * weight and a noise draw, and a check that depends on one seed's noise
+ * is a check that breaks when somebody changes the seed. */
+{
+  const seed = BASE.seed;
+  const span = (from: string, to: string): number[] => {
+    const out: number[] = [];
+    for (let d = dayNumberOf(from); d <= dayNumberOf(to); d += 1) {
+      out.push(demandFactor(seed, d));
+    }
+    return out;
+  };
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+
+  const hush = [...span("2025-12-20", "2025-12-31"), ...span("2026-01-01", "2026-01-02")];
+  const before = span("2025-12-06", "2025-12-19");
+  const after = span("2026-01-03", "2026-01-16");
+
+  check("the year-end hush covers the fourteen days it claims to", hush.length, 14);
+  check("the studio is quieter over the holidays than the fortnight before",
+    mean(hush) < mean(before), true);
+  check("...and than the fortnight after",
+    mean(hush) < mean(after), true);
+  check("...by a visible margin, not a rounding error",
+    mean(hush) < 0.75 * ((mean(before) + mean(after)) / 2), true);
+  check("the fortnights either side of it are themselves alike, so the dip is the hush and not the season",
+    Math.abs(mean(before) - mean(after)) < 0.1, true);
+
+  /* The documented range, over a whole year rather than a sample. */
+  const year = span("2025-09-01", "2026-08-31");
+  check("demand never leaves its documented 0.05..1 range across a full year",
+    year.every((f) => f >= 0.05 && f <= 1), true);
+  check("...and is not flat, which would make every check above vacuous",
+    new Set(year.map((f) => f.toFixed(3))).size > 100, true);
+
+  check("the same seed and day always give the same demand",
+    demandFactor(seed, dayNumberOf("2026-03-04")), demandFactor(seed, dayNumberOf("2026-03-04")));
+  /* Compared across a year, not on one day, and that is a correction
+   * rather than a preference: the first version of this check picked
+   * 2026-03-04 and failed, because demandFactor clamps to 1 and both
+   * seeds saturate there. 82 days a year sit at that ceiling, so a
+   * single-day comparison between seeds is a coin flip on whether it
+   * proves anything. */
+  const yearFrom = dayNumberOf("2025-09-01");
+  const otherYear = year.map((_, i) => demandFactor("another-seed", yearFrom + i));
+  check("a different seed gives a different rhythm on most days",
+    year.filter((f, i) => f !== otherYear[i]).length > 250, true);
+  check("...though not on all of them, because demand is capped at 1 and busy days saturate",
+    year.filter((f) => f === 1).length > 0, true);
+}
+
+/* ------------------------------------------------------------------ */
+/* periodProblems — the membership history checker                      */
+/* ------------------------------------------------------------------ */
+
+/* validate.ts runs this over every member, and it decides whether a
+ * membership history is coherent — which is upstream of derived status,
+ * which is what Product D means by "active member". It had no direct
+ * checks: it was only ever reached through generated data, which is
+ * coherent by construction, so every branch that reports a PROBLEM went
+ * unexercised. Mutation found the boundary — a period ending the same day
+ * it starts could stop being reported with nothing noticing. */
+{
+  const period = (
+    id: string,
+    startsOn: string,
+    endsOn: string | null,
+  ): MembershipPeriod => ({
+    id,
+    memberId: "member:000001",
+    state: "active",
+    startsOn,
+    endsOn,
+    planName: "monthly",
+  });
+  const joined = "2026-01-01";
+  const problemsFor = (ps: MembershipPeriod[]): string[] => periodProblems(ps, joined);
+
+  check("one open period starting the day they joined is coherent",
+    problemsFor([period("membership:000001", joined, null)]).length, 0);
+  check("a closed period followed by an open one is coherent",
+    problemsFor([
+      period("membership:000001", joined, "2026-03-01"),
+      period("membership:000002", "2026-03-01", null),
+    ]).length, 0);
+
+  check("no periods at all is reported",
+    problemsFor([]).join("|"), "no membership periods");
+  check("a period ending the SAME day it starts is reported, by id",
+    problemsFor([period("membership:000001", joined, joined), period("membership:000002", joined, null)])
+      .some((x) => x === "period membership:000001 ends on or before its start"), true);
+  check("...and so is one ending before it starts",
+    problemsFor([period("membership:000001", "2026-06-01", "2026-02-01"), period("membership:000002", "2026-06-01", null)])
+      .some((x) => x.endsWith("ends on or before its start")), true);
+  check("a history that does not start when the member joined is reported",
+    problemsFor([period("membership:000001", "2026-05-05", null)])
+      .some((x) => x.includes("history starts 2026-05-05, member joined 2026-01-01")), true);
+  check("a gap between two periods is reported with both ids",
+    problemsFor([
+      period("membership:000001", joined, "2026-03-01"),
+      period("membership:000002", "2026-04-01", null),
+    ]).some((x) => x === "gap or overlap between membership:000001 and membership:000002"), true);
+  check("an open period that is not last is reported",
+    problemsFor([
+      period("membership:000001", joined, null),
+      period("membership:000002", "2026-03-01", null),
+    ]).some((x) => x.includes("is open but not last")), true);
+  check("a history with no open period at all is reported",
+    problemsFor([period("membership:000001", joined, "2026-03-01")])
+      .some((x) => x === "expected exactly 1 open period, found 0"), true);
+}
+
+/* ------------------------------------------------------------------ */
+/* The two gatekeepers every timestamp passes through                   */
+/* ------------------------------------------------------------------ */
+
+/* isStrictTimestamp decides whether a session's start time is usable at
+ * all — the CSV export drops any row that fails it. Neither it nor
+ * isStrictDate had a single check. Mutation found the shape of the hole:
+ * the three time-component bounds could each be loosened to <= with
+ * nothing noticing, which accepts hour 24, minute 60 and second 60 as
+ * real times. */
+{
+  check("a real time passes", isStrictTimestamp("2026-08-21T12:30:00"), true);
+  check("midnight passes", isStrictTimestamp("2026-08-21T00:00:00"), true);
+  check("the last second of the day passes", isStrictTimestamp("2026-08-21T23:59:59"), true);
+  check("hour 24 is not a time", isStrictTimestamp("2026-08-21T24:00:00"), false);
+  check("minute 60 is not a time", isStrictTimestamp("2026-08-21T12:60:00"), false);
+  check("second 60 is not a time, leap seconds included",
+    isStrictTimestamp("2026-08-21T12:59:60"), false);
+  check("a timestamp on an impossible date is refused",
+    isStrictTimestamp("2026-02-30T12:00:00"), false);
+  check("a date alone is not a timestamp", isStrictTimestamp("2026-08-21"), false);
+  check("an offset is not this format, which is studio-local by contract",
+    isStrictTimestamp("2026-08-21T12:00:00-04:00"), false);
+  check("a single-digit hour is refused rather than guessed at",
+    isStrictTimestamp("2026-08-21T9:00:00"), false);
+
+  check("a real date passes", isStrictDate("2026-08-21"), true);
+  check("the 30th of February is not a date, whatever the regex says",
+    isStrictDate("2026-02-30"), false);
+  check("the 29th of February is not a date in a common year",
+    isStrictDate("2026-02-29"), false);
+  check("...but it is in a leap year", isStrictDate("2024-02-29"), true);
+  check("...and not in 1900, which the four-year rule alone would allow",
+    isStrictDate("1900-02-29"), false);
+  check("...while 2000 is a leap year, which the hundred-year rule alone would deny",
+    isStrictDate("2000-02-29"), true);
+  check("month 13 is not a month", isStrictDate("2026-13-01"), false);
+  check("day 0 is not a day", isStrictDate("2026-08-00"), false);
+  check("a two-digit year is refused rather than guessed at", isStrictDate("26-08-21"), false);
+}
+
+/* ------------------------------------------------------------------ */
+/* The seeded stream — everything above rests on it, and nothing        */
+/* checked it directly until 2026-08-21.                                */
+/* ------------------------------------------------------------------ */
+
+/* Every promise this engine makes reduces to one claim: the same seed
+ * gives the same sequence. random.ts was only ever exercised THROUGH
+ * generateStudio, which proves the whole pipeline agrees with itself but
+ * says nothing about which part is responsible. Mutation found the gap:
+ * changing `if (hi < lo) throw` to `<=` makes int(5, 5) throw instead of
+ * returning 5 — and picking from a one-element list is an ordinary call,
+ * `int(0, items.length - 1)`. Nothing noticed. */
+{
+  const a = makeStream("proof-seed-0001", "attendance");
+  const b = makeStream("proof-seed-0001", "attendance");
+  const other = makeStream("proof-seed-0001", "names");
+  const otherSeed = makeStream("proof-seed-0002", "attendance");
+
+  const take = (s: { next(): number }, n: number): number[] =>
+    Array.from({ length: n }, () => s.next());
+
+  const first = take(a, 20);
+  check("the same seed and stream give the same sequence",
+    JSON.stringify(first), JSON.stringify(take(b, 20)));
+  check("a different stream name gives a different sequence",
+    JSON.stringify(first) === JSON.stringify(take(other, 20)), false);
+  check("a different seed gives a different sequence",
+    JSON.stringify(first) === JSON.stringify(take(otherSeed, 20)), false);
+  check("every draw sits in [0, 1)",
+    first.every((n) => n >= 0 && n < 1), true);
+
+  const ints = makeStream("proof-seed-0001", "ints");
+  check("a single-value range returns that value rather than throwing",
+    ints.int(5, 5), 5);
+  check("...including zero, which is what int(0, list.length - 1) gives a one-item list",
+    ints.int(0, 0), 0);
+  let reversedRefused = false;
+  try {
+    ints.int(9, 2);
+  } catch {
+    reversedRefused = true;
+  }
+  check("a reversed range is refused, because an empty range has no answer",
+    reversedRefused, true);
+  check("every int lands inside the range asked for",
+    Array.from({ length: 500 }, () => ints.int(3, 7)).every((n) => n >= 3 && n <= 7), true);
+
+  const odds = makeStream("proof-seed-0001", "odds");
+  check("a probability of 0 never fires",
+    Array.from({ length: 2000 }, () => odds.chance(0)).some(Boolean), false);
+  check("a probability of 1 always fires",
+    Array.from({ length: 2000 }, () => odds.chance(1)).every(Boolean), true);
 }
 
 /* ------------------------------------------------------------------ */
@@ -718,10 +1560,186 @@ for (const file of ENGINE_SOURCES) {
   check("the validator blesses a filled studio",
     validateBundle(onA).ok, true);
 
+  /* THE BAND ITSELF, WHICH THE BRIEF STATES AND NOTHING CHECKED.
+   *
+   * app/shared/CLAUDE.md documents this knob as filling to roughly
+   * target−25%..target+15% with per-session variance. The checks above
+   * prove the fill is deterministic, that it fills MORE than organic, and
+   * that nobody gets two seats — none of them look at the band. Mutation
+   * found the consequence: the `+ 15` that sets the top of the range can
+   * become `- 15`, collapsing it, with every check still green.
+   *
+   * The slack is for rounding, not for doubt: seats are integers, so on a
+   * twelve-person class one seat is eight percentage points, and the
+   * measured spread runs a little outside the nominal band at both ends.
+   * The two "reaches" checks are what actually pin the shape — a
+   * collapsed band cannot put a session above its target. */
+  const occupancyOf = (bundle: GeneratedStudioBundle): number[] => {
+    const asOf = dayNumberOf(BASE.asOfDate);
+    const booked = new Map<string, number>();
+    for (const b of bundle.dataset.bookings) {
+      if (b.status !== "booked") continue;
+      booked.set(b.classSessionId, (booked.get(b.classSessionId) ?? 0) + 1);
+    }
+    return bundle.dataset.classSessions
+      .filter((c) => c.status === "scheduled" && dayNumberOf(dateOfTimestamp(c.startsAt)) >= asOf)
+      .map((c) => ((booked.get(c.id) ?? 0) / c.capacity) * 100);
+  };
+  const SLACK = 10;
+  for (const target of [85, 50]) {
+    const occ = occupancyOf(generateStudio({ ...BASE, upcomingFillTarget: target / 100 }));
+    check(`filling to ${target}% leaves upcoming sessions to measure`, occ.length > 0, true);
+    check(`...none of them below the band's floor`,
+      occ.every((o) => o >= target - 25 - SLACK), true);
+    check(`...none above its ceiling`,
+      occ.every((o) => o <= target + 15 + SLACK), true);
+    check(`...and the band's upper half is actually used`,
+      occ.some((o) => o > target), true);
+    check(`...as is its lower half, so this is a spread and not one number`,
+      occ.some((o) => o < target), true);
+  }
+
   check("validateConfig rejects a fill target above 1",
     validateConfig({ ...BASE, upcomingFillTarget: 1.5 }).length > 0, true);
   check("validateConfig accepts a fill target inside 0..1",
     validateConfig({ ...BASE, upcomingFillTarget: 0.7 }).length, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* validateConfig — the engine's front door                             */
+/* ------------------------------------------------------------------ */
+
+/* Every bound this function enforces is documented in the contract, and
+ * only one of them had a check. Mutation put the score at 58%, the lowest
+ * of any module swept: ten of its comparisons could be loosened with
+ * nothing noticing, because a validator reached only with valid input
+ * never runs the half that says no. These walk each limit from both
+ * sides. */
+{
+  const ok = (c: Partial<SyntheticStudioConfig>): number =>
+    validateConfig({ ...BASE, ...c } as SyntheticStudioConfig).length;
+  const says = (c: Partial<SyntheticStudioConfig>): string =>
+    validateConfig({ ...BASE, ...c } as SyntheticStudioConfig).join(" | ");
+
+  check("the base configuration itself is valid, or none of this means anything",
+    ok({}), 0);
+
+  check("an empty seed is refused", says({ seed: "" }).includes("seed must be non-empty"), true);
+  check("...and so is a seed of only spaces",
+    says({ seed: "   " }).includes("seed must be non-empty"), true);
+  check("an empty timezone is refused",
+    says({ timezone: "" }).includes("timezone must be non-empty"), true);
+  check("an impossible asOfDate is refused by the calendar, not the regex",
+    says({ asOfDate: "2026-02-30" }).includes("real calendar date"), true);
+
+  check("memberCount 1 is allowed", ok({ memberCount: 1 }), 0);
+  check("memberCount 2000 is allowed", ok({ memberCount: 2000 }), 0);
+  check("memberCount 0 is refused", says({ memberCount: 0 }).includes("memberCount"), true);
+  check("memberCount 2001 is refused", says({ memberCount: 2001 }).includes("memberCount"), true);
+  check("a fractional memberCount is refused",
+    says({ memberCount: 60.5 }).includes("memberCount"), true);
+
+  check("historyDays 90 is allowed", ok({ historyDays: 90 }), 0);
+  check("historyDays 1900 is allowed", ok({ historyDays: 1900 }), 0);
+  check("historyDays 89 is refused", says({ historyDays: 89 }).includes("historyDays"), true);
+  check("historyDays 1901 is refused", says({ historyDays: 1901 }).includes("historyDays"), true);
+
+  check("an unset facilityCapacity is fine", ok({ facilityCapacity: undefined }), 0);
+  check("facilityCapacity 16 is allowed", ok({ facilityCapacity: 16 }), 0);
+  check("facilityCapacity 500 is allowed", ok({ facilityCapacity: 500 }), 0);
+  check("facilityCapacity 15 is refused",
+    says({ facilityCapacity: 15 }).includes("facilityCapacity"), true);
+  check("facilityCapacity 501 is refused, because the building has a ceiling",
+    says({ facilityCapacity: 501 }).includes("facilityCapacity"), true);
+
+  check("a fill target of exactly 0 is allowed", ok({ upcomingFillTarget: 0 }), 0);
+  check("...and exactly 1", ok({ upcomingFillTarget: 1 }), 0);
+  check("a fill target below 0 is refused",
+    says({ upcomingFillTarget: -0.01 }).includes("upcomingFillTarget"), true);
+  check("NaN is not a fill target, though it is a number",
+    says({ upcomingFillTarget: Number.NaN }).includes("upcomingFillTarget"), true);
+  check("neither is Infinity",
+    says({ upcomingFillTarget: Number.POSITIVE_INFINITY }).includes("upcomingFillTarget"), true);
+  check("a fill target given as a string is refused rather than coerced",
+    says({ upcomingFillTarget: "0.5" as unknown as number }).includes("upcomingFillTarget"), true);
+
+  check("every documented mode is accepted",
+    (["clean", "edge-cases", "scale"] as const).every((mode) => ok({ mode }) === 0), true);
+  check("an undocumented mode is refused, naming what it got",
+    says({ mode: "chaos" as unknown as SyntheticStudioConfig["mode"] }).includes('got "chaos"'), true);
+
+  check("several bad values are all reported, not just the first",
+    validateConfig({ ...BASE, seed: "", memberCount: 0, historyDays: 5 } as SyntheticStudioConfig).length, 3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Injected defects need an id no real record has — and six digits      */
+/* ------------------------------------------------------------------ */
+
+/* An id is `kind:NNNNNN` and ID_PATTERN wants EXACTLY six digits. The
+ * injector used to mint its phantom ids by adding 900001 to the collection
+ * length, which is fine for a studio of sixty and wrong for a large one:
+ * past 99,998 rows the sum needs a seventh digit. At the largest settings
+ * the shipped form offers — 2000 members, five years, edge-cases —
+ * attendance reaches about 168,000 rows and thirty ids came out malformed,
+ * so the report read as a data defect when the fault was in the id.
+ *
+ * That full-scale run takes thirteen seconds, which is most of this
+ * suite's budget for one case, so it is not run here. What IS run is the
+ * property that distinguishes the two schemes at any size: phantom ids are
+ * now minted DOWNWARD from the top of the six-digit space, so they sit at
+ * 999999 and below rather than a little past the collection length. At
+ * sixty members that is 999982..999999 where the old scheme gave ~900776.
+ */
+{
+  const bundle = generateStudio({
+    ...DEFAULT_CONFIG,
+    seed: "phantom-ids",
+    asOfDate: "2026-08-22",
+    memberCount: 60,
+    historyDays: 180,
+    mode: "edge-cases",
+  });
+  const d = bundle.dataset;
+
+  const everyId = [
+    ...d.attendance.map((r) => r.id),
+    ...d.bookings.map((r) => r.id),
+    ...d.classSessions.map((r) => r.id),
+  ];
+  check("every id an edge-cases run mints is still a six-digit id",
+    everyId.every((id) => ID_PATTERN.test(id)), true);
+
+  /* The phantoms are the ids above the real range, which runs 1..length. */
+  const numberOf = (id: string): number => Number(id.split(":")[1]);
+  const phantomAttendance = d.attendance
+    .map((r) => numberOf(r.id))
+    .filter((n) => n > d.attendance.length);
+  /* Non-vacuous: edge-cases mode must actually have injected something,
+   * or every line below would pass by having nothing to look at. */
+  check("edge-cases mode injected rows with phantom ids",
+    phantomAttendance.length > 0, true);
+  check("...and every one is minted downward from the top of the range",
+    phantomAttendance.every((n) => n >= 999_000 && n <= 999_999), true);
+  check("...so none of them collides with a real row",
+    phantomAttendance.every((n) => n > d.attendance.length), true);
+  check("...and each phantom is used once",
+    new Set(phantomAttendance).size, phantomAttendance.length);
+
+  /* The guard underneath it all: makeId refuses a seventh digit outright
+   * rather than emitting an id the validator would later call malformed. */
+  let refused = "";
+  try {
+    makeId("attendance", 1_000_000);
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error);
+  }
+  check("a seventh digit is refused at the source", refused.includes("six digits"), true);
+  check("...and the last six-digit id is still allowed",
+    makeId("attendance", 999_999), "attendance:999999");
+
+  const report = validateBundle(bundle);
+  check("an edge-cases bundle validates clean, ids included", report.ok, true);
 }
 
 /* ------------------------------------------------------------------ */

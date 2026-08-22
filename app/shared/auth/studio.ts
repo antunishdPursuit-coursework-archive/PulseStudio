@@ -8,17 +8,13 @@
 import { DEFAULT_CONFIG } from "../synthetic/config.js";
 import type { SyntheticDataset, SyntheticMember } from "../synthetic/contracts.js";
 import { generateStudio } from "../synthetic/generate.js";
+import { todayIsoInZone } from "../today.js";
 
+/* Was its own hand-assembled formatToParts copy. One of the three modules
+ * that wrote this rule got it wrong, so there is one implementation now —
+ * see app/shared/today.ts. */
 function studioDate(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: DEFAULT_CONFIG.timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
+  return todayIsoInZone(DEFAULT_CONFIG.timezone);
 }
 
 let cached: SyntheticDataset | undefined;

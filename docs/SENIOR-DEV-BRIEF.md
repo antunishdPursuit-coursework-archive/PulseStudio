@@ -76,24 +76,51 @@ proposed in the UI:
 - ranked by attended classes in the 60 days before they went quiet — most
   frequent first, so the most valuable save is on top
 
+**Added since this brief was first written**, each documented in full in
+`app/products/d-reengagement/README.md` rather than duplicated here — a
+second copy is a second thing to keep true:
+
+- **The live trail** is now the DEFAULT door: the same running studio
+  Booking books against, with Booking's own reservation log merged in. Every
+  member in it is fictional and the page says so.
+- **The outreach discipline** — one note per lapse, do-not-contact, a
+  consent window, and an opt-in gate — all pure and unit-checked, with an
+  escape for a claim made by mistake.
+- **The closed loop** judges every note taken against the records: who came
+  back, how many days after, and which entries these records cannot judge.
+- **A coverage window**: a studio that stops RECORDING attendance looks
+  exactly like a studio everybody left, so the page says when the records
+  themselves have gone quiet rather than presenting a page of false flags.
+- **The page adapts to who is signed in** without ever gating: a member who
+  lands on this staff view is told what it is and where their own pages are,
+  and nothing is hidden.
+
 ## 4. The files
 
-All inside `app/products/d-reengagement/`:
+All inside `app/products/d-reengagement/` unless the path says otherwise.
 
-| File | Lines | Role |
-| --- | --- | --- |
-| `logic.ts` | 185 | **The engine.** Pure functions: no DOM, no clock, no fetch. "Today" is always a parameter. |
-| `config.ts` | 60 | **The brand seam.** Studio name, mailbox, thresholds, and the outreach voice — every studio-specific value lives here and nowhere else. |
-| `deps.ts` | 30 | **The portability seam.** The only file that imports from outside the folder. |
-| `main.ts` | 266 | The page: renders flags, evidence, drafts; wires the three data doors. |
-| `csv.ts` | 297 | Parses and adapts a studio's own attendance export, in-browser. |
-| `generate.ts` | 277 | Seeded studio generator (60 fictional members) so the ranking is visible. |
-| `tests.ts` / `tests.html` | 585 / 37 | 75 browser-run unit checks with a pinned reference date. |
-| `styles.css` | 144 | Violet-on-black/white, built entirely on shared theme tokens. |
-| `index.html` | 48 | The page. Staff-only: carries `noindex, nofollow`. |
-| `README.md` | 133 | Folder documentation, rebrand checklist, plug-in spec. |
-| `REQUESTFOR-A-B-C.md` | 137 | What we need from the other three developers. |
-| `PROPOSAL-pages-deploy.md` | 84 | The deploy decision record. |
+There is no line-count column. There was one, and on 2026-08-21 every
+number in it was wrong — `logic.ts` was listed at 185 lines against 905,
+`tests.ts` at 585 against 2549, and the suite at "75 checks" against 435.
+This document already carries the lesson in section 6 ("a count in prose"),
+and then kept a whole table of them. What a file DOES stays true; how long
+it is does not, and nobody reading this needs the number.
+
+| File | Role |
+| --- | --- |
+| `logic.ts` | **The engine.** Pure functions: no DOM, no clock, no fetch. "Today" is always a parameter. Also holds every sentence the page shows that is a rule rather than markup — the evidence line, the rule statement, the empty-state lines — so each one can be checked. |
+| `config.ts` | **The brand seam.** Studio name, mailbox, thresholds, the outreach voice, and the two placeholders the records use for "the data does not say" — every studio-specific value lives here and nowhere else. |
+| `deps.ts` | **The portability seam.** The only file that imports from outside the folder. |
+| `main.ts` | The page: builds elements, wires events, moves focus. Whatever it renders that is a *decision* has been moved out, because this module touches the DOM at import and so no headless check can load it. |
+| `csv.ts` | Parses and adapts a studio's own attendance export, in-browser. |
+| `outreach.ts` | The ledger, the suppression list, the consent window, and the outcome of every note taken. |
+| `live-studio.ts` | The default door: the running studio plus Booking's published reservation log. |
+| `generate.ts` | Seeded studio generator (60 fictional members) so the ranking is visible. |
+| `tests.ts` / `tests.html` | The browser suite, with a pinned reference date. It states its own count on the page and in `npm run check` — read it there, not here. |
+| `styles.css` | Violet-on-black/white, built entirely on shared theme tokens. |
+| `index.html` | The page. Staff-only: carries `noindex, nofollow`. |
+| `README.md` | Folder documentation, rebrand checklist, plug-in spec. |
+| `docs/REQUESTFOR-A-B-C.md` | What we need from the other three developers. **In `docs/`, not here** — it sat in this folder and was served at a public URL until 2026-08-21. |
 
 Three ways data gets in, all through one render path:
 
@@ -116,9 +143,11 @@ Three ways data gets in, all through one render path:
 - **STAFF-ONLY.** Cancellation-risk inference never reaches a member-facing
   surface. The page is `noindex, nofollow` and deliberately **crawlable** so
   that tag can be read (see trap 7).
-- **STATED RESULTS, NEVER BLANK.** Every screen says what it checked:
-  "5 members checked, 1 flagged as of August 18, 2026." A quiet week must be
-  distinguishable from a broken tool.
+- **STATED RESULTS, NEVER BLANK.** Every screen says what it checked, in the
+  form "N members checked, M flagged as of <date>" — and when M is zero it
+  says WHICH of the four reasons applies, because a studio where everyone
+  came in last week and a studio where everyone left three months ago are
+  not the same news. A quiet week must be distinguishable from a broken tool.
 - **The words "demo", "example", and "mock" appear nowhere in the repo** —
   code, comments, docs, commits, or UI. This is a real product. The team's
   word for shared sample records is "fixture"; the first shipped version is
@@ -126,24 +155,42 @@ Three ways data gets in, all through one render path:
 - **No AI is ever a contributor.** No `Co-Authored-By`, no "Generated with",
   no assistant name in any commit, PR, comment, or file. Rensley is the sole
   author. If you write commit messages, write them in his voice, plainly.
-- **Backgrounds are black or white only** (`var(--bg)`); every feature colour
-  is `var(--accent)` — violet for Product D. Never add a fifth colour or
-  restyle another developer's.
+- **Backgrounds come from `var(--bg)`** — built-in light and dark stay white
+  and black, and a person may choose an accessible custom background/text
+  pair through the shared appearance control. No gradients. Every feature
+  colour is `var(--accent)` — violet for Product D — with
+  `var(--accent-strong)` wherever that colour has to be READ, because the
+  identity hex is below WCAG AA as text on white. Never add a fifth colour
+  or restyle another developer's.
 
-## 6. What is verified, with exact numbers
+## 6. What is verified, and where to read it
 
-Do not take these on trust — reproduce them. But they were true at the time of
-writing, checked in a real browser, not inferred from code.
+Do not take these on trust — reproduce them. And do not trust the NUMBERS a
+document quotes either: this section used to name two, "75 checks run" and
+"5 members checked, 1 flagged", and both went stale. The suite grew, and the
+default door stopped reading the 5-member starter fixture and started
+reading the running studio. A count in prose cannot be kept true; every one
+below says where to read it live instead.
 
-- **75 checks run, 75 passed, 0 failed** at
-  `/products/d-reengagement/tests.html`. The suite pins "today" to
-  2026-08-18 so verdicts never drift with the real clock.
-- On the shared records: **5 members checked, 1 flagged** — Maria Santos, last
-  attended yoga with Ana Torres on 2026-08-01, 3 classes in her prior 60 days.
-  James Okafor (3 days ago), Priya Patel (paused), Leo Kim (never attended),
-  and Sofia Reyes (canceled) are correctly not flagged.
-- On the generated studio: **60 members checked, 8 flagged**, ranked 13 → 12 →
-  10 → 8 prior classes — visibly ranked by value, not by days quiet.
+- **`/products/d-reengagement/tests.html` states its own verdict** in the
+  form "N checks run, N passed, 0 failed". Open it; that line is the claim.
+  The suite pins "today" to 2026-08-18 so verdicts never drift with the real
+  clock.
+- **The page states its own result** in the form "N members checked, M
+  flagged as of <date>", with the source of those records named directly
+  underneath — the running studio, a CSV you dropped in, or a generated one.
+  Every member in the running studio is fictional and the page says so.
+- **The near-misses are in the suite, not on the page**, which is where they
+  belong: a recent attendee, a paused member, a canceled one and a
+  never-attended newcomer are each pinned as NOT flagged, by name, against a
+  reference date that never moves. The names on the page shift with the
+  records; those checks do not.
+- **The ranking is visible on any door with enough members**: flagged members
+  come out ordered by prior attendance, most classes first, so the list is
+  ranked by value rather than by days quiet. The specific counts are not
+  quoted here — the generated studio is seeded on the calendar day and
+  builds different people every day, so any number written down about it is
+  wrong tomorrow by design.
 - The suite has been **proven able to fail**: changing the threshold from 14 to
   10 produced `FAIL — exactly 14 days quiet is NOT flagged (expected 0, got 1)`
   and nothing else. A suite that has never failed proves nothing.
@@ -182,6 +229,30 @@ These cost real time. They are the most valuable part of this brief.
    non-secure origins, so the click threw synchronously and the promise
    rejection handler never ran. Guarded now.
 
+9. **A shared record mutated in passing.** Nothing writes to the studio's
+   records, and until recently nothing checked that. The suite now
+   deep-freezes a generated record set, runs every function the page runs,
+   and compares the JSON byte for byte — acceptance check 7 from the product
+   brief, which had been stated in two documents and asserted nowhere.
+10. **A count in prose.** "75 checks run" and "5 members checked, 1 flagged"
+    were both written into this file and both went stale — the suite grew and
+    the default door changed. Product D's README had three timings that were
+    wrong within a day. Where a number matters, say where to read it live.
+11. **A member name that runs as a formula.** A CSV cell beginning `=`, `+`,
+    `-` or `@` is evaluated by every spreadsheet, and member names arrive
+    from a studio's own export. Every CSV this repo writes now defuses it.
+12. **An invisible character splitting one member into two.** A zero-width
+    space makes two identical-looking names two different people, each with
+    half a history and each able to be flagged for a silence that never
+    happened. Removed and counted — but NOT the zero-width joiner and
+    non-joiner, which are real letters in Persian and Devanagari.
+13. **A per-item question answered by scanning everything.** Four of these,
+    the worst freezing the page for 137 seconds at studio scale. Each fix was
+    proven byte-identical to what it replaced, not merely faster.
+14. **A metric mistaken for a behaviour.** `scrollWidth` exceeding
+    `clientWidth` is not a page that scrolls, and a timing taken at load
+    average 92 is not a regression. Both nearly sent a fix at working code.
+
 ## 8. Known open items — honest state
 
 - **The 14/60 thresholds are not ratified.** They are Rensley's proposal,
@@ -189,28 +260,130 @@ These cost real time. They are the most valuable part of this brief.
 - **No real studio has used this.** No real member has received a note. The
   product has never been in front of a real user — that is the biggest gap and
   it is human work, not code.
-- **The shared fixtures age.** `fixtures.json` has fixed 2026 dates, so around
-  2026-09-30 Maria passes 60 days and the shared-records view correctly shows
-  0 flagged. The unit checks are pinned and will not rot, but the live page on
-  shared records eventually shows an empty list. Refreshing the team-owned
-  fixture is the fix — **never hardcode a fake "today"**.
+- **The shared fixtures age.** `fixtures.json` has fixed 2026 dates. Two
+  active members can be flagged from it: Maria Santos (last attended
+  2026-08-01, so past 60 days on 2026-09-30) and James Okafor (2026-08-15,
+  past 60 on 2026-10-14). Sofia Reyes is canceled and never flags.
+  **So the list empties on 2026-10-15, not 2026-09-30** — this paragraph
+  said the earlier date until 2026-08-21, having taken the first member to
+  age out for the last. The unit checks are pinned and will not rot; the
+  live page on shared records is what goes empty. `scripts/check-fixtures.mjs`
+  prints the countdown on every run, so the number is read from the gate
+  rather than from here. Refreshing the team-owned fixture is the fix —
+  **never hardcode a fake "today"**.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
 - **Manny's staff dashboard has no `noindex`** and is live and public showing
-  member names and rosters. `app/robots.txt` blocks its crawl as a stopgap.
-  Only he can add the tag. This is flagged in `REQUESTFOR-A-B-C.md`.
+  member names and rosters. This brief used to add "`app/robots.txt` blocks
+  its crawl as a stopgap" — it does not, and never did on this deploy. That
+  file is served at `/PulseStudio/robots.txt` on a project page, while
+  crawlers read the USER site's root, which is a different repository; its
+  Disallow line was also missing the path prefix. Both corrected, and the
+  honest position is now written in three places: the robots file, the
+  sitemap, and `REQUESTFOR-A-B-C.md`. The dashboard has NO crawler
+  protection at all, and only its owner can add the tag.
+- **The session ids in the shared studio are not stable.** Measured: 1900 of
+  1900 move to a different date each day, because they are minted
+  positionally over a window anchored on today. Product A persists
+  reservations WITH a session id, so a stored reservation resolves to the
+  wrong class the next day. `SHARED_DATA_CONTRACT.md` says every record must
+  have a stable id; these do not. The fix is content-derived ids, which
+  changes every id in the dataset and everything pinned to them — a team
+  decision, raised rather than improvised, per `app/shared/CLAUDE.md`.
+- **Three developer accents are below WCAG AA** as text on the light theme —
+  blue 3.68:1, amber 2.15:1, green 2.54:1. Violet was too and is fixed
+  without changing its identity hex. `scripts/check-contrast.mjs` measures
+  all of them every run; the other three are baselined against their owners,
+  who are the only people who may change them.
+
+Raised since, each in `docs/REQUESTFOR-A-B-C.md` and each belonging to
+somebody else — none is mine to close:
+
+- **A member booking a class reads a builder's name.** Kerrian's page
+  header carries an `.owner-badge` reading "Kerrian", measured in a browser
+  at 74x26 pixels. The audience law says authorship is carried by the
+  builder's COLOUR, which his blue already does on every screen of Product
+  A. Baselined so `check-audience.mjs` reports it rather than failing the
+  build for everybody.
+- **Dennis's dotenv template is named after a banned word.** The language
+  gate no longer objects — a path is a name, not the word — but whether the
+  repo should hold that filename is his call, and `.env.fixture` would
+  satisfy the law and still read naturally.
+- **The contract's product map understates every product**, mine included
+  until I corrected my own row. Three rows still name fewer records than
+  their product reads. No data-law breach in any of them; the risk is that
+  a new teammate reads the table to learn what they may touch.
+
+And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
+
+- **`synthetic/page.ts` has no checks and cannot have any** from the
+  suites — it reads `document` at module load. Proven by breaking it
+  syntactically and watching every synthetic check pass. `tsc` still
+  catches type and syntax errors.
+- **The engine and this product disagree about "today", latently.**
+  `validate.ts` skips attendance dated on the as-of date; `findQuietMembers`
+  counts a class attended today. They have never disagreed because the
+  generator schedules no attended record on that date — measured 0 at 60
+  members and 0 at 300 — but if that changes, a member who came in this
+  morning reads as quiet to the answer key and recent to this product.
 
 ## 9. How to run, gate, and commit
 
 ```
-npm install
-npm run check      # tsc --noEmit — must pass before any commit
-npm run build      # tsc — emits .js beside each .ts
+npm ci             # what CI runs; npm install is fine locally
+npm run check      # the gate — must pass before any commit
+npm run build      # tsc — emits the .js the browser runs
 npm run start      # serves app/ at http://localhost:4173
 ```
 
 Then `http://localhost:4173/products/d-reengagement/` and its `tests.html`.
+
+**`npm run check` is not `tsc --noEmit`,** which this page used to say. It is
+`tsc` — which EMITS — followed by every gate `package.json` lists and the
+three suites:
+
+| | what it fails on |
+| --- | --- |
+| `tsc` | a type error, and it writes the `.js` the next step runs |
+| `check-styles.mjs` | a product restyling something the shared theme owns |
+| `check-contrast.mjs` | a NEW colour pairing below WCAG AA |
+| `check-language.mjs` | a banned word in use, or an assistant credited |
+| `check-fixtures.mjs` | a broken shared record, or one that has aged out |
+| `check-lanes.mjs` | a commit touching another developer's product folder |
+| `check-published.mjs` | a NEW file under `app/` that the website would never ask for |
+| `check-audience.mjs` | a builder name or product letter in copy a member reads |
+| `check-secrets.mjs` | credential material in any tracked file |
+| `check-sources.mjs` | a NEW tracked `.js` under `app/` — committed build output, or hand-written JavaScript no compiler reads |
+| `check-reachable.mjs` | a NEW module under `app/` that no page reaches (needs a build; types-only modules are not dead code) |
+| `run-suites.mjs` | any of the three browser suites, run headlessly |
+
+Each gate carries `--self-test`, which plants known-bad input and proves it
+still catches it — run one if you ever doubt a green. Do not read the list
+above as complete either: `package.json` is where the `check` script names
+them, and it is the only place that cannot drift.
+
+`npm run mutate` is the other half and is deliberately NOT in the gate. It
+changes one token in a compiled module, reruns a suite, and puts the file
+back; whatever the suite still passes is a way that module could be wrong
+with nobody hearing about it. Read the survivors, not the percentage —
+[equivalent-mutants.md](./equivalent-mutants.md) lists the ones nobody can
+close, and why. It found the greeting that used a member's whole name, the
+CSV export whose byte order rested on sort stability, and a check in this
+product that could not fail at all.
+
+That distinction is not pedantry. Verifying a fix with `tsc --noEmit`
+compiles nothing, so the suites re-run the PREVIOUS build and report a clean
+pass over code you just changed. It happened on this branch, to a fix that
+had been deliberately reverted to see the checks go red; they stayed green
+and said nothing. **A check proved against stale build output proves
+nothing.**
+
+Verified from a clean clone on 2026-08-21, not from a working tree with
+artefacts lying around: clone, `npm ci`, `npm run check` green, `npm run
+build`, `npm run start`, and every page — front door, the tool, all three
+proof suites, storytold and ready — served and rendered. The reviewer bundle
+builds there too.
 
 - **Compiled `.js` is gitignored on purpose.** Source is source; CI builds.
   `.github/workflows/pages.yml` runs the gate and only publishes if it passes,
@@ -246,7 +419,7 @@ Be specific and be hard on it. In rough priority:
 1. **Try to break the rule.** Find an input where the flag list is wrong and
    nothing says so. Concrete input, wrong output, cite the file and line.
 2. **Attack the test suite, not just the code.** Which real bug classes would
-   pass all 75 checks today? Mutate `logic.ts` and find a change that keeps the
+   pass the suite as it stands today? Mutate `logic.ts` and find a change that keeps the
    suite green — that is a missing check, and it is worth more than a style note.
 3. **Judge the ranking rule.** "Most classes in the prior 60 days" is a proxy
    for "most valuable save". Is it the right proxy for a gym? What would you

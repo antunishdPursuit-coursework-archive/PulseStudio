@@ -10,6 +10,7 @@
  * resolvable ATTENDED rows count as visits when recomputing quiet days.
  */
 
+import { counted } from "../text.js";
 import { ID_PATTERN } from "./contracts.js";
 import type {
   GeneratedStudioBundle,
@@ -336,7 +337,7 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     add(
       "cohort-count-mismatch",
       dataset.studio.id,
-      `${Object.keys(truth.memberCohorts).length} cohorts for ${dataset.members.length} members`,
+      `${Object.keys(truth.memberCohorts).length} cohorts for ${counted(dataset.members.length, "member")}`,
     );
   }
   const realizedQuiet = new Map<string, number>();
@@ -401,12 +402,19 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
   }
 
   // --- canonical order: collections ascending by id ---------------------
+  /* EVERY collection, because that is what app/shared/CLAUDE.md promises:
+   * "every synthetic collection sorts ascending by id". Three of the eight —
+   * instructors, classTypes and studioPolicies — were never in this list, so
+   * the guarantee held for five of them and was unchecked for the rest. */
   const collections: Array<[string, ReadonlyArray<{ id: string }>]> = [
     ["members", dataset.members],
     ["memberships", dataset.memberships],
+    ["instructors", dataset.instructors],
+    ["classTypes", dataset.classTypes],
     ["classSessions", dataset.classSessions],
     ["bookings", dataset.bookings],
     ["attendance", dataset.attendance],
+    ["studioPolicies", dataset.studioPolicies],
   ];
   for (const [name, rows] of collections) {
     for (let i = 1; i < rows.length; i += 1) {
@@ -428,16 +436,30 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     // the member-facing text itself — production data. The forbidden
     // vocabulary is the kind that would let a product read a verdict.
     const forbiddenKey = /^(cohort|group|expected|eligib|quiet)/i;
+    /* EVERY ELEMENT, NOT THE FIRST ONE. This used to scan only value[0] of
+     * each array — `const sample = value.length > 0 ? [value[0]] : []` —
+     * which catches a leak that is on the TYPE and misses entirely the
+     * leak that is on a RECORD. A stray label on member 500, or on the one
+     * member an edge-case injection touched, walked straight past it, and
+     * a leak on a single record is the shape this check most needs to
+     * catch. The cost of doing it properly is a key-name test per field on
+     * a few tens of thousands of records: milliseconds, against a check
+     * that was close to decorative.
+     *
+     * Reported once per distinct key with a count, so a leak that IS on
+     * the type produces one line instead of fifty thousand. */
+    const leakCounts = new Map<string, { count: number; first: string }>();
     const scan = (value: unknown, path: string): void => {
       if (Array.isArray(value)) {
-        const sample = value.length > 0 ? [value[0]] : [];
-        for (const v of sample) scan(v, `${path}[0]`);
+        for (let i = 0; i < value.length; i += 1) scan(value[i], `${path}[${i}]`);
         return;
       }
       if (typeof value !== "object" || value === null) return;
       for (const [k, v] of Object.entries(value)) {
         if (forbiddenKey.test(k)) {
-          add("answer-label-leak", path, `record key "${k}" belongs in the answer key, not on records`);
+          const seen = leakCounts.get(k);
+          if (seen === undefined) leakCounts.set(k, { count: 1, first: path });
+          else seen.count += 1;
         }
         scan(v, `${path}.${k}`);
       }
@@ -446,6 +468,8 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       {
         members: dataset.members,
         memberships: dataset.memberships,
+        instructors: dataset.instructors,
+        classTypes: dataset.classTypes,
         classSessions: dataset.classSessions,
         bookings: dataset.bookings,
         attendance: dataset.attendance,
@@ -453,29 +477,54 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       },
       "dataset",
     );
+    for (const [key, { count, first }] of leakCounts) {
+      add(
+        "answer-label-leak",
+        first,
+        `record key "${key}" belongs in the answer key, not on records` +
+          (count > 1 ? ` (${count} records carry it)` : ""),
+      );
+    }
   }
 
   // --- sensitive data: scan DECODED field values, not file text ---------
   // Nothing in this dataset may even be SHAPED like a credential: no long
   // digit runs (card-shaped), no nine-digit runs (government-id-shaped).
+  //
+  // ONE SCAN, ONE CODE. This ran TWICE, under two codes: a recursive walk
+  // reporting "real-pii-pattern" against a dotted path, and a flat per-record
+  // pass reporting "sensitive-pattern" against a record id. One planted
+  // credential therefore produced two problems, and the reconciliation at the
+  // bottom of this file matches declared against found on code + entityId —
+  // so declaring either one left the other UNDECLARED and the exact
+  // reconciliation edge-cases mode depends on could never balance. No PII
+  // defect is declared today, which is the only reason nothing was red; the
+  // first person to add one would have hit a wall with no explanation on it.
+  //
+  // The recursive walk is kept because it reaches nested values a flat pass
+  // cannot, and it now attributes to the OWNING RECORD's id, which is what a
+  // declaration can name. "sensitive-pattern" is the surviving code.
   {
     const credentialShaped = /\d{13,19}|(?<!\d)\d{9}(?!\d)/;
-    const scanStrings = (value: unknown, path: string): void => {
+    const scanStrings = (value: unknown, owner: string, path: string): void => {
       if (typeof value === "string") {
         if (credentialShaped.test(value)) {
-          add("real-pii-pattern", path, `value looks credential-shaped: "${value.slice(0, 40)}"`);
+          add("sensitive-pattern", owner, `credential-shaped digit run at ${path}: "${value.slice(0, 40)}"`);
         }
         return;
       }
       if (Array.isArray(value)) {
-        for (let i = 0; i < value.length; i += 1) scanStrings(value[i], `${path}[${i}]`);
+        for (let i = 0; i < value.length; i += 1) scanStrings(value[i], owner, `${path}[${i}]`);
         return;
       }
       if (typeof value === "object" && value !== null) {
-        for (const [k, v] of Object.entries(value)) scanStrings(v, `${path}.${k}`);
+        const record = value as Record<string, unknown>;
+        // A record with its own id owns everything beneath it.
+        const nextOwner = typeof record["id"] === "string" ? record["id"] : owner;
+        for (const [k, v] of Object.entries(record)) scanStrings(v, nextOwner, `${path}.${k}`);
       }
     };
-    scanStrings(dataset, "dataset");
+    scanStrings(dataset, dataset.studio.id, "dataset");
   }
 
   // --- booking lifecycle order ------------------------------------------
@@ -498,30 +547,6 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
       add("attendance-on-canceled-booking", a.id, `outcome recorded against canceled ${booking.id}`);
     }
   }
-
-  // --- sensitive data: scan DECODED field values, not serialized text ----
-  // Credential-shaped digit runs (13-19 digits, or an exact 9-digit run)
-  // must not exist in any string field. Serialized-text scanning can be
-  // fooled by adjacent fields and formatting; values cannot.
-  const scanValue = (owner: string, value: unknown): void => {
-    if (typeof value !== "string") return;
-    if (/\d{13,19}/.test(value) || /(?<!\d)\d{9}(?!\d)/.test(value)) {
-      add("sensitive-pattern", owner, `credential-shaped digit run in "${value.slice(0, 40)}"`);
-    }
-  };
-  const scanRecord = (record: Record<string, unknown>): void => {
-    const id = typeof record["id"] === "string" ? (record["id"] as string) : dataset.studio.id;
-    for (const value of Object.values(record)) scanValue(id, value);
-  };
-  scanRecord(dataset.studio as unknown as Record<string, unknown>);
-  for (const r of dataset.members) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.memberships) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.instructors) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.classTypes) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.classSessions) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.bookings) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.attendance) scanRecord(r as unknown as Record<string, unknown>);
-  for (const r of dataset.studioPolicies) scanRecord(r as unknown as Record<string, unknown>);
 
   // --- reconcile with declared violations ------------------------------
   const keyOf = (x: { code: string; entityId: string }): string =>

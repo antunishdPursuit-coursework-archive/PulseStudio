@@ -1,0 +1,146 @@
+{
+  "note": "Files under app/ that are published at a public URL but are not the website. app/ IS the site: the Pages workflow publishes it with path: app. Everything here was already published the day scripts/check-published.mjs landed (2026-08-21). This list is meant to SHRINK — when an owner moves a file to docs/, drop its line. Anything not on this list fails the gate.",
+  "allowed": [
+    {
+      "file": "app/products/a-booking/AGENTS.md",
+      "owner": "Kerrian",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/a-booking/CLAUDE.md",
+      "owner": "Kerrian",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/b-dashboard/AGENTS.md",
+      "owner": "Manny",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/b-dashboard/CLAUDE.md",
+      "owner": "Manny",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/c-chatbot/AGENTS.md",
+      "owner": "Dennis",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/c-chatbot/CLAUDE.md",
+      "owner": "Dennis",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/.gitignore",
+      "owner": "Rensley",
+      "why": "a build artifact rule, harmless to serve and meaningless to a reader"
+    },
+    {
+      "file": "app/products/d-reengagement/AGENTS.md",
+      "owner": "Rensley",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/CLAUDE.md",
+      "owner": "Rensley",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/products/d-reengagement/LICENSE.md",
+      "owner": "Rensley",
+      "why": "the licence, which is meant to be readable at a URL"
+    },
+    {
+      "file": "app/products/d-reengagement/README.md",
+      "owner": "Rensley",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/AGENTS.md",
+      "owner": "the team",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/shared/CLAUDE.md",
+      "owner": "the team",
+      "why": "the per-folder brief the root CLAUDE.md requires every working folder to carry, and it has to sit beside the code it governs"
+    },
+    {
+      "file": "app/shared/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/auth/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/auth/schema.sql",
+      "owner": "the team",
+      "why": "a design document for a database nothing runs yet; published only because it sits beside the auth code it describes"
+    },
+    {
+      "file": "app/shared/components/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/fonts/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    },
+    {
+      "file": "app/shared/photos/CREDITS.md",
+      "owner": "the team",
+      "why": "photo attribution, which is a licence obligation and belongs in public"
+    },
+    {
+      "file": "app/shared/synthetic/CALIBRATION.md",
+      "owner": "the team",
+      "why": "where the engine's rhythms come from; published so a claim about real-world data can be checked by anyone reading it"
+    },
+    {
+      "file": "app/shared/synthetic/README.md",
+      "owner": "the team",
+      "why": "developer documentation for the folder it sits in"
+    }
+  ],
+  "indexingNote": "Published pages that have made no indexing decision: neither listed in sitemap.xml nor carrying <meta name=\"robots\" content=\"noindex\">. On a GitHub Pages PROJECT site robots.txt cannot help — the crawler reads the USER site's robots.txt in another repository, and Disallow blocks crawling rather than indexing, which stops a noindex tag from ever being seen. The tag is the only thing that works. Recorded 2026-08-22; shrinking this list belongs to the page's owner. Anything not listed here fails the gate.",
+  "indexing": [
+    {
+      "file": "app/products/b-dashboard/index.html",
+      "owner": "Manny",
+      "why": "the staff scheduling dashboard's front page, public and neither listed nor noindex. app/robots.txt already says this in its own comment — the re-engagement tool carries the tag and this does not. A staff surface showing rosters and attendance should carry noindex; behind a sign-in would be better still, since neither robots.txt nor a meta tag is a security control"
+    },
+    {
+      "file": "app/products/b-dashboard/staff-dashboard.html",
+      "owner": "Manny",
+      "why": "the page the dashboard actually runs, same position as its index.html and same remedy"
+    }
+  ],
+  "iconsNote": "Published pages with no <link rel=\"icon\">. A browser given none asks for /favicon.ico on every load and gets a 404; this site ships app/favicon.svg, which a browser only finds when a page points at it. The four pages that are team-owned or Rensley's were fixed on 2026-08-22; these four are in other lanes and are one line each for their owner. This list is meant to SHRINK.",
+  "icons": [
+    {
+      "file": "app/products/a-booking/index.html",
+      "owner": "Kerrian",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/b-dashboard/index.html",
+      "owner": "Manny",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/b-dashboard/staff-dashboard.html",
+      "owner": "Manny",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/c-chatbot/index.html",
+      "owner": "Dennis",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    }
+  ]
+}
