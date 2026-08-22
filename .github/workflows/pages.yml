@@ -83,7 +83,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mode=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/dev/null || echo "none")
+          # A FAILED CALL IS NOT AN ANSWER. This was one line with
+          # `|| echo "none"` on the end, which folded three different
+          # outcomes into one: Pages is not enabled, the token was refused,
+          # and the API was briefly unreachable. The last two would have
+          # skipped the publish, left the run GREEN, and reported success
+          # for a deploy that never happened. A 404 is a fact about this
+          # repo and stays green; anything else stops the run.
+          set +e
+          mode=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/tmp/pages-api-err)
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            if grep -q "HTTP 404" /tmp/pages-api-err; then
+              mode="none"
+            else
+              echo "::error::Could not read this repo's Pages configuration, so this run cannot tell whether it should publish. Refusing to guess."
+              cat /tmp/pages-api-err
+              exit 1
+            fi
+          fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           if [ "$mode" != "workflow" ]; then
             {

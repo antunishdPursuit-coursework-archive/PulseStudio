@@ -11,8 +11,15 @@ These rules were each paid for at least once. Follow them exactly.
 **The session's working directory RESETS between turns**, and this repo is
 usually NOT the session's primary cwd. A bare `git` command has run in the
 wrong repository twice — once nearly merging into a production codebase.
-Therefore: **every git command carries `-C /Users/Rensley/Desktop/pulseStudio/PulseStudio`**
-(or an explicit `cd` inside the same compound command). No bare git, ever.
+Therefore: **every git command names the repository it means** — a `-C`
+pointing at this checkout, or an explicit `cd` inside the same compound
+command. No bare git, ever.
+
+The absolute path used to be written out here. It was one developer's home
+directory, which is no use to anybody else — and this file is served at a
+public URL, because everything under `app/` is. The filing law already
+says a path from your machine is not tooling; it is not documentation
+either.
 
 ## Lane law
 
