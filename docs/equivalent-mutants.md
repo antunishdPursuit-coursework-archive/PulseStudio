@@ -154,6 +154,15 @@ is the durable part — the individual fixes are just where it landed.
   layout, and the resulting `"#NaNNaNNaN"` is rejected by `isHexColor` at
   every consumer — so a bad value degrades to the readable default instead
   of one layer silently repairing it into a third colour nobody chose.
+- **Module-level caches that could go stale or disagree.** Swept and came
+  back clean, which is worth recording so nobody re-derives it.
+  `auth/studio.ts` caches the generated studio and `auth/session.ts` caches
+  the member ids that validate a session; both are set once with `??=` and
+  never invalidated, and the second is built from the first, so they cannot
+  disagree. Across a midnight rollover they go stale TOGETHER — consistently
+  stale is the safe failure, and signing out a member whose id vanished is
+  the documented behaviour rather than a bug. The rest of the module-level
+  state is page-local or a once-flag.
 - **Comparators that return 0 and leave the rest to input order.** Three
   instances, all in something a person reads: the synthetic CSV export, the
   flagged ranking, and which class counts as "last attended" when a sign-in
