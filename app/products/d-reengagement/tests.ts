@@ -1979,6 +1979,44 @@ check("no visits in a real window is a real answer, not an absent one",
     imported.skipped.length, 0);
   check("...reading two people", imported.memberCount, 2);
 }
+/* A HALF-FILLED IDENTITY COLUMN MUST NOT SILENCE THE AMBIGUITY.
+ *
+ * The heuristic counts only rows where BOTH the id and the name are
+ * present, because a blank cell says nothing about whether the column
+ * numbers members or visits. Counting blanks instead makes the empty
+ * string look like a repeated id, which reads as "this column is not
+ * per-row after all" — and the notice explaining why five records came out
+ * of a three-person file never gets written.
+ *
+ * It takes TWO blank cells to matter, which is why this case is spelled
+ * out rather than left to a simpler one: a single blank id is still
+ * distinct from every other id, so the verdict does not move. Found by
+ * mutation, and the shape had to be measured before it could be pinned. */
+{
+  const halfFilled = [
+    "member id,member,date",
+    "V1,Maria Santos,2026-08-01",
+    "V2,Maria Santos,2026-08-04",
+    "V3,Maria Santos,2026-08-08",
+    ",Ann Lee,2026-08-02",
+    ",Bo Diaz,2026-08-03",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(halfFilled, "America/New_York");
+  check("blank identity cells do not hide per-visit numbering",
+    imported.identityMayCountRows, true);
+  check("...so the page still explains why the member count looks wrong",
+    imported.skipped.some((s) => s.includes("numbers VISITS rather than")), true);
+  /* One blank is not enough to move it, and saying so keeps the case above
+   * from looking like an arbitrary choice of file. */
+  const oneBlank = [
+    "member id,member,date",
+    "V1,Maria Santos,2026-08-01",
+    "V2,Maria Santos,2026-08-04",
+    ",Ann Lee,2026-08-02",
+  ].join("\n");
+  check("a single blank identity cell changes nothing",
+    adaptAttendanceCsv(oneBlank, "America/New_York").identityMayCountRows, true);
+}
 {
   const oneEach = "member id,member,date\nM1,Maria Santos,2026-08-01\nM2,James Okafor,2026-08-02\n";
   const imported = adaptAttendanceCsv(oneEach, "America/New_York");

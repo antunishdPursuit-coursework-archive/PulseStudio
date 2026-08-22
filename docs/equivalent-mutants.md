@@ -127,6 +127,18 @@ here was 21ms for twenty studios.
   never disagree.
 - Several loop bounds guarded by `if (!x) continue` on the next line.
 
+**A guard whose boundary needs two of something.** `csv.ts` — the identity
+heuristic counts only rows where BOTH the id and the name are present, and
+turning that `||` into `&&` survived. The reason it looked equivalent is
+that ONE blank cell changes nothing: the empty string is still distinct
+from every other id, so the verdict does not move. It takes TWO blanks
+before the empty string reads as a repeated id and the ambiguity notice
+goes silent — leaving five records from a three-person file with nothing on
+the page to explain them. Measured before it could be pinned, and worth
+remembering as a shape: a mutation that survives the obvious case is not
+equivalent, it is under-tested at a boundary that needs more than one of
+something to reach.
+
 **Covered, but only by luck.** Not equivalent — genuinely detectable, just
 not reliably.
 
