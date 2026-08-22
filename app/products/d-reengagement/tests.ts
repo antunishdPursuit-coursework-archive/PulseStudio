@@ -584,6 +584,25 @@ check("today is computed in the studio timezone",
   const r = findQuietMembers(allRecent, TODAY, proposedRules);
   check("a genuinely healthy studio still gets the good news",
     nobodyFlaggedLine(r, proposedRules)?.includes("been in within the last 14 days"), true);
+
+  /* AND SAYS NOTHING ABOUT THE CATEGORIES THAT ARE EMPTY.
+   *
+   * Each clause is guarded by a count being above zero, and every one of
+   * those guards could be loosened to "or equal" with nothing noticing —
+   * the clauses had checks for APPEARING and none for staying away. The
+   * result would be an empty state reciting "0 have never attended a
+   * class" for every category the studio does not have, which is the
+   * opposite of stating a negative usefully: it is noise wearing the
+   * shape of information. */
+  const healthy = nobodyFlaggedLine(r, proposedRules) ?? "";
+  check("...without reciting a zero for the long-quiet",
+    healthy.includes("quiet longer than"), false);
+  check("...or for members who never attended",
+    healthy.includes("never attended"), false);
+  check("...or for members already booked back in",
+    healthy.includes("already booked back in"), false);
+  check("...and no clause counts nobody",
+    /\b0 (has|have|is|are)\b/.test(healthy), false);
 }
 {
   const noneActive = recordsFor([
@@ -999,6 +1018,74 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("without their instructor, their usual class still wins",
     fallback?.session_id, "up_1");
 }
+/* THE EDGE OF THE PRIOR WINDOW, WHICH IS THE NUMBER ON THE CARD.
+ *
+ * "4 classes in the prior 60 days" is the evidence a staff member weighs,
+ * and the comparison deciding what counts as inside those 60 days could
+ * be shifted with nothing noticing. The window is measured back from the
+ * member's LAST visit, not from today — so with a last visit on
+ * 2026-08-01 it opens on 2026-06-02, exactly sixty days earlier. */
+{
+  const priorCountFor = (extra: string): number => {
+    const fx = recordsFor([
+      { id: "m1", name: "Quiet Regular", status: "active",
+        attended: ["2026-08-01@yoga", extra] },
+    ]);
+    const flagged = run(fx).flagged[0];
+    if (!flagged) throw new Error("fixture defect");
+    return flagged.priorCount;
+  };
+
+  check("a class exactly sixty days before the last visit is inside the window",
+    priorCountFor("2026-06-02@yoga"), 2);
+  check("...and one day earlier is outside it",
+    priorCountFor("2026-06-01@yoga"), 1);
+  check("...while a class in the middle of the window plainly counts",
+    priorCountFor("2026-07-15@yoga"), 2);
+}
+
+/* THE TEN-DAY WINDOW THE INVITATION LIVES IN.
+ *
+ * Four separate mutations survived on the one line that decides which
+ * class a member is invited to — both ends of the window and the guard
+ * against an unreadable date. The capacity rule beside it was checked and
+ * the wording was checked; the window itself never was.
+ *
+ * Each case carries exactly ONE candidate, so what is being measured is
+ * the boundary and not the ranking. TODAY is 2026-08-18, which puts the
+ * window at the 19th through the 28th. */
+{
+  const withSession = (startsAt: string): FixtureSet => {
+    const fx = recordsFor([
+      { id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01@yoga"] },
+    ]);
+    fx.class_sessions.push({
+      session_id: "candidate", class_type: "yoga", level: "beginner", instructor_id: "i_1",
+      starts_at: startsAt, ends_at: startsAt, capacity: 12, session_status: "scheduled",
+    });
+    return fx;
+  };
+  const offered = (startsAt: string): string | null => {
+    const fx = withSession(startsAt);
+    const flagged = run(fx).flagged[0];
+    if (!flagged) throw new Error("fixture defect");
+    return suggestedSession(flagged, fx, TODAY)?.session_id ?? null;
+  };
+
+  check("a class TODAY is not offered — it may already have started",
+    offered("2026-08-18T18:00:00-04:00"), null);
+  check("tomorrow is the first day that can be offered",
+    offered("2026-08-19T18:00:00-04:00"), "candidate");
+  check("the tenth day out is still inside the window",
+    offered("2026-08-28T18:00:00-04:00"), "candidate");
+  check("the eleventh is not — an invitation that far ahead is not a nudge",
+    offered("2026-08-29T18:00:00-04:00"), null);
+  check("a class that already happened is never offered",
+    offered("2026-08-10T18:00:00-04:00"), null);
+  check("a class whose date cannot be read is never offered",
+    offered("not-a-timestamp"), null);
+}
+
 {
   const fx = recordsFor([{ id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01@yoga"] }]);
   const f = run(fx).flagged[0];
