@@ -1239,6 +1239,73 @@ for (const file of ENGINE_SOURCES) {
 }
 
 /* ------------------------------------------------------------------ */
+/* validateConfig — the engine's front door                             */
+/* ------------------------------------------------------------------ */
+
+/* Every bound this function enforces is documented in the contract, and
+ * only one of them had a check. Mutation put the score at 58%, the lowest
+ * of any module swept: ten of its comparisons could be loosened with
+ * nothing noticing, because a validator reached only with valid input
+ * never runs the half that says no. These walk each limit from both
+ * sides. */
+{
+  const ok = (c: Partial<SyntheticStudioConfig>): number =>
+    validateConfig({ ...BASE, ...c } as SyntheticStudioConfig).length;
+  const says = (c: Partial<SyntheticStudioConfig>): string =>
+    validateConfig({ ...BASE, ...c } as SyntheticStudioConfig).join(" | ");
+
+  check("the base configuration itself is valid, or none of this means anything",
+    ok({}), 0);
+
+  check("an empty seed is refused", says({ seed: "" }).includes("seed must be non-empty"), true);
+  check("...and so is a seed of only spaces",
+    says({ seed: "   " }).includes("seed must be non-empty"), true);
+  check("an empty timezone is refused",
+    says({ timezone: "" }).includes("timezone must be non-empty"), true);
+  check("an impossible asOfDate is refused by the calendar, not the regex",
+    says({ asOfDate: "2026-02-30" }).includes("real calendar date"), true);
+
+  check("memberCount 1 is allowed", ok({ memberCount: 1 }), 0);
+  check("memberCount 2000 is allowed", ok({ memberCount: 2000 }), 0);
+  check("memberCount 0 is refused", says({ memberCount: 0 }).includes("memberCount"), true);
+  check("memberCount 2001 is refused", says({ memberCount: 2001 }).includes("memberCount"), true);
+  check("a fractional memberCount is refused",
+    says({ memberCount: 60.5 }).includes("memberCount"), true);
+
+  check("historyDays 90 is allowed", ok({ historyDays: 90 }), 0);
+  check("historyDays 1900 is allowed", ok({ historyDays: 1900 }), 0);
+  check("historyDays 89 is refused", says({ historyDays: 89 }).includes("historyDays"), true);
+  check("historyDays 1901 is refused", says({ historyDays: 1901 }).includes("historyDays"), true);
+
+  check("an unset facilityCapacity is fine", ok({ facilityCapacity: undefined }), 0);
+  check("facilityCapacity 16 is allowed", ok({ facilityCapacity: 16 }), 0);
+  check("facilityCapacity 500 is allowed", ok({ facilityCapacity: 500 }), 0);
+  check("facilityCapacity 15 is refused",
+    says({ facilityCapacity: 15 }).includes("facilityCapacity"), true);
+  check("facilityCapacity 501 is refused, because the building has a ceiling",
+    says({ facilityCapacity: 501 }).includes("facilityCapacity"), true);
+
+  check("a fill target of exactly 0 is allowed", ok({ upcomingFillTarget: 0 }), 0);
+  check("...and exactly 1", ok({ upcomingFillTarget: 1 }), 0);
+  check("a fill target below 0 is refused",
+    says({ upcomingFillTarget: -0.01 }).includes("upcomingFillTarget"), true);
+  check("NaN is not a fill target, though it is a number",
+    says({ upcomingFillTarget: Number.NaN }).includes("upcomingFillTarget"), true);
+  check("neither is Infinity",
+    says({ upcomingFillTarget: Number.POSITIVE_INFINITY }).includes("upcomingFillTarget"), true);
+  check("a fill target given as a string is refused rather than coerced",
+    says({ upcomingFillTarget: "0.5" as unknown as number }).includes("upcomingFillTarget"), true);
+
+  check("every documented mode is accepted",
+    (["clean", "edge-cases", "scale"] as const).every((mode) => ok({ mode }) === 0), true);
+  check("an undocumented mode is refused, naming what it got",
+    says({ mode: "chaos" as unknown as SyntheticStudioConfig["mode"] }).includes('got "chaos"'), true);
+
+  check("several bad values are all reported, not just the first",
+    validateConfig({ ...BASE, seed: "", memberCount: 0, historyDays: 5 } as SyntheticStudioConfig).length, 3);
+}
+
+/* ------------------------------------------------------------------ */
 /* Render the stated verdict                                            */
 /* ------------------------------------------------------------------ */
 
