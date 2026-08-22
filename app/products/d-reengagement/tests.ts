@@ -3534,6 +3534,52 @@ check("clean records produce no data-quality line",
     timedFlag?.lastSession.starts_at.slice(0, 10), "2026-07-25");
 }
 
+/* THE INVITATION MUST NOT DEPEND ON ARRAY ORDER EITHER.
+ *
+ * suggestedSession breaks a same-time tie on session_id, and the block
+ * above is a warning about exactly that: in the CSV door ids come from row
+ * position, so an id tie-break is no tie-break at all. Here it is sound
+ * for the opposite reason — the engine mints ids deterministically from
+ * the seed, so they are a property of the studio rather than of the array.
+ *
+ * MEASURED FIRST, because the obvious version of this check proved
+ * nothing. A generated studio never ties here: the two rooms in a slot are
+ * given DIFFERENT class types, and candidates are filtered to one type, so
+ * no member ever has two candidates at the same moment. Removing the
+ * tie-break entirely left that check green. This fixture makes the tie
+ * exist — same class, same minute, two rooms — so the comparator is what
+ * decides. */
+{
+  const fx = recordsFor([
+    { id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01@yoga"] },
+  ]);
+  for (const id of ["room_b", "room_a"]) {
+    fx.class_sessions.push({
+      session_id: id, class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "2026-08-22T18:00:00-04:00", ends_at: "2026-08-22T19:00:00-04:00",
+      capacity: 12, session_status: "scheduled",
+    });
+  }
+
+  const starts = fx.class_sessions.map((c) => c.starts_at);
+  check("the fixture really does offer two classes at the same moment",
+    starts.length - new Set(starts).size, 1);
+
+  const pick = (records: FixtureSet): string | null => {
+    const f = findQuietMembers(records, TODAY, proposedRules).flagged[0];
+    return f ? suggestedSession(f, records, TODAY)?.session_id ?? null : null;
+  };
+  const forward = pick(fx);
+  const reversed = pick({ ...fx, class_sessions: [...fx.class_sessions].reverse() });
+
+  check("a class really was chosen, so this is not two nulls agreeing",
+    forward !== null, true);
+  check("the same member is invited to the same class whatever order the sessions arrive in",
+    forward, reversed);
+  check("...and the winner is the one the comparator names, not the one listed first",
+    forward, "room_a");
+}
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 
