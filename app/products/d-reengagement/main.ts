@@ -640,7 +640,10 @@ generateBtn.addEventListener("click", () => {
   const studio = generateStudio(seed, anchor);
   renderRecords(
     studio.records,
-    `Data: a generated studio (seed ${studio.seed}) — ${studio.memberCount} members, ` +
+    /* counted(), though STUDIO_MIX sums to 60 and one member is not
+       * reachable today. The phrase costs nothing to write correctly and
+       * the trap is one edit to that table away. */
+      `Data: a generated studio (seed ${studio.seed}) — ${counted(studio.memberCount, "member")}, ` +
       `every one of them fictional. This is not a real studio's records.`,
   );
   csvReset.hidden = false;

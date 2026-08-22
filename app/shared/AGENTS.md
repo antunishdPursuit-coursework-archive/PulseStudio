@@ -131,6 +131,16 @@ the legacy contract) is what all four products speak.
   gate; what is unproven is its runtime behaviour. Same shape as Product
   D's `main.ts`, and the same remedy applies — anything in it that becomes
   a RULE rather than markup should move to a module a check can load.
+  **That remedy was applied to `main.ts` on 2026-08-22 and found two bugs
+  in two extractions**, so it is not theoretical. Applied to THIS file the
+  same day it found none, which is worth recording so nobody re-derives
+  it: the form-reading path looks like the dangerous one — a raw
+  `Number(countEl.value)` straight off a text input — and every hostile
+  value was measured going in. Blank, `abc`, `0`, `-5`, `7.5`, `1e9` and
+  `Infinity` are all refused by `validateConfig` with a message naming the
+  field, the page shows it, and both download doors close on the stale
+  bytes. The mode and history casts land in the same validator. What is
+  left here really is markup, a clock read, and a local save.
 - **`check-contrast.mjs` needs a build, deliberately.** It imports
   `app/shared/color.js` rather than reimplementing the contrast formula,
   because it used to carry its own copy and nothing compared the two — the
