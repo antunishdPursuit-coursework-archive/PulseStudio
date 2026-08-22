@@ -136,6 +136,24 @@ is the durable part — the individual fixes are just where it landed.
   Product D's outreach log and the synthetic attendance export. The log was
   escaping one column of six; the exporter escaped all of them but had no
   check that it still called the escaper.
+- **Counts written into sentences without a plural.** Every `${n} things`
+  phrase in Product D and in shared. Several were reachable with the shipped
+  thresholds — "1 classes in the prior 60 days" on the line staff judge a
+  flag by — and two existing checks were pinning the wrong grammar as the
+  expected answer.
+- **In-band markers a real value can equal.** "The records did not say" was
+  encoded as the words `"class"` and `"the team"`, both of which a studio can
+  genuinely have in its own export. A file naming both produced "the import
+  recorded no class type and no instructor", which is a page asserting a
+  negative that is false — worse than the doubled word it replaced, because
+  it reads correctly. The marker is the empty string now: the one value no
+  real class and no real person can be called.
+
+  Worth keeping the distinction that sweep needed, because the two look
+  identical in code. `?? "all levels"` for a class with no level is a
+  **default** — a reasonable name for the thing, which nothing reads to
+  decide whether the records spoke. `?? "class"` was a **marker**, read to
+  decide exactly that. Only markers must be uncollidable.
 
 ## What is genuinely uncovered
 
