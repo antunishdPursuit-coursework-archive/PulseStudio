@@ -1043,6 +1043,89 @@ for (const file of ENGINE_SOURCES) {
   }
 }
 
+/* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
+ *
+ * validate.ts skips attendance dated on the as-of date — `day >= asOfDay
+ * continue; // future rows are never evidence`. Product D's
+ * findQuietMembers counts a class attended today. Those definitions
+ * disagree, and have never disagreed in practice for one reason: no
+ * generated attendance row is ever dated there.
+ *
+ * app/shared/CLAUDE.md has warned about this in prose and asks whoever
+ * changes it to raise it first. This is that warning with a check behind
+ * it. If the generator ever fills today's classes, a member who attended
+ * this morning reads as quiet to the answer key and as recent to Product
+ * D, and it looks like a bug in whichever you read second.
+ *
+ * THE BOUNDARY IS TIGHT, WHICH IS WHY THIS IS WORTH CHECKING. The newest
+ * attended class in clean mode is exactly ONE day before the as-of date —
+ * measured, not assumed. One day nearer and the two products part company,
+ * so this is a check standing next to the edge rather than one admiring it
+ * from a distance.
+ *
+ * EDGE-CASES MODE IS EXCLUDED FROM THE RULE, ON PURPOSE. It injects a
+ * `future-attendance` defect deliberately, so it DOES hold a row against a
+ * later session. What matters there is the other half — that the row is
+ * DECLARED — and that is checked instead of pretending the mode is clean.
+ *
+ * The check is on the ATTENDANCE, not on the schedule: today's classes DO
+ * exist and are scheduled, and with `upcomingFillTarget` they are booked
+ * too. Booked is not attended, and that distinction is what keeps the two
+ * products agreeing. */
+{
+  const asOf = "2026-08-22";
+  const asOfDay = dayNumberOf(asOf);
+  const attendedDay = (bundle: GeneratedStudioBundle, sessionId: string): number => {
+    const session = bundle.dataset.classSessions.find((s) => s.id === sessionId);
+    return session === undefined ? Number.NaN : dayNumberOf(dateOfTimestamp(session.startsAt));
+  };
+  const build = (mode: SyntheticStudioConfig["mode"], fill?: number): GeneratedStudioBundle =>
+    generateStudio({
+      ...DEFAULT_CONFIG,
+      seed: "as-of-boundary",
+      asOfDate: asOf,
+      memberCount: 120,
+      historyDays: 365,
+      mode,
+      ...(fill === undefined ? {} : { upcomingFillTarget: fill }),
+    });
+
+  for (const [label, mode, fill] of [
+    ["clean", "clean", undefined],
+    ["clean, filled", "clean", 0.7],
+    ["scale", "scale", undefined],
+  ] as ReadonlyArray<[string, SyntheticStudioConfig["mode"], number | undefined]>) {
+    const bundle = build(mode, fill);
+    const days = bundle.dataset.attendance
+      .map((a) => attendedDay(bundle, a.classSessionId))
+      .filter((d) => Number.isFinite(d));
+
+    check(`${label}: there is a history to search`, days.length > 1000, true);
+    check(`${label}: nothing is attended on or after the as-of date`,
+      days.filter((d) => d >= asOfDay).length, 0);
+    /* The tie exists: the newest visit is the day before, so the rule above
+     * is standing on the boundary rather than far from it. */
+    check(`${label}: and the newest visit is the day before, so the edge is real`,
+      asOfDay - Math.max(...days), 1);
+    check(`${label}: today's classes still exist`,
+      bundle.dataset.classSessions.filter((s) => s.startsAt.slice(0, 10) === asOf).length > 0, true);
+  }
+
+  /* Booked is not attended — with the fill knob somebody has a seat in
+   * today's class, and still nobody has attended it. */
+  const filled = build("clean", 0.7);
+  check("with the fill knob, today's classes are booked",
+    filled.dataset.bookings.filter((b) => attendedDay(filled, b.classSessionId) === asOfDay).length > 0, true);
+
+  /* Edge-cases breaks the rule deliberately, and must DECLARE it. */
+  const edge = build("edge-cases");
+  const futureRows = edge.dataset.attendance.filter((a) => attendedDay(edge, a.classSessionId) >= asOfDay);
+  check("edge-cases does hold attendance against a later class", futureRows.length > 0, true);
+  const declaredIds = new Set(edge.truth.declaredViolations.map((v) => v.entityId));
+  check("...and every one of them is declared, not a surprise",
+    futureRows.every((a) => declaredIds.has(a.id)), true);
+}
+
 /* THE MODULES THAT ARE ALLOWED TO READ THE CLOCK STILL HAVE TO READ IT IN
  * THE STUDIO'S ZONE.
  *

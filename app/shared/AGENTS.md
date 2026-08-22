@@ -119,6 +119,19 @@ the legacy contract) is what all four products speak.
   attended this morning would read as quiet to the answer key and as
   recent to D, and the disagreement would look like a bug in whichever one
   you were reading second. Raise it before changing that.
+
+  **That warning has a check behind it now** (2026-08-22), in
+  `synthetic/tests.ts`. The boundary is TIGHT rather than comfortable: in
+  clean mode the newest attended class is exactly ONE day before the as-of
+  date, measured. One day nearer and the two products part company, so the
+  check asserts both halves — nothing attended on or after the as-of date,
+  AND that the newest visit is the day before, so it is standing on the
+  edge rather than admiring it from a distance. Today's classes DO exist
+  and are scheduled, and with `upcomingFillTarget` they are booked;
+  booked is not attended, and that distinction is the whole invariant.
+  Edge-cases mode is excluded deliberately, because it injects a
+  `future-attendance` defect on purpose — what is checked there is that
+  every such row is DECLARED.
 - **`synthetic/page.ts` is not covered by any check, and the suite cannot
   cover it.** It is the reporting UI's entry module, loaded only by
   `synthetic/index.html` in a browser, so nothing in `synthetic/tests.ts`
