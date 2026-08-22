@@ -2398,6 +2398,31 @@ check("clean records produce no data-quality line",
       const day = s === null ? -1 : dayNumberFromIso(s.starts_at);
       return day > today && day <= today + 10;
     }), true);
+  /* THE TENTH DAY IS THE EDGE OF THE OFFER, so the schedule has to reach
+   * it. Shortening the loop by one day leaves every check above still
+   * passing — the invitations that remain are all inside the window — and
+   * quietly stops the last day suggestedSession can name from existing. */
+  const furthest = upcoming.reduce((far, s) => Math.max(far, dayNumberFromIso(s.starts_at)), today);
+  check("the schedule reaches the tenth day, the last one an offer can name",
+    furthest - today, 10);
+
+  /* THE BOOKINGS ARE FOR CLASSES THAT HAVE NOT HAPPENED. Inverting the
+   * status filter in the booking loop seats every regular in a class that
+   * is already over, which no check noticed and which is simply false
+   * data — a studio cannot hold you a seat in last Tuesday. */
+  const sessionById = new Map(sessions.map((s) => [s.session_id, s]));
+  check("no seat is held on a class that has already happened",
+    studio.records.reservations.every(
+      (r) => sessionById.get(r.session_id)?.session_status === "scheduled"), true);
+  check("this door holds seats at all", studio.records.reservations.length > 0, true);
+  check("every booking was made before the class it books",
+    studio.records.reservations.every((r) => {
+      const session = sessionById.get(r.session_id);
+      return session !== undefined && r.reserved_at < session.starts_at;
+    }), true);
+  check("no class was booked past its capacity",
+    upcoming.every((s) => remainingSpots(s, studio.records) >= 0), true);
+
   check("a draft from this door names the class rather than falling back",
     flagged.every((f) =>
       draftTextFor(f, studio.records, today, brand.studioName).includes("save you a spot")),
