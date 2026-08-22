@@ -20,7 +20,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
+import { adaptAttendanceCsv, cleanName, identityKey, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
@@ -2682,6 +2682,70 @@ check("clean records produce no data-quality line",
    * rather than a Map's size. */
   check("...and every minted session id is distinct",
     new Set(distinct.records.class_sessions.map((s) => s.session_id)).size, 4);
+}
+
+// 30g. The same name in different bytes is the same member.
+//
+//      A member split in two has their attendance split too: somebody who
+//      came eight times reads as two members who came four times each, and
+//      either half can fall inside the quiet window while the real person
+//      is still turning up. The tool then writes "we have missed you" to
+//      somebody who was there on Tuesday.
+{
+  const upload = (rows: ReadonlyArray<ReadonlyArray<string>>) =>
+    adaptAttendanceCsv(rows.map((r) => r.join(",")).join("\n"), brand.timeZone);
+  const header = ["member name", "date", "class", "instructor", "status"];
+  /* Typed as string, not left as literals: TypeScript knows these two
+   * literals differ and calls the comparison unintentional — which is the
+   * very thing being asserted, that two names a reader cannot tell apart
+   * are different bytes. */
+  const NFC: string = "Jos\u00e9 \u00c1lvarez";     // é and Á precomposed
+  const NFD: string = "Jose\u0301 A\u0301lvarez";   // e + combining acute, A + acute
+
+  check("the two spellings really are different byte sequences", NFC === NFD, false);
+  check("...and Unicode calls them the same text", NFC.normalize("NFC") === NFD.normalize("NFC"), true);
+
+  const imported = upload([
+    header,
+    [NFC, "2026-07-01", "yoga", "kim", "attended"],
+    [NFD, "2026-07-08", "yoga", "kim", "attended"],
+    ["Ann Lee", "2026-07-01", "yoga", "kim", "attended"],
+    ["Ann\u00a0Lee", "2026-07-08", "yoga", "kim", "attended"],   // non-breaking space
+    ["Ann  Lee", "2026-07-15", "yoga", "kim", "attended"],        // two spaces
+    ["Anna Lee", "2026-07-15", "yoga", "kim", "attended"],
+  ]);
+  check("six rows, three people", imported.records.members.length, 3);
+  const classesFor = (fragment: string): number => {
+    const member = imported.records.members.find((m) => m.member_id.includes(fragment));
+    return imported.records.attendance.filter((a) => a.member_id === member?.member_id).length;
+  };
+  check("...and neither spelling loses half of José's history", classesFor("lvarez"), 2);
+  check("...nor half of Ann's", classesFor("ann_lee"), 3);
+
+  /* THE GUARD AGAINST OVER-MERGING, which is the way this fix goes wrong.
+   * A shorter name is not the same name, and an accent is a judgement the
+   * studio makes about its own members rather than one this tool makes for
+   * them. */
+  check("Ann Lee and Anna Lee stay two people",
+    imported.records.members.filter((m) => m.display_name.toLowerCase().includes("lee")).length, 2);
+  check("an accent is still a difference",
+    identityKey("Jose") === identityKey("Jos\u00e9"), false);
+  check("...and so is punctuation, which is deliberately untouched",
+    identityKey("a.b@x.com") === identityKey("ab@x.com"), false);
+
+  /* Nothing here edits anybody's name — only which rows are one person. */
+  check("the display name keeps exactly what the file said",
+    imported.records.members.some((m) => m.display_name === "Ann  Lee"
+      || m.display_name === "Ann Lee" || m.display_name === "Ann\u00a0Lee"), true);
+
+  /* The same rule reaches the identity column, not only the name column. */
+  const byId = adaptAttendanceCsv(
+    [["member id", "member name", "date", "class", "instructor", "status"],
+     ["  M-1 ", "Ann Lee", "2026-07-01", "yoga", "kim", "attended"],
+     ["m-1", "A. Lee", "2026-07-08", "yoga", "kim", "attended"]]
+      .map((r) => r.join(",")).join("\n"), brand.timeZone);
+  check("an identifier is keyed the same way, whitespace and case included",
+    byId.records.members.length, 1);
 }
 
 // 31. The open offer belongs to the CSV door, and is not a bug there.

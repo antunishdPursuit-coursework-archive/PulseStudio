@@ -331,6 +331,38 @@ export function cleanName(value: string): string {
   return value.replace(NOT_IN_A_NAME, "").trim();
 }
 
+/* THE KEY ONLY — never the display name.
+ *
+ * Two things that are the SAME TEXT were producing two members:
+ *
+ *  - "José Álvarez" written NFC and written NFD. They render identically
+ *    and Unicode calls them canonically equivalent; they are one name. A
+ *    studio exporting from macOS sends NFD and one exporting from Windows
+ *    sends NFC, so a file that has passed through both splits a member in
+ *    half.
+ *  - "Ann Lee" with a non-breaking space, and "Ann  Lee" with two. Both are
+ *    formatting that survived an export, not a different person.
+ *
+ * A member split in two has their attendance split too. Somebody who came
+ * eight times reads as two members who came four times each, and either
+ * half can fall inside the quiet window while the real person is still
+ * turning up — so the tool writes "we have missed you" to a member who was
+ * there on Tuesday. That is the specific embarrassment this product exists
+ * to prevent.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO, because the note below it is right:
+ * no stripping dots from an email, no collapsing punctuation, no folding
+ * accents away. "Ann Lee" and "Anna Lee" stay two people, and so do
+ * "Jose" and "José" — that last one is a judgement the studio makes, not
+ * one this tool makes for them. Canonical equivalence and whitespace are
+ * not judgements; they are the same string wearing different bytes.
+ *
+ * The DISPLAY name keeps exactly what the file said. Nothing here edits
+ * anybody's name — it only decides which rows are the same person. */
+export function identityKey(value: string): string {
+  return value.normalize("NFC").replace(/\s+/gu, " ").trim().toLowerCase();
+}
+
 /** Readable id fragment only — NEVER identity. Identity is keyed on the
  *  name as written; this just makes ids nicer to read when it can. */
 function slug(value: string): string {
@@ -502,8 +534,8 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     // reading it.
     const rawIdentity = identityCol === -1 ? "" : (cells[identityCol] ?? "").trim();
     const nameKey = rawIdentity !== ""
-      ? `id:${rawIdentity.toLowerCase()}`
-      : `name:${name.toLowerCase()}`;
+      ? `id:${identityKey(rawIdentity)}`
+      : `name:${identityKey(name)}`;
     let memberId = memberIdByName.get(nameKey);
     if (memberId === undefined) {
       memberId = `csv_m_${memberIdByName.size + 1}_${slug(name) || "member"}`;

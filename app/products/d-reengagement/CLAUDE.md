@@ -114,6 +114,34 @@ was in. It is `returnedLine` in `outreach.ts` now.
 What is left in `main.ts` is plumbing: read the key, apply the answer,
 state it. Keep it that way.
 
+## The same name in different bytes is the same member
+
+Identity in the CSV door was keyed on `trim().toLowerCase()` and nothing
+more, which the comment beside it defended as deliberate — anything
+cleverer "would merge people the studio considers distinct". That reasoning
+is right about punctuation and still stands. It was wrong about two things
+that are the SAME TEXT:
+
+- **NFC and NFD.** "José Álvarez" precomposed and the same name written
+  with combining accents render identically and are canonically equivalent
+  by Unicode's own definition. macOS exports NFD and Windows exports NFC,
+  so a file that has passed through both splits a member in half.
+- **Whitespace that survived an export.** A non-breaking space or a double
+  space between forename and surname is formatting, not a different person.
+
+A split member has their attendance split too. Somebody who came eight
+times reads as two members who came four times each, and either half can
+fall inside the quiet window while the real person is still turning up — so
+the tool writes "we have missed you" to a member who was there on Tuesday.
+
+`identityKey()` normalizes to NFC, collapses whitespace runs, trims and
+case-folds — the KEY only. Display names keep exactly what the file said;
+nothing edits anybody's name. And the line the old comment drew is still
+drawn: "Ann Lee" and "Anna Lee" are two people, "Jose" and "José" are two
+people, and an email keeps its dots. Canonical equivalence and whitespace
+are not judgements about who somebody is; they are one string wearing
+different bytes.
+
 ## Composite keys are NESTED here, never joined with a separator
 
 Two maps in this product key on more than one value, and both learned the
