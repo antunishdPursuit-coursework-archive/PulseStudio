@@ -2,13 +2,27 @@ name: pages
 
 # Browsers cannot run TypeScript and GitHub Pages does not build, so the
 # site is compiled here. The gate always runs — a red gate never ships.
-# The DEPLOY leg runs only when this repo's Pages is set to deploy from
-# Actions (Settings -> Pages -> Source: GitHub Actions); otherwise the run
-# states the skip and stays green, because "this repo has not enabled
-# Actions deploys" is an environment fact, not a build failure. The
-# workflow token cannot flip that switch itself — only a repo admin can.
+#
+# TWO JOBS, AND THE SPLIT IS THE POINT. Until 2026-08-22 the gate and the
+# deploy were one job, and that job declared `environment: github-pages`.
+# The environment only permits `main` to deploy, and an environment rule is
+# checked when the JOB STARTS — so running this workflow on any other
+# branch was refused before a single check had run. There was no way to
+# find out whether a branch was green except to merge it to main and watch
+# the live site. The gate has no business needing deploy permission, so it
+# no longer claims the environment: it runs anywhere, on a branch, on a
+# pull request, on a dispatch. Only `deploy` claims github-pages, and only
+# main can reach it.
+#
+# The DEPLOY leg additionally runs only when this repo's Pages is set to
+# deploy from Actions (Settings -> Pages -> Source: GitHub Actions);
+# otherwise the run states the skip and stays green, because "this repo has
+# not enabled Actions deploys" is an environment fact, not a build failure.
+# The workflow token cannot flip that switch itself — only a repo admin can.
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -17,16 +31,19 @@ permissions:
   pages: write
   id-token: write
 
+# Keyed by ref, NOT a single "pages" group. One shared group meant a pull
+# request run could cancel a deploy of main that was already in flight,
+# now that pull requests reach this workflow at all.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  gate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      mode: ${{ steps.pagesmode.outputs.mode }}
+      publishing: ${{ steps.publishing.outputs.ok }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,6 +53,21 @@ jobs:
       # The gate runs before anything is published — a red gate never deploys.
       - run: npm run check
       - run: npm run build
+
+      - name: Would this run publish?
+        id: publishing
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "ok=no" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Gate green — nothing published"
+              echo "This run is on \`${{ github.ref }}\`, and only \`main\` publishes."
+              echo "That is the whole point of running it here: a branch can be proven green before it is merged."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ok=yes" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Is this repo set to deploy Pages from Actions?
         id: pagesmode
         env:
@@ -50,12 +82,21 @@ jobs:
               echo "A repo admin can enable deploys: Settings -> Pages -> Source: GitHub Actions."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - if: steps.pagesmode.outputs.mode == 'workflow'
+
+      - if: steps.publishing.outputs.ok == 'yes' && steps.pagesmode.outputs.mode == 'workflow'
         uses: actions/configure-pages@v5
-      - if: steps.pagesmode.outputs.mode == 'workflow'
+      - if: steps.publishing.outputs.ok == 'yes' && steps.pagesmode.outputs.mode == 'workflow'
         uses: actions/upload-pages-artifact@v3
         with:
           path: app
-      - if: steps.pagesmode.outputs.mode == 'workflow'
-        id: deployment
+
+  deploy:
+    needs: gate
+    if: needs.gate.outputs.publishing == 'yes' && needs.gate.outputs.mode == 'workflow'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
         uses: actions/deploy-pages@v4
