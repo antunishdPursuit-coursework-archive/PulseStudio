@@ -25,6 +25,7 @@
  *     person in the file is treated as an active member; the UI states it.
  */
 
+import { counted } from "./text.js";
 import type { Attendance, ClassSession, FixtureSet, Member } from "./deps.js";
 import { GENERIC_CLASS_TYPE } from "./config.js";
 export { GENERIC_CLASS_TYPE };
@@ -613,7 +614,7 @@ export function importProvenance(imported: CsvImport, fileName: string): string 
   const skippedNote =
     imported.skipped.length === 0
       ? "0 rows skipped"
-      : `${imported.skipped.length} rows skipped: ${imported.skipped.slice(0, SHOWN).join("; ")}` +
+      : `${counted(imported.skipped.length, "row")} skipped: ${imported.skipped.slice(0, SHOWN).join("; ")}` +
         (imported.skipped.length > SHOWN
           ? ` — and ${imported.skipped.length - SHOWN} more, not listed here`
           : "");
@@ -643,7 +644,7 @@ export function importProvenance(imported: CsvImport, fileName: string): string 
     imported.splitIdentities.length === 0 ? "" : ` ${imported.splitIdentities.join(" ")}`;
 
   return (
-    `Data: ${fileName} — ${imported.rowCount} rows, ${imported.memberCount} members, ${skippedNote}. ` +
+    `Data: ${fileName} — ${counted(imported.rowCount, "row")}, ${counted(imported.memberCount, "member")}, ${skippedNote}. ` +
     `Members matched by ${imported.identityMethod}.${dateNote}${cleanedNote}${repeatNote}${splitNote} ` +
     `Everyone in the file is treated as an active member. ` +
     `This data never left your browser.`

@@ -31,6 +31,7 @@ export interface StudioBrand {
   timeZone: string;
 }
 
+import { counted } from "./text.js";
 import { STUDIO_NAME } from "./deps.js";
 
 export const brand: StudioBrand = {
@@ -170,8 +171,8 @@ export function draftMessage(f: DraftFacts): string {
    * only door. The links come from config (the reseller seam). */
   return [
     named
-      ? `Hi ${f.firstName} — it's been ${f.daysSince} days since your last ${f.usualClassType} class, and we've missed seeing you.`
-      : `Hi ${f.firstName} — it's been ${f.daysSince} days since your last class, and we've missed seeing you.`,
+      ? `Hi ${f.firstName} — it's been ${counted(f.daysSince, "day")} since your last ${f.usualClassType} class, and we've missed seeing you.`
+      : `Hi ${f.firstName} — it's been ${counted(f.daysSince, "day")} since your last class, and we've missed seeing you.`,
     invite,
     `Or come back your own way:\n· Book a class: ${brand.studioUrl}products/a-booking/\n· Ask us anything: ${brand.studioUrl}products/c-chatbot/\n· See what's new this week: ${brand.studioUrl}`,
     `— ${f.studioName}`,

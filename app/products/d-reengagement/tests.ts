@@ -18,6 +18,7 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
+import { counted } from "./text.js";
 import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
@@ -730,7 +731,7 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   const none = run(recordsFor([{ id: "m1", name: "Recent Regular", status: "active", attended: ["2026-08-16"] }]));
   check("summary states the negative when nobody is flagged",
     summaryLine(none, "August 18, 2026"),
-    "1 members checked, 0 flagged as of August 18, 2026.");
+    "1 member checked, 0 flagged as of August 18, 2026.");
 }
 
 // 12. The draft: every fact present, nothing template-shaped left. These
@@ -1715,7 +1716,7 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   check("the date reading is disclosed when the file proves it",
     line.includes("read day-first"), true);
   check("the cleaned name is disclosed", line.includes("invisible or control characters removed"), true);
-  check("a skipped row is disclosed with its reason", line.includes("rows skipped:"), true);
+  check("a skipped row is disclosed with its reason", line.includes("skipped:"), true);
   check("...and the sentence still ends with the standing limits",
     line.endsWith("This data never left your browser."), true);
 }
@@ -3201,6 +3202,58 @@ check("clean records produce no data-quality line",
       lines.length - 1, ledger.length);
     check("every line has the same number of columns as the header",
       new Set(lines.map((l) => l.split(",").length)).size, 1);
+  }
+}
+
+/* COUNTING THINGS IN A SENTENCE A PERSON READS.
+ *
+ * This product pluralised carefully in some places and not others, and
+ * several of the others were reachable. A member who attended exactly
+ * once gave "1 classes in the prior 60 days" on the evidence line, with
+ * the SHIPPED thresholds. A member who came back the day after a note
+ * gave "(1 days)". Two checks in this very file had pinned the wrong
+ * text — "1 members checked" — which is how a grammar bug becomes the
+ * expected answer.
+ *
+ * The thresholds are explicitly unratified, so the rest are reachable by
+ * configuring them: with minDaysQuiet at 0 the badge reads "1 days quiet"
+ * and the note sent to a member opens "it's been 1 days since your last
+ * class". That one is a studio's own voice getting a plural wrong on the
+ * first line of a personal message. */
+{
+  check("one is singular", counted(1, "day"), "1 day");
+  check("two is plural", counted(2, "day"), "2 days");
+  check("zero is plural, which is what English does", counted(0, "day"), "0 days");
+  check("an irregular plural is never guessed at",
+    counted(1, "class", "classes") + " / " + counted(4, "class", "classes"),
+    "1 class / 4 classes");
+
+  /* The sites that were wrong, through the real functions. */
+  const once = adaptAttendanceCsv(
+    ["Member,Date", "Once Only,2026-07-25"].join("\n"), "America/New_York");
+  const solo = findQuietMembers(once.records, dayNumberFromIso("2026-08-21"), proposedRules).flagged[0];
+  if (solo) {
+    check("a member who attended once reads as one class, not '1 classes'",
+      evidenceLine(solo, proposedRules.priorWindowDays).includes("1 class in the prior 60 days"), true);
+    check("...and never as the plural", 
+      evidenceLine(solo, proposedRules.priorWindowDays).includes("1 classes"), false);
+  }
+
+  const oneMember = findQuietMembers(once.records, dayNumberFromIso("2026-08-21"), proposedRules);
+  check("one member checked reads as one member",
+    summaryLine(oneMember, "August 21, 2026").startsWith("1 member checked"), true);
+
+  /* The draft, under a threshold a studio is free to set. */
+  const wide = { minDaysQuiet: 0, maxDaysQuiet: 60, priorWindowDays: 60 };
+  const dayOld = adaptAttendanceCsv(
+    ["Member,Date", "Just Yesterday,2026-08-20"].join("\n"), "America/New_York");
+  const fresh = findQuietMembers(dayOld.records, dayNumberFromIso("2026-08-21"), wide).flagged[0];
+  if (fresh) {
+    check("a one-day gap is one day in the note, not '1 days'",
+      draftTextFor(fresh, dayOld.records, dayNumberFromIso("2026-08-21"), brand.studioName)
+        .includes("it's been 1 day since"), true);
+    check("...and the evidence beside it agrees",
+      evidenceLine(fresh, wide.priorWindowDays).includes("1 classes"), false);
   }
 }
 

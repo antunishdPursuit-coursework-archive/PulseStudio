@@ -10,6 +10,7 @@
  * members this product exists to catch.
  */
 
+import { counted } from "./text.js";
 import type { ClassSession, FixtureSet, Member, Reservation } from "./deps.js";
 import type { DraftFacts, QuietRules } from "./config.js";
 import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, draftMessage } from "./config.js";
@@ -385,7 +386,7 @@ export function coverageWarning(
   if (!coverage.recordsHaveGoneQuiet) return null;
   if (result.flagged.length === 0) return null;
   return (
-    `These records show nobody attending anything for ${coverage.daysSinceAnyAttendance} days — ` +
+    `These records show nobody attending anything for ${counted(coverage.daysSinceAnyAttendance ?? 0, "day")} — ` +
     `longer than the ${rules.minDaysQuiet}-day rule itself. That makes every flag below suspect: ` +
     `a studio that stopped RECORDING attendance looks exactly like a studio everybody left. ` +
     `Check that attendance is still being taken before sending any of these.`
@@ -451,7 +452,7 @@ export function nobodyFlaggedLine(
 /** The stated-result line. Always names what ran — "5 members checked,
  *  0 flagged" — never leaving a blank where a result should be. */
 export function summaryLine(result: FlagResult, asOfLabel: string): string {
-  return `${result.checkedCount} members checked, ${result.flagged.length} flagged as of ${asOfLabel}.`;
+  return `${counted(result.checkedCount, "member")} checked, ${result.flagged.length} flagged as of ${asOfLabel}.`;
 }
 
 /** The data-quality line, or null when every record was usable. Staff can
@@ -728,7 +729,7 @@ export function evidenceLine(f: FlaggedMember, priorWindowDays: number): string 
         : "";
 
   const cadence =
-    `${f.priorCount} classes in the prior ${priorWindowDays} days ` +
+    `${counted(f.priorCount, "class", "classes")} in the prior ${counted(priorWindowDays, "day")} ` +
     `(≈${weeklyCadence(f.priorCount, priorWindowDays)}/week)`;
 
   const usualClassKnown =

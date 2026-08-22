@@ -7,6 +7,7 @@
  * SHARED_DATA_CONTRACT.md and is not negotiable.
  */
 
+import { counted } from "./text.js";
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";
@@ -247,7 +248,7 @@ function renderFlagged(
   name.textContent = `${rank}. ${f.member.display_name}`;
   const quiet = document.createElement("span");
   quiet.className = "quiet-pill";
-  quiet.textContent = `${f.daysSince} days quiet`;
+  quiet.textContent = `${counted(f.daysSince, "day")} quiet`;
   head.append(name, quiet);
 
   const evidence = document.createElement("p");

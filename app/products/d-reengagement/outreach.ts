@@ -13,6 +13,7 @@
  *   5. ready           draft away — a human still does the sending
  */
 
+import { counted } from "./text.js";
 import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
 import { dayNumberFromIso, firstNameOf, joinSentence, type FlaggedMember } from "./logic.js";
@@ -339,7 +340,7 @@ export function outcomesLine(results: OutreachResults): string {
   const median =
     results.medianDaysToReturn === null
       ? ""
-      : ` (median ${results.medianDaysToReturn} days after the note)`;
+      : ` (median ${counted(results.medianDaysToReturn ?? 0, "day")} after the note)`;
   return (
     joinSentence(
       [
