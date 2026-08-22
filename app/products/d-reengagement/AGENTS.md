@@ -73,6 +73,12 @@ report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They
 stayed green. A check proved against stale build output proves nothing.
 
+**Read the exit code of the thing you are checking, not of the pipe.**
+`npx tsc | head -3` reports `head`'s exit code, so it says 0 while tsc is
+printing errors two lines further down. Same family as the `--noEmit`
+trap above and it has bitten three times in one session: `npx tsc; echo
+$?` on its own line, or let `npm run check` be the judge.
+
 `npm run mutate` is the other half, and it is not part of the gate. It
 changes one token in a compiled module, reruns the suite, and puts the
 file back; anything the suite still passes is a way this code could be
