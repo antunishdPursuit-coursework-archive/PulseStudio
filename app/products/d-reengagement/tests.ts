@@ -993,6 +993,35 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
   check("...without inventing a teacher for it",
     noInstructor.includes("teaches"), false);
 
+  /* THE MIDDLE CASE: a class the records name, an instructor they do not,
+   * and a real session to offer. The wording picks between "Kim teaches
+   * yoga on Tuesday" and "There's a yoga class on Tuesday" with
+   * `named && taught`, and nothing covered the combination where those
+   * two disagree. Weakening it to `||` takes the first branch with no
+   * instructor to put in it, so the note reads "null teaches yoga". */
+  const classNoTeacherWithInvite = draftMessage({
+    ...base, usualClassType: "yoga", usualInstructorFirstName: null,
+    suggestedInvite: "on Tuesday at 9:00 AM",
+  });
+  check("a known class with no instructor is offered without one",
+    classNoTeacherWithInvite.includes("There's a yoga class on Tuesday at 9:00 AM"), true);
+  check("...and never says a missing name teaches it",
+    classNoTeacherWithInvite.includes("teaches"), false);
+  /* Two SPACES inside a line, not \s{2,} — a draft has blank lines between
+   * its paragraphs, and the first version of this check failed on the
+   * correct code because of them. The gap being looked for is a name that
+   * was left out mid-sentence. */
+  check("...with nothing empty where a name would go",
+    /\bnull\b|\bundefined\b|[^\S\n]{2,}/.test(classNoTeacherWithInvite), false);
+  /* The contrast: with BOTH known, the teacher is named. Without this the
+   * checks above would pass on a draft that never names anybody. */
+  const classAndTeacherWithInvite = draftMessage({
+    ...base, usualClassType: "yoga", usualInstructorFirstName: "Kim",
+    suggestedInvite: "on Tuesday at 9:00 AM",
+  });
+  check("with both known, the teacher is named",
+    classAndTeacherWithInvite.includes("Kim teaches yoga on Tuesday at 9:00 AM"), true);
+
   const unknownClassRealSession = draftMessage({
     ...base, usualClassType: null, usualInstructorFirstName: null,
     suggestedInvite: "on Thursday at 9:00 AM",
