@@ -2513,6 +2513,37 @@ check("clean records produce no data-quality line",
     true);
 }
 
+// 30a2. The declared ranges are actually reachable at both ends.
+//
+//       Every span in this generator goes through one helper,
+//       `low + Math.floor(random() * (high - low + 1))`. Drop the `+ 1` and
+//       the top of EVERY range silently disappears: a membership declared to
+//       renew in 1..30 days never renews on the 30th, a newcomer declared to
+//       have 2..5 visits never has 5. Nothing was wrong, and nothing would
+//       have said so — the helper is private, so this checks the consequence
+//       instead of widening the module's API for a test.
+//
+//       Renewals are the cleanest window on it: `today + intBetween(1, 30)`
+//       is readable straight off the records. Eight seeds span all thirty
+//       offsets, so the check is asking about a range that is genuinely
+//       filled rather than sampled.
+{
+  const rangeToday = dayNumberFromIso("2026-08-18");
+  const offsets = new Set<number>();
+  for (let seed = 1; seed <= 8; seed += 1) {
+    for (const m of generateStudio(seed, "2026-08-18").records.memberships) {
+      if (m.renews_on !== null) offsets.add(dayNumberFromIso(m.renews_on) - rangeToday);
+    }
+  }
+  const seen = [...offsets].sort((a, b) => a - b);
+  check("a renewal can fall on the first day of the declared range", seen[0], 1);
+  check("...and on the last, which is what the +1 in the helper buys",
+    seen[seen.length - 1], 30);
+  /* Non-vacuous: a range that produced two values would satisfy the ends
+   * above while saying nothing about the span. */
+  check("...with every day between them reachable", seen.length, 30);
+}
+
 // 30b. A generated studio's records have to be possible.
 //
 //      Two invariants nothing was checking, both found by mutation:
