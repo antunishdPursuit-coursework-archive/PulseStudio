@@ -1383,6 +1383,45 @@ for (const file of ENGINE_SOURCES) {
   check("the validator blesses a filled studio",
     validateBundle(onA).ok, true);
 
+  /* THE BAND ITSELF, WHICH THE BRIEF STATES AND NOTHING CHECKED.
+   *
+   * app/shared/CLAUDE.md documents this knob as filling to roughly
+   * target−25%..target+15% with per-session variance. The checks above
+   * prove the fill is deterministic, that it fills MORE than organic, and
+   * that nobody gets two seats — none of them look at the band. Mutation
+   * found the consequence: the `+ 15` that sets the top of the range can
+   * become `- 15`, collapsing it, with every check still green.
+   *
+   * The slack is for rounding, not for doubt: seats are integers, so on a
+   * twelve-person class one seat is eight percentage points, and the
+   * measured spread runs a little outside the nominal band at both ends.
+   * The two "reaches" checks are what actually pin the shape — a
+   * collapsed band cannot put a session above its target. */
+  const occupancyOf = (bundle: GeneratedStudioBundle): number[] => {
+    const asOf = dayNumberOf(BASE.asOfDate);
+    const booked = new Map<string, number>();
+    for (const b of bundle.dataset.bookings) {
+      if (b.status !== "booked") continue;
+      booked.set(b.classSessionId, (booked.get(b.classSessionId) ?? 0) + 1);
+    }
+    return bundle.dataset.classSessions
+      .filter((c) => c.status === "scheduled" && dayNumberOf(dateOfTimestamp(c.startsAt)) >= asOf)
+      .map((c) => ((booked.get(c.id) ?? 0) / c.capacity) * 100);
+  };
+  const SLACK = 10;
+  for (const target of [85, 50]) {
+    const occ = occupancyOf(generateStudio({ ...BASE, upcomingFillTarget: target / 100 }));
+    check(`filling to ${target}% leaves upcoming sessions to measure`, occ.length > 0, true);
+    check(`...none of them below the band's floor`,
+      occ.every((o) => o >= target - 25 - SLACK), true);
+    check(`...none above its ceiling`,
+      occ.every((o) => o <= target + 15 + SLACK), true);
+    check(`...and the band's upper half is actually used`,
+      occ.some((o) => o > target), true);
+    check(`...as is its lower half, so this is a spread and not one number`,
+      occ.some((o) => o < target), true);
+  }
+
   check("validateConfig rejects a fill target above 1",
     validateConfig({ ...BASE, upcomingFillTarget: 1.5 }).length > 0, true);
   check("validateConfig accepts a fill target inside 0..1",
