@@ -282,18 +282,33 @@ export function findQuietMembers(
        * not. Session ids are unique, so this is a total order — the same
        * rule suggestedSession's comparator already follows.
        *
-       * The tie-break is on CONTENT, and that correction cost a round:
-       * breaking the tie on session_id looked right and changed nothing,
+       * The tie-break is on CONTENT, and that correction cost two rounds.
+       * Breaking the tie on session_id looked right and changed nothing,
        * because this door mints ids from row position — csv_s_1, csv_s_2 —
        * so reversing the rows reverses the ids too. A key derived from the
-       * order cannot rescue an order-dependent answer. Class type and
-       * instructor are properties of the class itself; session_id stays
-       * last only to keep the comparator total. */
+       * order cannot rescue an order-dependent answer.
+       *
+       * THE SECOND ROUND WAS THE SAME MISTAKE ONE STEP ALONG. The fix then
+       * compared instructor_ID, and this door mints those from row
+       * position as well: csv_i_1_ana / csv_i_2_kim reversed to
+       * csv_i_1_kim / csv_i_2_ana, and the leading number decides the
+       * string comparison. Two yoga classes on one day with different
+       * teachers still answered "Ana" or "Kim" depending on which row came
+       * first — reachable through the front door, because a studio can run
+       * the same class twice in a day. The instructor's NAME is the
+       * content; the id is where it happened to land.
+       *
+       * session_id stays last only to keep the comparator total, and it
+       * cannot decide anything on its own: two sessions sharing a moment,
+       * a class type and a teacher are one session in every door. */
       .sort(
         (a, b) =>
           Date.parse(b.starts_at) - Date.parse(a.starts_at) ||
           compareText(a.class_type, b.class_type) ||
-          compareText(a.instructor_id, b.instructor_id) ||
+          compareText(
+            instructorById.get(a.instructor_id) ?? "",
+            instructorById.get(b.instructor_id) ?? "",
+          ) ||
           compareText(a.session_id, b.session_id),
       );
 

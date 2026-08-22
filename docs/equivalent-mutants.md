@@ -208,6 +208,21 @@ is the durable part — the individual fixes are just where it landed.
   sheet recorded no times. Each meant the same records in a different order
   gave a different answer.
 
+  **The position-derived key came back a second time, one tie-break along**
+  (2026-08-22). The correction above moved the "last attended" tie off
+  `session_id` and onto class type, then instructor_ID — and the CSV door
+  mints instructor ids from row position too: `csv_i_1_ana` / `csv_i_2_kim`
+  reverse to `csv_i_1_kim` / `csv_i_2_ana`, and the leading number decides
+  the comparison. Two yoga classes on one day with different teachers still
+  answered "Ana" or "Kim" depending which row came first, through the front
+  door with an ordinary file. It compares the instructor's NAME now.
+
+  Why the existing check missed it is the part worth keeping: that check
+  ties on DIFFERENT class types, so the class comparison decides and the
+  next tie-break is never reached. **A tie-break chain needs a case per
+  link.** Proving link one is sound says nothing about link two, and
+  mutation is what said so — three survivors sat on that comparator.
+
   Two things that sweep taught, both cheap to repeat. A tie-break has to be
   on CONTENT — breaking the "last attended" tie on `session_id` changed
   nothing, because that door mints ids from row position, so reversing the

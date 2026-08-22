@@ -4181,6 +4181,46 @@ check("clean records produce no data-quality line",
   const timedFlag = findQuietMembers(timed.records, T, proposedRules).flagged[0];
   check("a genuinely later date still outranks any tie-break",
     timedFlag?.lastSession.starts_at.slice(0, 10), "2026-07-25");
+
+  /* THE SAME MISTAKE ONE STEP ALONG, found by mutation.
+   *
+   * The block above ties on DIFFERENT class types, so the class comparison
+   * decides and the next tie-break is never reached. A studio can run the
+   * same class twice in a day with different teachers, and then the class
+   * comparison returns 0 and the instructor decides. That comparison was on
+   * instructor_ID — which this door mints from row position, exactly like
+   * the session ids the comment above warns about. Measured before the fix:
+   * the same two rows answered "yoga/Ana" or "yoga/Kim" depending which
+   * came first. Reachable through the front door with an ordinary file. */
+  const sameClassDifferentTeacher = (first: string, second: string): string => {
+    const fx = adaptAttendanceCsv([
+      "Member,Date,Class,Instructor",
+      `Pat Rivera,2026-07-25,yoga,${first}`,
+      `Pat Rivera,2026-07-25,yoga,${second}`,
+      "Pat Rivera,2026-06-27,yoga,Zoe",
+    ].join("\n"), "America/New_York");
+    const f = findQuietMembers(fx.records, T, proposedRules).flagged[0];
+    return f === undefined ? "none" : `${f.lastSession.class_type}/${f.lastInstructorName}`;
+  };
+
+  /* The tie has to exist before anything rests on it: same day, same class,
+   * two teachers means two sessions sharing a timestamp. */
+  const twoTeacherRows = adaptAttendanceCsv([
+    "Member,Date,Class,Instructor",
+    "Pat Rivera,2026-07-25,yoga,Ana",
+    "Pat Rivera,2026-07-25,yoga,Kim",
+  ].join("\n"), "America/New_York");
+  check("the same class twice in a day is two sessions at one moment",
+    twoTeacherRows.records.class_sessions.length, 2);
+  check("...sharing a timestamp",
+    new Set(twoTeacherRows.records.class_sessions.map((c) => c.starts_at)).size, 1);
+
+  check("two teachers, same class, same day: the answer does not move with row order",
+    sameClassDifferentTeacher("Ana", "Kim"), sameClassDifferentTeacher("Kim", "Ana"));
+  check("...and it is the teacher's name that decides, not where the row sat",
+    sameClassDifferentTeacher("Ana", "Kim"), "yoga/Ana");
+  check("...still by name when the alphabet disagrees with the rows",
+    sameClassDifferentTeacher("Zoe", "Ana"), "yoga/Ana");
 }
 
 /* THE INVITATION MUST NOT DEPEND ON ARRAY ORDER EITHER.
