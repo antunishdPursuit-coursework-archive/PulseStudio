@@ -70,11 +70,26 @@ report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They
 stayed green. A check proved against stale build output proves nothing.
 
-**Read the exit code of the thing you are checking, not of the pipe.**
-`npx tsc | head -3` reports `head`'s exit code, so it says 0 while tsc is
-printing errors two lines further down. Same family as the `--noEmit`
-trap above and it has bitten three times in one session: `npx tsc; echo
-$?` on its own line, or let `npm run check` be the judge.
+**The instrument answers the question you asked it, not the one you
+meant.** Three times in one session a measurement here quietly reported
+something else, and each looked like a clean result:
+
+- `npx tsc | head -3` reports `head`'s exit code, so it says 0 while the
+  compiler is printing errors two lines below the cut. Run `npx tsc; echo
+  $?` on its own line, or let `npm run check` be the judge.
+- `JSON.stringify(Infinity)` is the string `null`. Printing a number that
+  way made an unguarded division look guarded; `weeklyCadence` was
+  returning Infinity into a sentence staff read, and the probe said null.
+  Log numbers plainly.
+- Timing a click that contains your own `setTimeout` measures the timeout.
+  A three-second freeze that was not there nearly became a defect report;
+  the click actually blocks for 7ms.
+
+Same family as the `--noEmit` trap above: in every case the check could
+not have failed, which is exactly what each gate's `--self-test` exists to
+prevent, applied to the person running them. When a measurement agrees
+with what you expected, that is when to ask what else would produce the
+same reading.
 
 `npm run mutate` is the other half, and it is not part of the gate. It
 changes one token in a compiled module, reruns the suite, and puts the
