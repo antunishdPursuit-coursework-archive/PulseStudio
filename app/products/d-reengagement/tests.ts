@@ -2746,6 +2746,54 @@ check("clean records produce no data-quality line",
       .map((r) => r.join(",")).join("\n"), brand.timeZone);
   check("an identifier is keyed the same way, whitespace and case included",
     byId.records.members.length, 1);
+
+  /* MEMBERS WERE ONLY THE FIRST OF FOUR IDENTITIES IN THIS FILE. Fixing
+   * that one alone left instructors and class types keyed the old way, so a
+   * half-swept family read as a fixed one. */
+  const INST_NFC = "Kim L\u00e9e";
+  const INST_NFD = "Kim Le\u0301e";
+  const twoForms = upload([
+    header,
+    ["Ada Lovelace", "2026-07-01", "yoga", INST_NFC, "attended"],
+    ["Bob Stone", "2026-07-01", "yoga", INST_NFD, "attended"],
+  ]);
+  check("one instructor written two ways is one instructor",
+    twoForms.records.instructors.length, 1);
+  check("...so it is also one class on that day", twoForms.records.class_sessions.length, 1);
+
+  const CLASS_NFC = "Barre \u00e0 Terre";
+  const CLASS_NFD = "Barre a\u0300 Terre";
+  const classForms = upload([
+    header,
+    ["Ada Lovelace", "2026-07-01", CLASS_NFC, "kim", "attended"],
+    ["Bob Stone", "2026-07-01", CLASS_NFD, "kim", "attended"],
+  ]);
+  check("one class written two ways is one class", classForms.records.class_sessions.length, 1);
+
+  /* THE COMPOUNDING FAILURE, and the reason this was worth chasing past the
+   * first fix. When a file carries the identifier on some rows and leaves it
+   * blank on others, the same person becomes two members — and this tool
+   * SAYS SO, because staff cannot act on a flag they do not understand. That
+   * notice keyed on the old form too, so for an accented name the member was
+   * split in half AND the sentence explaining it stayed silent. The check
+   * pairs both halves: the split is detected, and it is reported. */
+  const withId = ["member id", ...header];
+  const splitAscii = adaptAttendanceCsv([
+    withId,
+    ["M1", "Ann Lee", "2026-07-01", "yoga", "kim", "attended"],
+    ["", "Ann Lee", "2026-07-08", "yoga", "kim", "attended"],
+  ].map((r) => r.join(",")).join("\n"), brand.timeZone);
+  const splitAccented = adaptAttendanceCsv([
+    withId,
+    ["M1", NFD, "2026-07-01", "yoga", "kim", "attended"],
+    ["", NFC, "2026-07-08", "yoga", "kim", "attended"],
+  ].map((r) => r.join(",")).join("\n"), brand.timeZone);
+  check("a split identity is reported for a plain name",
+    splitAscii.splitIdentities.length, 1);
+  check("...and for an accented one, which used to be silent",
+    splitAccented.splitIdentities.length, 1);
+  check("...naming the member rather than a lowercased key",
+    splitAccented.splitIdentities[0]?.startsWith(NFD) || splitAccented.splitIdentities[0]?.startsWith(NFC), true);
 }
 
 // 31. The open offer belongs to the CSV door, and is not a bug there.

@@ -358,7 +358,15 @@ export function cleanName(value: string): string {
  * not judgements; they are the same string wearing different bytes.
  *
  * The DISPLAY name keeps exactly what the file said. Nothing here edits
- * anybody's name — it only decides which rows are the same person. */
+ * anybody's name — it only decides which rows are the same person.
+ *
+ * USED FOR EVERY IDENTITY IN THIS FILE, not just members. Fixing members
+ * alone left instructors and class types keyed the old way, so one
+ * instructor written two ways still became two instructors and two
+ * sessions. Worse, the SPLIT-IDENTITY NOTICE keyed on the old form too:
+ * a member with an accented name was split in half AND the warning that
+ * exists to tell staff about exactly that stayed silent, because its own
+ * key had the same fault. A half-swept family reads as a fixed one. */
 export function identityKey(value: string): string {
   return value.normalize("NFC").replace(/\s+/gu, " ").trim().toLowerCase();
 }
@@ -468,8 +476,8 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
     const names = new Set<string>();
     let filled = 0;
     for (const r of body) {
-      const id = (r.cells[identityCol] ?? "").trim().toLowerCase();
-      const name = (r.cells[memberCol] ?? "").trim().toLowerCase();
+      const id = identityKey(r.cells[identityCol] ?? "");
+      const name = identityKey(r.cells[memberCol] ?? "");
       if (id === "" || name === "") continue;
       filled += 1;
       ids.add(id);
@@ -548,16 +556,16 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
      * divided between them — and the half with the older last visit can
      * cross the quiet threshold and be flagged while the whole person has
      * been coming in all along. Recorded per name so the page can say it. */
-    let idsForName = idsSeenPerName.get(name.toLowerCase());
+    let idsForName = idsSeenPerName.get(identityKey(name));
     if (idsForName === undefined) {
       idsForName = new Set<string>();
-      idsSeenPerName.set(name.toLowerCase(), idsForName);
+      idsSeenPerName.set(identityKey(name), idsForName);
     }
     idsForName.add(memberId);
 
     let instructorId = "";
     if (instructorName !== "") {
-      const instKey = instructorName.toLowerCase();
+      const instKey = identityKey(instructorName);
       instructorId = instructorIdByName.get(instKey) ?? "";
       if (instructorId === "") {
         instructorId = `csv_i_${instructorIdByName.size + 1}_${slug(instructorName) || "instructor"}`;
@@ -571,13 +579,13 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       byClass = new Map<string, Map<string, string>>();
       sessionIdByDate.set(date, byClass);
     }
-    const classKey = classType.toLowerCase();
+    const classKey = identityKey(classType);
     let byInstructor = byClass.get(classKey);
     if (byInstructor === undefined) {
       byInstructor = new Map<string, string>();
       byClass.set(classKey, byInstructor);
     }
-    const instructorKey = instructorName.toLowerCase();
+    const instructorKey = identityKey(instructorName);
     let sessionId = byInstructor.get(instructorKey);
     if (sessionId === undefined) {
       sessionsMinted += 1;
@@ -623,7 +631,7 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const splitIdentities: string[] = [];
   for (const [lowered, ids] of idsSeenPerName) {
     if (ids.size < 2) continue;
-    const shown = members.find((m) => m.display_name.toLowerCase() === lowered)?.display_name ?? lowered;
+    const shown = members.find((m) => identityKey(m.display_name) === lowered)?.display_name ?? lowered;
     splitIdentities.push(
       `${shown} was read as ${ids.size} different people — the identifier column is filled on some of their rows and blank on others, so their visits are split and a flag for either half may be wrong.`,
     );

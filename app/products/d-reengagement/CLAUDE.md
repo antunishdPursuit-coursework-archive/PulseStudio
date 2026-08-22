@@ -134,6 +134,15 @@ times reads as two members who came four times each, and either half can
 fall inside the quiet window while the real person is still turning up — so
 the tool writes "we have missed you" to a member who was there on Tuesday.
 
+**Four identities live in this file, not one.** Members, instructors, class
+types, and the key behind the split-identity notice. Fixing members alone
+left the other three keyed the old way — one instructor written two ways
+was still two instructors and two sessions — and a half-swept family reads
+as a fixed one. Worst of the three: the SPLIT-IDENTITY NOTICE keyed on the
+old form, so a member with an accented name was divided in half AND the
+sentence that exists to tell staff exactly that stayed silent. The split
+and its explanation failed together.
+
 `identityKey()` normalizes to NFC, collapses whitespace runs, trims and
 case-folds — the KEY only. Display names keep exactly what the file said;
 nothing edits anybody's name. And the line the old comment drew is still
