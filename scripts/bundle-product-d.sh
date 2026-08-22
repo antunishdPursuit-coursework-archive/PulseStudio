@@ -5,6 +5,15 @@
 #
 #   sh scripts/bundle-product-d.sh
 #
+# WHERE ITS OUTPUT LANDS, WHICH IS THE OTHER HALF OF THE SAME STORY. The
+# bundle is written to app/products/d-reengagement/product-d-sources.md —
+# INSIDE the published tree. It is not served, and the only reason is that
+# .gitignore catches it: the Pages workflow builds from a checkout, so an
+# untracked file is not there to publish. That safety is one .gitignore
+# edit away from disappearing, and the file is 9,453 lines of source handed
+# to an outside reviewer. If it ever needs to be committed, move the output
+# to docs/ in the same change — do not un-ignore it where it sits.
+#
 # WHY IT LIVES IN scripts/ AND NOT BESIDE THE PRODUCT. It used to sit at
 # app/products/d-reengagement/bundle.sh, and app/ IS the website — the Pages
 # workflow publishes it with `path: app`, so this script was being served at a

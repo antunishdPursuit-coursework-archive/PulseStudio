@@ -375,6 +375,24 @@ is the durable part — the individual fixes are just where it landed.
   different screens. **Measure where a branch is reachable before
   arranging for it to be reachable where you happen to be looking.**
 
+## Swept clean, so nobody sweeps them again
+
+- **The filing law's other two directories.** `scripts/` holds only tooling
+  and `docs/` only what is read before writing code; neither has drifted.
+  The root had, and now has a rule.
+- **Tooling portability**, which the law says already cost this team once —
+  eleven scratch runners hardcoding one developer's home directory. No
+  script contains an absolute or home path today; all fifteen `.mjs` derive
+  their root from `import.meta.url`, and both `.sh` files `cd` relative to
+  their own location. Verified by running each from `/tmp`: both work and
+  leave the tree unchanged.
+- **The reviewer bundle is not published.** `bundle-product-d.sh` writes
+  9,453 lines into `app/products/d-reengagement/` — inside the published
+  tree — and is safe only because `.gitignore` catches it, so the Pages
+  checkout never has it. 404 on the live site, confirmed. That safety is
+  one `.gitignore` edit away from disappearing, and the script now says so
+  next to the comment explaining why the script itself moved out of `app/`.
+
 ## What is genuinely uncovered
 
 `app/shared/synthetic/page.ts` scores zero, and no check in the suite can
