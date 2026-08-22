@@ -120,13 +120,26 @@ function runSuite(suite) {
   }
 }
 
-/** Offsets of `tok` that are not inside a string or a line comment.
- *  Approximate on purpose: a mis-sited swap becomes a syntax error, which
- *  counts as caught and is discarded. */
+/** Offsets of `tok` that are not inside a string or a comment.
+ *
+ *  BLOCK comments are blanked first, and that is not tidiness: without
+ *  it, prose inside a `/* ... *\/` block gets mutated. schedule.ts
+ *  reported two survivors on comment lines — "60 minutes < 90-minute
+ *  spacing" and an arrow in a range description — which no check could
+ *  ever catch because nothing about the program changed. False survivors
+ *  are worse than a low score: they send somebody hunting a gap that does
+ *  not exist.
+ *
+ *  Still approximate on purpose: a mis-sited swap becomes a syntax error,
+ *  which counts as caught and is discarded. */
 function sites(src, tok) {
   const out = [];
   let offset = 0;
-  for (const line of src.split("\n")) {
+  /* Blank block comments in place so every offset stays where it was. */
+  const blanked = src.replace(/\/\*[\s\S]*?\*\//g, (m) =>
+    m.replace(/[^\n]/g, " "),
+  );
+  for (const line of blanked.split("\n")) {
     const code = line
       .replace(/\/\/.*$/, "")
       .replace(/(['"`]).*?\1/g, (m) => " ".repeat(m.length));

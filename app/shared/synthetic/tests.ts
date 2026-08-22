@@ -17,6 +17,7 @@ import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn, periodProblems } from "./lifecycle.js";
 import { demandFactor } from "./scenarios.js";
+import { buildSchedule, roomsPerSlot } from "./schedule.js";
 import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
@@ -1027,6 +1028,66 @@ for (const file of ENGINE_SOURCES) {
       shouldFire,
     );
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* buildSchedule — the timetable everything else is hung on             */
+/* ------------------------------------------------------------------ */
+
+/* This module reported 100% until the runner's clock was fixed; it is
+ * really 54%, and six of its comparisons could be changed with nothing
+ * noticing. They are not obscure: the horizon the schedule covers, how
+ * many sessions a day holds, and whether a class happening TODAY counts
+ * as finished.
+ *
+ * Two are left afterwards and are recorded rather than chased. The guard
+ * `if (!type || !instructor)` can never fire — both are looked up by
+ * modulo, so zero sessions in a whole schedule lack either — which makes
+ * it defensive code, not a hole. The other decides whether a class on the
+ * as-of date can be marked canceled, and the check below WOULD catch it,
+ * but only when the 2% cancellation draw actually fires: five sessions
+ * that day gives it about a 10% chance per seed. So it is covered
+ * probabilistically, not deterministically, and calling that "caught"
+ * would be the same overclaim the runner's clock was making. */
+{
+  const sch = buildSchedule(BASE);
+  const dates = [...sch.sessionsByDate.keys()].sort();
+
+  check("the schedule starts historyDays before the as-of date",
+    dates[0], "2026-02-19");
+  check("...and runs exactly fourteen days past it",
+    dates[dates.length - 1], "2026-09-01");
+  check("...covering every day in between with none missing",
+    dates.length, BASE.historyDays + 1 + 14);
+
+  const perDay = new Set([...sch.sessionsByDate.values()].map((v) => v.length));
+  check("every day holds the same number of sessions", perDay.size, 1);
+  check("...and that number is slots times rooms, with nothing extra",
+    [...perDay][0], 5 * roomsPerSlot(BASE.memberCount));
+  check("a boutique studio of sixty runs one room per slot",
+    roomsPerSlot(BASE.memberCount), 1);
+  check("...while a big-box gym is capped at six", roomsPerSlot(10_000), 6);
+
+  /* THE AS-OF DATE IS NOT THE PAST. A class today has not happened yet:
+   * it is scheduled, not completed, and it cannot already have been
+   * canceled as a historical fact. Both comparisons deciding that could
+   * be shifted by a day with nothing here to notice. */
+  const today = sch.sessionsByDate.get(BASE.asOfDate) ?? [];
+  check("the as-of date carries sessions at all", today.length > 0, true);
+  check("...and every one of them is scheduled, not completed",
+    today.every((c) => c.status === "scheduled"), true);
+
+  const dayOf = (c: { startsAt: string }): string => c.startsAt.slice(0, 10);
+  const future = sch.sessions.filter((c) => dayOf(c) > BASE.asOfDate);
+  const past = sch.sessions.filter((c) => dayOf(c) < BASE.asOfDate);
+  check("nothing in the future is marked completed",
+    future.some((c) => c.status === "completed"), false);
+  check("...nor canceled, which is a fact only the past can carry",
+    future.some((c) => c.status === "canceled"), false);
+  check("the past carries both completed and canceled",
+    ["completed", "canceled"].every((st) => past.some((c) => c.status === st)), true);
+  check("...and cancellation stays the small share it claims to be",
+    past.filter((c) => c.status === "canceled").length / past.length < 0.06, true);
 }
 
 /* ------------------------------------------------------------------ */
