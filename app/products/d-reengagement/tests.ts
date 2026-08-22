@@ -638,6 +638,34 @@ check("when somebody IS flagged there is nothing to explain",
   check("the last recorded day is found", cov.daysSinceAnyAttendance, 0);
   check("...and no warning is printed over a healthy record set",
     coverageWarning(cov, findQuietMembers(stillRunning, TODAY, proposedRules), proposedRules), null);
+
+  /* THE THREE COMPARISONS INSIDE THIS ANSWER.
+   *
+   * attendanceCoverage decides whether the RECORDS have gone quiet, which
+   * is the warning printed above the flags — if the clipboard broke, every
+   * flag underneath is suspect. Three comparisons build it and none had a
+   * boundary: which rows are too new to count, which row is the most
+   * recent, and how quiet the records must be before it says so. TODAY is
+   * 2026-08-18 and the threshold is 14 days. */
+  const coverageOf = (days: readonly string[]): ReturnType<typeof attendanceCoverage> =>
+    attendanceCoverage(
+      recordsFor(days.map((d, i) => ({
+        id: `c${i}`, name: `Person ${i}`, status: "active" as const, attended: [d],
+      }))),
+      TODAY,
+      proposedRules,
+    );
+
+  check("a row dated today is the most recent, not a future row to skip",
+    coverageOf(["2026-08-18", "2026-07-01"]).daysSinceAnyAttendance, 0);
+  check("the most recent usable row wins, whatever order they arrive in",
+    coverageOf(["2026-07-01", "2026-08-10", "2026-07-20"]).daysSinceAnyAttendance, 8);
+
+  check("records exactly at the threshold have NOT gone quiet",
+    coverageOf(["2026-08-04"]).recordsHaveGoneQuiet, false);
+  check("...one day past it, they have",
+    coverageOf(["2026-08-03"]).recordsHaveGoneQuiet, true);
+  check("...and the day count backs that up", coverageOf(["2026-08-04"]).daysSinceAnyAttendance, 14);
 }
 {
   // The clipboard broke on 2026-08-01. Everyone still comes; nobody is recorded.
@@ -1188,6 +1216,65 @@ check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 
   ];
   check("a cancel row with no canceled_at falls back to the booking date, still qualified",
     recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY), "2026-08-11 (canceled)");
+}
+
+/* "SINCE THEIR LAST VISIT" HAS TWO EDGES, AND NEITHER WAS CHECKED.
+ *
+ * The card can say "Booked since their last visit — but did not attend",
+ * which is a different story from plain silence and changes what a staff
+ * member writes. Both comparisons bounding it survived mutation: whether
+ * an action on the DAY OF the last visit counts as after it, and whether
+ * one dated today counts as having happened yet. Last visit is
+ * 2026-08-01 and TODAY is 2026-08-18. */
+{
+  const bookedOn = (reservedAt: string): string | null => {
+    const fx = recordsFor([
+      { id: "m1", name: "Edge Booker", status: "active", attended: ["2026-08-01"] },
+    ]);
+    fx.reservations = [
+      { reservation_id: "r1", member_id: "m1", session_id: "s-future",
+        reservation_status: "reserved", reserved_at: reservedAt, canceled_at: null },
+    ];
+    return recentBookingActivity("m1", fx, dayNumberFromIso("2026-08-01"), TODAY);
+  };
+
+  check("a booking made on the day of the last visit is not 'since' it",
+    bookedOn("2026-08-01T09:00:00"), null);
+  check("the day after is", bookedOn("2026-08-02T09:00:00"), "2026-08-02");
+  check("a booking made today counts — it has happened",
+    bookedOn("2026-08-18T09:00:00"), "2026-08-18");
+  check("one dated tomorrow does not, because it has not",
+    bookedOn("2026-08-19T09:00:00"), null);
+  check("nor does one whose date cannot be read", bookedOn("sometime"), null);
+}
+
+/* AND "UPCOMING" MEANS STRICTLY FUTURE, THE SAME AS THE INVITATION.
+ *
+ * upcomingReservedNextClassDates decides who is listed as already booked
+ * back in and left alone. A class TODAY does not make that list, matching
+ * suggestedSession's window — the same convention, and now the same
+ * check. */
+{
+  const reservedFor = (startsAt: string): boolean => {
+    const fx = recordsFor([
+      { id: "m1", name: "Booked Back", status: "active", attended: ["2026-08-01"] },
+    ]);
+    fx.class_sessions.push({
+      session_id: "s_when", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: startsAt, ends_at: startsAt, capacity: 12, session_status: "scheduled",
+    });
+    fx.reservations = [
+      { reservation_id: "r1", member_id: "m1", session_id: "s_when",
+        reservation_status: "reserved", reserved_at: "2026-08-15T09:00:00", canceled_at: null },
+    ];
+    return upcomingReservedNextClassDates(fx, TODAY).has("m1");
+  };
+
+  check("a class today does not count as already booked back in",
+    reservedFor("2026-08-18T18:00:00"), false);
+  check("tomorrow does", reservedFor("2026-08-19T18:00:00"), true);
+  check("a class that already happened does not",
+    reservedFor("2026-08-10T18:00:00"), false);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1836,6 +1923,38 @@ check("unrecognized status maps to unknown, never attended", normalizeStatus("ma
   const r = run(fx);
   check("unusable evidence is counted", r.unusableEvidenceCount, 1);
   check("unusable evidence still does not hide the member", r.flagged.length, 1);
+
+  /* WHERE "FUTURE" BEGINS, WHICH IS NOT TODAY.
+   *
+   * The folder's brief states the rule: future or unreadable dates are
+   * never evidence. It does not say today is future, and the code agrees
+   * — a class dated today counts. The comparison drawing that line could
+   * be shifted with nothing noticing, which would quietly add every one
+   * of today's classes to the "could not be used as evidence" number a
+   * staff member reads. TODAY here is 2026-08-18. */
+  const evidenceAt = (startsAt: string): number => {
+    const one = recordsFor([
+      { id: "m1", name: "Edge Case", status: "active", attended: ["2026-08-01"] },
+    ]);
+    one.class_sessions.push({
+      session_id: "s_edge", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: startsAt, ends_at: startsAt, capacity: 12, session_status: "completed",
+    });
+    one.attendance.push({
+      attendance_id: "a_edge", member_id: "m1", session_id: "s_edge",
+      attendance_status: "attended", recorded_at: startsAt,
+    });
+    return run(one).unusableEvidenceCount;
+  };
+
+  check("a class dated today is usable evidence, not future",
+    evidenceAt("2026-08-18T09:00:00-04:00"), 0);
+  check("...yesterday plainly is too",
+    evidenceAt("2026-08-17T09:00:00-04:00"), 0);
+  check("tomorrow is where unusable begins",
+    evidenceAt("2026-08-19T09:00:00-04:00"), 1);
+  check("...and a date nothing can read is unusable too",
+    evidenceAt("whenever"), 1);
 }
 
 // 18d. Clean records say nothing — a data-quality line only appears when

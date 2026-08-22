@@ -66,6 +66,15 @@ and defensive; the generated corpus simply never produces the input.
 - `random.ts` — `next() < probability`. `<` and `<=` differ only when a draw
   lands exactly on the boundary: about one in four billion for a float built
   from a 32-bit integer.
+- `logic.ts` — `if (held > 0) taken.set(...)` in the seat memo. Storing a
+  zero is identical to not storing it, because every consumer reads the map
+  with `?? 0`.
+- `logic.ts` — the sort comparator's `<` on `session_id`, and `date < prior`
+  when picking the earliest. Ids are unique and equal dates order the same
+  either way.
+- `logic.ts` — `day > lastRecordedDay` and the `isFinite` half of the guard
+  beside it: an unreadable date is `NaN`, and every comparison against `NaN`
+  is false, so letting it through changes nothing.
 - `identity.ts` — `nameKind === "shared" && sharedNameGroup !== null`.
   `scenarios.ts` sets both together and only for that cohort, so they can
   never disagree.
