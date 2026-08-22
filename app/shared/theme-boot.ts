@@ -15,6 +15,9 @@ import {
   hexToHsl,
   hslToHex,
   isHexColor,
+  parseCustomColors,
+  DEFAULT_CUSTOM,
+  type CustomColors,
   nearestReadable,
   type Hsl,
 } from "./color.js";
@@ -29,7 +32,6 @@ renderStudioBrand();
 const root = document.documentElement;
 const THEME_KEY = "pulse-theme";
 const CUSTOM_KEY = "pulse-theme-custom";
-const DEFAULT_CUSTOM = { background: "#ffffff", text: "#0a0a0a" };
 
 /* STORAGE IS A PRIVILEGE, NOT A GUARANTEE. A browser with site data blocked
  * (private windows, enterprise policy, a sandboxed frame) throws on the very
@@ -63,24 +65,15 @@ function writeStored(key: string, value: string): boolean {
 let themeRemembered = true;
 
 type Theme = "light" | "dark" | "custom";
-type CustomColors = typeof DEFAULT_CUSTOM;
 
 
 
 
 function customColors(): CustomColors {
-  try {
-    const parsed: unknown = JSON.parse(readStored(CUSTOM_KEY) ?? "");
-    if (typeof parsed === "object" && parsed !== null) {
-      const record = parsed as Record<string, unknown>;
-      const background = record.background;
-      const text = record.text;
-      if (isHexColor(background) && isHexColor(text)) return { background, text };
-    }
-  } catch {
-    // An invalid saved preference falls back to the readable default pair.
-  }
-  return DEFAULT_CUSTOM;
+  /* The parsing rule lives in color.ts so a check can reach it; this
+   * module cannot be imported by anything, because it reads `document` at
+   * load. */
+  return parseCustomColors(readStored(CUSTOM_KEY));
 }
 
 /* WHICH ACCENT SURVIVES THIS BACKGROUND.

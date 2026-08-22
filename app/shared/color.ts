@@ -91,3 +91,38 @@ export function nearestReadable(candidate: Hsl, other: string): Hsl {
   }
   return candidate;
 }
+
+export type CustomColors = { background: string; text: string };
+
+/** The readable pair a studio falls back to when nothing valid is saved. */
+export const DEFAULT_CUSTOM: CustomColors = { background: "#ffffff", text: "#0a0a0a" };
+
+/* THE SAVED COLOUR PAIR, READ FROM A BROWSER KEY.
+ *
+ * `pulse-theme-custom` is written by this site and read on every page
+ * load, which means anything can be in it: another tab, a person with dev
+ * tools, a half-finished write. Every shape JSON can hold reaches here,
+ * including `null` — whose typeof is "object", which is why that clause is
+ * spelled out.
+ *
+ * A bad value is not an error to report; it is a preference that no longer
+ * makes sense, so the readable default takes over silently. What must NOT
+ * happen is a half-valid pair getting through: a saved background with a
+ * missing text colour would leave the page painting one and inheriting the
+ * other, which is how unreadable combinations appear without anyone
+ * choosing them. Both or neither. */
+export function parseCustomColors(raw: string | null): CustomColors {
+  if (raw === null) return DEFAULT_CUSTOM;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return DEFAULT_CUSTOM;
+  }
+  if (typeof parsed !== "object" || parsed === null) return DEFAULT_CUSTOM;
+  const record = parsed as Record<string, unknown>;
+  const background = record["background"];
+  const text = record["text"];
+  if (isHexColor(background) && isHexColor(text)) return { background, text };
+  return DEFAULT_CUSTOM;
+}

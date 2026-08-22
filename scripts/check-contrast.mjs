@@ -96,6 +96,8 @@ const {
   hexToHsl,
   hslToHex,
   nearestReadable,
+  parseCustomColors,
+  DEFAULT_CUSTOM,
 } = await import(pathToFileURL(COLOR_MODULE).href);
 export { contrast, relativeLuminance };
 
@@ -196,6 +198,34 @@ function selfTest() {
       Math.abs(nearestReadable(hexToHsl("#8b5cf6"), "#ffffff").hue - hexToHsl("#8b5cf6").hue) < 0.001, true],
     ["...the same holds against a black background",
       contrast(hslToHex(nearestReadable(hexToHsl("#3b3b3b"), "#000000")), "#000000") >= AA_TEXT, true],
+
+    /* THE SAVED PAIR, read from a browser key on every page load. Anything
+     * can be in that key, and a HALF-valid pair is the dangerous shape: a
+     * background with no text colour would paint one and inherit the
+     * other, which is how unreadable combinations appear without anybody
+     * choosing them. Both or neither. */
+    ["a saved pair of two hex colours is used",
+      JSON.stringify(parseCustomColors('{"background":"#102030","text":"#f0f0f0"}')),
+      JSON.stringify({ background: "#102030", text: "#f0f0f0" })],
+    ["nothing saved falls back to the readable default",
+      JSON.stringify(parseCustomColors(null)), JSON.stringify(DEFAULT_CUSTOM)],
+    ["text without a background is refused whole",
+      JSON.stringify(parseCustomColors('{"text":"#f0f0f0"}')), JSON.stringify(DEFAULT_CUSTOM)],
+    ["a background without text is refused whole",
+      JSON.stringify(parseCustomColors('{"background":"#102030"}')), JSON.stringify(DEFAULT_CUSTOM)],
+    ["a non-hex value is refused",
+      JSON.stringify(parseCustomColors('{"background":"red","text":"#f0f0f0"}')),
+      JSON.stringify(DEFAULT_CUSTOM)],
+    ["a stored null is refused, not dereferenced",
+      JSON.stringify(parseCustomColors("null")), JSON.stringify(DEFAULT_CUSTOM)],
+    ["a stored array is refused",
+      JSON.stringify(parseCustomColors('["#102030","#f0f0f0"]')), JSON.stringify(DEFAULT_CUSTOM)],
+    ["text that is not JSON is refused",
+      JSON.stringify(parseCustomColors("{oops")), JSON.stringify(DEFAULT_CUSTOM)],
+    ["an empty string is refused",
+      JSON.stringify(parseCustomColors("")), JSON.stringify(DEFAULT_CUSTOM)],
+    ["and the default pair is itself readable, or the fallback is the bug",
+      contrast(DEFAULT_CUSTOM.background, DEFAULT_CUSTOM.text) >= AA_TEXT, true],
   ];
   let failed = 0;
   for (const [label, got, want] of cases) {
