@@ -154,6 +154,19 @@ is the durable part — the individual fixes are just where it landed.
   layout, and the resulting `"#NaNNaNNaN"` is rejected by `isHexColor` at
   every consumer — so a bad value degrades to the readable default instead
   of one layer silently repairing it into a third colour nobody chose.
+- **Comparators that return 0 and leave the rest to input order.** Three
+  instances, all in something a person reads: the synthetic CSV export, the
+  flagged ranking, and which class counts as "last attended" when a sign-in
+  sheet recorded no times. Each meant the same records in a different order
+  gave a different answer.
+
+  Two things that sweep taught, both cheap to repeat. A tie-break has to be
+  on CONTENT — breaking the "last attended" tie on `session_id` changed
+  nothing, because that door mints ids from row position, so reversing the
+  rows reversed the ids too. And a stability check needs the tie to EXIST:
+  two of these passed while the code was broken, because the fixture never
+  produced a tie at all. Assert the tie is there before relying on it, and
+  confirm by deleting the tie-break rather than by reading the check.
 - **In-band markers a real value can equal.** "The records did not say" was
   encoded as the words `"class"` and `"the team"`, both of which a studio can
   genuinely have in its own export. A file naming both produced "the import
