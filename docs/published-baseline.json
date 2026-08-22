@@ -119,5 +119,28 @@
       "owner": "Manny",
       "why": "the page the dashboard actually runs, same position as its index.html and same remedy"
     }
+  ],
+  "iconsNote": "Published pages with no <link rel=\"icon\">. A browser given none asks for /favicon.ico on every load and gets a 404; this site ships app/favicon.svg, which a browser only finds when a page points at it. The four pages that are team-owned or Rensley's were fixed on 2026-08-22; these four are in other lanes and are one line each for their owner. This list is meant to SHRINK.",
+  "icons": [
+    {
+      "file": "app/products/a-booking/index.html",
+      "owner": "Kerrian",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/b-dashboard/index.html",
+      "owner": "Manny",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/b-dashboard/staff-dashboard.html",
+      "owner": "Manny",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    },
+    {
+      "file": "app/products/c-chatbot/index.html",
+      "owner": "Dennis",
+      "why": "one line in the head: <link rel=\"icon\" href=\"../../favicon.svg\" type=\"image/svg+xml\">"
+    }
   ]
 }

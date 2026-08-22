@@ -117,6 +117,23 @@ export function indexingChoice(html, listedInSitemap) {
   return "decided";
 }
 
+/* DOES THIS PAGE SAY WHERE ITS ICON IS?
+ *
+ * A browser given no `<link rel="icon">` asks the server for /favicon.ico
+ * on its own, every load. This site ships `app/favicon.svg` — an SVG, which
+ * a browser only finds when a page points at it — so eight of the twelve
+ * published pages were requesting a file that does not exist and logging a
+ * 404 in every visitor's console. Found by opening the pages, which is what
+ * the git law means by "a green gate does not open a browser": the gate was
+ * green through all of it.
+ *
+ * Small, and the reason it is worth a rule anyway is that it is invisible
+ * from the code. Nothing fails, nothing renders wrong, and the only signal
+ * is a console line nobody reads on a page nobody opened. */
+export function declaresIcon(html) {
+  return /<link[^>]+rel=["'][^"']*\bicon\b[^"']*["'][^>]*>/i.test(html);
+}
+
 /* ---------- the self-test ---------- */
 
 function selfTest() {
@@ -144,7 +161,30 @@ function selfTest() {
     ["a description mentioning noindex is not a robots tag",
       '<meta name="description" content="how noindex works">', false, "undecided"],
   ];
-  let failedIndexing = 0;
+  const iconCases = [
+    ["a plain icon link counts", '<link rel="icon" href="/favicon.svg">', true],
+    ["with a type and other attributes too",
+      '<link rel="icon" href="../../favicon.svg" type="image/svg+xml">', true],
+    ["single quotes count", "<link rel='icon' href='/favicon.svg'>", true],
+    ["shortcut icon is still an icon", '<link rel="shortcut icon" href="/f.ico">', true],
+    ["a page with no link has none", "<head><title>x</title></head>", false],
+    /* A stylesheet is not an icon, and neither is the WORD icon in a title
+     * — a rule that cannot tell those apart would pass every page. */
+    ["a stylesheet is not an icon", '<link rel="stylesheet" href="/theme.css">', false],
+    ["the word icon in prose is not a link", "<title>Our icon story</title>", false],
+    ["a preload of the icon is not a declaration",
+      '<link rel="preload" href="/favicon.svg" as="image">', false],
+  ];
+  let failedIcons = 0;
+  for (const [label, html, want] of iconCases) {
+    const got = declaresIcon(html);
+    if (got !== want) {
+      failedIcons += 1;
+      console.error(`  self-test MISS — ${label}: wanted ${want}, got ${got}`);
+    }
+  }
+
+  let failedIndexing = failedIcons;
   for (const [label, html, listed, want] of indexingCases) {
     const got = indexingChoice(html, listed);
     if (got !== want) {
@@ -163,7 +203,7 @@ function selfTest() {
     }
   }
   console.log(
-    `self-test: ${planted.length + indexingCases.length} planted cases, ${planted.length + indexingCases.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + indexingCases.length + iconCases.length} planted cases, ${planted.length + indexingCases.length + iconCases.length - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
@@ -174,6 +214,8 @@ function selfTest() {
 }
 
 /* ---------- the gate ---------- */
+
+const pagesWithIcons = (files) => files.filter((f) => f.endsWith(".html")).length;
 
 function run() {
   const tracked = execFileSync("git", ["-C", ROOT, "ls-files", "app"], {
@@ -194,6 +236,36 @@ function run() {
       `${web.length} the website asks for, ${sources.length} TypeScript sources beside the modules they compile to, ` +
       `${other.length} neither.`,
   );
+
+  /* Third pass: every page points at the icon this site ships. */
+  const knownIcons = new Map((baseline.icons ?? []).map((e) => [e.file, e]));
+  const iconless = [];
+  for (const file of tracked) {
+    if (!file.endsWith(".html")) continue;
+    if (!declaresIcon(readFileSync(join(ROOT, file), "utf8"))) iconless.push(file);
+  }
+  const freshIconless = iconless.filter((f) => !knownIcons.has(f));
+  console.log(
+    `check-published: ${pagesWithIcons(tracked)} published pages checked for an icon link — ` +
+      `${iconless.length} without one (${iconless.length - freshIconless.length} known).`,
+  );
+  for (const file of iconless.filter((f) => knownIcons.has(f))) {
+    const entry = knownIcons.get(file);
+    console.log(`  known · ${file} · ${entry.why} (owner: ${entry.owner})`);
+  }
+  for (const file of freshIconless) {
+    console.error(
+      `  ${file} · declares no <link rel="icon">, so every browser that opens it asks for /favicon.ico ` +
+        "and gets a 404. This site ships app/favicon.svg, which a browser only finds when a page points " +
+        'at it: add <link rel="icon" href="<path>/favicon.svg" type="image/svg+xml">.',
+    );
+  }
+  if (freshIconless.length > 0) {
+    console.error(
+      `check-published: ${freshIconless.length} page(s) with no icon link. FAIL`,
+    );
+    process.exit(1);
+  }
 
   /* Second pass: every page's indexing decision. */
   const sitemapPath = join(ROOT, "app/sitemap.xml");
