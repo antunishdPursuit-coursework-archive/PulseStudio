@@ -2627,6 +2627,63 @@ check("clean records produce no data-quality line",
     returnedLine(one, (id) => id), "Came back after a note — worth a hello at the front desk: m1 (1 day)");
 }
 
+// 30f. A separator in a class name must not merge two classes.
+//
+//      A session was keyed on `${date}|${classType}|${instructorName}`, and
+//      the last two come straight out of an uploaded file. logic.ts already
+//      made this correction once for its seat memo, where the note says the
+//      flat key was "correct exactly as long as no member id ever contains
+//      a pipe — true of all three doors today and true only by luck". Here
+//      it was not even luck: the values are whatever the studio typed.
+{
+  const upload = (rows: ReadonlyArray<ReadonlyArray<string>>) =>
+    adaptAttendanceCsv(rows.map((r) => r.join(",")).join("\n"), brand.timeZone);
+  const header = ["member name", "date", "class", "instructor", "status"];
+
+  /* The collision, spelled out: "yoga|kim" + "lee" and "yoga" + "kim|lee"
+   * both flatten to 2026-07-01|yoga|kim|lee. */
+  const collided = upload([
+    header,
+    ["Ada Lovelace", "2026-07-01", "yoga|kim", "lee", "attended"],
+    ["Bob Stone", "2026-07-01", "yoga", "kim|lee", "attended"],
+  ]);
+  check("two class-and-instructor pairs that flatten alike stay two classes",
+    collided.records.class_sessions.length, 2);
+  check("...and each member's attendance stays on their own class",
+    new Set(collided.records.attendance.map((a) => a.session_id)).size, 2);
+  check("...with the class names kept as written",
+    collided.records.class_sessions.map((s) => s.class_type).sort().join(" / "),
+    "yoga / yoga|kim");
+
+  /* THE ORDINARY FILE STILL BEHAVES, which is the half a fix like this
+   * breaks: the same class on the same day with the same instructor is ONE
+   * session however many people attended it. */
+  const ordinary = upload([
+    header,
+    ["Ada Lovelace", "2026-07-01", "yoga", "kim", "attended"],
+    ["Bob Stone", "2026-07-01", "yoga", "kim", "attended"],
+    ["Cleo Diaz", "2026-07-01", "Yoga", "Kim", "attended"],
+  ]);
+  check("one class, one day, one instructor is one session however many attend",
+    ordinary.records.class_sessions.length, 1);
+  check("...and casing does not split it", ordinary.records.attendance.length, 3);
+
+  /* Different on any one axis is a different session. */
+  const distinct = upload([
+    header,
+    ["Ada Lovelace", "2026-07-01", "yoga", "kim", "attended"],
+    ["Ada Lovelace", "2026-07-01", "spin", "kim", "attended"],
+    ["Ada Lovelace", "2026-07-01", "yoga", "lee", "attended"],
+    ["Ada Lovelace", "2026-07-02", "yoga", "kim", "attended"],
+  ]);
+  check("a different class, instructor or day is a different session",
+    distinct.records.class_sessions.length, 4);
+  /* Ids stay unique and sequential now that the counter is its own thing
+   * rather than a Map's size. */
+  check("...and every minted session id is distinct",
+    new Set(distinct.records.class_sessions.map((s) => s.session_id)).size, 4);
+}
+
 // 31. The open offer belongs to the CSV door, and is not a bug there.
 //
 //     A studio's own attendance export is HISTORY: it has no upcoming

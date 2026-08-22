@@ -114,6 +114,32 @@ was in. It is `returnedLine` in `outreach.ts` now.
 What is left in `main.ts` is plumbing: read the key, apply the answer,
 state it. Keep it that way.
 
+## Composite keys are NESTED here, never joined with a separator
+
+Two maps in this product key on more than one value, and both learned the
+same lesson the hard way.
+
+`logic.ts`'s seat memo keyed on `${session_id}|${member_id}` and recovered
+the session by slicing at the last pipe — correct exactly as long as no
+member id contains a pipe, which is true of all three doors and true only
+by luck.
+
+`csv.ts`'s session key was worse, because it was not luck. It joined
+`${date}|${classType}|${instructorName}`, and the last two come STRAIGHT
+OUT OF THE UPLOADED FILE. A studio writing "yoga|kim" as a class type with
+instructor "lee" collides with class "yoga" and instructor "kim|lee":
+both flatten to `2026-07-01|yoga|kim|lee`, the two classes become one
+session, and the second member's attendance is filed against the first
+member's class. Product D would then tell him his usual class is one he
+has never taken, taught by somebody who does not teach it.
+
+No separator is safe against arbitrary text, so there is no separator.
+Nesting needs its own counter, because the flat map's `.size` was doing
+double duty as the session count. Ids minted here (`csv_m_1_maria`,
+`csv_s_1_2026-07-01`) are pipe-free by construction — `slug()` strips
+everything but `a-z0-9_` — so keys built only from ids are safe, and the
+checks say which is which.
+
 ## Storage keys this product writes
 
 `pulse-outreach-ledger` (notes taken, once per lapse), `pulse-suppressions`

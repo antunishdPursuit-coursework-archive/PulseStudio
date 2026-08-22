@@ -367,7 +367,24 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
   const members: Member[] = [];
   const memberIdByName = new Map<string, string>();
   const sessions: ClassSession[] = [];
-  const sessionIdByKey = new Map<string, string>();
+  /* NESTED, NOT A JOINED STRING KEY — the same correction logic.ts already
+   * made to its seat memo, and here the values are not even safe by luck.
+   *
+   * A session used to be keyed on `${date}|${classType}|${instructorName}`,
+   * and class type and instructor name come STRAIGHT OUT OF THE UPLOADED
+   * FILE. A studio whose export writes "yoga|kim" as a class type collides
+   * with one writing class "yoga" and instructor "kim|lee": both flatten to
+   * `2026-07-01|yoga|kim|lee`, two genuinely different classes become one
+   * session, and the second member's attendance is filed against the first
+   * member's class. Product D then tells him his usual class is one he has
+   * never taken, taught by somebody who does not teach it — which is the
+   * one thing a re-engagement note must not do.
+   *
+   * No separator is safe against arbitrary text, so there is no separator.
+   * Nesting also needs its own counter: the flat map's `.size` was the
+   * session count, and a Map of Maps does not carry that. */
+  const sessionIdByDate = new Map<string, Map<string, Map<string, string>>>();
+  let sessionsMinted = 0;
   const instructors: { instructor_id: string; display_name: string }[] = [];
   const instructorIdByName = new Map<string, string>();
   const attendance: Attendance[] = [];
@@ -517,11 +534,23 @@ export function adaptAttendanceCsv(text: string, timeZone: string): CsvImport {
       }
     }
 
-    const sessionKey = `${date}|${classType.toLowerCase()}|${instructorName.toLowerCase()}`;
-    let sessionId = sessionIdByKey.get(sessionKey);
+    let byClass = sessionIdByDate.get(date);
+    if (byClass === undefined) {
+      byClass = new Map<string, Map<string, string>>();
+      sessionIdByDate.set(date, byClass);
+    }
+    const classKey = classType.toLowerCase();
+    let byInstructor = byClass.get(classKey);
+    if (byInstructor === undefined) {
+      byInstructor = new Map<string, string>();
+      byClass.set(classKey, byInstructor);
+    }
+    const instructorKey = instructorName.toLowerCase();
+    let sessionId = byInstructor.get(instructorKey);
     if (sessionId === undefined) {
-      sessionId = `csv_s_${sessionIdByKey.size + 1}_${date}`;
-      sessionIdByKey.set(sessionKey, sessionId);
+      sessionsMinted += 1;
+      sessionId = `csv_s_${sessionsMinted}_${date}`;
+      byInstructor.set(instructorKey, sessionId);
       sessions.push({
         session_id: sessionId,
         class_type: classType,
