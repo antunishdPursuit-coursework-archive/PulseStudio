@@ -7,7 +7,7 @@
  * SHARED_DATA_CONTRACT.md and is not negotiable.
  */
 
-import { counted } from "./text.js";
+import { counted } from "./deps.js";
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";

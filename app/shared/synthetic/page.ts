@@ -5,6 +5,7 @@
  * proof suite audits the engine sources for exactly that.
  */
 
+import { counted } from "../text.js";
 import {
   DEFAULT_CONFIG,
   GENERATOR_VERSION,
@@ -112,7 +113,7 @@ generateBtn.addEventListener("click", () => {
     metric("Peak concurrent attendance", report.stats["peakConcurrentAttendance"] ?? 0, `facility capacity ${bundle.dataset.studio.facilityCapacity}`),
     metric("Cohorts", cohorts.size, [...cohorts.entries()].map(([k, v]) => `${k} ${v}`).join(" · ")),
     metric("Generation", `${Math.round(t1 - t0)}ms`, `validation ${Math.round(t2 - t1)}ms`),
-    metric("Validation", report.ok ? "PASSED" : "FAILED", `${report.problems.length} findings, ${bundle.truth.declaredViolations.length} declared`),
+    metric("Validation", report.ok ? "PASSED" : "FAILED", `${counted(report.problems.length, "finding")}, ${bundle.truth.declaredViolations.length} declared`),
   );
   violationsEl.textContent =
     bundle.truth.declaredViolations.length === 0

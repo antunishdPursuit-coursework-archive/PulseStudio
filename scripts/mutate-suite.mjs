@@ -67,6 +67,12 @@ const SUITE_BY_PREFIX = [
   ["app/shared/synthetic/", "synthetic"],
   ["app/shared/auth/", "auth"],
   ["app/products/d-reengagement/", "reengagement"],
+  /* Shared modules used by more than one product are judged by whichever
+   * suite actually checks them, which is not always the folder they live
+   * in. app/shared/text.js is used by Product D and by the synthetic
+   * reporting page; its checks are in D's suite, so asking the synthetic
+   * one reports 0% for the wrong reason — the suite never loads it. */
+  ["app/shared/text.", "reengagement"],
 ];
 /* A sample, for a module too large to sweep whole. --stride=4 tries every
  * fourth site (1 in 4). It is deterministic — every Nth, never random — so the same

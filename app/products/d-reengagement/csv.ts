@@ -25,7 +25,7 @@
  *     person in the file is treated as an active member; the UI states it.
  */
 
-import { counted } from "./text.js";
+import { counted } from "./deps.js";
 import type { Attendance, ClassSession, FixtureSet, Member } from "./deps.js";
 import { GENERIC_CLASS_TYPE } from "./config.js";
 export { GENERIC_CLASS_TYPE };

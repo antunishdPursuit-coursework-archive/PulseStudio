@@ -31,7 +31,7 @@ export interface StudioBrand {
   timeZone: string;
 }
 
-import { counted } from "./text.js";
+import { counted } from "./deps.js";
 import { STUDIO_NAME } from "./deps.js";
 
 export const brand: StudioBrand = {

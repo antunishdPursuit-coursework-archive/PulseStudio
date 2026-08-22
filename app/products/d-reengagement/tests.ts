@@ -11,6 +11,7 @@
  *    that fails loudly if it ever appears.
  */
 
+import { counted } from "./deps.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
@@ -18,7 +19,6 @@ import {
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
-import { counted } from "./text.js";
 import { adaptAttendanceCsv, cleanName, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
 import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";

@@ -10,6 +10,7 @@
  * resolvable ATTENDED rows count as visits when recomputing quiet days.
  */
 
+import { counted } from "../text.js";
 import { ID_PATTERN } from "./contracts.js";
 import type {
   GeneratedStudioBundle,
@@ -336,7 +337,7 @@ export function validateBundle(bundle: GeneratedStudioBundle): ValidationReport 
     add(
       "cohort-count-mismatch",
       dataset.studio.id,
-      `${Object.keys(truth.memberCohorts).length} cohorts for ${dataset.members.length} members`,
+      `${Object.keys(truth.memberCohorts).length} cohorts for ${counted(dataset.members.length, "member")}`,
     );
   }
   const realizedQuiet = new Map<string, number>();

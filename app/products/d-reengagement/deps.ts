@@ -72,3 +72,7 @@ export type {
   ReservationStatus,
   StudioPolicy,
 } from "../../shared/contract.js";
+
+/* Sentence-level counting, shared so Product D and the synthetic page
+ * cannot drift apart on "1 class" versus "1 classes". */
+export { counted } from "../../shared/text.js";

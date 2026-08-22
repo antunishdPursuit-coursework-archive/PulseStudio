@@ -10,7 +10,7 @@
  * members this product exists to catch.
  */
 
-import { counted } from "./text.js";
+import { counted } from "./deps.js";
 import type { ClassSession, FixtureSet, Member, Reservation } from "./deps.js";
 import type { DraftFacts, QuietRules } from "./config.js";
 import { GENERIC_CLASS_TYPE, GENERIC_INSTRUCTOR, draftMessage } from "./config.js";

@@ -1,4 +1,10 @@
-/* Counting things in a sentence a person reads.
+/* Pulse Studio — counting things in a sentence a person reads. TEAM-OWNED.
+ *
+ * It sits in app/shared because BOTH sides need it: Product D writes
+ * "1 class in the prior 60 days", and the synthetic reporting page writes
+ * "1 finding". Putting it in a product folder would have meant two copies
+ * of one rule, which is the duplication app/shared/color.ts exists to
+ * undo for the contrast formula.
  *
  * This product already pluralised carefully in places — "1 note taken" and
  * "2 notes taken", "1 duplicate row was" and "2 duplicate rows were" — and
@@ -16,9 +22,8 @@
  * One helper rather than a ternary at each site, because the ternaries
  * were the problem: fifteen places to remember, several already forgotten.
  *
- * It lives in its own file so every module can use it. `config.ts` holds
- * the draft voice and is imported by `logic.ts`, so the helper cannot live
- * in either without one importing the other the wrong way round.
+ * Product D reaches it through its own `deps.ts`, which is that folder's
+ * only door to the outside — the portability seam its brief describes.
  */
 
 /** `counted(1, "class", "classes")` is "1 class"; `counted(4, …)` is

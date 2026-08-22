@@ -13,7 +13,7 @@
  *   5. ready           draft away — a human still does the sending
  */
 
-import { counted } from "./text.js";
+import { counted } from "./deps.js";
 import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
 import { dayNumberFromIso, firstNameOf, joinSentence, type FlaggedMember } from "./logic.js";
