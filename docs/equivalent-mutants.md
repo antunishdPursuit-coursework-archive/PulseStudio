@@ -103,6 +103,17 @@ which the self-test does not exercise. They are not worth chasing: an
 inverted pass/fail there makes the gate fail on a clean repo, which the
 next CI run says immediately.
 
+**check-language's quote rules are asymmetric on purpose — swept, no bug.**
+`bannedWordHits` treats a word as a mention only when quoted on BOTH sides;
+`attributionHits` accepts a quote on EITHER. That reads like drift and is
+not. The attribution patterns that matter are ANCHORED —
+`/^\s*co-authored-by\s*:/i` — so anything before them means the line is
+prose rather than a git trailer, and the quote test is a lighter secondary
+guard for the unanchored ones like `generated (with|by)`. Tightening it to
+both-sides makes the gate FAIL ON ITS OWN SELF-TEST, whose planted cases
+are quoted strings in source: a gate has to be able to write down the rule
+it enforces. Both survivors are equivalent; do not "fix" them.
+
 **Judging a file by its own self-test is circular, and the score says so.**
 When `--judge` runs a gate's own `--self-test`, a mutation INSIDE that
 self-test cannot be caught: the thing deciding whether the mutation was
