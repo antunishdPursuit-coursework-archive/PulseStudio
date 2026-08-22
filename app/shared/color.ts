@@ -126,3 +126,35 @@ export function parseCustomColors(raw: string | null): CustomColors {
   if (isHexColor(background) && isHexColor(text)) return { background, text };
   return DEFAULT_CUSTOM;
 }
+
+export type Theme = "light" | "dark" | "custom";
+
+/** The AA threshold for body text, and the one number this file's
+ *  decisions turn on. */
+export const AA_TEXT = 4.5;
+
+/* WHICH THEME A SAVED PREFERENCE SHOULD PRODUCE, or none.
+ *
+ * It lives beside the arithmetic because the interesting half of the
+ * answer IS a measurement: a saved custom pair is honoured only while it
+ * is still readable. That guard matters because the pair and the
+ * threshold can drift apart without anybody touching the preference — a
+ * person saves a pair, the studio later tightens what counts as readable,
+ * and the stored choice becomes one the site would no longer let them
+ * make. Applying it anyway would hand somebody text they cannot read and
+ * a control they never used again.
+ *
+ * `null` means "nothing to apply": leave the page on its built-in
+ * default, which follows the operating system. An unrecognised value is
+ * not guessed at.
+ */
+export function themeToApply(
+  saved: string | null,
+  colors: CustomColors,
+): Theme | null {
+  if (saved === "light" || saved === "dark") return saved;
+  if (saved === "custom") {
+    return contrast(colors.background, colors.text) >= AA_TEXT ? "custom" : null;
+  }
+  return null;
+}

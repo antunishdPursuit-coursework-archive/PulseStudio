@@ -98,6 +98,7 @@ const {
   nearestReadable,
   parseCustomColors,
   DEFAULT_CUSTOM,
+  themeToApply,
 } = await import(pathToFileURL(COLOR_MODULE).href);
 export { contrast, relativeLuminance };
 
@@ -226,6 +227,37 @@ function selfTest() {
       JSON.stringify(parseCustomColors("")), JSON.stringify(DEFAULT_CUSTOM)],
     ["and the default pair is itself readable, or the fallback is the bug",
       contrast(DEFAULT_CUSTOM.background, DEFAULT_CUSTOM.text) >= AA_TEXT, true],
+
+    /* WHICH THEME A SAVED PREFERENCE PRODUCES. The interesting half is a
+     * measurement: a stored custom pair is honoured only while it is
+     * still readable, because the pair and the threshold can drift apart
+     * without anybody touching the preference. Applying it anyway hands
+     * somebody text they cannot read. */
+    ["a saved light preference is honoured", themeToApply("light", DEFAULT_CUSTOM), "light"],
+    ["a saved dark preference is honoured", themeToApply("dark", DEFAULT_CUSTOM), "dark"],
+    ["nothing saved leaves the page on its built-in default",
+      themeToApply(null, DEFAULT_CUSTOM), null],
+    ["an unrecognised preference is not guessed at",
+      themeToApply("sepia", DEFAULT_CUSTOM), null],
+    ["a readable custom pair is applied",
+      themeToApply("custom", { background: "#102030", text: "#f0f0f0" }), "custom"],
+    ["a custom pair that no longer reaches AA is NOT applied",
+      themeToApply("custom", { background: "#ffffff", text: "#bbbbbb" }), null],
+    /* The closest an 8-bit colour gets to the line, from both sides:
+     * #767676 on white is 4.5422 and #777777 is 4.4781. NOTHING lands
+     * exactly on 4.5 — searched every grey — so whether the comparison is
+     * `>=` or `>` cannot be told apart by any colour a person can pick.
+     * The first draft of these called #767676 "exactly on the threshold",
+     * which is the kind of name that reads as proof of a boundary nobody
+     * has actually tested. */
+    ["the darkest grey that still clears AA on white is applied",
+      themeToApply("custom", { background: "#ffffff", text: "#767676" }), "custom"],
+    ["...and the very next one, which does not, is refused",
+      themeToApply("custom", { background: "#ffffff", text: "#777777" }), null],
+    ["...those two really do straddle the line",
+      contrast("#ffffff", "#767676") >= AA_TEXT && contrast("#ffffff", "#777777") < AA_TEXT, true],
+    ["...and the plainly unreadable pair is refused too",
+      contrast("#ffffff", "#bbbbbb") < AA_TEXT, true],
   ];
   let failed = 0;
   for (const [label, got, want] of cases) {

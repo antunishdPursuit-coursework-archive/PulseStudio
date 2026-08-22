@@ -16,8 +16,10 @@ import {
   hslToHex,
   isHexColor,
   parseCustomColors,
+  themeToApply,
   DEFAULT_CUSTOM,
   type CustomColors,
+  type Theme,
   nearestReadable,
   type Hsl,
 } from "./color.js";
@@ -64,7 +66,6 @@ function writeStored(key: string, value: string): boolean {
  * reload when this browser refuses to remember it. */
 let themeRemembered = true;
 
-type Theme = "light" | "dark" | "custom";
 
 
 
@@ -160,15 +161,13 @@ function applyTheme(theme: Theme, colors = customColors()): void {
 }
 
 function initialTheme(): void {
-  const saved = readStored(THEME_KEY);
-  if (saved === "light" || saved === "dark") {
-    applyTheme(saved);
-    return;
-  }
-  if (saved === "custom") {
-    const colors = customColors();
-    if (contrast(colors.background, colors.text) >= 4.5) applyTheme("custom", colors);
-  }
+  /* The decision lives in color.ts so a check can reach it — including
+   * the part that refuses a saved custom pair which is no longer
+   * readable. This module cannot be imported by anything. */
+  const colors = customColors();
+  const theme = themeToApply(readStored(THEME_KEY), colors);
+  if (theme === null) return;
+  applyTheme(theme, colors);
 }
 
 function modeButton(theme: "light" | "dark", icon: string, label: string): HTMLButtonElement {
