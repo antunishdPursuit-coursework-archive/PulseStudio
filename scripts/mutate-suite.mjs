@@ -145,7 +145,17 @@ function sites(src, tok) {
       .replace(/(['"`]).*?\1/g, (m) => " ".repeat(m.length));
     let i = code.indexOf(tok);
     while (i >= 0) {
-      out.push(offset + i);
+      /* Skip an angle bracket that belongs to a LARGER operator. Swapping
+       * the last `>` of `h >>> 0` for `>=` yields `h >>>= 0`, which is
+       * valid, assigns, and returns the same value — a survivor that says
+       * nothing about the checks. random.ts reported two of them, one per
+       * shift. `=>` is the same trap from the other side. */
+      const before = code[i - 1] ?? "";
+      const after = code[i + tok.length] ?? "";
+      const angleNeighbour = "<>=-".includes(before) || "<>=".includes(after);
+      if (!((tok === ">" || tok === "<") && angleNeighbour)) {
+        out.push(offset + i);
+      }
       i = code.indexOf(tok, i + 1);
     }
     offset += line.length + 1;
