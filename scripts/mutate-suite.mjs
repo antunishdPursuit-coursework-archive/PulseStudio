@@ -98,7 +98,20 @@ const STRIDE = strideArg === undefined ? 1 : Math.max(1, Number(strideArg.slice(
  *
  * The contract is just the exit code: non-zero means the judge NOTICED.
  * That is weaker than a suite, which reports how many checks failed, and
- * it is enough — a mutation nothing objects to is the finding either way. */
+ * it is enough — a mutation nothing objects to is the finding either way.
+ *
+ * ONE LIMIT, AND IT IS CIRCULAR: when the judge is a file's OWN
+ * --self-test, mutations inside that self-test cannot be detected. The
+ * thing deciding whether the mutation was noticed is the thing that was
+ * mutated. Weakening `const ok = a && b && c && d` to `||` survives, and
+ * says nothing about the gate — every condition still holds, so the
+ * verdict is the same either way.
+ *
+ * So read a GATE's score as being about its RULE, and ignore survivors in
+ * its self-test and its run(). check-styles reports 48% with four of its
+ * eleven survivors inside the self-test's own verdict; the number that
+ * means something is the one over the rule alone. A suite does not have
+ * this problem, because the suite and the module are different files. */
 const judgeArg = process.argv.find((a) => a.startsWith("--judge="));
 const JUDGE = judgeArg === undefined ? null : judgeArg.slice("--judge=".length).trim().split(/\s+/);
 

@@ -103,6 +103,15 @@ which the self-test does not exercise. They are not worth chasing: an
 inverted pass/fail there makes the gate fail on a clean repo, which the
 next CI run says immediately.
 
+**Judging a file by its own self-test is circular, and the score says so.**
+When `--judge` runs a gate's own `--self-test`, a mutation INSIDE that
+self-test cannot be caught: the thing deciding whether the mutation was
+noticed is the thing that was mutated. Weakening `const ok = a && b && c &&
+d` to `||` survives and means nothing — every condition still holds either
+way. Read a gate's score as being about its RULE; survivors in its
+self-test and its `run()` are noise. `check-styles` reports 48% with four
+of eleven survivors inside its own verdict.
+
 **The judge does not have to be a suite.** `npm run mutate` routed every
 module to one of the three browser suites, so anything they cannot reach
 reported "no suite covers this" and stopped. `app/shared/color.ts` was in
