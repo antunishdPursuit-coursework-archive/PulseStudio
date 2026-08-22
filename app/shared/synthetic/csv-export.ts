@@ -66,7 +66,12 @@ export function attendanceCsv(dataset: SyntheticDataset): string {
       member.displayName,
       dateOfTimestamp(session.startsAt),
       STATUS_WORDS[a.status] ?? "unknown",
-      typeById.get(session.classTypeId) ?? "class",
+      /* Empty, not the word "class". A row whose type cannot be resolved
+       * is one this file cannot describe, and Product D's import reads a
+       * blank class cell as exactly that. Writing "class" would hand the
+       * importer a class genuinely named "class", which is a real shape
+       * and would be indistinguishable from the truth. */
+      typeById.get(session.classTypeId) ?? "",
       instructorById.get(session.instructorId) ?? "",
     ]);
   }

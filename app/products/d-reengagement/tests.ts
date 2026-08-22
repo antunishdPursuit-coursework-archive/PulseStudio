@@ -15,6 +15,7 @@ import { counted } from "./deps.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
+  sharedStudio,
   attendanceCsv,
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
@@ -3352,6 +3353,29 @@ check("clean records produce no data-quality line",
     classPhrase("spin class"), "spin class");
   check("a Masterclass is still a Masterclass class, because it is one",
     classPhrase("Masterclass"), "Masterclass class");
+
+  /* BOTH DOORS HAVE TO AGREE ON WHAT ABSENCE LOOKS LIKE.
+   *
+   * The live trail resolves a session's class type from the shared
+   * studio's own type list. When that lookup fails there is nothing to
+   * report, and the fallback used to be the word "class" — which, once
+   * the marker became empty, would have made an unresolvable session look
+   * like a studio whose classes are genuinely called "class". Two doors
+   * disagreeing about absence is how one of them starts lying.
+   *
+   * STATED LIMIT, measured: putting the word back does NOT fail these.
+   * Every session in the shared studio resolves its type, so the fallback
+   * never runs and no check can reach it. What these three do is hold the
+   * OUTCOME — nothing unresolved, nothing named after a marker — so they
+   * catch the day the studio starts producing a session this door cannot
+   * describe. They are not evidence the fallback is right. */
+  const live = fixtureSetFrom(sharedStudio(), []);
+  check("the live trail names real class types, not a fallback word",
+    live.class_sessions.every((c) => c.class_type !== "class"), true);
+  check("...and none of them is the absence marker either, so nothing is unresolved",
+    live.class_sessions.some((c) => c.class_type === NOT_RECORDED), false);
+  check("...while level keeps a real DEFAULT, which is a different thing",
+    live.class_sessions.every((c) => c.level.trim() !== ""), true);
 }
 
 const passed = results.filter((r) => r.passed).length;

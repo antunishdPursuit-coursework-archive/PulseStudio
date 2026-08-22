@@ -12,6 +12,7 @@
  * breaks the page.
  */
 
+import { NOT_RECORDED } from "./config.js";
 import type {
   Attendance,
   ClassSession,
@@ -108,7 +109,15 @@ export function fixtureSetFrom(
 
   const class_sessions: ClassSession[] = dataset.classSessions.map((s) => ({
     session_id: s.id,
-    class_type: typeById.get(s.classTypeId)?.name ?? "class",
+    /* NOT_RECORDED, not the word "class". A session whose type cannot be
+     * resolved is one the records do not describe, and that has to look
+     * different from a studio whose classes are genuinely called "class"
+     * — which is a real export shape, and which used to make this page
+     * announce that the import had recorded nothing. The `level` fallback
+     * below is different in kind: "all levels" is a sensible DEFAULT for a
+     * class with no level, not a marker for absence, and nothing reads it
+     * to decide whether the records said something. */
+    class_type: typeById.get(s.classTypeId)?.name ?? NOT_RECORDED,
     level: typeById.get(s.classTypeId)?.level ?? "all levels",
     instructor_id: s.instructorId,
     starts_at: s.startsAt,
