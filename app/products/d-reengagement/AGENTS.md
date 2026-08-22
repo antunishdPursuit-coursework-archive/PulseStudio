@@ -218,8 +218,8 @@ here once, to a fix deliberately reverted to watch the checks go red. They
 stayed green. A check proved against stale build output proves nothing.
 
 **The instrument answers the question you asked it, not the one you
-meant.** Three times in one session a measurement here quietly reported
-something else, and each looked like a clean result:
+meant.** Five times now a measurement here quietly reported something
+else, and each looked like a clean result:
 
 - `npx tsc | head -3` reports `head`'s exit code, so it says 0 while the
   compiler is printing errors two lines below the cut. Run `npx tsc; echo
@@ -231,6 +231,18 @@ something else, and each looked like a clean result:
 - Timing a click that contains your own `setTimeout` measures the timeout.
   A three-second freeze that was not there nearly became a defect report;
   the click actually blocks for 7ms.
+- **A browser's console is a rolling buffer across navigations in the same
+  tab.** Reading it after loading a page reports every error since that tab
+  opened, so a fixed page kept showing the error it had just stopped
+  producing. Open a tab that has loaded only the page in question, or the
+  count is a history rather than a reading. Both halves need it: the page
+  that still has the fault must show ONE, and the fixed page must show
+  none.
+- **`fetch` inside a page serves from cache.** Four pages reported as
+  missing a `<link rel="icon">` that the file on disk and the server's own
+  response both had. `cache: "no-store"`, or a query string — otherwise the
+  answer describes the last load rather than this one, and an edit that
+  already worked looks broken.
 
 Same family as the `--noEmit` trap above: in every case the check could
 not have failed, which is exactly what each gate's `--self-test` exists to
