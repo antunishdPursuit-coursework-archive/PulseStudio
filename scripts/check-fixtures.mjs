@@ -201,6 +201,23 @@ export function attendanceFreshness(data) {
 const FRESH_ENOUGH_DAYS = 14;
 const USELESS_AFTER_DAYS = 60;
 
+/* THE BOUNDARY, as a function, so the self-test can reach it.
+ *
+ * The rules are `daysOld > FRESH_ENOUGH_DAYS` and `daysOld >
+ * USELESS_AFTER_DAYS`, so the first day that BREAKS is day 15 and day 61,
+ * not 14 and 60. Written inline this was off by one in both numbers and in
+ * the printed expiry date, and said "0 days before it stops showing a
+ * recent attendee" on the last day it still showed one. A countdown that is
+ * wrong on the day it matters is read as the answer. */
+export function freshnessCountdown(daysOld) {
+  return {
+    stale: daysOld > FRESH_ENOUGH_DAYS,
+    dead: daysOld > USELESS_AFTER_DAYS,
+    daysUntilStale: FRESH_ENOUGH_DAYS + 1 - daysOld,
+    daysUntilFailure: USELESS_AFTER_DAYS + 1 - daysOld,
+  };
+}
+
 /** Every problem in one pass. Returns [] for a clean fixture. */
 export function validateFixtures(data, unions) {
   const problems = [];
@@ -330,6 +347,63 @@ export function validateFixtures(data, unions) {
     attendanceSeen.add(key);
   }
 
+  /* THE STATED OFFSET HAS TO BE THE ONE THE STUDIO ACTUALLY HAD.
+   *
+   * Every datetime here is written `...T09:00:00-04:00`, and that offset is
+   * not decoration: a product reads the instant with `new Date(value)`, so a
+   * wrong offset moves a class by an hour on every screen that shows it.
+   * America/New_York is -04:00 from March to November and -05:00 the rest of
+   * the year, and this file already spans both — which is exactly why the
+   * mistake is easy. Rolling the dates forward is the routine edit this
+   * gate ASKS FOR when the fixture ages, and a roll across the November or
+   * March boundary silently leaves every moved value stating the offset it
+   * used to have.
+   *
+   * Checked against Intl rather than against a table of transition dates,
+   * because the table is the thing that goes stale. */
+  /* Built ONCE, and only if the zone is real. An unusable timezone is
+   * already somebody else's finding above, and this rule crashed the whole
+   * gate on the self-test's own planted "Mars/Olympus" rather than standing
+   * down — a check that takes the gate with it reports nothing at all. */
+  let offsetFormatter = null;
+  if (typeof data.timezone === "string" && data.timezone !== "") {
+    try {
+      offsetFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: data.timezone,
+        timeZoneName: "longOffset",
+      });
+    } catch {
+      offsetFormatter = null;
+    }
+  }
+  if (offsetFormatter !== null) {
+    const realOffset = (iso) => {
+      const when = new Date(iso);
+      if (Number.isNaN(when.getTime())) return null;
+      const found = offsetFormatter.format(when).match(/GMT([+-]\d{2}:\d{2})/);
+      return found === null ? null : found[1];
+    };
+    for (const [collection, rows] of Object.entries(data)) {
+      if (!Array.isArray(rows)) continue;
+      for (const [i, row] of rows.entries()) {
+        if (typeof row !== "object" || row === null) continue;
+        for (const [field, value] of Object.entries(row)) {
+          if (typeof value !== "string") continue;
+          const stated = value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2})$/);
+          if (stated === null) continue;
+          const actual = realOffset(value);
+          if (actual !== null && actual !== stated[1]) {
+            say(
+              "wrong-utc-offset",
+              `${collection}[${i}].${field} is ${value}, but ${data.timezone} was at ${actual} then, ` +
+                `not ${stated[1]} — every product reading this instant would be an hour out`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   return problems;
 }
 
@@ -355,6 +429,23 @@ function selfTest() {
   const bend = (fn) => { const d = clean(); fn(d); return d; };
   const planted = [
     ["a clean fixture passes", clean(), null],
+    /* THE OFFSET TRAP, which is the routine edit this gate asks for going
+     * wrong. America/New_York is -04:00 in August and -05:00 in January;
+     * rolling dates across either boundary without touching the offset
+     * moves every affected class by an hour on every screen. */
+    ["a summer datetime claiming winter's offset is caught",
+      bend((d) => { d.class_sessions[0].starts_at = "2026-08-12T09:00:00-05:00"; }), "wrong-utc-offset"],
+    ["a winter datetime claiming summer's offset is caught",
+      bend((d) => { d.class_sessions[0].starts_at = "2026-01-12T09:00:00-04:00"; }), "wrong-utc-offset"],
+    ["a summer datetime with summer's offset passes",
+      bend((d) => { d.class_sessions[0].starts_at = "2026-08-12T09:00:00-04:00";
+                    d.class_sessions[0].ends_at = "2026-08-12T10:00:00-04:00"; }), null],
+    ["a winter datetime with winter's offset passes",
+      bend((d) => { d.class_sessions[0].starts_at = "2026-01-12T09:00:00-05:00";
+                    d.class_sessions[0].ends_at = "2026-01-12T10:00:00-05:00"; }), null],
+    /* A date with no time carries no offset to be wrong about. */
+    ["a date-only field is not judged for an offset",
+      bend((d) => { d.memberships[0].started_on = "2026-01-12"; }), null],
     ["a dangling member reference is caught", bend((d) => { d.reservations[0].member_id = "ghost"; }), "dangling-reference"],
     ["a dangling session reference is caught", bend((d) => { d.attendance[0].session_id = "ghost"; }), "dangling-reference"],
     ["an illegal status is caught", bend((d) => { d.members[0].membership_status = "lapsed"; }), "illegal-enum"],
@@ -430,7 +521,35 @@ function selfTest() {
     }
   }
 
-  let failed = failedFreshness;
+  /* THE COUNTDOWN'S BOUNDARY, pinned at every edge. Each of these was
+   * wrong by one until 2026-08-22, when running the gate under a frozen
+   * clock showed it announcing "0 days before it stops showing a recent
+   * attendee" on the last day it still showed one. */
+  let failedCountdown = 0;
+  const countdownCases = [
+    // daysOld, stale, dead, daysUntilStale, daysUntilFailure
+    [0, false, false, 15, 61],
+    [7, false, false, 8, 54],
+    [13, false, false, 2, 48],
+    [14, false, false, 1, 47], // the LAST fresh day — one day left, not none
+    [15, true, false, 0, 46],  // the first stale day
+    [60, true, false, -45, 1], // the last day that still passes
+    [61, true, true, -46, 0],  // the first day that fails
+  ];
+  for (const [daysOld, stale, dead, untilStale, untilFail] of countdownCases) {
+    const got = freshnessCountdown(daysOld);
+    if (got.stale !== stale || got.dead !== dead
+      || got.daysUntilStale !== untilStale || got.daysUntilFailure !== untilFail) {
+      failedCountdown += 1;
+      console.error(
+        `  self-test MISS — countdown at ${daysOld} days old: wanted stale=${stale} dead=${dead} ` +
+          `untilStale=${untilStale} untilFail=${untilFail}, got stale=${got.stale} dead=${got.dead} ` +
+          `untilStale=${got.daysUntilStale} untilFail=${got.daysUntilFailure}`,
+      );
+    }
+  }
+
+  let failed = failedFreshness + failedCountdown;
   for (const [label, data, wantCode] of planted) {
     const problems = validateFixtures(data, unions);
     const got = wantCode === null ? problems.length === 0 : problems.some((p) => p.code === wantCode);
@@ -439,7 +558,7 @@ function selfTest() {
       console.error(`  self-test MISS — ${label}: wanted ${wantCode ?? "a clean pass"}, got [${problems.map((p) => p.code).join(", ") || "nothing"}]`);
     }
   }
-  const total = planted.length + freshCases.length + failCases.length + 2;
+  const total = planted.length + freshCases.length + failCases.length + countdownCases.length + 2;
   console.log(`self-test: ${total} planted fixtures, ${total - failed} behaved, ${failed} did not.`);
   console.log(
     failed === 0
@@ -493,15 +612,26 @@ if (!IS_COMMAND) {
   if (freshness.newest === null) {
     console.log("check-fixtures: no attended class in the fixture, so it can demonstrate nobody attending recently.");
   } else {
-    const expires = new Date((Math.floor(Date.now() / 86_400_000) + (FRESH_ENOUGH_DAYS - freshness.daysOld)) * 86_400_000)
+    /* OFF BY ONE UNTIL 2026-08-22, in both numbers and in the date.
+     *
+     * The rules are `daysOld > FRESH_ENOUGH_DAYS` and
+     * `daysOld > USELESS_AFTER_DAYS`, so the first day that BREAKS is
+     * day 15 and day 61 — not 14 and 60. Counting `14 - daysOld` made the
+     * line say "0 days before it stops showing a recent attendee" on the
+     * last day it still showed one, and named an expiry date one day early.
+     * A countdown that is wrong on the day it matters is worse than none,
+     * because it is read as the answer. Verified against the gate's own
+     * behaviour under a frozen clock rather than against this arithmetic. */
+    const { daysUntilStale, daysUntilFailure } = freshnessCountdown(freshness.daysOld);
+    const expires = new Date((Math.floor(Date.now() / 86_400_000) + daysUntilStale) * 86_400_000)
       .toISOString().slice(0, 10);
     console.log(
       `check-fixtures: newest attended class is ${freshness.newest}, ${freshness.daysOld} days ago — ` +
         (freshness.daysOld > FRESH_ENOUGH_DAYS
           ? `PAST the ${FRESH_ENOUGH_DAYS}-day mark, so it can no longer show a recent attendee. ` +
             `It stops demonstrating anything at all, and fails this gate, at ${USELESS_AFTER_DAYS} days.`
-          : `${FRESH_ENOUGH_DAYS - freshness.daysOld} days before it stops showing a recent attendee ` +
-            `(${expires}); ${USELESS_AFTER_DAYS - freshness.daysOld} before it fails this gate.`),
+          : `${daysUntilStale} ${daysUntilStale === 1 ? "day" : "days"} before it stops showing a recent attendee ` +
+            `(${expires}); ${daysUntilFailure} before it fails this gate.`),
     );
   }
   if (freshness.daysOld !== null && freshness.daysOld > USELESS_AFTER_DAYS) {

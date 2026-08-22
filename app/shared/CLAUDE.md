@@ -138,6 +138,29 @@ the legacy contract) is what all four products speak.
   field, the page shows it, and both download doors close on the stale
   bytes. The mode and history casts land in the same validator. What is
   left here really is markup, a clock read, and a local save.
+- **The shared fixture ages out on a clock, and rolling it forward is a
+  CHORE, not a fix.** `check-fixtures.mjs` fails once the newest attended
+  class is more than 60 days old, so the file has to be rolled forward
+  roughly every two months or the gate blocks every deploy. Rolled +4 days
+  on 2026-08-22 — which also repaired three sessions marked `scheduled`
+  that were already in the past — and the gate now passes through
+  2026-10-18 and fails on 2026-10-19. Measured by running the gate under a
+  frozen clock, not by reading the arithmetic.
+
+  **The durable fix is an anchor, and it is an OPEN TEAM DECISION**, not
+  something to slip in: give the file an `anchor_date` and resolve its
+  dates relative to today at load. What makes it more than a one-liner is
+  that these datetimes carry a real UTC offset — the file already spans
+  both `-04:00` and `-05:00` correctly — so a shift has to recompute the
+  offset for each shifted value through `Intl`, and the alternative
+  (offset-free local times, as the generated door uses) changes what
+  `new Date(value)` means for any consumer. Decide it deliberately.
+- **A stated UTC offset is checked against the studio's real one.** Added
+  the same day, because the roll-forward above is the routine edit that
+  breaks it: moving dates across the March or November transition without
+  touching the offset leaves every affected value an hour out on every
+  screen that shows it. Checked through `Intl` rather than a table of
+  transition dates, since the table is the thing that goes stale.
 - **`loadFixtures()` and `fixtures.json` are reached by no page**, found
   2026-08-22. The data law names `loadFixtures()` as the one shared
   loader and that is still the rule — but its only importer is
