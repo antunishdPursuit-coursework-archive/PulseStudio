@@ -337,6 +337,56 @@ check("a full timestamp still reads its date part",
     dayNumberFromIso(todayIsoInZone("America/New_York", lateEvening)));
   check("a studio in another zone gets its own date",
     todayIsoInZone("Australia/Sydney", lateEvening), "2026-08-20");
+
+  /* THE TWO NIGHTS A YEAR THE CLOCK MOVES, AND THE ONE IT ROLLS THE YEAR.
+   *
+   * Everything this product decides hangs off "today" as a day number, so
+   * an hour handled wrongly shifts every member's days-quiet by one, and a
+   * year handled wrongly shifts them by 365. The existing cases above cover
+   * an ordinary evening and a second zone; these cover the three nights
+   * that are not ordinary. Intl does the work — the point is that nobody
+   * later replaces it with a fixed offset, which is what "-04:00" hard-coded
+   * anywhere would be.
+   */
+  /* WINTER IS WHERE A FIXED OFFSET SHOWS. New York is -05:00 from
+   * November to March, so an instant between 04:00Z and 05:00Z is still
+   * the previous evening there while a hard-coded -04:00 has already
+   * rolled the date over. These two are the cases that actually tell the
+   * implementations apart — replacing Intl with a fixed offset fails them
+   * and leaves the rest of this block green, which is why they are here
+   * and named for what they prove. */
+  check("a January evening is still the previous day in the studio",
+    todayIsoInZone("America/New_York", new Date("2026-01-15T04:30:00Z")), "2026-01-14");
+  check("...and a February one",
+    todayIsoInZone("America/New_York", new Date("2026-02-10T04:15:00Z")), "2026-02-09");
+
+  /* The two transition hours themselves. A fixed offset agrees with Intl
+   * on both of these, so they are NOT evidence about offsets — they are
+   * here because an instant inside a gap or a repeated hour is where a
+   * date function is most likely to throw or return something odd. */
+  check("an instant inside the spring-forward gap still names a real day",
+    todayIsoInZone("America/New_York", new Date("2026-03-08T06:30:00Z")), "2026-03-08");
+  check("...and one inside the repeated fall-back hour does too",
+    todayIsoInZone("America/New_York", new Date("2026-11-01T05:30:00Z")), "2026-11-01");
+  check("New Year in UTC is still the old year in the studio",
+    todayIsoInZone("America/New_York", new Date("2026-01-01T04:59:00Z")), "2025-12-31");
+  check("...and a minute later it is not",
+    todayIsoInZone("America/New_York", new Date("2026-01-01T05:00:00Z")), "2026-01-01");
+
+  /* A day is a day whatever the clock did that night: consecutive dates
+   * across both transitions must be exactly one day number apart, or a
+   * 23-hour day silently becomes two days quiet and a 25-hour one becomes
+   * none. */
+  const spans = [
+    ["2026-03-07T17:00:00Z", "2026-03-08T17:00:00Z", "spring forward"],
+    ["2026-10-31T17:00:00Z", "2026-11-01T17:00:00Z", "fall back"],
+    ["2025-12-31T17:00:00Z", "2026-01-01T17:00:00Z", "the turn of the year"],
+  ] as const;
+  for (const [before, after, label] of spans) {
+    const a = dayNumberFromIso(todayIsoInZone("America/New_York", new Date(before)));
+    const b = dayNumberFromIso(todayIsoInZone("America/New_York", new Date(after)));
+    check(`one calendar day across ${label} is one day number`, b - a, 1);
+  }
 }
 {
   check("a date is spelled out from its text, never from a viewer's clock",
