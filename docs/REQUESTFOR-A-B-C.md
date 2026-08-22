@@ -524,6 +524,52 @@ one-line edits by three people, not one by me.
 If you think a read on that list should not be happening, that is a better
 conversation than a table edit, and I would rather have it.
 
+## Things the new gates found in your lane (2026-08-22)
+
+Six gates landed on `main` today. Each of them BASELINES what it found
+rather than failing you for it — nothing here is breaking a build, and none
+of it is mine to edit. The baselines are JSON in `docs/`, which is not
+where anybody looks, so the actionable items are repeated here once.
+
+Everything below is verified, and each says how to check it yourself.
+
+**Kerrian (A) — one line.** `a-booking/index.html` declares no
+`<link rel="icon">`, so every browser that opens it asks for
+`/favicon.ico` and gets a 404. The site ships `app/favicon.svg`, which a
+browser only finds when a page points at it. Add:
+`<link rel="icon" href="../../favicon.svg" type="image/svg+xml">`.
+Check: open the page, look at the console.
+
+**Dennis (C) — the same one line**, in `c-chatbot/index.html`.
+
+**Manny (B) — four, and two are worth a conversation.**
+
+- The same favicon line, in `index.html` and `staff-dashboard.html`.
+- **Neither dashboard page has made an indexing decision.** They are not in
+  `sitemap.xml` and carry no `noindex`, so they are a staff surface — rosters
+  and attendance — that a crawler may index. `app/robots.txt` already says
+  this in its own comment and explains why it cannot help: on a Pages
+  PROJECT site the crawler reads the USER site's robots.txt in a different
+  repository. The meta tag is the only thing that works, which is why
+  Product D carries one. Neither a tag nor robots.txt is a security
+  control; a page holding real member data belongs behind a sign-in.
+- **`staff-dashboard.js` is hand-written JavaScript with no `.ts` beside
+  it**, and it is the module `index.html` actually loads. `tsconfig.json`
+  includes only `app/**/*.ts`, so `tsc` never opens it: 69 shipped lines
+  that no gate type-checks. Check: `node scripts/check-sources.mjs`.
+- **`b-dashboard/main.ts` is reached by no page.** It renders a whole
+  dashboard from `loadFixtures()`, and `index.html` names
+  `staff-dashboard.js` instead. Which of the two is the real dashboard is
+  yours to say. Check: `node scripts/check-reachable.mjs`.
+
+**One consequence that is the team's, not yours.** Because `main.ts` is the
+only importer of `app/shared/data.ts`, `loadFixtures()` and
+`fixtures.json` are read by nothing the site serves. `check-fixtures.mjs`
+still validates that file and still prints how long before it ages out —
+read that countdown as being about records, not about a screen, because no
+screen shows them. Worth knowing before anyone spends a day rolling those
+dates forward.
+
 ## If you disagree with anything here
 
 Say so on the PR or in person — every number above (14/60 thresholds
