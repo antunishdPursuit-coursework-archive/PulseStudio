@@ -222,6 +222,60 @@ function selfTest() {
     ["...the same holds against a black background",
       contrast(hslToHex(nearestReadable(hexToHsl("#3b3b3b"), "#000000")), "#000000") >= AA_TEXT, true],
 
+    /* THE RANGE GUARD INSIDE nearestReadable, which had no check and is
+     * load-bearing on almost every call.
+     *
+     * The search walks lightness outward from the candidate by up to a
+     * hundred steps, so from a mid-grey it reaches -49 and 150 — and
+     * hslToHex given those does not fail, it returns MALFORMED TEXT:
+     * lightness -50 produces "#-33-99-cc" and lightness 150 produces
+     * "#113109104". isHexColor rejects both, but nothing inside this
+     * function asks isHexColor; it hands them straight to contrast, which
+     * computes a number from them quite happily — including a NEGATIVE
+     * luminance for the first. The guard is what stops a colour nobody can
+     * display being chosen as the readable one.
+     *
+     * Mutation found it: the guard could be turned off entirely, or made
+     * to exclude exactly 0 and 100, and every check still passed.
+     *
+     * Checked as a CONTRACT over a sweep rather than at one point, because
+     * a single candidate says nothing about a search that moves. */
+    ["nearestReadable never returns a lightness outside 0..100",
+      (() => {
+        for (const target of ["#ffffff", "#000000", "#808080", "#743df5"]) {
+          for (let l = 0; l <= 100; l += 5) {
+            const got = nearestReadable({ hue: 200, saturation: 60, lightness: l }, target);
+            if (got.lightness < 0 || got.lightness > 100) return false;
+          }
+        }
+        return true;
+      })(), true],
+    ["...and everything it returns is a colour a browser can render",
+      (() => {
+        for (const target of ["#ffffff", "#000000", "#808080", "#743df5"]) {
+          for (let l = 0; l <= 100; l += 5) {
+            if (!isHexColor(hslToHex(nearestReadable({ hue: 200, saturation: 60, lightness: l }, target)))) return false;
+          }
+        }
+        return true;
+      })(), true],
+    /* Non-vacuous: the sweep has to include a case that actually MOVES,
+     * or a function that returned its input unchanged would pass both. */
+    ["...over a sweep where the answer really does move",
+      (() => {
+        let moved = 0;
+        for (let l = 0; l <= 100; l += 5) {
+          if (nearestReadable({ hue: 200, saturation: 60, lightness: l }, "#ffffff").lightness !== l) moved += 1;
+        }
+        return moved > 5;
+      })(), true],
+    /* The two lightnesses the guard must still ALLOW, since one tempting
+     * way to write it excludes them. */
+    ["pure black is a lightness the search may use",
+      hslToHex(nearestReadable({ hue: 200, saturation: 60, lightness: 0 }, "#ffffff")), "#000000"],
+    ["and out-of-range input is malformed, which is why the guard exists",
+      isHexColor(hslToHex({ hue: 200, saturation: 60, lightness: -50 })), false],
+
     /* THE SAVED PAIR, read from a browser key on every page load. Anything
      * can be in that key, and a HALF-valid pair is the dangerous shape: a
      * background with no text colour would paint one and inherit the

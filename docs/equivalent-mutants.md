@@ -79,6 +79,45 @@ here was 21ms for twenty studios.
   if the generator ever fills today's classes those two definitions start
   disagreeing. See [../app/shared/CLAUDE.md](../app/shared/CLAUDE.md).
 
+**The judge does not have to be a suite.** `npm run mutate` routed every
+module to one of the three browser suites, so anything they cannot reach
+reported "no suite covers this" and stopped. `app/shared/color.ts` was in
+that position — the module that decides whether a person's chosen
+background and text are readable enough to accept, checked only by
+`check-contrast.mjs --self-test`. `--judge="<command>"` judges by exit
+code instead:
+
+    node scripts/mutate-suite.mjs app/shared/color.js \
+      --judge="node scripts/check-contrast.mjs --self-test"
+
+First measurement of that module: 59% caught. The gates' own rule
+functions are reachable the same way.
+
+**What it found there**, and why the rest of its survivors are not
+findings:
+
+- The range guard in `nearestReadable` could be turned off entirely and
+  every check still passed. It is load-bearing on almost every call — the
+  search walks lightness outward by up to a hundred steps, so from a
+  mid-grey it reaches -49 and 150, and `hslToHex` given those does not
+  fail. It returns MALFORMED TEXT: `"#-33-99-cc"` and `"#113109104"`.
+  `isHexColor` rejects both, but nothing inside that function asks
+  `isHexColor` — it hands them to `contrast`, which computes a number
+  quite happily, including a negative luminance. Checked as a contract
+  over a sweep now, because one candidate says nothing about a search that
+  moves.
+- Excluding lightness exactly 0 and 100 from that guard survives, and is
+  equivalent: swept 12,600 candidates across five targets, 8,710 of which
+  move, and NONE lands on either extreme. The walk stops at the first
+  qualifying lightness, so it reaches an edge only if nothing else
+  qualifies — and then it returns the candidate unchanged instead.
+- The sRGB linearisation threshold `channel <= 0.03928`. A channel is
+  n/255 and 0.03928 x 255 is 10.0164, so no 8-bit channel lands on it.
+- The five HSL sector boundaries `hue < 60`, `< 120` and so on. At exactly
+  60 the secondary term equals chroma, so both branches produce the same
+  triple. True at every sector edge, by the arithmetic rather than by the
+  data.
+
 **Arithmetic that cannot differ.**
 
 - `logic.ts` — the three guards in `dayNumberFromIso`. Each is masked by the

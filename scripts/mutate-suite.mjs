@@ -83,6 +83,25 @@ const SUITE_BY_PREFIX = [
 const strideArg = process.argv.find((a) => a.startsWith("--stride="));
 const STRIDE = strideArg === undefined ? 1 : Math.max(1, Number(strideArg.slice("--stride=".length)) || 1);
 
+/* JUDGED BY SOMETHING OTHER THAN A SUITE.
+ *
+ * Three browser suites are not the only checks in this repo, and the
+ * modules they cannot reach are exactly the ones worth asking about.
+ * `app/shared/color.ts` decides whether a person's chosen background and
+ * text are readable enough to accept — and its only checks live in
+ * `check-contrast.mjs --self-test`, so until this option existed the tool
+ * answered "no suite covers app/shared/color.js" and stopped. The gates'
+ * own rule functions are in the same position.
+ *
+ *   node scripts/mutate-suite.mjs app/shared/color.js \
+ *     --judge="node scripts/check-contrast.mjs --self-test"
+ *
+ * The contract is just the exit code: non-zero means the judge NOTICED.
+ * That is weaker than a suite, which reports how many checks failed, and
+ * it is enough — a mutation nothing objects to is the finding either way. */
+const judgeArg = process.argv.find((a) => a.startsWith("--judge="));
+const JUDGE = judgeArg === undefined ? null : judgeArg.slice("--judge=".length).trim().split(/\s+/);
+
 const explicit = process.argv.find((a) => a.startsWith("--suite="));
 const suiteFor = (rel) => {
   if (explicit) return explicit.slice("--suite=".length);
@@ -106,7 +125,20 @@ const SWAPS = [
  * that had been reported caught turned out to run in 16.1s and 18.5s. */
 let budgetMs = 30_000;
 
+function runJudge() {
+  try {
+    execFileSync(JUDGE[0], JUDGE.slice(1), {
+      encoding: "utf8", timeout: budgetMs, cwd: ROOT, stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { failed: 0, timedOut: false };
+  } catch (err) {
+    const timedOut = err !== null && typeof err === "object" && err.code === "ETIMEDOUT";
+    return { failed: 1, timedOut };
+  }
+}
+
 function runSuite(suite) {
+  if (JUDGE !== null) return runJudge();
   try {
     const out = execFileSync(
       "node",
@@ -172,7 +204,7 @@ function sites(src, tok) {
 let anyMissing = false;
 for (const rel of TARGETS) {
   const path = join(ROOT, rel);
-  const suite = suiteFor(rel);
+  const suite = JUDGE === null ? suiteFor(rel) : JUDGE.join(" ");
   if (suite === null) {
     console.error(
       `mutate-suite: no suite covers ${rel}. Pass --suite=<synthetic|auth|reengagement>, ` +
