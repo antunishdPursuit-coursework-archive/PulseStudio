@@ -307,6 +307,71 @@ export function keepSuppressionRecords(rows: unknown): KeptRows<SuppressionRecor
 }
 
 /* ------------------------------------------------------------------ */
+/* Reading a list back out of a browser store                           */
+/* ------------------------------------------------------------------ */
+
+/* WHY THIS IS HERE AND NOT IN main.ts, WHERE IT RAN UNTIL 2026-08-22.
+ *
+ * main.ts is the page's entry module. Nothing can load it outside a
+ * browser, so no check reaches it — `npm run mutate` scores its shared
+ * twin, synthetic/page.ts, at 0% caught with every mutation surviving, and
+ * both folder briefs already name the remedy: anything in an entry module
+ * that is a RULE rather than markup belongs in a module a check can load.
+ *
+ * This is a rule. It decides what a staff member is told when the browser
+ * hands back something that is not what was stored — which happens for
+ * dull reasons (another tab mid-write, a quota failure, a person with dev
+ * tools) and must never end in a silent empty list, because an empty
+ * do-not-contact list means messaging someone who asked not to be.
+ *
+ * The two failures are deliberately NOT the same. Unreadable bytes or a
+ * value that is not a list at all is unrecoverable: it is reset. Individual
+ * bad ROWS are not — the good rows survive and the count of the bad ones is
+ * stated, the same accounting attendance rows already get. Only the first
+ * clears the key, which is why `clear` is reported separately from the
+ * warning rather than inferred from it. */
+export interface RecoveredList<T> {
+  rows: T[];
+  /** Sentences the page appends verbatim. Empty when nothing went wrong.
+   *  Leading space included, because they join a running warning. */
+  warning: string;
+  /** Whether the stored value is beyond saving and should be thrown away.
+   *  Dropped rows do NOT set this: the survivors are still worth keeping. */
+  clear: boolean;
+}
+
+export function recoverStoredList<T>(
+  raw: string | null,
+  label: string,
+  keep: (rows: unknown) => KeptRows<T>,
+): RecoveredList<T> {
+  const unreadable = {
+    rows: [],
+    warning: ` The stored ${label} was unreadable and was reset.`,
+    clear: true,
+  };
+  if (raw === null) return { rows: [], warning: "", clear: false };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return unreadable;
+  }
+  /* Array.isArray, not a typeof test: `typeof [] === "object"` and so is
+   * `null`, and JSON.parse produces both. */
+  if (!Array.isArray(parsed)) return unreadable;
+  const { kept, dropped } = keep(parsed);
+  if (dropped === 0) return { rows: kept, warning: "", clear: false };
+  return {
+    rows: kept,
+    warning:
+      ` ${counted(dropped, "unreadable entry", "unreadable entries")}` +
+      ` in the stored ${label} ${dropped === 1 ? "was" : "were"} discarded.`,
+    clear: false,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* How long a mailto: link may be                                       */
 /* ------------------------------------------------------------------ */
 

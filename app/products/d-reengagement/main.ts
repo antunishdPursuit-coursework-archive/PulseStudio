@@ -46,6 +46,7 @@ import {
   workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
+  recoverStoredList,
   lapseKeyOf,
   outreachResults,
   outreachStateFor,
@@ -120,32 +121,14 @@ function storageWorks(): boolean {
   return true;
 }
 
+/* The plumbing only. What to DO with a store that hands back the wrong
+ * thing is recoverStoredList in outreach.ts, where the unit checks can
+ * reach it — this reads the key, applies the answer, and states it. */
 function loadList<T>(key: string, keep: (rows: unknown) => KeptRows<T>): T[] {
-  const label = key.replace("pulse-", "");
-  const raw = readStored(key);
-  if (raw === null) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    storageWarning += ` The stored ${label} was unreadable and was reset.`;
-    clearStored(key);
-    return [];
-  }
-  if (!Array.isArray(parsed)) {
-    storageWarning += ` The stored ${label} was unreadable and was reset.`;
-    clearStored(key);
-    return [];
-  }
-  /* PER-ROW, NOT PER-FILE. One corrupt row used to be indistinguishable from
-   * a corrupt file, and an unchecked cast let a row with a missing takenAt
-   * reach the median arithmetic and produce NaN. The rule itself lives in
-   * outreach.ts so the unit checks hold it; this only states the count. */
-  const { kept, dropped } = keep(parsed);
-  if (dropped > 0) {
-    storageWarning += ` ${dropped} unreadable ${dropped === 1 ? "entry" : "entries"} in the stored ${label} ${dropped === 1 ? "was" : "were"} discarded.`;
-  }
-  return kept;
+  const recovered = recoverStoredList(readStored(key), key.replace("pulse-", ""), keep);
+  if (recovered.clear) clearStored(key);
+  storageWarning += recovered.warning;
+  return recovered.rows;
 }
 
 let ledger = loadList("pulse-outreach-ledger", keepOutreachRecords);

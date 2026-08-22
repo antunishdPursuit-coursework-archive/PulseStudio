@@ -37,6 +37,7 @@ import {
   workflowStateLine,
   mailtoIsTooLong,
   keepSuppressionRecords,
+  recoverStoredList,
   lapseKeyOf,
   outreachResults,
   outreachStateFor,
@@ -2507,6 +2508,64 @@ check("clean records produce no data-quality line",
     attendedBeforeJoining, 0);
   check(`across ${SEEDS} studios, no paused or canceled member holds a seat`,
     heldByNonMember, 0);
+}
+
+// 30d. What a staff member is told when the browser hands back rubbish.
+//
+//      This decision ran inside main.ts until 2026-08-22, which no check
+//      can load — the same hole synthetic/page.ts has, and the remedy both
+//      briefs already name: a RULE in an entry module moves to a module a
+//      check can reach. It matters more than most, because the list it
+//      recovers is the do-not-contact list, and a silent empty one means
+//      messaging somebody who asked not to be.
+{
+  const good = { memberId: "m1", suppressedOn: "2026-08-01" };
+  const alsoGood = { memberId: "m2", suppressedOn: "2026-08-02" };
+  const bad = { memberId: "", suppressedOn: "nonsense" };
+  const recover = (raw: string | null) =>
+    recoverStoredList(raw, "suppressions", keepSuppressionRecords);
+
+  const nothing = recover(null);
+  check("nothing stored is not a failure", nothing.rows.length, 0);
+  check("...and says nothing", nothing.warning, "");
+  check("...and clears nothing", nothing.clear, false);
+
+  const broken = recover("{ not json");
+  check("unreadable bytes keep no rows", broken.rows.length, 0);
+  check("...and say so, naming what was lost",
+    broken.warning, " The stored suppressions was unreadable and was reset.");
+  check("...and the key is thrown away", broken.clear, true);
+
+  check("a stored value that is not a list is unreadable too",
+    recover(JSON.stringify({ memberId: "m1" })).clear, true);
+  /* typeof null === "object", and JSON.parse produces it. A typeof test
+   * here would accept null and hand it to the keeper. */
+  check("a stored null is unreadable, not an empty list",
+    recover("null").clear, true);
+  check("a stored empty list is fine", recover("[]").clear, false);
+  check("...and says nothing", recover("[]").warning, "");
+
+  const clean = recover(JSON.stringify([good, alsoGood]));
+  check("good rows all survive", clean.rows.length, 2);
+  check("...silently", clean.warning, "");
+
+  const one = recover(JSON.stringify([good, bad]));
+  check("a bad row is dropped, not the file", one.rows.length, 1);
+  check("...counted in the singular",
+    one.warning, " 1 unreadable entry in the stored suppressions was discarded.");
+  /* THE POINT OF SPLITTING clear FROM warning. A dropped row must not
+   * take the surviving do-not-contact entries with it. */
+  check("...and the survivors are kept", one.clear, false);
+
+  const two = recover(JSON.stringify([bad, good, bad]));
+  check("two bad rows are counted in the plural",
+    two.warning, " 2 unreadable entries in the stored suppressions were discarded.");
+  check("...and the good row still survives", two.rows.length, 1);
+
+  /* The label is the caller's, so the sentence names the right list. */
+  check("the warning names the list it is about",
+    recoverStoredList("{ not json", "outreach-ledger", keepOutreachRecords).warning,
+    " The stored outreach-ledger was unreadable and was reset.");
 }
 
 // 31. The open offer belongs to the CSV door, and is not a bug there.

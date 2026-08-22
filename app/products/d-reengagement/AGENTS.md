@@ -81,6 +81,27 @@ reading a screen as evidence:
   disagreement that holds only while that boundary stays unreachable.
   Adding a schedule was exactly the change that could have started it.
 
+## main.ts is unreachable by any check — move rules out of it
+
+`main.ts` is the page's entry module: nothing can load it outside a
+browser, so no unit check reaches it. `npm run mutate` scores its shared
+twin `synthetic/page.ts` at 0% caught with every mutation surviving, and
+`tsc` catches only type and syntax errors in either. **Anything in it that
+is a RULE rather than markup belongs in a module a check can load.**
+
+Done once already, on 2026-08-22: the decision about what a staff member
+is told when the browser hands back something that is not what was stored
+moved to `recoverStoredList` in `outreach.ts`. It matters more than most,
+because one of the two lists it recovers is do-not-contact, and a silent
+empty one means messaging somebody who asked not to be. The two failures
+are deliberately different — unreadable bytes or a non-list is reset, but
+individual bad ROWS are dropped and counted while the survivors stay,
+which is why `clear` is reported separately from the warning instead of
+inferred from it. 18 checks, and every mutation of it is caught.
+
+What is left in `main.ts` is plumbing: read the key, apply the answer,
+state it. Keep it that way.
+
 ## Storage keys this product writes
 
 `pulse-outreach-ledger` (notes taken, once per lapse), `pulse-suppressions`
