@@ -45,7 +45,17 @@ jobs:
       mode: ${{ steps.pagesmode.outputs.mode }}
       publishing: ${{ steps.publishing.outputs.ok }}
     steps:
+        # FULL HISTORY, ON PURPOSE. check-lanes.mjs and check-language.mjs
+        # read the commits this branch adds on top of origin/main. The
+        # default depth-1 checkout has no origin/main to compare against, so
+        # both said so and stood down — honestly, but uselessly: the lane
+        # law is the one rule that keeps two people's branches from
+        # colliding, and it was skipping on every pull request, which is the
+        # only place it can still prevent anything. The repo is 147 tracked
+        # files; the full fetch costs nothing worth measuring.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
