@@ -97,10 +97,19 @@ export function buildSchedule(config: SyntheticStudioConfig): StudioSchedule {
     SLOT_TIMES.length,
     Math.max(4, 4 + Math.floor(config.memberCount / 60)),
   );
-  /* Take the most-used times first, then put them back in clock order. */
+  /* Take the most-used times first, then put them back in clock order.
+   *
+   * PLAIN COMPARISON, NOT localeCompare. These are "HH:MM" strings and
+   * every locale agrees about digits, so this changes no byte of any
+   * bundle — verified across four configurations before and after. It is
+   * changed anyway because localeCompare reads the RUNTIME'S LOCALE, and
+   * this engine's whole promise is that a seed produces the same studio
+   * everywhere. It already refuses to read a clock or an unseeded random
+   * source for that reason; the machine's language settings are the same
+   * kind of outside state, and the suite audits for it now. */
   const openSlots: readonly string[] = SLOT_PRIORITY.slice(0, slotsPerDay)
     .slice()
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   const rooms = roomsPerSlot(config.memberCount);
   const asOfDay = dayNumberOf(config.asOfDate);

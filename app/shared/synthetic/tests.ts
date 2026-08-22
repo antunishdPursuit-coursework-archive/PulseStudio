@@ -1035,6 +1035,16 @@ const FORBIDDEN: ReadonlyArray<[string, RegExp]> = [
   ["a network call", /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/],
   ["a clock read", /Date\.now\s*\(|\bDate\s*\(\s*\)|new\s+Date\s*(?!\s*\()|performance\.now\s*\(/],
   ["unseeded randomness", /Math\.random\s*\(|crypto\.getRandomValues|randomUUID/],
+  /* THE MACHINE'S LANGUAGE IS OUTSIDE STATE TOO. localeCompare and
+   * Intl.Collator order text by the runtime's locale and ICU version, so a
+   * seed could produce one studio here and a different one on a colleague's
+   * laptop — the same failure a clock read or an unseeded draw would cause,
+   * arriving by a quieter route. schedule.ts sorted its slot times with
+   * localeCompare until 2026-08-22. It changed no byte of any bundle,
+   * verified across four configurations, because every locale agrees about
+   * the digits in "17:30" — but "it happens to agree" is what this engine
+   * refuses to rest on everywhere else. Plain < and > are locale-blind. */
+  ["locale-dependent ordering", /localeCompare\s*\(|Intl\.Collator/],
 ];
 for (const file of ENGINE_SOURCES) {
   const source = await (await fetch(`./${file}`)).text();
@@ -1190,6 +1200,15 @@ for (const file of ENGINE_SOURCES) {
     ["unseeded randomness", "const r = Math.random();", true],
     ["unseeded randomness", "const id = crypto.randomUUID();", true],
     ["unseeded randomness", "const r = stream.chance(0.02);", false],
+    ["locale-dependent ordering", "names.sort((a, b) => a.localeCompare(b));", true],
+    ["locale-dependent ordering", "const c = new Intl.Collator('en');", true],
+    /* The replacement must not read as a violation, or the rule would
+     * forbid its own fix. */
+    ["locale-dependent ordering", "slots.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));", false],
+    /* And a date formatter is not a collator — the engine never formats,
+     * but page.ts does, and a rule that cannot tell them apart would
+     * spread. */
+    ["locale-dependent ordering", "new Intl.DateTimeFormat('en-CA', { timeZone })", false],
     ["a clock read", "const t = Date.now();", true],
     ["a clock read", "const t = new Date();", true],
     ["a clock read", "const t = new Date;", true],
