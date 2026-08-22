@@ -306,8 +306,27 @@ export function findQuietMembers(
     });
   }
 
+  /* MOST EVIDENCE FIRST, THEN LONGEST QUIET, THEN BY ID.
+   *
+   * The third key is not decoration. Two members with the same prior count
+   * and the same days quiet are common — this list is short and both keys
+   * are small integers — and without a tie-break their order came from
+   * whatever order the records happened to arrive in. Re-importing the
+   * same file with its rows shuffled, or the live trail merging Booking's
+   * log, then changed who a staff member reads first.
+   *
+   * member_id is unique, so this is a total order: the same members always
+   * rank the same way, whatever produced them. Same reasoning as the
+   * shared CSV export's comparator. */
   flagged.sort(
-    (a, b) => b.priorCount - a.priorCount || b.daysSince - a.daysSince,
+    (a, b) =>
+      b.priorCount - a.priorCount ||
+      b.daysSince - a.daysSince ||
+      (a.member.member_id < b.member.member_id
+        ? -1
+        : a.member.member_id > b.member.member_id
+          ? 1
+          : 0),
   );
 
   return {

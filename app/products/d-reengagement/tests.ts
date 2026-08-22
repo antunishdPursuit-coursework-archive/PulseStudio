@@ -3449,6 +3449,46 @@ check("clean records produce no data-quality line",
   }
 }
 
+/* THE RANKING IS A PROPERTY OF THE MEMBERS, NOT OF THE FILE.
+ *
+ * Most evidence first, then longest quiet — and both are small integers
+ * over a short list, so two members tying on both is ordinary rather than
+ * exotic. Without a third key their order came from whatever order the
+ * records arrived in, so re-importing the same file with its rows
+ * shuffled changed who a staff member reads first. */
+{
+  const T = dayNumberFromIso("2026-08-21");
+  const identical = [
+    "Member,Date",
+    "Ada Reyes,2026-06-27", "Ada Reyes,2026-07-25",
+    "Bo Nakamura,2026-06-27", "Bo Nakamura,2026-07-25",
+  ].join("\n");
+  const fx = adaptAttendanceCsv(identical, "America/New_York");
+  const rank = (records: FixtureSet): string =>
+    findQuietMembers(records, T, proposedRules).flagged
+      .map((f) => f.member.display_name).join(",");
+
+  const forward = rank(fx.records);
+  const reversed = rank({ ...fx.records, members: [...fx.records.members].reverse() });
+
+  check("two members really can tie on both sort keys",
+    findQuietMembers(fx.records, T, proposedRules).flagged
+      .map((f) => `${f.priorCount}|${f.daysSince}`).join(" ") === "2|27 2|27", true);
+  check("the same members rank the same way whatever order they arrive in",
+    forward, reversed);
+  check("...and the order is by id, which is the only unique key here",
+    forward, "Ada Reyes,Bo Nakamura");
+
+  /* The keys that matter still come first. */
+  const mixed = adaptAttendanceCsv([
+    "Member,Date",
+    "Zoe Adams,2026-06-27", "Zoe Adams,2026-07-04", "Zoe Adams,2026-07-25",
+    "Al Baker,2026-07-25",
+  ].join("\n"), "America/New_York");
+  check("more evidence still outranks a name that sorts earlier",
+    rank(mixed.records), "Zoe Adams,Al Baker");
+}
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 
