@@ -14,6 +14,7 @@ the legacy contract) is what all four products speak.
 | Area | What it is |
 | --- | --- |
 | `theme.css` + `theme-boot.ts` | The appearance rules as code: built-in `--bg` light/dark stays white/black, an accessible custom background/text pair is allowed, and four developer accents are scoped by `body.product-a\|b\|c\|d`; the boot persists theme preferences AND auto-mounts the session chip into any `.topnav`/`.page-head`/`.topbar` (opt out: `<body data-no-session>`) |
+| `color.ts` | The WCAG arithmetic — luminance, contrast ratio, hex/HSL, and `nearestReadable`. It has no DOM in it ON PURPOSE: `theme-boot.ts` reads `document` at module load, so nothing could import it, and `scripts/check-contrast.mjs` was carrying a second copy of the same formula. Both now import this one, so the gate measures the arithmetic the browser actually runs |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
@@ -129,6 +130,14 @@ the legacy contract) is what all four products speak.
   gate; what is unproven is its runtime behaviour. Same shape as Product
   D's `main.ts`, and the same remedy applies — anything in it that becomes
   a RULE rather than markup should move to a module a check can load.
+- **`check-contrast.mjs` needs a build, deliberately.** It imports
+  `app/shared/color.js` rather than reimplementing the contrast formula,
+  because it used to carry its own copy and nothing compared the two — the
+  gate could have blessed a palette the browser refuses. It exits 1 with a
+  clear message when the compiled module is missing. Its `--self-test`
+  covers the arithmetic itself now, including `nearestReadable`, which is
+  what accepts or adjusts a person's chosen colours and previously had no
+  checks anywhere.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for

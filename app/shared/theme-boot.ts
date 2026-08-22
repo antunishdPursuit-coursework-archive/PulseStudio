@@ -10,6 +10,14 @@
    edit inside a product folder. A page that should
    stay chip-free (a proof page) opts out with <body data-no-session>. */
 
+import {
+  contrast,
+  hexToHsl,
+  hslToHex,
+  isHexColor,
+  nearestReadable,
+  type Hsl,
+} from "./color.js";
 import { mountSessionControl } from "./components/topbar.js";
 import { renderStudioBrand } from "./components/brand-header.js";
 
@@ -57,25 +65,8 @@ let themeRemembered = true;
 type Theme = "light" | "dark" | "custom";
 type CustomColors = typeof DEFAULT_CUSTOM;
 
-function isHexColor(value: unknown): value is string {
-  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-}
 
-function luminance(color: string): number {
-  const parts = color.slice(1).match(/.{2}/g);
-  if (parts === null) return 0;
-  const channels = parts.map((part) => {
-    const channel = Number.parseInt(part, 16) / 255;
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
-}
 
-function contrast(background: string, text: string): number {
-  const first = luminance(background);
-  const second = luminance(text);
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
 
 function customColors(): CustomColors {
   try {
@@ -198,7 +189,6 @@ function modeButton(theme: "light" | "dark", icon: string, label: string): HTMLB
   return button;
 }
 
-type Hsl = { hue: number; saturation: number; lightness: number };
 
 type ColorEditor = {
   canvas: HTMLCanvasElement;
@@ -207,49 +197,8 @@ type ColorEditor = {
   state: Hsl;
 };
 
-function hslToHex({ hue, saturation, lightness }: Hsl): string {
-  const s = saturation / 100;
-  const l = lightness / 100;
-  const chroma = (1 - Math.abs(2 * l - 1)) * s;
-  const secondary = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const match = l - chroma / 2;
-  const channels =
-    hue < 60 ? [chroma, secondary, 0] : hue < 120 ? [secondary, chroma, 0] :
-    hue < 180 ? [0, chroma, secondary] : hue < 240 ? [0, secondary, chroma] :
-    hue < 300 ? [secondary, 0, chroma] : [chroma, 0, secondary];
-  return `#${channels.map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, "0")).join("")}`;
-}
 
-function hexToHsl(hex: string): Hsl {
-  const channels = hex.slice(1).match(/.{2}/g)?.map((part) => Number.parseInt(part, 16) / 255);
-  const red = channels?.[0] ?? 1;
-  const green = channels?.[1] ?? 1;
-  const blue = channels?.[2] ?? 1;
-  const maximum = Math.max(red, green, blue);
-  const minimum = Math.min(red, green, blue);
-  const delta = maximum - minimum;
-  const lightness = (maximum + minimum) / 2;
-  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
-  let hue = 0;
-  if (delta !== 0) {
-    if (maximum === red) hue = 60 * (((green - blue) / delta) % 6);
-    else if (maximum === green) hue = 60 * ((blue - red) / delta + 2);
-    else hue = 60 * ((red - green) / delta + 4);
-  }
-  return { hue: (hue + 360) % 360, saturation: saturation * 100, lightness: lightness * 100 };
-}
 
-function nearestReadable(candidate: Hsl, other: string): Hsl {
-  if (contrast(hslToHex(candidate), other) >= 4.5) return candidate;
-  for (let step = 1; step <= 100; step += 1) {
-    for (const lightness of [candidate.lightness - step, candidate.lightness + step]) {
-      if (lightness < 0 || lightness > 100) continue;
-      const adjusted = { ...candidate, lightness };
-      if (contrast(hslToHex(adjusted), other) >= 4.5) return adjusted;
-    }
-  }
-  return candidate;
-}
 
 function makeEditor(label: string, state: Hsl): { field: HTMLElement; editor: ColorEditor } {
   const field = document.createElement("section");

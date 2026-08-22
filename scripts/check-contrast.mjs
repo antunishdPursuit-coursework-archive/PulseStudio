@@ -66,18 +66,38 @@ const DEVELOPERS = [
   { key: "rensley", product: "D", owner: "Rensley" },
 ];
 
-export function relativeLuminance(hex) {
-  const channels = [0, 2, 4]
-    .map((i) => parseInt(hex.slice(1 + i, 3 + i), 16) / 255)
-    .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+/* THE SAME ARITHMETIC THE BROWSER RUNS, not a second copy of it.
+ *
+ * This gate used to carry its own luminance and contrast functions. So did
+ * `app/shared/theme-boot.ts`, where the identical formula decides whether
+ * a person's chosen background and text pair is readable enough to accept.
+ * Two implementations of one standard with nothing comparing them: the
+ * gate could bless a palette the browser would refuse, or the reverse, and
+ * the first anybody would know is somebody reading grey text the gate
+ * called fine.
+ *
+ * They could not be merged in place — theme-boot reads `document` at
+ * module load, so Node cannot import it. The arithmetic now lives in
+ * `app/shared/color.ts`, which touches nothing, and both sides import it.
+ * That is why this gate needs a build: it is deliberately reading the
+ * compiled artefact the browser will load rather than a paraphrase of it. */
+const COLOR_MODULE = join(ROOT, "app/shared/color.js");
+if (!existsSync(COLOR_MODULE)) {
+  console.error(
+    "check-contrast: app/shared/color.js is not built. Run `npm run build` first — " +
+      "this gate measures the same compiled arithmetic the browser runs, on purpose.",
+  );
+  process.exit(1);
 }
-
-export function contrast(a, b) {
-  const first = relativeLuminance(a);
-  const second = relativeLuminance(b);
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
+const {
+  contrast,
+  luminance: relativeLuminance,
+  isHexColor,
+  hexToHsl,
+  hslToHex,
+  nearestReadable,
+} = await import(pathToFileURL(COLOR_MODULE).href);
+export { contrast, relativeLuminance };
 
 /** Read `--name: #rrggbb;` declarations out of a CSS block. */
 function tokensIn(block) {
@@ -147,6 +167,35 @@ function selfTest() {
     ["the readable violet clears AA on white", contrast("#743df5", "#ffffff") >= AA_TEXT, true],
     ["the dark-theme violet clears AA on black", contrast("#9e77f8", "#000000") >= AA_TEXT, true],
     ["the brand violet does NOT clear AA on white", contrast("#8b5cf6", "#ffffff") >= AA_TEXT, false],
+
+    /* THE REST OF app/shared/color.ts, which the browser runs and nothing
+     * checked until it moved out of theme-boot.ts. These are not extra
+     * arithmetic for this gate's own sake: nearestReadable is what accepts
+     * or adjusts a person's chosen colours, and it had no checks at all
+     * because the module it lived in cannot be imported by anything. */
+    ["contrast is symmetric, whichever way round it is asked",
+      contrast("#123456", "#fedcba") === contrast("#fedcba", "#123456"), true],
+    ["a six-digit hex is a colour", isHexColor("#a1b2c3"), true],
+    ["...in either case", isHexColor("#A1B2C3"), true],
+    ["a three-digit hex is not the form this studio stores", isHexColor("#abc"), false],
+    ["a named colour is not one either", isHexColor("rebeccapurple"), false],
+    ["...nor is a non-string", isHexColor(null), false],
+
+    ["hex survives a round trip through HSL",
+      hslToHex(hexToHsl("#743df5")), "#743df5"],
+    ["...including pure white, where saturation is undefined",
+      hslToHex(hexToHsl("#ffffff")), "#ffffff"],
+    ["...and pure black", hslToHex(hexToHsl("#000000")), "#000000"],
+    ["...and a fully saturated primary", hslToHex(hexToHsl("#00ff00")), "#00ff00"],
+
+    ["a colour already readable is returned untouched",
+      hslToHex(nearestReadable(hexToHsl("#000000"), "#ffffff")), "#000000"],
+    ["an unreadable colour is moved until it clears AA",
+      contrast(hslToHex(nearestReadable(hexToHsl("#8b5cf6"), "#ffffff")), "#ffffff") >= AA_TEXT, true],
+    ["...and it is moved, not replaced with something unrelated",
+      Math.abs(nearestReadable(hexToHsl("#8b5cf6"), "#ffffff").hue - hexToHsl("#8b5cf6").hue) < 0.001, true],
+    ["...the same holds against a black background",
+      contrast(hslToHex(nearestReadable(hexToHsl("#3b3b3b"), "#000000")), "#000000") >= AA_TEXT, true],
   ];
   let failed = 0;
   for (const [label, got, want] of cases) {
