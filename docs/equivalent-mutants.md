@@ -186,6 +186,16 @@ findings:
   when lightness is 0 or 1, and either forces max and min equal, which the
   `delta === 0` test above it has already caught. Safe by construction, not
   by luck.
+- `csv-export.ts` — `return a < b ? -1 : 1` in the export comparator. The
+  line above it is `if (a !== b)`, so the two values are never equal by the
+  time this runs and `<` and `<=` cannot differ. Guarded by its own
+  predecessor rather than by the data — and separately confirmed that the
+  `return 0` below it is unreachable too: 740 rows at sixty members and
+  6,673 at three hundred, with no two identical in all six columns.
+- `identity.ts` — the retry bound `attempt < 40` and the plan loop
+  `i < plans.length`. One extra iteration of a retry that already succeeded,
+  and one index past the end of an array read with `?? `. Neither changes an
+  answer.
 - `random.ts` — `next() < probability`. `<` and `<=` differ only when a draw
   lands exactly on the boundary: about one in four billion for a float built
   from a 32-bit integer.
