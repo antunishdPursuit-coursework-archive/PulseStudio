@@ -114,6 +114,15 @@ the legacy contract) is what all four products speak.
   attended this morning would read as quiet to the answer key and as
   recent to D, and the disagreement would look like a bug in whichever one
   you were reading second. Raise it before changing that.
+- **`synthetic/page.ts` is not covered by any check, and the suite cannot
+  cover it.** It is the reporting UI's entry module, loaded only by
+  `synthetic/index.html` in a browser, so nothing in `synthetic/tests.ts`
+  imports it — proven, not assumed: breaking the compiled `page.js`
+  syntactically leaves all 294 synthetic checks passing. `tsc` still
+  compiles the TypeScript, so type and syntax errors are caught at the
+  gate; what is unproven is its runtime behaviour. Same shape as Product
+  D's `main.ts`, and the same remedy applies — anything in it that becomes
+  a RULE rather than markup should move to a module a check can load.
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for

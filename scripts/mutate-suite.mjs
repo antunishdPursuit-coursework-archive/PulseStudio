@@ -92,20 +92,31 @@ const SWAPS = [
   ["+ 1", "- 1"], ["- 1", "+ 1"],
 ];
 
+/* Milliseconds to allow one suite run. Derived from a clean run rather
+ * than fixed, because a fixed one silently turns into a lie: this was
+ * 20_000 while the synthetic suite took 16-18s, so a mutation that merely
+ * slowed things a little was killed and counted as CAUGHT. Scores read
+ * higher than the checks deserved until 2026-08-21, when two survivors
+ * that had been reported caught turned out to run in 16.1s and 18.5s. */
+let budgetMs = 30_000;
+
 function runSuite(suite) {
   try {
     const out = execFileSync(
       "node",
       [join(ROOT, "scripts/run-suites.mjs"), "--suite", suite],
-      { encoding: "utf8", timeout: 20_000, cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
+      { encoding: "utf8", timeout: budgetMs, cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
     );
     const m = out.match(/___RUN_SUITES_RESULT___(\{.*\})/);
-    if (m === null) return { failed: -1 };
-    return JSON.parse(m[1]);
-  } catch {
-    /* A crash, a hang, or a non-zero exit all mean the suite NOTICED.
-     * Only a clean pass is a survivor. */
-    return { failed: 1 };
+    if (m === null) return { failed: -1, timedOut: false };
+    return { ...JSON.parse(m[1]), timedOut: false };
+  } catch (err) {
+    /* A crash or a non-zero exit means the suite NOTICED. A TIMEOUT does
+     * not: it may only mean the mutation made things slow, or that the
+     * suite grew. Those are counted apart and reported, never folded into
+     * "caught". */
+    const timedOut = err !== null && typeof err === "object" && err.code === "ETIMEDOUT";
+    return { failed: 1, timedOut };
   }
 }
 
@@ -151,6 +162,16 @@ for (const rel of TARGETS) {
   const original = readFileSync(path, "utf8");
   const survivors = [];
   let applied = 0;
+  let timedOut = 0;
+
+  /* Time one clean run and give each mutation five times that, with a
+   * floor. A mutation is allowed to be slower than the original; it is
+   * not allowed to be counted as caught for being slower. */
+  {
+    const started = Date.now();
+    runSuite(suite);
+    budgetMs = Math.max(30_000, (Date.now() - started) * 5);
+  }
 
   /* Collect every site first, then walk them with the stride, so the
    * sample spreads across the whole file rather than exhausting the first
@@ -172,7 +193,9 @@ for (const rel of TARGETS) {
         if (mutated === original) continue;
         writeFileSync(path, mutated);
         applied += 1;
-        if (runSuite(suite).failed === 0) {
+        const result = runSuite(suite);
+        if (result.timedOut) timedOut += 1;
+        if (result.failed === 0) {
           const lineNo = original.slice(0, at).split("\n").length;
           survivors.push({
             lineNo,
@@ -195,6 +218,11 @@ for (const rel of TARGETS) {
   console.log(
     `mutate-suite: ${applied} single-token mutations — ${caught} caught, ${survivors.length} survived (${pct}% caught).`,
   );
+  if (timedOut > 0) {
+    console.log(
+      `mutate-suite: ${timedOut} run${timedOut === 1 ? "" : "s"} hit the ${Math.round(budgetMs / 1000)}s budget and are counted as caught — treat that many of the caught as unproven.`,
+    );
+  }
   if (STRIDE > 1) {
     console.log(
       `mutate-suite: SAMPLED — 1 site in ${STRIDE} of ${allSites.length}. The percentage covers what was tried, not the module.`,

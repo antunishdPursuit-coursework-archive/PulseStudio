@@ -16,6 +16,7 @@ import { attendanceCsv, csvField } from "./csv-export.js";
 import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn, periodProblems } from "./lifecycle.js";
+import { demandFactor } from "./scenarios.js";
 import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
@@ -1026,6 +1027,70 @@ for (const file of ENGINE_SOURCES) {
       shouldFire,
     );
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* demandFactor — the calibrated rhythm, finally measured               */
+/* ------------------------------------------------------------------ */
+
+/* CALIBRATION.md says this studio's rhythms come from published real-gym
+ * check-in distributions rather than invention, and demandFactor is where
+ * that claim lives: generate.ts asks it whether each member turns up on
+ * each day. Five of the six survivors in scenarios.ts sat on its one
+ * holiday line, because BASE reaches only 180 days back from August and
+ * December never falls inside it — so the year-end dip was modelled,
+ * shipped, and never once exercised.
+ *
+ * These use a longer span on purpose. The window means are compared
+ * rather than single days, because a single day also carries a weekday
+ * weight and a noise draw, and a check that depends on one seed's noise
+ * is a check that breaks when somebody changes the seed. */
+{
+  const seed = BASE.seed;
+  const span = (from: string, to: string): number[] => {
+    const out: number[] = [];
+    for (let d = dayNumberOf(from); d <= dayNumberOf(to); d += 1) {
+      out.push(demandFactor(seed, d));
+    }
+    return out;
+  };
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+
+  const hush = [...span("2025-12-20", "2025-12-31"), ...span("2026-01-01", "2026-01-02")];
+  const before = span("2025-12-06", "2025-12-19");
+  const after = span("2026-01-03", "2026-01-16");
+
+  check("the year-end hush covers the fourteen days it claims to", hush.length, 14);
+  check("the studio is quieter over the holidays than the fortnight before",
+    mean(hush) < mean(before), true);
+  check("...and than the fortnight after",
+    mean(hush) < mean(after), true);
+  check("...by a visible margin, not a rounding error",
+    mean(hush) < 0.75 * ((mean(before) + mean(after)) / 2), true);
+  check("the fortnights either side of it are themselves alike, so the dip is the hush and not the season",
+    Math.abs(mean(before) - mean(after)) < 0.1, true);
+
+  /* The documented range, over a whole year rather than a sample. */
+  const year = span("2025-09-01", "2026-08-31");
+  check("demand never leaves its documented 0.05..1 range across a full year",
+    year.every((f) => f >= 0.05 && f <= 1), true);
+  check("...and is not flat, which would make every check above vacuous",
+    new Set(year.map((f) => f.toFixed(3))).size > 100, true);
+
+  check("the same seed and day always give the same demand",
+    demandFactor(seed, dayNumberOf("2026-03-04")), demandFactor(seed, dayNumberOf("2026-03-04")));
+  /* Compared across a year, not on one day, and that is a correction
+   * rather than a preference: the first version of this check picked
+   * 2026-03-04 and failed, because demandFactor clamps to 1 and both
+   * seeds saturate there. 82 days a year sit at that ceiling, so a
+   * single-day comparison between seeds is a coin flip on whether it
+   * proves anything. */
+  const yearFrom = dayNumberOf("2025-09-01");
+  const otherYear = year.map((_, i) => demandFactor("another-seed", yearFrom + i));
+  check("a different seed gives a different rhythm on most days",
+    year.filter((f, i) => f !== otherYear[i]).length > 250, true);
+  check("...though not on all of them, because demand is capped at 1 and busy days saturate",
+    year.filter((f) => f === 1).length > 0, true);
 }
 
 /* ------------------------------------------------------------------ */
