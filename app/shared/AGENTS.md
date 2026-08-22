@@ -141,6 +141,23 @@ the legacy contract) is what all four products speak.
   field, the page shows it, and both download doors close on the stale
   bytes. The mode and history casts land in the same validator. What is
   left here really is markup, a clock read, and a local save.
+- **`loadFixtures()` and `fixtures.json` are reached by no page**, found
+  2026-08-22. The data law names `loadFixtures()` as the one shared
+  loader and that is still the rule — but its only importer is
+  `b-dashboard/main.ts`, and `b-dashboard/index.html` loads
+  `staff-dashboard.js` instead, a hand-written module with no TypeScript
+  source. So nothing the site serves reads the legacy fixture set.
+  `check-fixtures.mjs` still validates it against the contract and still
+  prints its staleness countdown, which is worth keeping — but read that
+  countdown as being about RECORDS aging, not about a screen going stale:
+  no screen shows them. Worth knowing before anyone spends a day rolling
+  those dates forward. Whether the legacy loader has a future is a team
+  question; `check-reachable.mjs` holds the fact so it cannot quietly stop
+  being true.
+- **`components/logo.ts` is called by nothing.** `components/README.md`
+  promises the pulse mark as a callable; every header draws its own
+  instead. Either a page should use it or the README should stop
+  promising it — also held by `check-reachable.mjs`.
 - **`check-contrast.mjs` needs a build, deliberately.** It imports
   `app/shared/color.js` rather than reimplementing the contrast formula,
   because it used to carry its own copy and nothing compared the two — the

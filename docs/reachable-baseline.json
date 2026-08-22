@@ -1,0 +1,20 @@
+{
+  "note": "TypeScript modules under app/ that no page reaches, as of the day scripts/check-reachable.mjs landed (2026-08-22). The filing law says a file kept 'just in case' is a file the next person has to evaluate, and unreferenced code is the quiet kind: it compiles, it passes every other gate, and it reads like working code. Each entry names an owner, because deleting a module or wiring it back in is the owner's call and this gate edits nothing. This list is meant to SHRINK. Anything not on it fails the gate.",
+  "allowed": [
+    {
+      "file": "app/products/b-dashboard/main.ts",
+      "owner": "Manny",
+      "why": "renders the whole staff dashboard from loadFixtures(), and no page loads it — b-dashboard/index.html names staff-dashboard.js instead, which is hand-written JavaScript with no TypeScript source (see sources-baseline.json). Two modules for one dashboard, and the compiled one is the one nothing runs. Which of the two is the real dashboard is Manny's call"
+    },
+    {
+      "file": "app/shared/data.ts",
+      "owner": "the team",
+      "why": "loadFixtures(), the one shared fixture loader the data law names. Its only importer is b-dashboard/main.ts, which no page loads, so nothing the site serves reads app/shared/fixtures.json. check-fixtures.mjs still validates that file against the contract and still prints its staleness countdown, which is worth keeping — but read the countdown as being about records, not about a screen: no screen shows them. Whether the legacy loader has a future is a team question, not a lane one"
+    },
+    {
+      "file": "app/shared/components/logo.ts",
+      "owner": "the team",
+      "why": "the pulse mark as a callable, documented in components/README.md as one of the three shared pieces. Nothing imports it: every header draws its own mark. Either a page should use it or the README should stop promising it"
+    }
+  ]
+}

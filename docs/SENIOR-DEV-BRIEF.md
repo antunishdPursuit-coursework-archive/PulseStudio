@@ -354,6 +354,8 @@ three suites:
 | `check-published.mjs` | a NEW file under `app/` that the website would never ask for |
 | `check-audience.mjs` | a builder name or product letter in copy a member reads |
 | `check-secrets.mjs` | credential material in any tracked file |
+| `check-sources.mjs` | a NEW tracked `.js` under `app/` — committed build output, or hand-written JavaScript no compiler reads |
+| `check-reachable.mjs` | a NEW module under `app/` that no page reaches (needs a build; types-only modules are not dead code) |
 | `run-suites.mjs` | any of the three browser suites, run headlessly |
 
 Each gate carries `--self-test`, which plants known-bad input and proves it
