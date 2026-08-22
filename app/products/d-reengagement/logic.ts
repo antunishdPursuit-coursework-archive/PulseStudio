@@ -633,7 +633,25 @@ export function suggestedSession(
   const instructorByName = new Map(
     data.instructors.map((i) => [i.display_name, i.instructor_id]),
   );
-  const usualInstructorId = instructorByName.get(flagged.usualInstructorName) ?? null;
+  /* AN UNRECORDED INSTRUCTOR IS NOT A NAME TO LOOK UP.
+   *
+   * usualInstructorName is NOT_RECORDED — the empty string — when the
+   * records never said who taught the member's usual class. Asking a
+   * name-keyed map for that marker is asking "which instructor is called
+   * nothing", and if any instructor ever is, they win: measured on a
+   * planted set, a member whose instructor was unrecorded got offered a
+   * class six days later than the soonest one, because the empty-named
+   * instructor was taken for their usual teacher.
+   *
+   * No door can produce an instructor with an empty name today — the CSV
+   * import refuses to create one, and the generated and live studios use
+   * real names — so this is currently unreachable. It is still wrong to
+   * depend on that. The marker means "no preference", and the equivalent-
+   * mutants catalogue already records what markers cost when a real value
+   * can equal them; this is the same family, one instance further on. */
+  const usualInstructorId = flagged.usualInstructorName === NOT_RECORDED
+    ? null
+    : instructorByName.get(flagged.usualInstructorName) ?? null;
   const candidates = data.class_sessions
     .filter((s) => {
       if (s.session_status !== "scheduled") return false;

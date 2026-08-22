@@ -195,6 +195,18 @@ is the durable part — the individual fixes are just where it landed.
   it reads correctly. The marker is the empty string now: the one value no
   real class and no real person can be called.
 
+  **The sweep was not finished, and finishing it took a second pass on
+  2026-08-22.** Choosing an uncollidable marker only fixes the places that
+  COMPARE it. `suggestedSession` was READING it: it prefers a member's
+  usual instructor by asking a name-keyed map for `usualInstructorName`,
+  which is the marker when the records never said who taught the class —
+  so it asked which instructor is called nothing. Planted an instructor
+  with an empty display name and the member was offered a class six days
+  later than the soonest, because that instructor won the preference. No
+  door can produce an empty instructor name today, so it is unreachable
+  rather than correct, and the note above already explains why that
+  distinction is the whole point.
+
   Worth keeping the distinction that sweep needed, because the two look
   identical in code. `?? "all levels"` for a class with no level is a
   **default** — a reasonable name for the thing, which nothing reads to

@@ -3889,6 +3889,62 @@ check("clean records produce no data-quality line",
   check("a Masterclass is still a Masterclass class, because it is one",
     classPhrase("Masterclass"), "Masterclass class");
 
+  /* THE MARKER MUST NOT BE LOOKED UP AS A NAME EITHER.
+   *
+   * The paragraph above says empty is safe because no real person can be
+   * called nothing. suggestedSession was DEPENDING on that: it prefers the
+   * member's usual instructor by asking a name-keyed map for
+   * usualInstructorName, and when the records never said who taught the
+   * class that name is the marker. So it asked which instructor is called
+   * nothing — and if one ever were, they would win. Measured on the set
+   * below before the fix: the member was offered a class on the 25th
+   * instead of the soonest one on the 19th.
+   *
+   * No door can produce an empty instructor name today; the CSV import
+   * refuses to create one and the other two studios use real names. That
+   * makes this unreachable, not correct, and the difference is the whole
+   * reason this file keeps finding things. */
+  {
+    const markerT = dayNumberFromIso("2026-08-18");
+    const studioWith = (ghostName: string): FixtureSet => ({
+      timezone: "America/New_York",
+      note: "",
+      members: [{ member_id: "m1", display_name: "Ada", membership_status: "active" }],
+      memberships: [],
+      instructors: [
+        { instructor_id: "i_ghost", display_name: ghostName },
+        { instructor_id: "i_real", display_name: "Kim" },
+      ],
+      class_sessions: [
+        /* Attended a class whose instructor is not in the list, so the
+         * member's usual instructor is genuinely unrecorded. */
+        { session_id: "past", class_type: "yoga", level: "all levels", instructor_id: "i_missing",
+          starts_at: "2026-08-01T09:00:00", ends_at: "2026-08-01T10:00:00", capacity: 12, session_status: "completed" },
+        { session_id: "up_real", class_type: "yoga", level: "all levels", instructor_id: "i_real",
+          starts_at: "2026-08-19T09:00:00", ends_at: "2026-08-19T10:00:00", capacity: 12, session_status: "scheduled" },
+        { session_id: "up_ghost", class_type: "yoga", level: "all levels", instructor_id: "i_ghost",
+          starts_at: "2026-08-25T09:00:00", ends_at: "2026-08-25T10:00:00", capacity: 12, session_status: "scheduled" },
+      ],
+      reservations: [],
+      attendance: [{ attendance_id: "a1", member_id: "m1", session_id: "past",
+        attendance_status: "attended", recorded_at: "2026-08-01T10:05:00" }],
+      studio_policies: [],
+    });
+
+    const withMarker = studioWith(NOT_RECORDED);
+    const markerFlag = findQuietMembers(withMarker, markerT, proposedRules).flagged[0];
+    /* The case rests on this member's instructor being unrecorded. */
+    check("the member's usual instructor really is unrecorded",
+      markerFlag?.usualInstructorName, NOT_RECORDED);
+    check("an instructor called nothing does not win the preference",
+      suggestedSession(markerFlag!, withMarker, markerT)?.session_id, "up_real");
+
+    const named2 = studioWith("Lee");
+    const namedFlag = findQuietMembers(named2, markerT, proposedRules).flagged[0];
+    check("...and the soonest class is still the answer with a named instructor",
+      suggestedSession(namedFlag!, named2, markerT)?.session_id, "up_real");
+  }
+
   /* BOTH DOORS HAVE TO AGREE ON WHAT ABSENCE LOOKS LIKE.
    *
    * The live trail resolves a session's class type from the shared
