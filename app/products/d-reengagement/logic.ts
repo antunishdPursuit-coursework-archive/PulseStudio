@@ -477,7 +477,20 @@ export function dataQualityLine(result: FlagResult): string | null {
 /** Visits per week over the prior window, comparable across members and
  *  honestly rounded — a twice-a-week regular and a once-a-month visitor
  *  should never look alike on the card. */
-export function weeklyCadence(priorCount: number, windowDays: number): number {
+export function weeklyCadence(
+  priorCount: number,
+  windowDays: number,
+): number | null {
+  /* A window of no days has no rate in it. Dividing anyway gives Infinity,
+   * and this number is interpolated straight into the line a staff member
+   * reads — "2 classes in the prior 0 days (≈Infinity/week)". The window
+   * comes from QuietRules, which the team has not ratified and any studio
+   * can configure, so "nobody would set that" is not a guarantee.
+   *
+   * null rather than 0, because 0 a week is a real answer about a real
+   * member and this is the absence of an answer. The caller drops the
+   * clause, the same way it drops a class type the records never named. */
+  if (!Number.isFinite(windowDays) || windowDays <= 0) return null;
   return Math.round((priorCount / (windowDays / 7)) * 10) / 10;
 }
 
@@ -728,9 +741,10 @@ export function evidenceLine(f: FlaggedMember, priorWindowDays: number): string 
         ? `a class with ${f.lastInstructorName}`
         : "";
 
+  const perWeek = weeklyCadence(f.priorCount, priorWindowDays);
   const cadence =
-    `${counted(f.priorCount, "class", "classes")} in the prior ${counted(priorWindowDays, "day")} ` +
-    `(≈${weeklyCadence(f.priorCount, priorWindowDays)}/week)`;
+    `${counted(f.priorCount, "class", "classes")} in the prior ${counted(priorWindowDays, "day")}` +
+    (perWeek === null ? "" : ` (≈${perWeek}/week)`);
 
   const usualClassKnown =
     f.usualClassType !== NOT_RECORDED && f.usualClassType.trim() !== "";

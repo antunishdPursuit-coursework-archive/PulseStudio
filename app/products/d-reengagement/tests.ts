@@ -1187,6 +1187,26 @@ check("never-attended member is NOT flagged (onboarding, not ours)",
 check("cadence math: 12 classes in 60 days is 1.4 a week", weeklyCadence(12, 60), 1.4);
 check("cadence math: 3 classes in 60 days is 0.4 a week", weeklyCadence(3, 60), 0.4);
 
+/* A WINDOW OF NO DAYS HAS NO RATE IN IT.
+ *
+ * This number is interpolated straight into the line a staff member
+ * reads, and dividing by a zero-day window gave "2 classes in the prior 0
+ * days (≈Infinity/week)". The window comes from QuietRules, which the
+ * team has not ratified and any studio can configure, so "nobody would
+ * set that" is not a guarantee.
+ *
+ * Worth recording how this was nearly missed: the first probe printed the
+ * result with JSON.stringify, which renders Infinity as `null` — so it
+ * looked already guarded when it was not. */
+check("a zero-day window has no rate", weeklyCadence(4, 0), null);
+check("...nor does a negative one", weeklyCadence(4, -7), null);
+check("...nor an unreadable one", weeklyCadence(4, Number.NaN), null);
+check("...and none of those is Infinity dressed up",
+  [weeklyCadence(4, 0), weeklyCadence(4, -7)].every((x) => x === null), true);
+check("a one-week window reports the count itself", weeklyCadence(4, 7), 4);
+check("no visits in a real window is a real answer, not an absent one",
+  weeklyCadence(0, 60), 0);
+
 // 12g. The closed loop: a note followed by attendance is a RETURN with the
 //      days counted; silence after the note is stated; a visit BEFORE the
 //      note never counts; foreign ledger entries are accounted, not dropped.
@@ -3407,6 +3427,26 @@ check("clean records produce no data-quality line",
     live.class_sessions.some((c) => c.class_type === NOT_RECORDED), false);
   check("...while level keeps a real DEFAULT, which is a different thing",
     live.class_sessions.every((c) => c.level.trim() !== ""), true);
+}
+
+/* AND THE LINE DROPS THE CLAUSE RATHER THAN PRINTING THE GAP.
+ *
+ * Same rule the class type follows: what cannot be said is left out, not
+ * rendered as a marker. */
+{
+  const fx = adaptAttendanceCsv(
+    ["Member,Date", "Pat Rivera,2026-06-27", "Pat Rivera,2026-07-25"].join("\n"),
+    "America/New_York");
+  const f = findQuietMembers(fx.records, dayNumberFromIso("2026-08-21"),
+    { minDaysQuiet: 14, maxDaysQuiet: 60, priorWindowDays: 60 }).flagged[0];
+  if (f) {
+    check("a real window carries the rate", evidenceLine(f, 60).includes("(≈0.2/week)"), true);
+    check("a zero window drops it rather than printing Infinity",
+      evidenceLine(f, 0).includes("Infinity"), false);
+    check("...or null, or NaN", /null|NaN/.test(evidenceLine(f, 0)), false);
+    check("...while still saying how many classes and over what window",
+      evidenceLine(f, 0).includes("2 classes in the prior 0 days"), true);
+  }
 }
 
 const passed = results.filter((r) => r.passed).length;
