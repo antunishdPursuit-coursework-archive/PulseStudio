@@ -13,6 +13,7 @@
 
 import type { FixtureSet } from "./deps.js";
 import {
+  csvField,
   attendanceCsv,
   generateStudio as generateSharedStudio,
   SYNTHETIC_DEFAULT_CONFIG,
@@ -29,6 +30,7 @@ import {
   availabilityLine,
   mailtoHref,
   outcomesLine,
+  outreachLogCsv,
   outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
@@ -3158,6 +3160,48 @@ check("clean records produce no data-quality line",
   check("a bare carriage return inside quotes keeps every letter of the name",
     loneCr.records.members[0]?.display_name, "Ada\nRowe");
   check("...and still reads as a single row", loneCr.rowCount, 1);
+}
+
+/* THE DOWNLOADED LOG. A staff member opens this in a spreadsheet, which
+ * is the one place a cell beginning = + - or @ stops being text and
+ * becomes a formula. Member names here can come straight from a studio's
+ * own export, so that is not hypothetical. */
+{
+  const sheet = [
+    "Member,Date",
+    "=cmd()|calc,2026-06-20", "=cmd()|calc,2026-07-04",
+    "Robin Vale,2026-06-20", "Robin Vale,2026-07-04",
+  ].join("\n");
+  const imported = adaptAttendanceCsv(sheet, "America/New_York");
+  const members = imported.records.members;
+  const hostile = members.find((m) => m.display_name.startsWith("=cmd"));
+  const plain = members.find((m) => m.display_name === "Robin Vale");
+  check("a hostile name imports as a member at all", hostile !== undefined, true);
+  if (hostile && plain) {
+    const ledger = [
+      { memberId: hostile.member_id, lapseKey: `${hostile.member_id}|2026-07-04`,
+        takenAt: "2026-07-10", channel: "copy" as const },
+      { memberId: "member:not-here", lapseKey: "member:not-here|2026-01-01",
+        takenAt: "2026-07-11", channel: "email" as const },
+    ];
+    const results = outreachResults(ledger, imported.records, dayNumberFromIso("2026-08-21"));
+    const names = new Map(members.map((m) => [m.member_id, m.display_name]));
+    const csv = outreachLogCsv(results, ledger, names, csvField);
+    const lines = csv.trim().split("\n");
+
+    check("the header names all six columns",
+      lines[0], "member,member id,channel,note taken,result,days to return");
+    check("a formula-shaped name never starts a cell",
+      /(^|,)=/.test(csv), false);
+    check("...it is quoted and prefixed so a spreadsheet reads it as text",
+      lines.some((l) => l.includes("'=cmd")), true);
+    check("a note whose member is not in these records still appears",
+      csv.includes("not in these records"), true);
+    check("...so the log has a row for every note taken, not just the judgeable ones",
+      lines.length - 1, ledger.length);
+    check("every line has the same number of columns as the header",
+      new Set(lines.map((l) => l.split(",").length)).size, 1);
+  }
 }
 
 const passed = results.filter((r) => r.passed).length;

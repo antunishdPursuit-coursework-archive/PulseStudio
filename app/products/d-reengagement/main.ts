@@ -40,6 +40,7 @@ import {
   availabilityLine,
   mailtoHref,
   outcomesLine,
+  outreachLogCsv,
   outreachAvailability,
   workflowStateLine,
   mailtoIsTooLong,
@@ -442,46 +443,11 @@ function renderOutcomes(data: FixtureSet, today: number): void {
   logBtn.type = "button";
   logBtn.textContent = "Download the outreach log (stays on this device)";
   logBtn.addEventListener("click", () => {
-    /* csvField (through deps.ts) quotes for CSV structure AND defuses a
-     * cell a spreadsheet would otherwise run. Member names here can come
-     * straight from a studio's own imported export, so a name beginning
-     * with = + - or @ reaches this file as a formula unless something
-     * stops it. One implementation, tested once, in the shared exporter. */
-    const quote = csvField;
-    const lines = ["member,member id,channel,note taken,result,days to return"];
-    for (const o of results.outcomes) {
-      lines.push(
-        [
-          quote(memberName.get(o.record.memberId) ?? ""),
-          o.record.memberId,
-          o.record.channel,
-          o.record.takenAt,
-          o.result === "returned" ? "came back" : "still quiet",
-          o.daysToReturn === null ? "" : String(o.daysToReturn),
-        ].join(","),
-      );
-    }
-    /* EVERY NOTE TAKEN, INCLUDING THE ONES THESE RECORDS CANNOT JUDGE.
-     * outreachResults counts those separately as notEvaluable — a note taken
-     * against a different data source, whose member is not in the records
-     * loaded now. The page states the count; this file used to drop them
-     * entirely, so the downloaded log was an incomplete record of what staff
-     * actually did, with nothing in the file to say so. A log that quietly
-     * omits rows is worse than no log: it reads as complete. */
-    for (const record of ledger) {
-      if (results.outcomes.some((o) => o.record === record)) continue;
-      lines.push(
-        [
-          quote(memberName.get(record.memberId) ?? ""),
-          record.memberId,
-          record.channel,
-          record.takenAt,
-          "not in these records — cannot be judged",
-          "",
-        ].join(","),
-      );
-    }
-    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    /* The rows are built in outreach.ts so a check can read them; this
+     * module touches the DOM at import. csvField (through deps.ts) quotes
+     * for CSV structure AND defuses a cell a spreadsheet would run. */
+    const text = outreachLogCsv(results, ledger, memberName, csvField);
+    const blob = new Blob([text], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

@@ -416,6 +416,58 @@ export function availabilityLine(counts: OutreachAvailability): string {
   return `No draft offered for ${blocked} of ${total} — ${reasons.join(", ")}.`;
 }
 
+/* THE DOWNLOADED LOG — every note taken, including the unjudgeable ones.
+ *
+ * Built here rather than in the click handler so a check can read it. Two
+ * things about it are easy to get wrong and neither is visible in a
+ * browser until somebody opens the file in a spreadsheet.
+ *
+ * EVERY field goes through csvField, not just the name. A member's name is
+ * the field most likely to carry `=`, `+`, `-` or `@` from a studio's own
+ * export, so it was the one that got quoted — but quoting one column and
+ * not the rest leaves the reader guessing which are safe, and makes the
+ * file's safety depend on how member ids happen to be minted today. They
+ * are sanitised now (an imported `=cmd()` becomes `csv_m_1_cmd`), which is
+ * exactly the kind of fact that changes without anybody rechecking here.
+ *
+ * And a note whose member is not in the records loaded now still appears,
+ * marked. outreachResults counts those separately; this file used to drop
+ * them, so the log read as a complete record of what staff did while
+ * quietly omitting rows. A log that omits is worse than no log. */
+export function outreachLogCsv(
+  results: OutreachResults,
+  ledger: readonly OutreachRecord[],
+  memberName: ReadonlyMap<string, string>,
+  quote: (value: string) => string,
+): string {
+  const lines = ["member,member id,channel,note taken,result,days to return"];
+  const row = (cells: readonly string[]): void => {
+    lines.push(cells.map(quote).join(","));
+  };
+  for (const o of results.outcomes) {
+    row([
+      memberName.get(o.record.memberId) ?? "",
+      o.record.memberId,
+      o.record.channel,
+      o.record.takenAt,
+      o.result === "returned" ? "came back" : "still quiet",
+      o.daysToReturn === null ? "" : String(o.daysToReturn),
+    ]);
+  }
+  for (const record of ledger) {
+    if (results.outcomes.some((o) => o.record === record)) continue;
+    row([
+      memberName.get(record.memberId) ?? "",
+      record.memberId,
+      record.channel,
+      record.takenAt,
+      "not in these records — cannot be judged",
+      "",
+    ]);
+  }
+  return lines.join("\n") + "\n";
+}
+
 /* WHICH RULE SPOKE, IN A SENTENCE.
  *
  * Five outcomes, four of which stop a draft being offered. It lived as a
