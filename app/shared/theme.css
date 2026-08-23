@@ -549,6 +549,14 @@ h1, h2, h3, .display, .page-head .role, .brand {
   text-transform: uppercase;
 }
 .site-footer-group ul { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
+/* A folded group: the heading IS the link, styled as the heading it
+   replaces rather than as a list item, so the column keeps its shape. */
+.site-footer-group[data-folded="true"] .site-footer-heading a {
+  color: var(--fg);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
 .site-footer a { color: var(--muted); text-decoration: none; }
 .site-footer a:hover { color: var(--fg); text-decoration: underline; }
 .site-footer a:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
