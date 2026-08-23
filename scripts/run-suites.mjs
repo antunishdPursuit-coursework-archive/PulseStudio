@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /* Pulse Studio — run every browser unit suite headlessly, in Node.
  *
- * WHY THIS EXISTS. The three suites (synthetic, auth, re-engagement) are
- * written to run in a browser tab: each has a tests.html that loads its
+ * WHY THIS EXISTS. Every suite in this repo is written to run in a browser
+ * tab: each has a tests.html that loads its
  * tests.js and paints the results into the page. That is a good way for a
  * human to read them and a useless way for CI to check them — a suite that
  * only runs when somebody remembers to open a tab is a suite that can go red
@@ -26,6 +26,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { nodeTooOldNote } from "./node-floor.mjs";
@@ -38,11 +39,52 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // from a suite can never be mistaken for the result payload.
 const RESULT_MARKER = "___RUN_SUITES_RESULT___";
 
-const SUITES = [
-  { key: "synthetic", dir: "app/shared/synthetic", label: "synthetic studio engine" },
-  { key: "auth", dir: "app/shared/auth", label: "session contract" },
-  { key: "reengagement", dir: "app/products/d-reengagement", label: "member re-engagement" },
-];
+/* WHICH SUITES RUN, and why this is a search rather than a list.
+ *
+ * This was a hand-written array of three. Three more suites were then
+ * written and committed — booking, the dashboard, the chatbot — and run by
+ * nothing at all, because the array did not know they existed. `npm run
+ * check` reported a confident green over checks that never executed, which
+ * is the exact failure the stub DOM below refuses to commit lower down.
+ *
+ * So the suites are FOUND, not remembered: any folder under app/ holding a
+ * tests.html is a suite, and adding one is enough to make it run. The only
+ * thing kept by hand is the label a person reads in the output — and a suite
+ * with no label is a hard ERROR, never a skip. Naming it costs one line;
+ * skipping it silently costs a green that means nothing. */
+const SUITE_LABELS = {
+  "app/shared/synthetic": "synthetic studio engine",
+  "app/shared/auth": "session contract",
+  "app/products/a-booking": "class booking",
+  "app/products/b-dashboard": "staff dashboard",
+  "app/products/c-chatbot": "member support",
+  "app/products/d-reengagement": "member re-engagement",
+};
+
+function discoverSuites() {
+  const found = [];
+  for (const area of ["app/products", "app/shared"]) {
+    const base = join(ROOT, area);
+    if (!existsSync(base)) continue;
+    for (const entry of readdirSync(base, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const dir = `${area}/${entry.name}`;
+      if (!existsSync(join(ROOT, dir, "tests.html"))) continue;
+      const label = SUITE_LABELS[dir];
+      if (label === undefined) {
+        throw new Error(
+          `run-suites found a suite at ${dir}/tests.html with no label. Add ` +
+            `"${dir}" to SUITE_LABELS in scripts/run-suites.mjs. A suite this ` +
+            "script cannot name is a suite nobody reads the result of.",
+        );
+      }
+      found.push({ key: entry.name, dir, label });
+    }
+  }
+  return found.sort((a, b) => a.dir.localeCompare(b.dir));
+}
+
+const SUITES = discoverSuites();
 
 /* The stub DOM.
  *
