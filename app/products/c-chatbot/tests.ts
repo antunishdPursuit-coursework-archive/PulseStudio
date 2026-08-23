@@ -46,6 +46,13 @@ const REFUSED = [
   "Is another member in the class?",
   "What was her attendance?",
   "Did she show up on Monday?",
+  /* Found by an adversarial review: both first-person, both about the
+   * asker's own records, and neither caught by the patterns above them —
+   * "do" was missing from the auxiliary list entirely, and a presence
+   * question has no verb from the book/attend/sign-up list and no
+   * RECORD_NOUNS word either. */
+  "Do I have a reservation tonight?",
+  "Was I at the studio last Tuesday?",
 ];
 for (const question of REFUSED) {
   check(`refuses: ${question}`, asksForPrivateMemberData(question), true);
@@ -60,6 +67,13 @@ const ANSWERED = [
   "Can I attend a beginner class?",
   "How do I book a class?",
   "What yoga classes are available?",
+  /* The same review found the fix for the two REFUSED cases above nearly
+   * introduced its own false refusal: bare "attend" in the first-person
+   * status-check pattern matched "attend" inside "able to attend", turning
+   * a schedule-fit question into a refusal. Pinned both directions so a
+   * future widening of that pattern trips this instead of shipping quietly. */
+  "Am I able to attend the yoga class at 6pm?",
+  "Am I attending yoga tomorrow?",
 ];
 for (const question of ANSWERED) {
   check(`answers: ${question}`, asksForPrivateMemberData(question), false);

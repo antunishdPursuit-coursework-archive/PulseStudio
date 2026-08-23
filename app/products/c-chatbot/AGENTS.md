@@ -44,10 +44,18 @@ states that conversational support is unavailable. The local server lives in
   like "did Maria come last week?" before any network call. Schedule
   questions ("which classes can I attend?") pass; the guard's word list is
   checked question-by-question in `tests.ts`.
-- **The answer is guarded on the way out too.** `answerProblems()` from
-  `shared/assistant-audience.ts` runs on the model's reply last, so staff
-  vocabulary or another member's name never reaches this member-facing
-  screen, whatever produced it.
+- **The answer is guarded on the way out too, and the name half needs
+  names to check against.** `answerProblems()` from
+  `shared/assistant-audience.ts` runs on the model's reply last. This
+  sentence used to say "staff vocabulary or another member's name never
+  reaches this member-facing screen" while `main.ts` called it with only
+  two arguments — no `otherMemberNames` — so only the staff-vocabulary
+  patterns ever ran and the name half was inert. Found by an adversarial
+  review, not by any check: nothing here exercises `main.ts` itself (it
+  looks up DOM elements at import time, same reason `support.ts` exists
+  apart from it). Fixed by passing every OTHER signed-in member's own
+  `display_name` from the loaded fixtures, the reader's own excluded —
+  never refused for saying their own name back to them.
 - **No instructor or availability claims.** Those require collections outside
   this product's agreed boundary.
 

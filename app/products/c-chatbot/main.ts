@@ -102,11 +102,23 @@ form.addEventListener("submit", async (event) => {
   status.textContent = "Checking the current studio information.";
   try {
     const answer = await haikuAnswer(question, fixtures);
-    /* The guard on the way OUT. The context never carries a member record,
-     * but the answer text is the model's and is checked last, so a roster
-     * said in staff words cannot reach a member-facing screen however it
-     * got into the reply. */
-    addMessage(answerProblems(answer, policy).length > 0 ? policy.refusal : answer, "assistant");
+    /* THE NAME HALF OF THE GUARD NEEDS NAMES TO CHECK AGAINST, and this
+     * used to call answerProblems() with none — so only the staff-
+     * vocabulary patterns ever fired, and a member's name slipping into a
+     * reply (however it got there; the model is not asked for one, but a
+     * guard that only works when nothing goes wrong is not a guard) would
+     * have reached the screen unchecked. The context sent to the model
+     * never carries a member record, but the guard runs on the TEXT that
+     * comes back, so it needs the studio's own roster to compare against —
+     * every signed-in member's own is excluded, never refused for saying
+     * their own name back to them. */
+    const otherMemberNames = fixtures.members
+      .map((member) => member.display_name)
+      .filter((name) => name !== session?.display_name);
+    addMessage(
+      answerProblems(answer, policy, otherMemberNames).length > 0 ? policy.refusal : answer,
+      "assistant",
+    );
     status.textContent = recordStatus(fixtures, Date.now(), true);
   } catch {
     addMessage("Conversational member support is unavailable right now. Please contact Pulse Studio staff for help.", "assistant");

@@ -42,7 +42,29 @@ export function asksForPrivateMemberData(question: string): boolean {
     /\b(?:another|other)\s+member\b/,
     new RegExp(`\\bmember(?:'s|s')?\\s+${RECORD_NOUNS}\\b`),
     new RegExp(`\\b[a-z'-]+'s\\s+${RECORD_NOUNS}\\b`),
-    /\b(?:am|have|did|was)\s+i\b.*\b(?:book|booked|reserve|reserved|attend|attended|sign(?:ed)?\s+up|come|go)\b/,
+    /* Bare "attend" (present tense, no -ed) used to sit in this list beside
+     * "attended", and it turned "Am I able to attend the yoga class at
+     * 6pm?" — a schedule-fit question, not a records question — into a
+     * refusal: "am i" matched the auxiliary half, and "attend" (inside
+     * "able to attend") satisfied the verb half regardless of the gap
+     * between them. A status check on the asker's own PAST attendance is
+     * what this line exists to catch, and "attended" already says that;
+     * present-tense "attend" is overwhelmingly a permission or
+     * schedule-fit question instead, so it is dropped rather than bounding
+     * the gap, which would still catch this exact sentence. */
+    /\b(?:am|have|did|was)\s+i\b.*\b(?:book|booked|reserve|reserved|attended|sign(?:ed)?\s+up|come|go)\b/,
+    /* TWO SHAPES A REVIEW FOUND STILL GETTING THROUGH, both first-person
+     * and both about the asker's own records:
+     *   "Do I have a reservation tonight?" — the auxiliary was restricted
+     *   to am/have/did/was, so "do" (and does/is/will/can/could) fell
+     *   through, and the object noun never checked RECORD_NOUNS at all.
+     *   "Was I at the studio last Tuesday?" — a presence question with no
+     *   verb from the book/attend/etc. list and no RECORD_NOUNS word
+     *   either; narrowed to "studio" as the object so it does not refuse
+     *   an ordinary schedule question like "Am I able to attend the yoga
+     *   class at 6pm?", which mentions "at" but never "at the studio". */
+    new RegExp(`\\b(?:do|does|am|is|have|has|did|was|will|can|could)\\s+i\\b[^.?!]*\\b${RECORD_NOUNS}\\b`),
+    /\b(?:was|am|is)\s+i\b[^.?!]*\b(?:in|at)\s+(?:the\s+)?studio\b/,
   ].some((pattern) => pattern.test(q));
 }
 
