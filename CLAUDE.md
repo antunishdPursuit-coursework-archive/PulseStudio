@@ -98,7 +98,9 @@ instead of doing it.
   EMITS, so the suites run the code you just changed rather than the last
   build — then every gate `package.json` lists and the three suites. (The
   gates are named there and not counted here: this sentence said "four"
-  from the day a fifth was added.) Each prints the count it
+  from the day a fifth was added — and the TABLE below then listed four of
+  them for as long again, which is the same drift one level down. If you
+  add a gate, add its row.) Each prints the count it
   actually reached, never a silent pass; read the count there, not from
   prose. Several of the laws above are no longer only stated:
 
@@ -108,7 +110,14 @@ instead of doing it.
   | `scripts/check-styles.mjs` | where styles live — a product may not restyle what the shared theme owns |
   | `scripts/check-contrast.mjs` | the colour law — a NEW pairing below WCAG AA fails |
   | `scripts/check-language.mjs` | the language law and "no AI is ever a contributor" |
-  | `scripts/check-fixtures.mjs` | the data law — every reference resolves, and the fixture has not aged out |
+  | `scripts/check-fixtures.mjs` | the data law — every reference resolves, the stated UTC offsets match the studio's real ones, and the fixture has not aged out |
+  | `scripts/check-lanes.mjs` | the lane law — no commit reaches into another developer's folder |
+  | `scripts/check-published.mjs` | the filing law — nothing new under `app/` the website would not ask for, every page has decided whether it wants to be indexed and where its icon is, and the root holds only the contract |
+  | `scripts/check-audience.mjs` | the audience law — no builder name or product letter in copy a member reads |
+  | `scripts/check-secrets.mjs` | the git law — no credential material in a public repo |
+  | `scripts/check-sources.mjs` | the git law — no committed build output, and every module the site runs has a TypeScript source |
+  | `scripts/check-reachable.mjs` | the filing law — no module under `app/` that no page reaches |
+  | `scripts/check-mirrors.mjs` | every `AGENTS.md` is still a byte-equivalent mirror of its `CLAUDE.md` |
   | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
 
   Every gate carries `--self-test`, which plants known-bad input and proves

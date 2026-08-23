@@ -413,14 +413,30 @@ LOOKED AT, not a scoreboard. Run the tool for a number.
 | shared `session`, `normalize`, `serialize`, `text`, `lifecycle` | in full | one documented comment-only block |
 | shared `color` | in full, judged by check-contrast's self-test | four equivalents, each explained |
 | shared `scenarios`, `identity`, `csv-export`, `schedule` | in full | heuristics and guarded comparisons |
-| shared `synthetic/generate` | **sampled, 1 site in 10 of 165** | the sampled survivor is the documented victim-picker |
+| shared `synthetic/generate` | **in full, 165 sites — 52% caught** | 80 survivors, dominated by paired guards; NOT individually audited |
 | the ten gates | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
 | `today`, `theme-boot`, `components/*`, `brand` | not measured | nothing to swap, or no suite reaches them |
 
-The one genuinely unsampled body of code is the other nine tenths of
-`synthetic/generate.ts`. A full sweep there is 165 suite runs at roughly
-twelve seconds each — half an hour — and the tenth that was sampled came
-back at 94%.
+**A SAMPLE IS NOT A VERDICT, and this table proved it on itself.** The row
+above said "sampled, 1 site in 10 — 94%" until the full sweep ran: 165
+sites, 34 minutes, **52% caught**. The tenth that was sampled happened to
+land on well-covered sites, and the number it produced was nearly twice the
+truth. The sampling option prints "SAMPLED — the percentage covers what was
+tried, not the module" for exactly this reason, and the warning was still
+not enough to stop the figure being written down as if it meant something.
+
+What the 80 survivors are, from reading the shapes rather than each one:
+this module is written in PAIRS. A loop bound `i < plans.length` sits above
+`if (!plan || !identity) continue`, and an index read `idx >= 0 ? xs[idx] :
+undefined` guards itself — so a single-token change to either half is
+absorbed by the other. Nine survivors are that shape, four more are the
+documented victim-picker `attendedHere < s.capacity - 1`, three are a
+meta-count in the report rather than data, and three are the back-to-back
+overlap boundary already recorded above.
+
+**They have not been audited one by one.** That is a day's work at twelve
+seconds a run and it is not claimed here. What is claimed is the number and
+the shape of what is behind it.
 
 ## Swept clean, so nobody sweeps them again
 

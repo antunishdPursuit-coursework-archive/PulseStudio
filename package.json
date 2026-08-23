@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Pulse Studio — one boutique fitness studio, four products, four developers.",
   "scripts": {
-    "check": "tsc && node scripts/check-styles.mjs && node scripts/check-contrast.mjs && node scripts/check-language.mjs && node scripts/check-fixtures.mjs && node scripts/check-lanes.mjs && node scripts/check-published.mjs && node scripts/check-audience.mjs && node scripts/check-secrets.mjs && node scripts/check-sources.mjs && node scripts/check-reachable.mjs && node scripts/run-suites.mjs",
+    "check": "tsc && node scripts/check-styles.mjs && node scripts/check-contrast.mjs && node scripts/check-language.mjs && node scripts/check-fixtures.mjs && node scripts/check-lanes.mjs && node scripts/check-published.mjs && node scripts/check-audience.mjs && node scripts/check-secrets.mjs && node scripts/check-sources.mjs && node scripts/check-reachable.mjs && node scripts/check-mirrors.mjs && node scripts/run-suites.mjs",
     "build": "tsc",
     "start": "python3 -m http.server 4173 --directory app",
     "start:haiku": "npm run build && node --env-file-if-exists=.env scripts/start-haiku.mjs",

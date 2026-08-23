@@ -8,11 +8,18 @@
 
 ## Lane check — the things no gate can decide for you
 
-<!-- `npm run check` already fails on: a banned word in use, an assistant
-     credited, a product restyling something the shared theme owns, a NEW
-     colour pairing below WCAG AA, a broken or aged-out shared record, and
-     any of the three suites. Do not re-tick those by hand; run the gate.
-     What is left below is judgement, which is why it is still a checklist. -->
+<!-- `npm run check` runs every gate the `check` script in `package.json`
+     names — read them THERE, not from a list here. This comment used to
+     enumerate six of them and was still naming six long after there were
+     eleven, which is the same drift the root brief warns about two levels
+     up: the gates are named in package.json and counted nowhere.
+
+     Do not re-tick by hand anything a gate decides. What is left below is
+     judgement, which is why it is still a checklist — and note that the
+     FIRST box is now half machine-checked: check-lanes.mjs fails a commit
+     that reaches into another developer's folder, so the part still asking
+     something of you is the AGREEMENT for a team-owned file, which no gate
+     can see. -->
 
 - [ ] Every changed file is inside my product folder, OR this PR changes a
       team-owned file and the team agreed first (say where/when below)
