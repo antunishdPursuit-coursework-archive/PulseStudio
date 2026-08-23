@@ -52,6 +52,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { isCommand } from "./is-command.mjs";
@@ -102,6 +103,74 @@ export function laneOfPath(file) {
     if (file.startsWith(prefix)) return lane;
   }
   return null;
+}
+
+/* ---------- proposal branches: the one way across a lane line ----------
+ *
+ * The lane law has no answer for "here is what your folder could look
+ * like", and that is a normal thing for one developer to offer another.
+ * The only honest way to offer it is as code somebody can read, run and
+ * decide about — which means a branch where the lane line is crossed
+ * deliberately, and never merged.
+ *
+ * THIS IS THE ONLY PLACE THAT PERMISSION EXISTS, and it is deliberately
+ * hard to use by accident:
+ *
+ *   - the branch must be NAMED in docs/proposal-branches.json, with a
+ *     reason and the exact lanes it may reach into
+ *   - a lane it did not declare still fails
+ *   - `main` can never be declared; the gate refuses the whole file if it
+ *     ever appears there, because a proposal that reached main would be
+ *     the trespass this law exists to stop, wearing a permission slip
+ *   - every proposed file is PRINTED on every run. The point is not to
+ *     make the crossing quiet; it is to make it legible.
+ *
+ * What it does NOT do is change who wrote anything. Authorship is never
+ * forged: each commit is attributed to whoever actually made it, and the
+ * lane it reached into is named.
+ */
+export const PROPOSALS_FILE = "docs/proposal-branches.json";
+
+/** The declaration covering `branch`, or null. Pure so the self-test can
+ *  hand it a table without touching the repository. */
+export function proposalFor(branch, table) {
+  if (typeof branch !== "string" || branch === "") return null;
+  const rows = Array.isArray(table?.branches) ? table.branches : [];
+  return rows.find((row) => row.branch === branch) ?? null;
+}
+
+/** Everything wrong with the declaration table itself. A table naming main
+ *  is not a mistake to route around — it is refused outright. */
+export function proposalTableProblems(table) {
+  const problems = [];
+  const rows = Array.isArray(table?.branches) ? table.branches : null;
+  if (rows === null) return ["docs/proposal-branches.json has no `branches` array"];
+  for (const row of rows) {
+    if (row.branch === "main") {
+      problems.push(
+        "main is declared as a proposal branch. It cannot be: a cross-lane change that " +
+          "reached main is exactly the trespass this law exists to stop.",
+      );
+    }
+    if (typeof row.why !== "string" || row.why.trim().length < 20) {
+      problems.push(`${row.branch}: no reason given, and a permission without a reason is just an exception`);
+    }
+    for (const lane of row.lanes ?? []) {
+      if (!(lane in LANES)) problems.push(`${row.branch}: declares lane "${lane}", which is not one of the four`);
+    }
+  }
+  return problems;
+}
+
+/** Split the trespasses this branch made into the ones it declared and the
+ *  ones it did not. With no declaration, everything is unexpected — which
+ *  is the ordinary behaviour of this gate. */
+export function splitTrespasses(trespasses, declaration) {
+  const allowed = new Set(declaration?.lanes ?? []);
+  const proposed = [];
+  const unexpected = [];
+  for (const t of trespasses) (allowed.has(t.owner) ? proposed : unexpected).push(t);
+  return { proposed, unexpected };
 }
 
 /**
@@ -232,8 +301,84 @@ function selfTest() {
       );
     }
   }
+
+  /* THE PROPOSAL PERMISSION HAS TO BE PROVABLY NARROW. A widening this gate
+   * cannot fail on is a widening that has quietly removed the law. Each of
+   * these plants a way the permission could leak and checks it does not. */
+  const table = {
+    branches: [
+      { branch: "b", why: "a reason long enough to actually be a reason", lanes: ["manny"], neverMerge: true },
+    ],
+  };
+  const trespasses = [
+    { file: "app/products/b-dashboard/main.ts", owner: "manny" },
+    { file: "app/products/a-booking/main.ts", owner: "kerrian" },
+  ];
+  const proposalCases = [
+    {
+      label: "an undeclared branch gets no permission at all",
+      run: () => splitTrespasses(trespasses, proposalFor("feat/whatever", table)).unexpected.length,
+      want: 2,
+    },
+    {
+      label: "a declared branch's OWN lane is proposed, not failed",
+      run: () => splitTrespasses(trespasses, proposalFor("b", table)).proposed.length,
+      want: 1,
+    },
+    {
+      label: "...and a lane it did not declare still fails",
+      run: () => splitTrespasses(trespasses, proposalFor("b", table)).unexpected.length,
+      want: 1,
+    },
+    {
+      label: "a detached HEAD matches nothing, so it fails safe",
+      run: () => splitTrespasses(trespasses, proposalFor("HEAD", table)).unexpected.length,
+      want: 2,
+    },
+    {
+      label: "an empty branch name matches nothing either",
+      run: () => splitTrespasses(trespasses, proposalFor("", table)).unexpected.length,
+      want: 2,
+    },
+    {
+      label: "no table at all means no permission",
+      run: () => splitTrespasses(trespasses, proposalFor("b", null)).unexpected.length,
+      want: 2,
+    },
+    {
+      label: "main can never be declared a proposal branch",
+      run: () => proposalTableProblems({ branches: [{ branch: "main", why: "x".repeat(30), lanes: ["manny"] }] }).length,
+      want: 1,
+    },
+    {
+      label: "a permission with no reason is refused",
+      run: () => proposalTableProblems({ branches: [{ branch: "b", why: "why not", lanes: ["manny"] }] }).length,
+      want: 1,
+    },
+    {
+      label: "a lane that is not one of the four is refused",
+      run: () => proposalTableProblems({ branches: [{ branch: "b", why: "x".repeat(30), lanes: ["nobody"] }] }).length,
+      want: 1,
+    },
+    {
+      label: "the table this repository actually ships is accepted",
+      run: () => existsSync(join(ROOT, PROPOSALS_FILE))
+        ? proposalTableProblems(JSON.parse(readFileSync(join(ROOT, PROPOSALS_FILE), "utf8"))).length
+        : 0,
+      want: 0,
+    },
+  ];
+  for (const c of proposalCases) {
+    const got = c.run();
+    if (got !== c.want) {
+      failed += 1;
+      console.error(`  self-test MISS — ${c.label}: wanted ${c.want}, got ${got}`);
+    }
+  }
+
   console.log(
-    `self-test: ${planted.length} planted cases, ${planted.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + proposalCases.length} planted cases, ` +
+      `${planted.length + proposalCases.length - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
@@ -261,7 +406,32 @@ function run() {
     return;
   }
 
+  /* WHICH BRANCH IS THIS. On CI the checkout is detached, so `git
+   * rev-parse --abbrev-ref HEAD` answers "HEAD" — which matches no
+   * declaration and therefore fails safe. GITHUB_REF_NAME is the name CI
+   * knows even then, and is read first for that reason. */
+  const branch = (process.env["GITHUB_REF_NAME"] ?? "").trim() ||
+    (() => { try { return git(["rev-parse", "--abbrev-ref", "HEAD"]).trim(); } catch { return ""; } })();
+
+  let table = null;
+  if (existsSync(join(ROOT, PROPOSALS_FILE))) {
+    try {
+      table = JSON.parse(readFileSync(join(ROOT, PROPOSALS_FILE), "utf8"));
+    } catch (error) {
+      console.error(`check-lanes: ${PROPOSALS_FILE} is not readable JSON — ${error.message}. FAIL`);
+      process.exit(1);
+    }
+    const problems = proposalTableProblems(table);
+    if (problems.length > 0) {
+      for (const p of problems) console.error(`  ${PROPOSALS_FILE} · ${p}`);
+      console.error("check-lanes: the proposal table itself is not allowed to say that. FAIL");
+      process.exit(1);
+    }
+  }
+  const declaration = proposalFor(branch, table);
+
   const failures = [];
+  const proposals = [];
   const unknown = new Set();
   let teamOwnedTotal = 0;
   const laneCounts = new Map();
@@ -271,7 +441,11 @@ function run() {
     teamOwnedTotal += teamOwned;
     if (lane === null) unknown.add(author);
     else laneCounts.set(lane, (laneCounts.get(lane) ?? 0) + 1);
-    for (const t of trespasses) {
+    const { proposed, unexpected } = splitTrespasses(trespasses, declaration);
+    for (const t of proposed) {
+      proposals.push({ sha: sha.slice(0, 7), author, file: t.file, owner: t.owner });
+    }
+    for (const t of unexpected) {
       failures.push({ sha: sha.slice(0, 7), author, file: t.file, owner: t.owner });
     }
   }
@@ -291,6 +465,34 @@ function run() {
     console.log(
       `  unrecognised author · ${author} · not judged. Add them to IDENTITIES in this script.`,
     );
+  }
+
+  /* THE CROSSING IS PRINTED, ALWAYS. A declared proposal branch does not
+   * get to be quiet about what it reached into — it gets to not fail. Every
+   * file is named, grouped by whose lane it is, so the owner reading this
+   * branch can see the whole of what is being offered to them. */
+  if (declaration !== null) {
+    const byOwner = new Map();
+    for (const p of proposals) {
+      if (!byOwner.has(p.owner)) byOwner.set(p.owner, new Set());
+      byOwner.get(p.owner).add(p.file);
+    }
+    const total = [...byOwner.values()].reduce((n, s) => n + s.size, 0);
+    console.log(
+      `check-lanes: branch "${branch}" is a declared PROPOSAL (${PROPOSALS_FILE}) — ` +
+        `${total} file${total === 1 ? "" : "s"} across ${byOwner.size} lane${byOwner.size === 1 ? "" : "s"} ` +
+        "changed on purpose, and reported rather than failed.",
+    );
+    console.log(`  why · ${declaration.why}`);
+    for (const [owner, files] of [...byOwner].sort()) {
+      console.log(`  proposed to ${owner} · ${[...files].sort().join(", ")}`);
+    }
+    if (declaration.neverMerge === true) {
+      console.log(
+        "  this branch is declared never-merge. Nothing here reaches main; each owner " +
+          "takes what they want from their own folder.",
+      );
+    }
   }
 
   if (failures.length === 0) {

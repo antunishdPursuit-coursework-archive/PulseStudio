@@ -1,0 +1,52 @@
+{
+  "$comment": [
+    "Branches that are ALLOWED to cross lane boundaries, and the only place that",
+    "permission exists. scripts/check-lanes.mjs reads this file, matches the branch",
+    "it is running on, and reports every cross-lane file it finds as a PROPOSAL",
+    "instead of failing on it.",
+    "",
+    "THE PERMISSION IS NARROW ON PURPOSE:",
+    "  - a branch not listed here fails on the first cross-lane file, as always",
+    "  - a listed branch still fails on a lane it did not declare",
+    "  - main can never be listed; the gate refuses the whole file if it is",
+    "  - every proposed file is PRINTED on every run, so nothing is ever silent",
+    "",
+    "WHAT A PROPOSAL BRANCH IS FOR. The lane law makes merge conflicts",
+    "structurally impossible by giving each developer one folder. That works while",
+    "everyone is building. It has no answer for 'here is what your folder could",
+    "look like' - which is a normal, useful thing for one developer to offer",
+    "another, and the only honest way to offer it is as code somebody can read,",
+    "run and decide about. These branches carry that offer. They are never merged;",
+    "each owner takes what they want.",
+    "",
+    "AUTHORSHIP IS NEVER FORGED. Every commit on a proposal branch is authored by",
+    "whoever actually wrote it. The gate still attributes it correctly and still",
+    "names the lane it reached into."
+  ],
+  "branches": [
+    {
+      "branch": "v0.0.2",
+      "why": "The integration line for a cross-lane proposal. Every product folder is worked on here so the four can be made to agree with each other and with app/shared/ at once. Never merged to main: each owner receives their own folder as something to copy or refuse.",
+      "lanes": ["kerrian", "manny", "dennis", "rensley"],
+      "neverMerge": true
+    },
+    {
+      "branch": "a",
+      "why": "Product A's half of the v0.0.2 proposal - the booking app, worked on so its owner can read a working folder rather than a list of defects.",
+      "lanes": ["kerrian"],
+      "neverMerge": true
+    },
+    {
+      "branch": "b",
+      "why": "Product B's half of the v0.0.2 proposal - the staff scheduling dashboard.",
+      "lanes": ["manny"],
+      "neverMerge": true
+    },
+    {
+      "branch": "c",
+      "why": "Product C's half of the v0.0.2 proposal - the member support assistant.",
+      "lanes": ["dennis"],
+      "neverMerge": true
+    }
+  ]
+}
