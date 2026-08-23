@@ -1,8 +1,8 @@
 # Product A: Member Booking App
 
 **Owner:** Kerrian
-**Phase:** Problem framing
-**Evidence level:** Planned
+**Phase:** Shipped
+**Evidence level:** Built and checked — `app/products/a-booking/tests.html`, 47 checks, run headlessly by `npm run check`
 
 ## First user and outcome
 
@@ -59,11 +59,18 @@ not reveal member-specific data.
 
 ## Non-goals for this increment
 
-Payments, membership signup, full production authentication, waitlists,
-automated reminders, recurring bookings, and attendance tracking are not part
-of the first fixture-backed MVP.
+Payments, membership signup, full production authentication, automated
+reminders, recurring bookings, and attendance tracking are not part of the
+first fixture-backed release.
+
+Waitlists WERE on this list and are not any more: booking, waitlisting,
+cancellation and automatic waitlist promotion all ship, with the guard chain
+in `rules.ts` and checks in `tests.ts`. The line stayed here after the code
+landed, which is how a brief starts lying — an assistant reads it first and
+believes it.
 
 ## Open decisions for Kerrian and the team
 
 Agree on the member-selection method, whether availability counts are
-public, the cancellation rule, and whether waitlists are deferred entirely.
+public, and the cancellation rule. (Waitlists are no longer an open
+question; they shipped.)

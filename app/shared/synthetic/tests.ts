@@ -1344,6 +1344,20 @@ for (const file of ENGINE_SOURCES) {
   check("signing out ends the server session, not just the remembered name",
     topbarSource.includes("signOutStaff") && topbarSource.includes("clearPulseSession"), true);
 
+  /* A THUMB IS NOT A POINTER. Seventeen controls measured under 44px on a
+     375px viewport, eleven of them the footer's navigation links at fifteen
+     pixels tall — invisible on a desktop, unusable on the phone a member
+     actually carries. The rule is keyed on `pointer: coarse` rather than a
+     width, because what changed is the input, not the screen. */
+  const themeSource = await (await fetch("../theme.css")).text();
+  check("the theme was actually read", themeSource.length > 200, true);
+  check("touch pointers get a 44px minimum",
+    /@media\s*\(pointer:\s*coarse\)/.test(themeSource), true);
+  check("...and it covers the footer links that were fifteen pixels tall",
+    /@media\s*\(pointer:\s*coarse\)[\s\S]{0,400}\.site-footer li a/.test(themeSource), true);
+  check("...with a real minimum, not just a comment about one",
+    /@media\s*\(pointer:\s*coarse\)[\s\S]{0,600}min-height:\s*44px/.test(themeSource), true);
+
   /* A RECURRING CLASS OF BUG, PINNED BY THE TWO CASES THAT ALREADY
    * HAPPENED. `hidden` is a UA-stylesheet `display: none` at the lowest
    * possible specificity; a plain class rule setting `display:` on the
