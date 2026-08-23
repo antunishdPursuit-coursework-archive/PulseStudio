@@ -696,6 +696,30 @@ and for nothing else.
 If we ever add the routine page's own hosting, or anything that fetches, this
 gets revisited rather than loosened by habit.
 
+## Manny — staff-dashboard.html throws on every load (2026-08-23)
+
+Found while bringing that page under the shared header system, and NOT caused
+by it — I checked the pristine file from git before writing this down.
+
+`staff-dashboard.js` line 19 does
+`document.querySelector('#classType').innerHTML = ...`. `index.html` has an
+element with that id. `staff-dashboard.html` has never had one. So the script
+throws `Cannot set properties of null` immediately, and everything after that
+line never runs — which is why the page renders `0`, `0`, `—` while
+`index.html` renders `35`, `19`, `Studio` from the same script and the same
+data.
+
+The two pages have drifted: one script, two markup files, and only one of
+them still matches it. That is the cost the published baseline already
+records for a duplicate nobody deleted.
+
+I did not touch it. My change to that file is four lines — a stylesheet link,
+a body class, the shared brand-link markup, and the theme-boot script tag —
+and the element ids in the file are byte-identical before and after, so the
+script sees exactly the DOM it saw before. Fixing the drift is your call, and
+it is a real decision rather than a typo: either retire the page, or bring
+its markup up to the script's expectations.
+
 ## Closed — settled, kept as one line each
 
 These had their own sections until 2026-08-23. They are done, and a finished
