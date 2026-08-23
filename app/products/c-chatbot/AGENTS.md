@@ -10,9 +10,12 @@ brief first; this file adds what is true about THIS folder.
 ## What this product is (proven in code, not aspiration)
 
 A single-page member support chat that loads the shared fixture through
-`loadFixtures()`, sends only scheduled `class_session` records and current
-`studio_policy` records to Claude Haiku, and keeps a fail-closed privacy
-refusal in the browser. The deployed GitHub Pages site has no backend and
+`loadFixtures()`, sends only upcoming scheduled `class_session` records and
+current `studio_policy` records to Claude Haiku, and keeps a fail-closed
+privacy refusal in the browser. The rules live in `support.ts` as pure
+functions; `tests.ts` (open `tests.html`) checks each one against a known
+answer. The audience and the outbound answer guard come from the shared
+`assistant-audience.ts`. The deployed GitHub Pages site has no backend and
 states that conversational support is unavailable. The local server lives in
 `scripts/start-haiku.mjs`; setup is documented in
 `docs/member-support-haiku.md` by team agreement.
@@ -36,8 +39,15 @@ states that conversational support is unavailable. The local server lives in
   model. The cancellation answer comes from `pol_001`; missing policy topics
   get a stated miss rather than an invented answer.
 - **The privacy guard fails closed without member records.** Generic patterns
-  refuse attendance, history, account, membership, booking, reservation, and
-  questions shaped like "did Maria come last week?" before any network call.
+  in `support.ts` refuse attendance, history, account, membership, booking,
+  reservation — singular or plural, either apostrophe — and questions shaped
+  like "did Maria come last week?" before any network call. Schedule
+  questions ("which classes can I attend?") pass; the guard's word list is
+  checked question-by-question in `tests.ts`.
+- **The answer is guarded on the way out too.** `answerProblems()` from
+  `shared/assistant-audience.ts` runs on the model's reply last, so staff
+  vocabulary or another member's name never reaches this member-facing
+  screen, whatever produced it.
 - **No instructor or availability claims.** Those require collections outside
   this product's agreed boundary.
 
@@ -47,7 +57,10 @@ states that conversational support is unavailable. The local server lives in
   Product C creates or updates no shared record.
 - Theme: `product-c` body class + `shared/theme.css` +
   `shared/theme-boot.js`, which also mounts the shared sign-in chip.
-- Storage: Product C reads and writes no browser storage.
+- Storage: Product C writes no browser storage. It reads the shared session
+  through `shared/auth/session.js` only to pick the greeting's voice —
+  convenience, never access control; the page stays member-facing whoever
+  is signed in.
 - Network: `npm run start:haiku` serves the site and proxies `/api/chat` to
   Anthropic with `ANTHROPIC_API_KEY` from the local environment. The key never
   enters browser code or the repository. The server accepts only the agreed
