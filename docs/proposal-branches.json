@@ -1,5 +1,6 @@
 {
   "$comment": [
+    "EVERY PROPOSAL BRANCH IS NAMED do-not-merge/<x>, and the name is the first thing anyone sees — in a branch list, in a PR title, in a checkout. The gate reads this table for permission; the prefix reads to a person.",
     "Branches that are ALLOWED to cross lane boundaries, and the only place that",
     "permission exists. scripts/check-lanes.mjs reads this file, matches the branch",
     "it is running on, and reports every cross-lane file it finds as a PROPOSAL",
@@ -25,27 +26,38 @@
   ],
   "branches": [
     {
-      "branch": "v0.0.2",
+      "branch": "do-not-merge/v0.0.2",
       "why": "The integration line for a cross-lane proposal. Every product folder is worked on here so the four can be made to agree with each other and with app/shared/ at once. Never merged to main: each owner receives their own folder as something to copy or refuse.",
-      "lanes": ["kerrian", "manny", "dennis", "rensley"],
+      "lanes": [
+        "kerrian",
+        "manny",
+        "dennis",
+        "rensley"
+      ],
       "neverMerge": true
     },
     {
-      "branch": "a",
+      "branch": "do-not-merge/a",
       "why": "Product A's half of the v0.0.2 proposal - the booking app, worked on so its owner can read a working folder rather than a list of defects.",
-      "lanes": ["kerrian"],
+      "lanes": [
+        "kerrian"
+      ],
       "neverMerge": true
     },
     {
-      "branch": "b",
+      "branch": "do-not-merge/b",
       "why": "Product B's half of the v0.0.2 proposal - the staff scheduling dashboard.",
-      "lanes": ["manny"],
+      "lanes": [
+        "manny"
+      ],
       "neverMerge": true
     },
     {
-      "branch": "c",
+      "branch": "do-not-merge/c",
       "why": "Product C's half of the v0.0.2 proposal - the member support assistant.",
-      "lanes": ["dennis"],
+      "lanes": [
+        "dennis"
+      ],
       "neverMerge": true
     }
   ]
