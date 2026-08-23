@@ -13,7 +13,10 @@ import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";
 import { csvField, onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
-import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { NOT_RECORDED, brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { ROUTINE_LIBRARY } from "./routine-library.js";
+import { loadLibrary, normalizeClassInterest, routinePanelView } from "./routines.js";
+import type { HomeRoutine } from "./routines.js";
 import {
   dataQualityLine,
   dayNumberFromIso,
@@ -213,6 +216,124 @@ function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): stri
  *  and so did this comment; the code three lines down always handled it
  *  correctly, which is exactly how a comment gets to be wrong for months. */
 
+/* The routine library is validated ONCE at load. A malformed entry is a
+ * defect in content somebody wrote, not a runtime condition to paper over,
+ * so it is reported where a person will see it rather than dropped. */
+const routineLibrary = loadLibrary(ROUTINE_LIBRARY);
+
+/** Which routine a staff member picked, per member. Defaults to NONE, and
+ *  the draft is complete without one. Never persisted here — the ledger
+ *  records it only when a note is actually taken. */
+const chosenRoutine = new Map<string, string>();
+/** Whether the class-interest filter is on, per member. Off by default:
+ *  showing everything is the honest starting point. */
+const routineFilterOn = new Map<string, boolean>();
+
+/** The optional routine panel. Markup only — every decision it renders was
+ *  made by routinePanelView(), which the suite can load and this file
+ *  cannot hide. */
+function renderRoutinePanel(
+  memberId: string,
+  usualClassType: string | null,
+  onChange: () => void,
+): HTMLElement {
+  const interest = normalizeClassInterest(usualClassType);
+  const filterOn = routineFilterOn.get(memberId) ?? false;
+  const view = routinePanelView(routineLibrary, interest, filterOn);
+
+  const panel = document.createElement("details");
+  panel.className = "routines";
+  const summary = document.createElement("summary");
+  summary.textContent = "Approved home routines (optional)";
+  panel.append(summary);
+
+  const heading = document.createElement("p");
+  heading.className = "evidence";
+  heading.textContent = view.heading;
+  panel.append(heading);
+
+  if (view.filterLabel !== null) {
+    const why = document.createElement("p");
+    why.className = "evidence";
+    why.textContent = view.filterLabel;
+    panel.append(why);
+  }
+
+  if (view.filterAvailable) {
+    const toggle = document.createElement("button");
+    toggle.className = "btn quiet";
+    toggle.type = "button";
+    toggle.textContent = filterOn
+      ? "Show all approved routines"
+      : "Show only routines related to classes this member has attended";
+    toggle.addEventListener("click", () => {
+      routineFilterOn.set(memberId, !filterOn);
+      onChange();
+    });
+    panel.append(toggle);
+  }
+
+  /* Any problem in the library is stated, never swallowed. */
+  for (const problem of routineLibrary.problems) {
+    const bad = document.createElement("p");
+    bad.className = "evidence";
+    bad.textContent = `Routine not offered — ${problem}`;
+    panel.append(bad);
+  }
+
+  const chosen = chosenRoutine.get(memberId) ?? null;
+  for (const r of view.routines) {
+    const item = document.createElement("div");
+    item.className = "routine";
+
+    const title = document.createElement("p");
+    title.className = "routine-title";
+    /* textContent throughout: routine text is authored by a person and this
+     * page may be read by anyone. Nothing here is ever set as HTML. */
+    title.textContent = `${r.title} · ${r.durationMinutes} min · ${r.difficulty}`;
+    item.append(title);
+
+    const summaryLine = document.createElement("p");
+    summaryLine.className = "evidence";
+    summaryLine.textContent = r.summary;
+    item.append(summaryLine);
+
+    const kit = document.createElement("p");
+    kit.className = "evidence";
+    kit.textContent = r.equipment.length === 0
+      ? "No equipment needed"
+      : `Equipment: ${r.equipment.join(", ")}`;
+    item.append(kit);
+
+    const notice = document.createElement("p");
+    notice.className = "evidence";
+    notice.textContent = r.safetyNotice;
+    item.append(notice);
+
+    const pick = document.createElement("button");
+    pick.className = "btn";
+    pick.type = "button";
+    const isChosen = chosen === r.id;
+    pick.textContent = isChosen ? "Included in draft — remove" : "Include this routine";
+    pick.setAttribute("aria-pressed", isChosen ? "true" : "false");
+    pick.addEventListener("click", () => {
+      if (isChosen) chosenRoutine.delete(memberId);
+      else chosenRoutine.set(memberId, r.id);
+      onChange();
+    });
+    item.append(pick);
+    panel.append(item);
+  }
+  return panel;
+}
+
+/** The routine a staff member picked for this member, or null. */
+function chosenRoutineFor(memberId: string): HomeRoutine | null {
+  const id = chosenRoutine.get(memberId);
+  if (id === undefined) return null;
+  return routineLibrary.routines.find((r) => r.id === id) ?? null;
+}
+
 function renderFlagged(
   f: FlaggedMember,
   rank: number,
@@ -388,7 +509,20 @@ function renderFlagged(
   });
 
   actions.append(copyBtn, mailLink, suppressBtn);
-  card.append(draftBlock, actions);
+  /* The routine panel sits BETWEEN the draft and the actions: after the
+   * evidence and the words a person will send, before the button that
+   * takes them. It is optional, collapsed, and the draft is complete
+   * without it. */
+  const routinePanel = renderRoutinePanel(
+    f.member.member_id,
+    f.usualClassType === NOT_RECORDED ? null : f.usualClassType,
+    () => {
+      focusMemberAfterRender = f.member.member_id;
+      rerender();
+    },
+  );
+
+  card.append(draftBlock, routinePanel, actions);
   return card;
 }
 

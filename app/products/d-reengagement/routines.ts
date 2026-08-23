@@ -34,7 +34,7 @@
  */
 
 import { identityKey } from "./csv.js";
-import { todayIsoInZone } from "./deps.js";
+import { counted, todayIsoInZone } from "./deps.js";
 
 /** The studio's own zone — the same one every threshold in D is measured in. */
 const STUDIO_TIMEZONE = "America/New_York";
@@ -167,16 +167,20 @@ function stepProblems(step: unknown, index: number): string[] {
 
   /* TIMED OR COUNTED, EXACTLY ONE. A step that is both is ambiguous to
    * whoever reads it out; a step that is neither cannot be followed. */
-  const timed = s["durationSeconds"] !== undefined;
-  const counted = s["repetitions"] !== undefined;
-  if (timed === counted) {
+  /* NOT named `counted`: that is the shared phrase helper imported above,
+   * and a local of the same name shadows it inside this function. Harmless
+   * today because nothing here formats a count — which is exactly how that
+   * kind of trap survives to bite the next edit. */
+  const isTimed = s["durationSeconds"] !== undefined;
+  const isCounted = s["repetitions"] !== undefined;
+  if (isTimed === isCounted) {
     out.push(`${where} must give either a duration or a repetition count, not both and not neither`);
   }
-  if (timed) {
+  if (isTimed) {
     const p = intProblem(`${where} duration`, s["durationSeconds"], 5, 600);
     if (p !== null) out.push(p);
   }
-  if (counted) {
+  if (isCounted) {
     const p = intProblem(`${where} repetitions`, s["repetitions"], 1, 100);
     if (p !== null) out.push(p);
   }
@@ -357,4 +361,55 @@ export function findRoutine(lib: LoadedLibrary, id: string): HomeRoutine | null 
   const found = lib.routines.find((r) => r.id === id) ?? null;
   if (found === null || found.status === "draft") return null;
   return found;
+}
+
+/* ---------- what the panel shows ---------- */
+
+/** Everything the routine panel needs, decided here rather than in main.ts.
+ *
+ *  This is a RULE, not markup, and D's own brief says rules move somewhere a
+ *  check can load — the remedy that found two bugs in two extractions when
+ *  it was applied to main.ts before. main.ts builds elements from this; it
+ *  decides nothing. */
+export interface RoutinePanelView {
+  /** The count line. Says what it checked even when the answer is nothing. */
+  heading: string;
+  /** Why a filter is on, in words, or null when it is not. */
+  filterLabel: string | null;
+  /** Whether a filter COULD be offered — false when nothing is recorded. */
+  filterAvailable: boolean;
+  routines: HomeRoutine[];
+}
+
+export function routinePanelView(
+  lib: LoadedLibrary,
+  interest: ClassInterest,
+  filterOn: boolean,
+): RoutinePanelView {
+  const approved = approvedRoutines(lib);
+  /* NOTHING APPROVED IS A RESULT, NOT A BLANK. The language law asks a
+   * screen with nothing to show to say what it checked. */
+  if (approved.length === 0) {
+    return {
+      heading: "0 approved routines. Nothing to include yet.",
+      filterLabel: null,
+      filterAvailable: false,
+      routines: [],
+    };
+  }
+  const filterAvailable = interest !== UNKNOWN_INTEREST;
+  const active = filterOn && filterAvailable;
+  const shown = active ? routinesForInterest(lib, interest) : approved;
+  return {
+    heading: counted(shown.length, "approved routine"),
+    /* The filter names the RECORD it came from — that this member attended
+     * these classes — and never suggests the routines suit them. */
+    filterLabel: active
+      ? `Related to classes this member has attended (${interest})`
+      : filterAvailable
+        ? null
+        : "No class interest recorded — showing all approved routines",
+    filterAvailable,
+    routines: shown,
+  };
 }

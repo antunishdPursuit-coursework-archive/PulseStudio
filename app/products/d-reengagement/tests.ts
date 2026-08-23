@@ -14,7 +14,7 @@
 import { counted } from "./deps.js";
 import {
   CLASS_INTEREST_ALIASES, UNKNOWN_INTEREST, approvedRoutines, compareRoutines,
-  findRoutine, loadLibrary, normalizeClassInterest, routineProblems, routinesForInterest,
+  findRoutine, loadLibrary, normalizeClassInterest, routineProblems, routinePanelView, routinesForInterest,
 } from "./routines.js";
 import type { HomeRoutine } from "./routines.js";
 import { NOT_REVIEWED, ROUTINE_LIBRARY, SAFETY_NOTICE } from "./routine-library.js";
@@ -4575,6 +4575,48 @@ check("clean records produce no data-quality line",
   /* No shipped routine may resolve by URL while it is a draft. */
   check("no shipped routine resolves by id yet",
     shipped.routines.every((r) => findRoutine(shipped, r.id) === null), true);
+
+  /* --- what the panel shows, decided outside the markup --- */
+  const emptyView = routinePanelView(shipped, "yoga", true);
+  check("with nothing approved the panel states what it checked",
+    emptyView.heading, "0 approved routines. Nothing to include yet.");
+  check("...and offers no filter to a list that does not exist",
+    emptyView.filterAvailable, false);
+  check("...and shows no routines", emptyView.routines.length, 0);
+
+  const live = loadLibrary([
+    routine({ id: "routine-1", status: "approved", durationMinutes: 10, interestKeys: ["yoga"] }),
+    routine({ id: "routine-2", status: "approved", durationMinutes: 20, interestKeys: ["strength"] }),
+    routine({ id: "routine-3", status: "approved", durationMinutes: 30, interestKeys: ["yoga"] }),
+  ]);
+  const unfiltered = routinePanelView(live, "yoga", false);
+  check("unfiltered, every approved routine shows", unfiltered.routines.length, 3);
+  check("...with no filter sentence", unfiltered.filterLabel, null);
+  check("...and the heading counts them", unfiltered.heading, "3 approved routines");
+
+  const yogaView = routinePanelView(live, "yoga", true);
+  check("filtered, the panel says WHY it is filtered",
+    yogaView.filterLabel, "Related to classes this member has attended (yoga)");
+  check("...and the filter never claims the routines suit the member",
+    /suit|right for|recommend|best|safe for/i.test(yogaView.filterLabel ?? ""), false);
+  check("...and shows only that interest", yogaView.routines.map((r) => r.id).join(","), "routine-1,routine-3");
+  check("...in the same order as unfiltered",
+    yogaView.routines.map((r) => r.id).join(","),
+    unfiltered.routines.filter((r) => r.interestKeys.includes("yoga")).map((r) => r.id).join(","));
+  check("the heading counts what is shown, not what exists",
+    yogaView.heading, "2 approved routines");
+
+  /* An unknown interest cannot be filtered on, and the panel says so
+   * instead of quietly showing everything with no explanation. */
+  const unknownView = routinePanelView(live, UNKNOWN_INTEREST, true);
+  check("an unknown class interest shows everything",
+    unknownView.routines.length, 3);
+  check("...and explains why there is no filter",
+    unknownView.filterLabel, "No class interest recorded — showing all approved routines");
+  check("...and does not offer a filter control", unknownView.filterAvailable, false);
+  check("one approved routine reads as singular",
+    routinePanelView(loadLibrary([routine({ id: "routine-1", status: "approved" })]), UNKNOWN_INTEREST, false).heading,
+    "1 approved routine");
 }
 
 /* EVERY CHECK MUST RUN BEFORE THE VERDICT IS COUNTED. The routine block was
