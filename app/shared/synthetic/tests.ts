@@ -1344,6 +1344,38 @@ for (const file of ENGINE_SOURCES) {
   check("signing out ends the server session, not just the remembered name",
     topbarSource.includes("signOutStaff") && topbarSource.includes("clearPulseSession"), true);
 
+  /* THE NAME GUARD MUST NOT COME BACK TO THE BROWSER.
+   *
+   * The member support page used to fetch every member's display name so it
+   * could check the assistant's answer against them — a member-facing page
+   * holding the whole roster, which is precisely what the data law forbids
+   * and a larger leak than the one it prevented. The check moved to the
+   * server, which already holds the roster and already sees the answer.
+   *
+   * These read the shipped source because the regression is a shape: a
+   * `.members` read reappearing on a member-facing page. The compiler now
+   * refuses that too (PublicFixtures has no `members`), and two independent
+   * guards on the same rule is the point, not duplication. */
+  const chatbotSource = await (await fetch("../../products/c-chatbot/main.ts")).text();
+  check("the member support page was actually read", chatbotSource.length > 200, true);
+  /* ANY `.members` AT ALL, not a named variable. The first version of this
+     looked for `fixtures.members` and a plant of `(fixtures as any).members`
+     walked straight past it — a cast is exactly how this regression would
+     actually arrive, since the compiler now refuses the honest spelling. */
+  check("it never reads the studio roster in the browser",
+    /\.members\b/.test(chatbotSource), false);
+  check("it takes the name verdict from the server instead",
+    chatbotSource.includes("nameRefused"), true);
+  check("...and still runs the vocabulary half itself",
+    chatbotSource.includes("answerProblems("), true);
+
+  const serverSource = await (await fetch("../../../scripts/start-haiku.mjs")).text();
+  check("the server was actually read", serverSource.length > 200, true);
+  check("the server holds the name guard",
+    serverSource.includes("answerNamesAnotherMember"), true);
+  check("...and reads the roster from outside app/, never from the served folder",
+    /staff-records\.json/.test(serverSource) && !/app[/\\]shared[/\\]staff-records/.test(serverSource), true);
+
   /* A RECURRING CLASS OF BUG, PINNED BY THE TWO CASES THAT ALREADY
    * HAPPENED. `hidden` is a UA-stylesheet `display: none` at the lowest
    * possible specificity; a plain class rule setting `display:` on the
@@ -1370,7 +1402,7 @@ for (const file of ENGINE_SOURCES) {
    * asked "where do I book?" on a page with a Book a class button on it.
    * These read the shipped server prompt and hold it to routes this
    * repository actually publishes. */
-  const serverSource = await (await fetch("../../../scripts/start-haiku.mjs")).text();
+  /* serverSource is read once, above. */
   /* Fetched, not assumed: the booking page the prompt points a member at
    * has to be a page this site actually serves. A 404 here means the
    * assistant is giving directions to a room that is not there. */
