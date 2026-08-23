@@ -135,77 +135,6 @@ jointly held.
 
 ---
 
-## Everyone — I changed shared ground, and here is what I checked (2026-08-21)
-
-No ask in this one. It is a notice, because `app/shared/` moved under your
-products and you should hear it from me rather than find it.
-
-**What changed and why**, each stated in its own commit and each because
-something was measurably wrong:
-
-- `theme.css` — the four developer accents are all below WCAG AA as text on
-  the light theme. **Your hexes are untouched.** Violet is fixed by adding a
-  companion token, and every shared rule now reads
-  `var(--accent-strong, var(--accent))`, which falls back to exactly what
-  you had. Also: `font-synthesis-weight: none`, because Anton ships one
-  weight and the front door was asking for 800 and 900, so browsers were
-  smearing the glyphs.
-- `theme-boot.ts` — it touched localStorage unguarded. A browser with site
-  data blocked throws on the ACCESS, so that module aborted and every page
-  in the studio lost its sign-in chip and appearance control at once. Also,
-  a custom background no longer erases the accent it was never measured
-  against.
-- `auth/session.ts` — a store that reads fine and refuses writes signed
-  people out the instant they signed in. The documented in-memory fallback
-  could not survive one read.
-- `synthetic/` — the answer-key leak scan read one record per collection;
-  the credential scan ran twice under two codes so an edge-case declaration
-  could never balance; `unsorted-collection` covered five of eight
-  collections while the brief promised all of them.
-- `ready.html`, `storytold.html`, `SHARED_DATA_CONTRACT.md`, `robots.txt`,
-  `sitemap.xml`, `llms.txt` — contrast, stale counts, an undocumented
-  envelope field, and a robots file that could not work on this deploy.
-
-**What I verified afterwards, in a browser, on your pages:**
-
-| | accent | `--accent-strong` | chip | appearance | console |
-| --- | --- | --- | --- | --- | --- |
-| A · booking | `#3b82f6` | undefined → falls back | yes | yes | clean |
-| B · dashboard | `#f59e0b` | undefined → falls back | yes | yes | clean |
-| C · chatbot | `#10b981` | undefined → falls back | yes | yes | clean |
-
-All three render their own content. And because Product A consumes the
-compatibility view, I exercised it directly: signed in as a member gives
-`{role: "member", member_id: "member:000001"}`, as staff gives
-`{role: "staff", member_id: null}`, signed out gives `null`. Unchanged.
-
-If anything looks different on your product and you think one of these did
-it, say so and I will fix it or revert it — shared ground is not mine, and
-"it passed the gate" is not the same as "it is right for your page".
-
-### And a clean result, recorded so nobody re-derives it (2026-08-21)
-
-I swept every tracked `.ts` and `.html` for DOM and eval sinks —
-`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`,
-`new Function`, `srcdoc`, `javascript:` URLs, inline `on*=` handlers. Not
-because I suspected anything; because I had claimed "no sinks" earlier on
-the strength of a three-pattern grep over my own folder, and a hand sweep on
-this branch has already missed something a systematic one caught.
-
-**Nothing is wrong.** Product D and `app/shared` contain no sink of any
-kind; every value reaches the DOM through `textContent`. Products A and B
-use `innerHTML` — fourteen places between them — and both escape correctly:
-each has its own `escapeHtml` covering `& < > " '`, and every interpolated
-value that could carry a person's text goes through it. What is left
-unescaped in both is counts and lengths, which are numbers, and one
-locally-computed headline string in A that no input reaches.
-
-So there is no ask here either. It is written down because a checked
-negative is worth as much as a finding and costs the next person the same
-hour it cost me — and because if either of you adds an `innerHTML` later,
-the thing to keep is the habit already in your code: escape at the
-interpolation, not at the source.
-
 ## Everyone — the shared fixture ages out on a clock (2026-08-21)
 
 Written down so nobody meets it by surprise — and deliberately NOT a deadline
@@ -438,103 +367,6 @@ a NEW failure fails the gate. When you clear yours the gate says `cleared ·
 I did not touch any of your colours, and I will not — a developer's colour is
 theirs. This is measurement and one worked pairing, nothing more.
 
-## Dennis — your `.env` template and my language gate collided (2026-08-21)
-
-You added local Haiku support to Product C and, following the ordinary
-dotenv convention, a template file whose name ends in a word the language
-law bans. I added `scripts/check-language.mjs`, which scans every tracked
-text file for those words. Merging the two turns `main` red — not on your
-file, but on `docs/member-support-haiku.md`, where the setup instructions
-tell the reader to copy it.
-
-**I did not touch anything in your lane, and I have not renamed the file.**
-What I changed is my own gate, because the failure was mostly its fault:
-
-- It scans file CONTENT and never filenames. So the repo was free to
-  CONTAIN that file, but no document was allowed to NAME it. That is not a
-  rule anyone chose, it is a gap.
-- Its assistant-name rule already treats `NAME.md` as a path rather than a
-  byline. The banned-word rule simply had not learned the same lesson.
-
-So a banned word inside a path now reads as a mention, and the setup
-instructions pass. Prose is unchanged — "for <that word>, see the brief"
-still fails, and there is a planted case holding each behaviour.
-
-**The one ask, and it is genuinely yours to decide:** do you want the file
-named that way? The law says the words appear nowhere, and the team's word
-is "fixture", so `.env.fixture` (or `.env.template`) would satisfy it and
-still read naturally as `cp .env.fixture .env`. Renaming is a one-line
-change in your doc and your ignore rules; I have not made it because the
-file is yours.
-
-If you would rather keep the dotenv convention, say so and it stays — the
-gate no longer objects to it, and this note becomes the record of why.
-
-## Kerrian — a member booking a class read your name (2026-08-21, cleared)
-
-`app/products/a-booking/index.html` carried
-`<span class="owner-badge">Kerrian</span>`. It was not hidden and it was not
-small: I measured it in a browser at 74 by 26 pixels, sitting in the page
-header directly after BOOK A CLASS, so the header read
-"BOOK A CLASS · Kerrian · Sign in".
-
-The audience law says a consumer-facing surface speaks TO its user and
-never ABOUT the project, and that authorship is carried by the builder's
-COLOUR plus `app/shared/storytold.html`. Your blue already does that job on
-every screen of Product A — the badge was the one part a member had no use
-for.
-
-**You removed it the same day**, in `c157ba9`, and I retired the baseline line
-it made stale in `b4001cb`. `docs/audience-baseline.json` now lists nothing at
-all — its `allowed` array is empty — so `scripts/check-audience.mjs` fails on
-any builder name that comes back rather than reporting it as known. There is no
-ask left here; this section stays as the record of what the gate is for.
-
-Worth knowing: Product D's unit-check page has the same badge, and it stays
-— a tests page is read by a developer, not a member, which is why the gate
-skips it. The difference is who is looking.
-
-## Everyone — I audited the data law, and it holds (2026-08-21)
-
-I compared what every product actually reads against the product map in
-`SHARED_DATA_CONTRACT.md`. Stating the good result first, because a report
-that only lists problems is not an audit:
-
-**No member-facing surface touches staff-only information.** Attendance,
-rosters and cancellation-risk inference appear only in the two staff
-products, B and D. That is the line the data law draws and nobody has
-crossed it.
-
-**Dennis, Product C does better than not-leaking — it defends the line.**
-`asksForPrivateMemberData()` builds a list of every member's name and first
-name for the sole purpose of REFUSING any question that mentions one, on
-top of six patterns for attendance and history questions. That is the ask I
-wrote in your section, implemented further than I asked. Thank you.
-
-**What is out of date is the map, not the code.** Every row understates its
-product, mine worst of all:
-
-| Row | Declares | Also reads | Harm |
-| --- | --- | --- | --- |
-| D (mine) | member, membership, reservation, attendance | `class_session`, `instructor` | none — corrected already |
-| B (Manny) | class_session, instructor, reservation | `attendance`, `member` | none: B is a staff surface, and attendance is staff information there |
-| A (Kerrian) | member, membership, class_session | `instructor` | none — needed to name who teaches a class |
-| C (Dennis) | class_session, studio_policy | `member`, `instructor` | none — the `member` read IS the privacy guard above |
-
-Not one of these is a data-law breach. They are a table that stopped
-matching the code, which matters because the table is what a new teammate
-reads to learn what their product is allowed to touch — and a map that
-understates reality teaches the wrong lesson in the safe direction only
-until somebody trusts it.
-
-**I corrected my own row and left yours alone.** The contract says each
-owner adds their required fields during team review, so these are three
-one-line edits by three people, not one by me.
-
-**The one ask:** add the fields your product already reads to your own row.
-If you think a read on that list should not be happening, that is a better
-conversation than a table edit, and I would rather have it.
-
 ## Things the new gates found in your lane (2026-08-22)
 
 Six gates landed on `main` today. Each of them BASELINES what it found
@@ -671,6 +503,76 @@ dashboard keeps nothing, and the shipped page keeps quite a lot.
 I checked the first three, the week picker and the room input myself against
 `staff-dashboard.js` and your two HTML files before writing this down.
 
+### Manny — a prompt to hand your assistant
+
+Your brief is the problem here, and that makes this awkward to fix: an
+assistant working in `b-dashboard/` reads `CLAUDE.md` FIRST and treats it as
+the authority on your code. So it opens the folder already believing the
+dashboard persists nothing. Told to "add persistence", it may well go and
+build a second mechanism beside the one you already have. Told the storage is
+a bug, it will delete working behaviour and the gate will stay green, because
+no gate checks a brief against its own folder.
+
+That is why this is worth fixing before your next change rather than after.
+
+Paste this. It is written to make your assistant distrust the brief and
+check the code, which is the opposite of its normal instinct:
+
+```text
+Before anything else: app/products/b-dashboard/CLAUDE.md contains statements
+about this code that are FALSE. You will have read it as authoritative. Do not.
+For this task the CODE is the authority and the brief is the thing being
+corrected.
+
+Work only inside app/products/b-dashboard/. Do not edit any other folder —
+this repository assigns one folder per developer and scripts/check-lanes.mjs
+enforces it.
+
+Verify each of these against the code yourself before changing a word. If any
+is wrong, say so and leave that line alone; the list came from an audit, and
+an audit can be wrong too.
+
+1. CLAUDE.md:14 says "no persistence of any kind" and CLAUDE.md:64 says this
+   product "reads and writes NO storage keys of its own". Check
+   staff-dashboard.js for a localStorage key of its own: how it is declared,
+   where it is written, where it is read back, and whether a storage listener
+   watches it.
+2. CLAUDE.md:47 says "Publish is in-memory only ... Nothing here persists."
+   Check what happens when a draft schedule is confirmed, and what happens to
+   those sessions on the next page load.
+3. CLAUDE.md:41 says the dashboard "shows the same week forever". The dataset
+   is frozen, but check whether the VIEW is one week — look for a week picker
+   and for controls that page the window forwards and back.
+4. CLAUDE.md:43 says every room label is the hardcoded studio name. That holds
+   for generator-derived sessions and the demand panel. Check whether the
+   add-a-session dialog has its own room input, in both HTML files.
+5. CLAUDE.md:23 says the required DOM ids "exist in neither HTML file". Count
+   them. If some exist and some do not, say which — the point may stand while
+   the count does not.
+6. CLAUDE.md:75 summarises the repo-wide colour law as "black or white
+   backgrounds only". Read the colour law in the ROOT CLAUDE.md. The built-in
+   light and dark backgrounds are white and black, and a person may also
+   select an accessible custom background/text pair through the shared
+   appearance control. Your brief predates that amendment.
+
+Then correct only the lines that are actually wrong, describing what the code
+does now. Where a count drifted, prefer naming the thing that knows the count
+over writing a new number — this repository has been bitten repeatedly by
+numbers written into prose.
+
+Do not change any behaviour. This is a documentation correction. If you find a
+real defect while reading, write it down and leave it.
+
+Finally: `npm run check` must pass before you commit, and the assistant is
+never a contributor — no AI name, no Co-Authored-By, no "Generated with"
+anywhere in the commit or the code.
+```
+
+Two of those six will probably come back as "the brief is right". Number 5 is
+the likeliest: I found one of the seven ids present and six absent, so the
+warning stands and only the count is wrong. That is the correct outcome, and
+it is why the prompt asks for verification instead of handing over a patch.
+
 ### Dennis — Product C
 
 - **`CLAUDE.md:32` cites "the comment at `main.ts:69-71`".** Those lines are
@@ -688,6 +590,117 @@ behaviour.
 If you think any of these is wrong, say so on the PR. Eighteen of the
 seventy-three raised in this sweep were thrown out by a second pass whose job
 was to refute them, so being wrong about one of these is entirely possible.
+
+## Everyone — which revision is live, and why it is not `healthz` (2026-08-23)
+
+**This needs team agreement before anybody writes it.** `.github/workflows/pages.yml`
+is team-owned, and Product D should not own deployment infrastructure. The request
+is below with the exact change, so approving it is a read rather than a design
+session.
+
+### The question worth answering
+
+Not "is the server alive". There is no server. `npm run start` is
+`python3 -m http.server --directory app`, the build is `tsc` with no bundler,
+and the deploy is `upload-pages-artifact` with `path: app` followed by
+`deploy-pages`. A `/api/healthz` cannot exist, and a STATIC file called
+`healthz` would return 200 exactly when the CDN is up — which the page load
+already told you. It would be a green light wired to nothing.
+
+The question that does bite: **which revision is actually live?** Today nothing
+can answer it. `github.sha` exists in the Actions context and nothing uses it —
+grep the workflow and every script and you get no hits. The deployed site has no
+way to see it.
+
+### The request
+
+**One step in the gate job**, after the gates pass and before
+`upload-pages-artifact`, writing `app/build-info.json`:
+
+```yaml
+      - if: steps.publishing.outputs.ok == 'yes' && steps.pagesmode.outputs.mode == 'workflow'
+        name: Record which revision this is
+        run: |
+          cat > app/build-info.json <<JSON
+          {
+            "sha": "${{ github.sha }}",
+            "runNumber": ${{ github.run_number }},
+            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+```
+
+The full forty-character SHA, not the short one: a short SHA is a prefix, and
+comparing prefixes is how two different revisions come to look identical.
+
+**Why filing it under `app/` is safe.** `check-published.mjs` reads
+`git ls-files app` — TRACKED files only. A file written at build time and never
+committed is invisible to it, so this adds nothing to the filing baseline.
+
+**Add `app/build-info.json` to `.gitignore`** in the same change. The file
+currently ignores `app/**/*.js` and `app/**/*.js.map` and nothing else under
+`app/`, so a generated JSON could be committed by accident and then it WOULD be
+a published file with an owner.
+
+### Four things a reader of that file has to get right
+
+1. **Cache-safe retrieval.** Request it with a cache-busting query and
+   `cache: "no-store"`. Pages sets a short max-age, but a stale intermediary
+   would otherwise report the previous deploy as the current one — the exact
+   failure the file exists to prevent.
+2. **Reject the HTML fallback.** A 404 on Pages returns an HTML page with a 200
+   in some configurations and a 404 in others, and either way it is not JSON.
+   The reader must confirm the body parses AND carries a forty-hex SHA. Treating
+   a successful fetch as a successful verification is how this gets worse than
+   having nothing.
+3. **Say `Build unknown`.** When the file is missing, unparseable, or fails the
+   SHA shape, say so in those words. Never `healthy` — static revision metadata
+   does not prove an application works, and a label that overstates itself is
+   worse than no label.
+4. **Distinct messages per failure.** Missing, unparseable, and mismatched are
+   three different problems with three different fixes. One shared message sends
+   the reader down the wrong one.
+
+### And a script that compares
+
+`scripts/check-deployed-version.mjs`, taking an expected SHA and exiting
+non-zero on mismatch, on a missing file, and on an unparseable body — with a
+different sentence for each. It carries `--self-test` like every other gate
+here, planting an HTML body, a truncated SHA, and a mismatched SHA to prove it
+still catches them.
+
+It should NOT go in `npm run check`. The gate runs before a deploy exists; a
+check that asks the live site about a revision that has not shipped yet would
+fail for the most ordinary reason there is.
+
+### If a version label ever appears in Product D
+
+Subtle, in the footer, and reading `Build unknown` whenever verification is
+unavailable. I will not add one until this exists, because a label that cannot
+be verified is a claim, and this product has spent the week removing those.
+
+## Closed — settled, kept as one line each
+
+These had their own sections until 2026-08-23. They are done, and a finished
+ask is the thing most worth deleting from a file people are supposed to read.
+The reasoning lives in the commits; what follows is enough to stop anybody
+re-raising them.
+
+- **Kerrian's page no longer shows a builder's name** (raised 2026-08-21).
+  The `.owner-badge` is gone from `a-booking/index.html` and
+  `docs/audience-baseline.json` has an empty `allowed` list, so the gate now
+  fails the build on the next one instead of reporting a known one. Product
+  D's `tests.html` keeps its badge and the gate skips it on purpose — a check
+  page is read by a developer, not a member.
+- **Dennis's `.env` template and the language gate no longer collide**
+  (raised 2026-08-21). `.env.example` exists and `check-language` passes.
+- **Shared ground was changed and checked** (2026-08-21). What was verified
+  then is now held by gates that run on every commit, which is a better record
+  than a paragraph.
+- **The data law was audited and it holds** (2026-08-21). Still true: members
+  see only their own data, staff-only information stays on staff surfaces, and
+  nothing sends automatically. `check-audience` and `check-fixtures` hold the
+  parts a script can hold.
 
 ## If you disagree with anything here
 
