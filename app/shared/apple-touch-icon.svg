@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Pulse Studio">
+  <!-- THE SOURCE for apple-touch-icon.png. Same mark, same rule about not
+       retyping the path. An OPAQUE white ground on purpose, unlike
+       favicon.svg: a home-screen icon is composited onto whatever wallpaper
+       the person chose, so a transparent icon with a white stroke disappears
+       against a light one. favicon.svg can be transparent because it sits on
+       the browser's own chrome, which the browser controls. -->
+  <rect width="180" height="180" rx="38" fill="#ffffff"/>
+  <g transform="translate(26 58) scale(4.0)">
+    <path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#0a0a0a" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

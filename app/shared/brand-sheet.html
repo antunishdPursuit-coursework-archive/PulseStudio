@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Studio — brand guidelines</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<style>
+/* Both faces are self-hosted from this origin — the same two files every
+   other page uses. Declared here rather than importing theme.css, because
+   this book paints its own ground on purpose: it is a specimen, not a
+   surface, and it must look identical on paper and on screen. */
+@font-face { font-family:"Anton"; font-weight:400; font-display:swap;
+  src:url("./fonts/anton-400.woff2") format("woff2"); }
+@font-face { font-family:"Epilogue"; font-weight:400 700; font-display:swap;
+  src:url("./fonts/epilogue-variable.woff2") format("woff2"); }
+
+@page { size: A4 landscape; margin: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin:0; background:#3f3f48; font-family:"Epilogue",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; }
+
+.page { width:297mm; height:210mm; margin:0 auto 10mm; padding:16mm 18mm 12mm;
+  background:#fff; color:#0a0a0a; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; }
+.page.dark { background:#000; color:#fff; }
+@media print { body{background:#fff;} .page{margin:0; page-break-after:always; box-shadow:none;} }
+
+.folio { position:absolute; bottom:9mm; left:18mm; right:18mm;
+  display:flex; justify-content:space-between;
+  font-family:ui-monospace,Menlo,monospace; font-size:7.5pt; color:#9a9aa4;
+  border-top:1px solid #e2e2e8; padding-top:5px; }
+.page.dark .folio { color:#6a6a76; border-color:#1e1e26; }
+
+.eyebrow { font-size:7.5pt; font-weight:700; letter-spacing:.22em;
+  text-transform:uppercase; color:#8a8a95; }
+h1 { font-family:"Anton",Impact,sans-serif; font-weight:400; margin:0;
+  letter-spacing:.01em; line-height:.92; }
+h2 { font-family:"Anton",Impact,sans-serif; font-weight:400; font-size:22pt;
+  margin:0 0 3mm; letter-spacing:.01em; }
+h3 { font-size:9pt; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  margin:0 0 3mm; padding-bottom:4px; border-bottom:1px solid #dcdce2; }
+p { margin:0 0 2.5mm; font-size:9.5pt; line-height:1.6; color:#33333d; }
+.page.dark p { color:#b6b6c0; }
+code,.mono { font-family:ui-monospace,Menlo,monospace; font-size:.88em; }
+.lede { font-size:12pt; line-height:1.5; color:#33333d; }
+.runner { opacity:0; }
+@media screen and (prefers-reduced-motion:no-preference) {
+  .live .runner { stroke-dasharray:10 62; stroke-dashoffset:72; animation:run 3.6s linear infinite; }
+  @keyframes run { 0%{opacity:0;stroke-dashoffset:72;} 12%{opacity:.9;} 55%{opacity:.9;}
+    70%{opacity:0;stroke-dashoffset:0;} 100%{opacity:0;stroke-dashoffset:0;} }
+}
+</style>
+</head>
+<body>
+<!-- ============================ 01 COVER ============================ -->
+<section class="page dark" style="justify-content:space-between">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <span class="eyebrow" style="color:#6a6a76">Pulse Studio</span>
+    <span class="eyebrow" style="color:#6a6a76">Brand guidelines · v1</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14mm">
+    <svg viewBox="0 0 32 32" width="150" height="150" aria-hidden="true" class="live" style="flex:none">
+      <path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="runner" d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#fff"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1 style="font-size:58pt">PULSE<br>STUDIO</h1>
+      <p style="font-size:11pt;color:#8a8a95;margin-top:5mm;max-width:118mm">
+        One mark. Two grounds. Two typefaces. Four builders, each with a colour
+        that says who made what — and a rule that none of them may wear
+        another's.
+      </p>
+    </div>
+  </div>
+  <div style="display:flex;gap:5px">
+    <span style="flex:1;height:5px;background:#3b82f6"></span>
+    <span style="flex:1;height:5px;background:#f59e0b"></span>
+    <span style="flex:1;height:5px;background:#10b981"></span>
+    <span style="flex:1;height:5px;background:#8b5cf6"></span>
+  </div>
+</section>
+
+<!-- ============================ 02 THE MARK ============================ -->
+<section class="page">
+  <span class="eyebrow">01 — The mark</span>
+  <h2 style="margin-top:2mm">A heartbeat, drawn once.</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12mm;flex:1">
+    <div>
+      <p class="lede" style="margin-bottom:5mm">A single pulse line. It is the
+        studio's promise in one stroke — that a member is seen, and that
+        something is still moving.</p>
+      <h3>One path, three places, never retyped</h3>
+      <p style="font-family:ui-monospace,Menlo,monospace;font-size:8.5pt;background:#f3f3f6;
+        padding:7px 9px;color:#0a0a0a;word-break:break-all">M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30</p>
+      <p>It lives in <code>app/favicon.svg</code> and as
+        <code>PULSE_MARK_PATH</code> in <code>shared/components/logo.ts</code>.
+        Every other asset — the social card, the touch icon, this page — pulls
+        that same string rather than copying it. A third hand-typed version is
+        how three copies drift apart.</p>
+      <h3 style="margin-top:5mm">It borrows its colour</h3>
+      <p>The stroke is <code>currentColor</code>. Put the mark in a header and
+        it is the foreground; put it on a fill and it is the ink. It is never
+        given a colour of its own, which is why it works on both grounds and
+        inside all four products without a variant.</p>
+    </div>
+    <div>
+      <h3>Sizes, from tokens</h3>
+      <div style="display:flex;gap:10mm;align-items:flex-end;padding:6mm 0 5mm;border-bottom:1px solid #ececeF">
+        <div style="text-align:center">
+          <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true"><path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#0a0a0a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="mono" style="font-size:7pt;color:#8a8a95;margin-top:3mm">20px<br>compact</div>
+        </div>
+        <div style="text-align:center">
+          <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#0a0a0a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="mono" style="font-size:7pt;color:#8a8a95;margin-top:3mm">26px<br>standard</div>
+        </div>
+        <div style="text-align:center">
+          <svg viewBox="0 0 32 32" width="64" height="64" aria-hidden="true"><path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#0a0a0a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="mono" style="font-size:7pt;color:#8a8a95;margin-top:3mm">hero<br>art</div>
+        </div>
+      </div>
+      <p style="margin-top:4mm"><b>Compact</b> sits in a product header beside the
+        wordmark. <b>Standard</b> is the front door's own header. The wide line
+        across the landing hero is an art treatment of the same path — not a
+        third logo. Sizes come from
+        <code>--pulse-mark-compact</code> / <code>--pulse-mark-standard</code>,
+        never a local pixel value.</p>
+      <h3 style="margin-top:5mm">What not to do</h3>
+      <p>Do not recolour it outside <code>currentColor</code>. Do not add a
+        fill. Do not stretch it — the stroke weight is tuned to the 32-unit
+        box. Do not put a constantly moving mark inside a dense product panel;
+        it belongs in the header, where a person is not reading past it.</p>
+    </div>
+  </div>
+  <div class="folio"><span>Pulse Studio — brand guidelines</span><span>01 · The mark</span></div>
+</section>
+<!-- ============================ 03 TYPOGRAPHY ============================ -->
+<section class="page">
+  <span class="eyebrow">02 — Typography</span>
+  <h2 style="margin-top:2mm">A shout and a speaking voice.</h2>
+  <p class="lede" style="max-width:200mm;margin-bottom:5mm">Two faces, chosen so
+    they cannot be mistaken for each other. One exists to be seen across a
+    room; the other exists to be read for a minute without noticing it.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12mm;flex:1">
+    <!-- ANTON -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;
+        border-bottom:2px solid #0a0a0a;padding-bottom:3mm">
+        <span style="font-family:'Anton';font-size:30pt;letter-spacing:.01em">Anton</span>
+        <span class="mono" style="font-size:7.5pt;color:#8a8a95">display · 400 · one weight</span>
+      </div>
+      <div style="font-family:'Anton';font-size:26pt;line-height:1.08;margin:4mm 0 3mm;letter-spacing:.01em">
+        ABCDEFGHIJKLM<br>NOPQRSTUVWXYZ<br>1234567890
+      </div>
+      <p><b>Anton ships one weight, and it is already the heavy one.</b> There is
+        no light Anton to fall back to, which is the point: it is used where the
+        studio raises its voice — the wordmark, page titles, the number on a
+        stat — and nowhere else.</p>
+      <p>Condensed, so a long word like RE-ENGAGEMENT still fits a narrow header
+        without being set smaller than its neighbours. Set it tight, in caps,
+        with a touch of letter-spacing so the heavy strokes do not close up.</p>
+      <p style="color:#b3243f"><b>Never</b> set body copy in Anton. At paragraph
+        sizes its counters fill in and the line becomes a texture rather than a
+        sentence.</p>
+    </div>
+
+    <!-- EPILOGUE -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;
+        border-bottom:2px solid #0a0a0a;padding-bottom:3mm">
+        <span style="font-family:'Epilogue';font-weight:600;font-size:30pt;letter-spacing:-.01em">Epilogue</span>
+        <span class="mono" style="font-size:7.5pt;color:#8a8a95">text · 400–700 variable</span>
+      </div>
+      <div style="margin:4mm 0 3mm">
+        <div style="font-weight:400;font-size:15pt;line-height:1.25">Regular 400 — the reading weight</div>
+        <div style="font-weight:600;font-size:15pt;line-height:1.25">Semibold 600 — labels and emphasis</div>
+        <div style="font-weight:700;font-size:15pt;line-height:1.25">Bold 700 — the loudest text gets</div>
+      </div>
+      <p><b>One variable file covers 400 to 700</b>, so weight is a continuum
+        rather than three separate downloads. A humanist sans with open
+        apertures and unambiguous figures — which matters on a screen that says
+        <span class="mono">54 days quiet</span> beside a person's name.</p>
+      <p>It carries everything Anton does not: sentences, evidence lines,
+        instructions, the words of a draft message. If a reader should
+        understand it rather than be struck by it, it is Epilogue.</p>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12mm;margin-top:4mm">
+    <div>
+      <h3>Why this pairing</h3>
+      <p>Maximum contrast of role with no contrast of era. Both are contemporary
+        grotesques, so they sit together without period clash — but one is
+        condensed and immovable at a single weight, the other open and fluid
+        across four. A reader never has to wonder which is speaking.</p>
+    </div>
+    <div>
+      <h3>Both are self-hosted, and that is a promise</h3>
+      <p><code>app/shared/fonts/anton-400.woff2</code> ·
+         <code>epilogue-variable.woff2</code> — served from this origin. No
+         Google Fonts link, no CDN, no third party contacted on any page.
+         Licensed under the SIL Open Font License; both licences ship beside
+         the files. When a page claims a visitor's data never leaves their
+         browser, this is part of why that is true.</p>
+    </div>
+  </div>
+  <div class="folio"><span>Pulse Studio — brand guidelines</span><span>02 · Typography</span></div>
+</section>
+<!-- ============================ 04 COLOUR ============================ -->
+<section class="page">
+  <span class="eyebrow">03 — Colour</span>
+  <h2 style="margin-top:2mm">Two grounds. Four signatures.</h2>
+  <div style="display:grid;grid-template-columns:0.85fr 1.15fr;gap:0 12mm;flex:1">
+    <div>
+      <h3>The grounds</h3>
+      <div style="display:flex;gap:4mm">
+        <div style="flex:1;border:1px solid #dcdce2">
+          <div style="background:#ffffff;height:26mm;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"><path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#0a0a0a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="padding:3mm">
+            <div style="font-family:'Anton';font-size:13pt">LIGHT</div>
+            <div class="mono" style="font-size:9pt;margin-top:2mm">#ffffff</div>
+            <div class="mono" style="font-size:9pt">#0a0a0a</div>
+            <div class="mono" style="font-size:6.5pt;color:#9a9aa4;margin-top:1mm">--bg / --fg</div>
+          </div>
+        </div>
+        <div style="flex:1;border:1px solid #dcdce2">
+          <div style="background:#000000;height:26mm;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"><path d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="padding:3mm">
+            <div style="font-family:'Anton';font-size:13pt">DARK</div>
+            <div class="mono" style="font-size:9pt;margin-top:2mm">#000000</div>
+            <div class="mono" style="font-size:9pt">#ffffff</div>
+            <div class="mono" style="font-size:6.5pt;color:#9a9aa4;margin-top:1mm">--bg / --fg</div>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:4mm">White and black are the built-ins. A person may
+        also choose their own background and text pair in <b>Settings</b>; the
+        shared control keeps that pair readable rather than trusting the
+        choice. Backgrounds always come from <code>var(--bg)</code> — never a
+        literal, never a gradient.</p>
+    </div>
+
+    <div>
+      <h3>The four builder accents</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm">
+
+        <div style="border:1px solid #dcdce2">
+          <div style="background:#3b82f6;color:#fff;height:20mm;display:flex;align-items:center;padding:0 4mm;
+            font-family:'Anton';font-size:20pt">A</div>
+          <div style="padding:3mm">
+            <div style="font-size:10pt;font-weight:700">Kerrian · Booking</div>
+            <div class="mono" style="font-size:13pt;font-weight:600;margin:1mm 0">#3b82f6</div>
+            <div class="mono" style="font-size:7pt;color:#8a8a95">ink #ffffff</div>
+            <div class="mono" style="font-size:7pt;color:#b3243f;margin-top:1.5mm">3.68:1 as text — below AA</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #dcdce2">
+          <div style="background:#f59e0b;color:#0a0a0a;height:20mm;display:flex;align-items:center;padding:0 4mm;
+            font-family:'Anton';font-size:20pt">B</div>
+          <div style="padding:3mm">
+            <div style="font-size:10pt;font-weight:700">Manny · Dashboard</div>
+            <div class="mono" style="font-size:13pt;font-weight:600;margin:1mm 0">#f59e0b</div>
+            <div class="mono" style="font-size:7pt;color:#8a8a95">ink #0a0a0a</div>
+            <div class="mono" style="font-size:7pt;color:#b3243f;margin-top:1.5mm">2.15:1 as text — below AA</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #dcdce2">
+          <div style="background:#10b981;color:#0a0a0a;height:20mm;display:flex;align-items:center;padding:0 4mm;
+            font-family:'Anton';font-size:20pt">C</div>
+          <div style="padding:3mm">
+            <div style="font-size:10pt;font-weight:700">Dennis · Support</div>
+            <div class="mono" style="font-size:13pt;font-weight:600;margin:1mm 0">#10b981</div>
+            <div class="mono" style="font-size:7pt;color:#8a8a95">ink #0a0a0a</div>
+            <div class="mono" style="font-size:7pt;color:#b3243f;margin-top:1.5mm">2.54:1 as text — below AA</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #dcdce2">
+          <div style="background:#8b5cf6;color:#fff;height:20mm;display:flex;align-items:center;padding:0 4mm;
+            font-family:'Anton';font-size:20pt">D</div>
+          <div style="padding:3mm">
+            <div style="font-size:10pt;font-weight:700">Rensley · Re-engagement</div>
+            <div class="mono" style="font-size:13pt;font-weight:600;margin:1mm 0">#8b5cf6</div>
+            <div class="mono" style="font-size:7pt;color:#8a8a95">ink #ffffff light / #0a0a0a dark</div>
+            <div class="mono" style="font-size:7pt;color:#0e6b4b;margin-top:1.5mm">cleared — has --accent-strong</div>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top:4mm;font-size:9pt"><b>An accent is an identity, not
+        automatically legible.</b> Each ratio above is that colour used as TEXT
+        on the light ground, against WCAG AA's 4.5:1. Three sit below it. That
+        is recorded rather than hidden: <code>docs/contrast-baseline.json</code>
+        names each one and its owner, and only that owner clears it — a
+        developer's colour is theirs. Product D added a
+        <code>--accent-strong</code> companion for text and cleared its own.
+        <code>check-contrast.mjs</code> fails any <i>new</i> pairing below AA,
+        measuring with the same module the browser runs.</p>
+    </div>
+  </div>
+  <div class="folio"><span>Pulse Studio — brand guidelines</span><span>03 · Colour</span></div>
+</section>
+
+<!-- ============================ 05 MOTION & VOICE ============================ -->
+<section class="page">
+  <span class="eyebrow">04 — Motion, assets, voice</span>
+  <h2 style="margin-top:2mm">Alive, not busy.</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 10mm;flex:1">
+    <div>
+      <h3>Motion</h3>
+      <p>One spark travels the pulse line every <b>3.6 seconds</b> — the same
+        beat the landing hero keeps — and then the mark rests.</p>
+      <p>Stroke and opacity only. Never transform, never layout: nothing
+        outside the mark's own box repaints, and one cycle in 3.6s is nowhere
+        near a flashing threshold.</p>
+      <p><b>Rest is the default state, not a fallback.</b> The spark is a second
+        copy of the path, invisible until animated, and every moving rule sits
+        inside <code>prefers-reduced-motion: no-preference</code>. Someone who
+        has asked their system for less motion sees a complete, solid mark —
+        not a degraded one.</p>
+    </div>
+    <div>
+      <h3>The assets</h3>
+      <p><code>favicon.svg</code> — the mark, transparent, stroke in
+        <code>currentColor</code>. Transparent because it composites onto the
+        browser's own chrome.</p>
+      <p><code>apple-touch-icon.png</code> — 180×180, and <b>opaque white on
+        purpose</b>. A home-screen icon lands on whatever wallpaper a person
+        chose; a transparent mark with a white stroke would vanish on a light
+        one.</p>
+      <p><code>og-image.png</code> — 1200×630 for link previews. Raster, because
+        the platforms that unfurl a link do not reliably render SVG.</p>
+      <p style="color:#8a8a95;font-size:8.5pt">Each is generated from the same
+        path string. The SVG sources sit beside the PNGs so the raster is never
+        the only copy.</p>
+    </div>
+    <div>
+      <h3>Voice</h3>
+      <p>The studio speaks <b>to</b> a person, never <b>about</b> the project.
+        Product letters and builder names stay off anything a member reads —
+        authorship is carried by colour, not by a byline.</p>
+      <p><b>State negatives explicitly.</b> A screen with nothing to show says
+        what it checked: <span class="mono" style="font-size:8pt">"5 members
+        checked, 0 flagged"</span> — never a blank panel.</p>
+      <p><b>Never claim what was not measured.</b> If a record is silent, the
+        copy says so rather than filling the gap with something plausible. A
+        draft that guessed once produced "your last class class" in a note
+        about to reach a real member.</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:5px;margin-top:4mm">
+    <span style="flex:1;height:4px;background:#3b82f6"></span>
+    <span style="flex:1;height:4px;background:#f59e0b"></span>
+    <span style="flex:1;height:4px;background:#10b981"></span>
+    <span style="flex:1;height:4px;background:#8b5cf6"></span>
+  </div>
+  <div class="folio"><span>Print: A4 landscape · margins none · background graphics on</span><span>04 · Motion, assets, voice</span></div>
+</section>
+</body>
+</html>
