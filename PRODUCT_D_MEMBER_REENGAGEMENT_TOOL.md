@@ -1,8 +1,15 @@
 # Product D: Member Re-engagement Tool
 
 **Owner:** Rensley
-**Phase:** Problem framing
-**Evidence level:** Planned
+**Phase:** Built and published
+**Evidence level:** Shipped and running. The rule, the evidence cards, the
+outreach discipline, the closed loop and the at-home routines are all live
+at
+<https://antunishdpursuit.github.io/PulseStudio/products/d-reengagement/>,
+with the unit checks published beside them at `tests.html`. These two lines
+said "Problem framing" and "Planned" until 2026-08-22. What this brief calls
+*proposed* below is still proposed: the code implements the 14/60-day
+thresholds and the exclusions, and the team has not ratified them.
 
 ## First user and outcome
 

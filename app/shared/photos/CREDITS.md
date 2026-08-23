@@ -1,8 +1,11 @@
 # app/shared/photos — where these pictures came from
 
-**TEAM-OWNED.** Four WebP files, 592 KB total, served from this repo like
-everything else — no image CDN, no third party watching who looks at the
-studio's website.
+**TEAM-OWNED.** Four WebP files, served from this repo like everything else
+— no image CDN, no third party watching who looks at the studio's website.
+No total size is quoted here, and that is the correction: this line said
+"592 KB total" from the commit that added the pictures until 2026-08-22, when
+somebody finally measured and found roughly two thirds of that. `wc -c *.webp`
+in this folder is the number, and it stays right when a picture is replaced.
 
 | File | What it shows | Photographer | Source |
 | --- | --- | --- | --- |

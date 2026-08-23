@@ -2,8 +2,16 @@
 
 **Location:** `app/shared/synthetic/` — TEAM-OWNED shared infrastructure.
 **Status:** built on the owner's direction; the contract is **PROPOSED** until
-Kerrian, Manny, and Dennis ratify it. Until then nothing outside this folder
-depends on these types, and no product folder was touched.
+Kerrian, Manny, and Dennis ratify it — but proposed has stopped meaning
+unused. This said "nothing outside this folder depends on these types, and
+no product folder was touched" until 2026-08-22, and by then every product
+folder imported from here: `a-booking/main.ts` and `c-chatbot/main.ts`
+directly, `d-reengagement` through its `deps.ts` seam, `b-dashboard`
+through `staff-dashboard.js`. So does the shared session layer —
+`auth/studio.ts` generates the studio sign-in resolves against, and
+`auth/sign-in.ts` and `components/topbar.ts` speak `SyntheticMember`. What
+ratification decides now is whether these shapes get renamed underneath
+code already running on them.
 
 One deterministic, normalized, fictional studio — up to 500 members with
 memberships, instructors, class sessions, bookings, and attendance that all

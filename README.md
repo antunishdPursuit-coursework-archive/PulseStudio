@@ -160,8 +160,13 @@ project's own licensing.
 
 ## Current phase
 
-Problem framing and shared project setup. The team will agree on the shared
-studio data definitions and handoff boundaries before building separate MVPs.
+All four products are built and published. Each has a live page linked from
+the front door, and every push to `main` runs the gate and republishes the
+site. What is not finished is stated on
+[Are we ready to present?](https://antunishdpursuit.github.io/PulseStudio/shared/ready.html),
+which names each gap in red rather than leaving it to be found on the day.
+This section said the team was still framing the problem and had not started
+building, until 2026-08-22.
 
 See [SHARED_DATA_CONTRACT.md](SHARED_DATA_CONTRACT.md) for the draft shared
 data contract and team review worksheet.

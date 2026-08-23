@@ -11,7 +11,7 @@ Process documents for the people building Pulse Studio. These sit OUTSIDE
 | [audience-baseline.json](./audience-baseline.json) | Builder names and product letters still visible in customer copy, with the owner who can clear each. This list only shrinks. |
 | [published-baseline.json](./published-baseline.json) | Everything `app/` serves at a public URL that is not the website, with the owner of each and why it is allowed to sit there. This list only shrinks. |
 | [contrast-baseline.json](./contrast-baseline.json) | The accent colours that were below WCAG AA the day `check-contrast.mjs` landed, with the owner who can clear each one. A developer's colour is theirs, so nobody else clears these. This list only shrinks. |
-| [equivalent-mutants.md](./equivalent-mutants.md) | Survivors `npm run mutate` reports that nobody can close, with the reason each is unreachable — read before chasing one. Also the three ways the runner itself lied before it was fixed. |
+| [equivalent-mutants.md](./equivalent-mutants.md) | Survivors `npm run mutate` reports that nobody can close, with the reason each is unreachable — read before chasing one. Also every way the runner itself lied before each was fixed, listed there rather than counted here — this cell said "three" until 2026-08-22, when that document already held more. |
 | [member-support-haiku.md](./member-support-haiku.md) | How Product C runs with Haiku locally, plus the marked member-safe guidance the local server reads on every question |
 | [REQUESTFOR-A-B-C.md](./REQUESTFOR-A-B-C.md) | What Product D needs from A, B and C, and what D gives back — one section per teammate, each ending in ONE ask |
 | [SENIOR-DEV-BRIEF.md](./SENIOR-DEV-BRIEF.md) | The whole of Product D in one file: what it does, how it is proven, and every open question — written to be read start to finish by someone new |
@@ -58,7 +58,7 @@ cost somebody a day:
   | Every developer's colour has to be readable | root `CLAUDE.md` (the colour law) | `scripts/check-contrast.mjs` |
   | Nobody edits another developer's folder | root `CLAUDE.md` (the lane law) | `scripts/check-lanes.mjs` (reads only what this branch adds to `origin/main`, skips merges, and counts team-owned changes it cannot judge) |
   | No secrets and no keys in a public repo | root `CLAUDE.md` (the git law) | `scripts/check-secrets.mjs` (current file contents only — it cannot see history, and says so) |
-  | Copy speaks to its user, never about the project | root `CLAUDE.md` (the audience law) | `scripts/check-audience.mjs` (reads static copy on consumer pages; the storytold page and the readiness board are named exemptions with reasons, in [audience-baseline.json](./audience-baseline.json)) |
+  | Copy speaks to its user, never about the project | root `CLAUDE.md` (the audience law) | `scripts/check-audience.mjs` (reads static copy on consumer pages; the storytold page, the readiness board and any `tests.html` are named in the script itself, each with its reason. [audience-baseline.json](./audience-baseline.json) is the other list — copy that was already failing on the day the gate landed — and it is empty, because its one entry was cleared on 2026-08-22) |
   | Nothing under `app/` is private | root `CLAUDE.md` (the filing law) | `scripts/check-published.mjs` (fails on a NEW file under `app/` that the website would never ask for; the ones already there are in [published-baseline.json](./published-baseline.json)) |
   | Every published page has decided whether it wants to be found | root `CLAUDE.md` (the audience law — staff tools sit behind a clearly named door) | `scripts/check-published.mjs` (a page must be in `sitemap.xml` OR carry `noindex`, never both and never neither; `robots.txt` cannot do this job on a Pages project site and says so itself) |
   | Every published page points at the icon the site ships | the filing law (`favicon.svg` sits at the top of `app/` because that is where it is looked for) | `scripts/check-published.mjs` (a browser given no `<link rel="icon">` asks for `/favicon.ico` and gets a 404 on every load; the four pages still without one are in [published-baseline.json](./published-baseline.json)) |
@@ -70,9 +70,13 @@ cost somebody a day:
   Each runs inside `npm run check`, each carries `--self-test`, and each
   states the counts it actually reached rather than passing in silence.
 
-  All ten decide "was I run, or imported?" through
-  [`scripts/is-command.mjs`](../scripts/is-command.mjs), which is one copy
-  on purpose. They each carried their own, and all ten were wrong the same
+  Every gate in the table above decides "was I run, or imported?" through
+  [`scripts/is-command.mjs`](../scripts/is-command.mjs), and so does
+  `scripts/node-floor.mjs`; it is one copy on purpose, and its importers
+  are the list to read rather than a number written here — this sentence
+  said "all ten" until 2026-08-22, by which point the table had grown past
+  ten. The ten gates that existed when the copies were merged each carried
+  their own, and all ten were wrong the same
   way: `import.meta.url` is the file's REAL path while `process.argv[1]` is
   whatever the caller typed, so a symlink anywhere in that path made the
   guard false and the gate exit 0 having checked nothing — no output, no
