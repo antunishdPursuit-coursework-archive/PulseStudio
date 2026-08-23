@@ -10,28 +10,38 @@ folder.
 
 ## What this product is (proven in code, not aspiration)
 
-A static staff view of upcoming class sessions: fill rates with attention
-flags (Underbooked / Filling soon / Full, computed from `booked` bookings
-only), a status filter, a per-session roster view, a local-only "add a
-class session" dialog, a single-room demand panel, and a hand-off button
-to Product D. Driven entirely by the shared synthetic generator — no
-server, no persistence of any kind.
+A staff view of upcoming class sessions: fill rates with attention flags
+(Underbooked / Filling soon / Full — computed from generator `booked`
+bookings, then overridden per member by the latest matching row in the
+booking app's `pulse-reservations-a`), a status filter, a per-session
+roster view, an "add a class session" dialog whose confirmed weeks persist
+to this browser, a by-room demand panel, and a hand-off link to Product D.
+Driven by the shared synthetic generator plus this browser's localStorage —
+no server.
 
-## THE structural fact to know before touching anything
+## THE structural facts to know before touching anything
 
-**The live page is `index.html` + `staff-dashboard.js` — and
-`staff-dashboard.js` is hand-written, git-tracked SOURCE**, despite being
-a `.js` in a TypeScript repo (it has no `.ts` twin; do not delete it as
-"compiled output"). Meanwhile `main.ts` is DEAD: an earlier
-`loadFixtures()`-based dashboard whose required DOM ids exist in neither
-HTML file — nothing loads it, and editing it changes nothing on the page.
-`staff-dashboard.html` WAS a stale sibling page and is gone (retired
-2026-08-23 on the do-not-merge/b proposal branch): it loaded the same
-script as `index.html` but declared only 12 of the 33 ids that script
-reaches for, so it threw `Cannot set properties of null` on line 19 of the
-script on every load and rendered nothing. Nothing linked to it; the only
-ways in were a typed URL or an old bookmark. `index.html` is the one
-dashboard, and it now carries its own `noindex` and favicon lines.
+**The live page is `index.html` + `staff-dashboard.js` + `dashboard.ts`.**
+`staff-dashboard.js` is hand-written, git-tracked SOURCE, despite being a
+`.js` in a TypeScript repo (it has no `.ts` twin; do not delete it as
+"compiled output"). It keeps the DOM wiring; the arithmetic — fill bands,
+seat counts, session-time formatting, the attention rule, room grouping —
+lives in `dashboard.ts` (added 2026-08-23), which `tsc` type-checks and
+`tests.ts` pins. Open `tests.html` to run the suite in a browser; the
+summary line reads "N checks run, P passed, F failed." (headless running
+waits on `scripts/run-suites.mjs` naming this page — team ground).
+
+Meanwhile `main.ts` is DEAD: an earlier `loadFixtures()`-based dashboard.
+Of the seven DOM ids it requires, only `#sessions` exists in `index.html`;
+the other six (`#status`, `#summary`, `#roster-dialog`, `#roster-content`,
+`#roster-title`, `#close-roster`) exist nowhere, so it would throw on
+`#status` before rendering anything — and nothing loads it, so editing it
+changes nothing on the page. `staff-dashboard.html` WAS a stale sibling
+page and is gone (retired 2026-08-23 on the do-not-merge/b proposal
+branch): it loaded the same script as `index.html` but declared only 12 of
+the ids that script reaches for, so it threw `Cannot set properties of
+null` on every load and rendered nothing. `index.html` is the one
+dashboard, and it carries its own `noindex` and favicon lines.
 
 ## Lane law
 
@@ -43,22 +53,29 @@ dashboard, and it now carries its own `noindex` and favicon lines.
 
 ## The deliberate design (do not "fix" without Manny's intent)
 
-- **The dataset is frozen on purpose**: seed `capacity-watch-2026`,
-  `asOfDate: "2026-08-19"`, and the 7-day window is computed from that
-  date, not from today — the dashboard shows the same week forever,
-  deterministically.
-- **One room.** Generator sessions carry no room field; every room label
-  and `#fastestRoom` are the hardcoded string `"Studio"`, and the demand
-  panel is that one room's peak fill. The home page's copy was already
-  corrected once for overstating this.
-- **Publish is in-memory only**: dialog-added sessions (`local-N` ids)
-  vanish on reload. Nothing here persists.
+- **Week 0 is anchored on purpose**: seed `capacity-watch-2026`,
+  `asOfDate: "2026-08-19"`, and week 0 is always the 7 days from that
+  date, never from today — the same starting week renders forever,
+  deterministically. The week picker shows four weeks at a time and
+  `#previousWeeks`/`#nextWeeks` page the window; forward paging has no
+  upper bound, so a staff person can walk into empty weeks (each states
+  "0 sessions").
+- **Rooms**: generator sessions carry no room field and default to the
+  string `"Studio"`; a session added in the dialog carries whatever room
+  was typed. The demand panel groups by that field, busiest room first,
+  and `#fastestRoom` ("Busiest room") is the top row's label.
+- **Publish persists to this browser**: confirming a draft writes the
+  week's `local-N` sessions to localStorage under `pulse-schedule-b`, and
+  they are restored (and re-validated) on the next load. A storage
+  listener picks up changes from another tab. No shared record is ever
+  created.
 - The roster locally re-maps generator camelCase into contract-style
   snake_case names — it LOOKS like contract data but is a private
   adapter inside this folder.
-- `#reengageBtn` navigates to the ABSOLUTE GitHub Pages URL of Product D
-  — from a local `npm run start` session it leaves localhost. If D's
-  hosting ever moves, this link must follow.
+- The fill-rate bands (70 / 90 / 100) live once, as named constants at
+  the top of `dashboard.ts`. The root product brief still lists the
+  threshold as an open decision for the team; until it is ratified,
+  these are the numbers, and `tests.ts` pins both sides of every edge.
 
 ## Integration facts
 
@@ -68,19 +85,25 @@ dashboard, and it now carries its own `noindex` and favicon lines.
 - Theme: `index.html` carries `product-b`, links `shared/theme.css`, and
   loads `shared/theme-boot.js` — which also gives the page the shared
   sign-in chip and theme toggle for free.
-- This product reads and writes NO storage keys of its own. Product A
-  publishes `pulse-reservations-a` (append-only, last-row-wins) as a seam
-  this dashboard MAY read one day; today it does not.
-- The header links to `../a-booking/index.html` — Kerrian's page must
-  keep existing at that path.
+- Storage: this product OWNS one key, `pulse-schedule-b` (its published
+  weeks), and READS the booking app's `pulse-reservations-a` — on load, on
+  window focus, and on storage events — validating every row and stating
+  the rejected count on the page. It never writes A's key. A canceled
+  runtime row decrements a session's confirmed count and a reserved one
+  increments it, so the tiles are generator data PLUS this browser.
+- The header links to `../a-booking/index.html`, and the "Plan
+  re-engagement" callout links to `../d-reengagement/index.html` — both
+  relative, so they hold on localhost and on the published site alike.
 
 ## Gate
 
 `npm run check` green before every commit. Never commit compiled `.js`
-(`main.js` here is exactly that — untracked, leave it be); remember that
-`staff-dashboard.js` is the one deliberate exception: tracked source. The
-repo-wide laws (no "demo"/"example"/"mock", no AI attribution, black or
-white backgrounds only, stated negatives, never commit red) all apply.
+(`main.js`, `dashboard.js` and `tests.js` here are exactly that —
+untracked, leave them be); remember that `staff-dashboard.js` is the one
+deliberate exception: tracked source. The repo-wide laws (no
+"demo"/"example"/"mock", no AI attribution, backgrounds always via
+`var(--bg)` and never hardcoded, stated negatives, never commit red) all
+apply.
 
 > AGENTS.md beside this file is a generated mirror for non-Claude
 > assistants — edit THIS file, then run `bash scripts/sync-agent-briefs.sh`.

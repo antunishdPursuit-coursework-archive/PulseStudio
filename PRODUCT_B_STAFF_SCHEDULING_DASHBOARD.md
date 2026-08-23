@@ -1,8 +1,9 @@
 # Product B: Staff Scheduling Dashboard
 
 **Owner:** Manny
-**Phase:** Problem framing
-**Evidence level:** Planned
+**Phase:** Built and published
+**Evidence level:** Shipped — `app/products/b-dashboard/index.html`, linked
+from the front door
 
 ## First user and outcome
 
@@ -29,6 +30,9 @@ cancel classes in the first increment.
 3. Staff see capacity, confirmed reservations, availability, and the agreed
    underbooked flag for each session.
 4. Staff open a session to review its roster and decide what action to take.
+5. Staff draft next week's classes in the schedule dialog and confirm them;
+   confirmed weeks persist to that browser only (localStorage key
+   `pulse-schedule-b`) and create no shared record.
 
 ## Shared data use
 
@@ -36,8 +40,10 @@ Reads `class_session`, `instructor`, `reservation`, and the member details that
 staff are permitted to see. It must use the field names, IDs, status values,
 and timezone defined in `SHARED_DATA_CONTRACT.md`.
 
-Product B is read-only for the shared-fixture MVP. Any staff action such as
-promoting or canceling a class remains a human decision outside the dashboard.
+Product B never writes a shared record: it reads the shared schedule and
+reservations, and any class it publishes is local to the browser until the
+team agrees where authored sessions live. Any staff action such as promoting
+or canceling a class remains a human decision outside the dashboard.
 
 ## Riskiest boundary
 
@@ -67,4 +73,7 @@ not part of the first fixture-backed MVP.
 
 Agree on the underbooked threshold, the time window for upcoming classes, how
 waitlists affect capacity, what staff roles can see, and whether a roster shows
-member names or anonymized IDs in the first release.
+member names or anonymized IDs in the first release. Until the threshold is
+ratified, the shipped numbers are the named constants at the top of
+`app/products/b-dashboard/dashboard.ts` — underbooked below 70%, filling soon
+at 90%, full at 100% — and that file is the one place they live.
