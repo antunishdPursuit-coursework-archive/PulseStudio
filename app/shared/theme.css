@@ -377,3 +377,56 @@ h1, h2, h3, .display, .page-head .role, .brand {
 @media (max-width: 860px) {
   .page-head .role { flex-basis: 100%; font-size: 1.1rem; }
 }
+
+
+/* ---- the pulse mark ---------------------------------------------------
+   One mark, three sizes, all from tokens so no page invents a local pixel
+   value. The landing header uses the standard size on purpose — it is the
+   front door's own header, not a bigger logo — and the wide line drawn
+   across the landing hero is an ART treatment of the same path, not a
+   fourth logo size. Product headers take the compact size beside the
+   brand word. */
+:root {
+  --pulse-mark-compact: 20px;
+  --pulse-mark-standard: 26px;
+}
+.home-brand .pulse-mark {
+  width: var(--pulse-mark-compact);
+  height: var(--pulse-mark-compact);
+  flex: none;
+}
+.brand .pulse-mark {
+  width: var(--pulse-mark-standard);
+  height: var(--pulse-mark-standard);
+  flex: none;
+}
+.home-brand { display: inline-flex; align-items: center; gap: 8px; }
+
+/* THE RESTING STATE IS THE WHOLE MARK. The runner path below is invisible
+   until an animation makes it otherwise, so everything outside the guarded
+   block sees a complete, solid logo: reduced motion is not a degraded
+   state, it is the default one. */
+.pulse-mark-runner { opacity: 0; }
+
+/* motion: pulse runner (guarded). One spark travels the line every 3.6s —
+   the same beat the landing hero already keeps (home.css) — then the mark
+   rests. Stroke movement only: no layout, no scale, nothing repainting
+   outside the mark's own box, and at 3.6s per cycle it is nowhere near any
+   flashing threshold. transform is never animated, so no transform-origin
+   question arises. The path is ~52 units long; the dash pair below is a
+   10-unit spark with a gap longer than the path, so exactly one spark is
+   ever on the line. */
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-mark-live .pulse-mark-runner {
+    stroke-dasharray: 10 62;
+    stroke-dashoffset: 72;
+    animation: pulse-mark-run 3.6s linear infinite;
+  }
+  @keyframes pulse-mark-run {
+    0%   { opacity: 0;    stroke-dashoffset: 72; }
+    12%  { opacity: 0.9; }
+    55%  { opacity: 0.9;  }
+    70%  { opacity: 0;    stroke-dashoffset: 0; }
+    100% { opacity: 0;    stroke-dashoffset: 0; }
+  }
+}
