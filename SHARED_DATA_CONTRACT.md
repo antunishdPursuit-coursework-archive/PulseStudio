@@ -154,12 +154,11 @@ the only way to say "Last attended: yoga with Ana on July 25" — the line a
 staff member judges a flag by — is to resolve the session and then its
 instructor. Reading them was correct; the row was wrong.
 
-An audit the same day compared every product's real reads against this
-table. **The data law itself holds** — no member-facing surface touches
-staff-only information, and Product C actively defends the line: it builds
-a list of member names for the sole purpose of REFUSING questions that
-mention one. **This table does not.** Three other rows are out of date, and
-each is its owner's to correct — see `docs/REQUESTFOR-A-B-C.md`.
+An audit the same day compared every product's real reads against this table.
+**The data law itself holds** — no member-facing surface touches staff-only
+information. Product C now matches its row exactly and refuses private-member
+questions without reading member records. Two other rows remain for their
+owners to correct — see `docs/REQUESTFOR-A-B-C.md`.
 
 ## Definitions the team must agree on
 
@@ -194,11 +193,10 @@ Each owner should add answers below before implementation:
 | --- | --- | --- | --- | --- |
 | Kerrian | Product A | `member`, `class_session` public fields, remaining spots | `reservation` (`reserved` / `canceled`) | A test persona stands in for auth; availability counts are public |
 | Manny | Product B | TBD | TBD | TBD |
-| Dennis | Product C | TBD | TBD | TBD |
+| Dennis | Product C | `class_session.session_id/class_type/level/starts_at/ends_at/session_status`, every `studio_policy` field, and the fixture timezone envelope | None — both collections are read-only | Choose a hosted `/api/chat` backend that keeps the Anthropic key secret |
 | Rensley | Product D | `member.member_id/display_name/membership_status`, `membership.status/renews_on`, `reservation.member_id/session_id/reservation_status`, `attendance.member_id/session_id/attendance_status/recorded_at`, `class_session.class_type/instructor_id`, `instructor.display_name` | None shared — product-local draft messages only, never sent automatically | Ratify 14/60-day drop-off thresholds; what does a missing attendance record mean for a reserved session; names vs. anonymized IDs on staff screens |
 
 Product briefs: [Product A](PRODUCT_A_MEMBER_BOOKING_APP.md),
-[Product B](PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md) and
-[Product D](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md). Product C has no brief in
-the root yet, so its scope is defined only by the worksheet row above and by
-`app/products/c-chatbot/CLAUDE.md`.
+[Product B](PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md),
+[Product C](PRODUCT_C_MEMBER_SUPPORT_CHATBOT.md), and
+[Product D](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md).

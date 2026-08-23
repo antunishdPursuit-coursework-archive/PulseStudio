@@ -158,7 +158,7 @@
 
     <!-- The map. Status lives on each edge's class: done | todo. -->
     <div class="map-stick">
-    <div class="map" role="img" aria-label="The data flow: shared records feed all four products, and A's booking log feeds Support and Re-engagement. One road is not built yet: the Dashboard reads the log but generates its own studio, so it rejects every booking Booking writes.">
+    <div class="map" role="img" aria-label="The data flow: shared records feed all four products, and A's booking log feeds Re-engagement. One road is not built yet: the Dashboard reads the log but generates its own studio, so it rejects every booking Booking writes.">
       <svg viewBox="0 0 860 250">
         <!-- the shared rail -->
         <g class="node n-shared">
@@ -195,12 +195,6 @@
         <g class="edge todo e-ab">
           <line x1="190" y1="66" x2="240" y2="66"/>
           <text class="lbl todo" x="215" y="56" text-anchor="middle">not yet</text>
-        </g>
-        <!-- B -> C : DONE. C's spaces-left answers read A's live reservation log. -->
-        <g class="edge done e-bc">
-          <line x1="410" y1="66" x2="460" y2="66"/>
-          <line class="runner" x1="410" y1="66" x2="460" y2="66" stroke-dasharray="26 52" style="--len: 52"/>
-          <text class="lbl done" x="435" y="56" text-anchor="middle">live</text>
         </g>
         <!-- A -> D : DONE. Re-engagement reads the running studio with A's
              live reservation log merged in (last row wins). -->
@@ -261,7 +255,7 @@
         <ul>
           <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip c">C</span> answers from, and <span class="chip d">D</span> reconciles against independent truth. <em>(This bullet also claimed <span class="chip b">B</span> watches it, until an audit on August 22, 2026 — the Dashboard builds its own studio from its own seed, which is the red road below. A page cannot list the same hand-off as green above and red below.)</em></li>
           
-          <li><strong><span class="chip a">A</span> → <span class="chip c">C</span>:</strong> support's spaces-left answers read Booking's own reservation log from this browser, with each member's latest reservation state winning.</li>
+          <li><strong><span class="chip s">shared</span> → <span class="chip c">C</span>:</strong> support reads only scheduled classes and current policies from the shared fixture; <code>pol_001</code> supplies the same 12-hour cancellation rule other products can quote.</li>
           <li><strong><span class="chip b">B</span> publishes for real:</strong> confirmed weekly schedules persist in this browser after a reload.</li>
           <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, and its <a href="./auth/tests.html">own suite</a> states how deeply it is checked.</li>
           <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file, and a gate holds the wire — a page that shows the name but is not wired to receive it fails the build. A clone edits four shared files; three product page titles are read before any module runs and stay a one-word edit each, in their owner’s lane.</li>
@@ -284,9 +278,9 @@
           <li><strong><span class="chip c">C</span> talks through Haiku locally</strong>
           <em>(not a road on the map — C's hand-offs are wired and firing; what
           is missing is somewhere to keep a key):</em>
-          member support can answer from the current safe schedule, policies,
-          and live browser reservations when the local server has an Anthropic
-          key. The deployed GitHub Pages site cannot run that conversation yet
+          member support can answer from the current safe schedule and policies
+          when the local server has an Anthropic key. The deployed GitHub Pages
+          site cannot run that conversation yet
           because it has no backend service where the key can stay secret. That
           hosted endpoint is Product C's only remaining deployment blocker.</li>
         </ul>

@@ -18,9 +18,7 @@ Manny, Dennis, or Rensley?" Then work only in their lane.
 | Rensley | D — Member Re-engagement Tool | `app/products/d-reengagement/` | Violet `#8b5cf6` |
 
 Each product's brief (`PRODUCT_<X>_*.md` in the repo root) defines its scope.
-Three of the four exist: A, B and D. Product C has none yet, so its scope
-lives in `app/products/c-chatbot/CLAUDE.md` and the shared contract's
-worksheet row until Dennis writes one.
+All four product briefs now exist.
 Do not build features from another product's brief.
 
 ## The lane law (why merges never conflict)

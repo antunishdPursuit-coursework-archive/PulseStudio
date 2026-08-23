@@ -192,32 +192,15 @@ The one answer to rule out is hardcoding a fake "today" inside a product.
 The pinned suites are the thing that must not move; a product that invents
 its own present would stop being checkable.
 
-## Dennis — Product C has no brief in the root (2026-08-21)
+## Dennis — Product C brief and worksheet (resolved 2026-08-23)
 
-Not urgent and not a defect — a gap the docs had stopped mentioning in two
-of the three places they should.
-
-`CLAUDE.md` says "Each product's brief (`PRODUCT_<X>_*.md` in the repo root)
-defines its scope", and lists the product briefs as part of what somebody
-who just cloned this needs in the first thirty seconds. Three exist: A, B
-and D. `README.md` was already honest about the fourth — it says the Product
-C brief will be added when its owner is ready. `CLAUDE.md` and
-`SHARED_DATA_CONTRACT.md` were not: the contract's last line linked only A
-and B, omitting D as well.
-
-Both corrected to say what is actually there. Until a brief exists, Product
-C's scope is defined by `app/products/c-chatbot/CLAUDE.md` and by your row
-in the shared contract's review worksheet — which currently reads TBD for
-required fields, fields created, and open questions.
-
-**The ask, whenever it suits:** the worksheet row is the smaller half and
-would help Product D directly. I read `class_session` and `instructor`
-display fields to personalise a draft; knowing which of those you also read,
-and whether you expect `studio_policy` to stay read-only, tells me whether
-we ever contend over the same records. The brief itself can wait for your
-increment.
-
-Nothing in `c-chatbot/` was touched.
+Product C now has `PRODUCT_C_MEMBER_SUPPORT_CHATBOT.md`, and Dennis's shared
+contract worksheet row records the exact fields it reads. The implementation
+loads the shared fixture through `loadFixtures()`, accesses only scheduled
+`class_session` records and current read-only `studio_policy` records, and
+creates no shared record. `pol_001` is the cancellation source for both
+surfaces. Private-member questions are refused without reading member,
+attendance, reservation, or risk records.
 
 ## The studio mailbox (affects everyone)
 

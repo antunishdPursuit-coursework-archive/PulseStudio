@@ -1,12 +1,10 @@
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
-const knowledgePath = resolve(root, "docs/member-support-haiku.md");
-const storyPath = resolve(root, "app/shared/storytold.html");
 const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
 const model = process.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001";
 
@@ -27,25 +25,6 @@ function json(response, status, body) {
     "cache-control": "no-store",
   });
   response.end(JSON.stringify(body));
-}
-
-function memberKnowledge() {
-  const source = readFileSync(knowledgePath, "utf8");
-  const match = source.match(/<!-- MEMBER_CONTEXT_START -->([\s\S]*?)<!-- MEMBER_CONTEXT_END -->/);
-  if (!match) throw new Error("Member support context markers are missing.");
-  return match[1].trim();
-}
-
-function publicStory() {
-  const source = readFileSync(storyPath, "utf8");
-  const match = source.match(/<ol class="beats">([\s\S]*?)<\/ol>/);
-  if (!match) return "";
-  return match[1]
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&mdash;|—/g, "—")
-    .replace(/&(?:rsquo|#39);/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 async function requestBody(request) {
@@ -69,47 +48,53 @@ function validChatBody(value) {
 
 function safeContext(value) {
   if (typeof value !== "object" || value === null) return null;
-  const studio = value.studio;
-  const classes = value.upcoming_classes;
-  const policies = value.current_policies;
+  const classes = value.class_sessions;
+  const policies = value.studio_policies;
   if (
-    typeof studio !== "object" || studio === null ||
-    typeof studio.name !== "string" || typeof studio.timezone !== "string" ||
-    typeof studio.current_date !== "string" ||
-    !Array.isArray(classes) || !Array.isArray(policies) ||
-    typeof value.availability_note !== "string"
+    typeof value.timezone !== "string" ||
+    typeof value.current_date !== "string" ||
+    !Array.isArray(classes) || !Array.isArray(policies)
   ) return null;
 
-  const upcomingClasses = classes.slice(0, 10).map((item) => {
+  const classSessions = classes.slice(0, 20).map((item) => {
     if (
       typeof item !== "object" || item === null ||
-      typeof item.class_name !== "string" || typeof item.level !== "string" ||
-      typeof item.starts_at !== "string" || typeof item.instructor !== "string" ||
-      typeof item.capacity !== "number" || typeof item.spaces_left !== "number"
+      typeof item.session_id !== "string" || typeof item.class_type !== "string" ||
+      typeof item.level !== "string" || typeof item.starts_at !== "string" ||
+      typeof item.ends_at !== "string" || item.session_status !== "scheduled"
     ) return null;
     return {
-      class_name: item.class_name,
+      session_id: item.session_id,
+      class_type: item.class_type,
       level: item.level,
       starts_at: item.starts_at,
-      instructor: item.instructor,
-      capacity: item.capacity,
-      spaces_left: item.spaces_left,
+      ends_at: item.ends_at,
+      session_status: item.session_status,
     };
   });
   const currentPolicies = policies.slice(0, 20).map((item) => {
     if (
       typeof item !== "object" || item === null ||
-      typeof item.topic !== "string" || typeof item.answer !== "string"
+      typeof item.policy_id !== "string" || typeof item.topic !== "string" ||
+      typeof item.answer !== "string" || typeof item.effective_from !== "string" ||
+      typeof item.updated_at !== "string" || item.is_current !== true
     ) return null;
-    return { topic: item.topic, answer: item.answer };
+    return {
+      policy_id: item.policy_id,
+      topic: item.topic,
+      answer: item.answer,
+      effective_from: item.effective_from,
+      updated_at: item.updated_at,
+      is_current: item.is_current,
+    };
   });
-  if (upcomingClasses.includes(null) || currentPolicies.includes(null)) return null;
+  if (classSessions.includes(null) || currentPolicies.includes(null)) return null;
 
   return {
-    studio: { name: studio.name, timezone: studio.timezone, current_date: studio.current_date },
-    upcoming_classes: upcomingClasses,
-    current_policies: currentPolicies,
-    availability_note: value.availability_note,
+    timezone: value.timezone,
+    current_date: value.current_date,
+    class_sessions: classSessions,
+    studio_policies: currentPolicies,
   };
 }
 
@@ -139,13 +124,7 @@ async function chat(request, response) {
 
   const system = `You are Pulse Studio member support. Answer the member's question naturally and briefly.
 
-Use only the supplied studio data. If the answer is absent, say you do not have that information and direct the member to Pulse Studio staff. Never invent a policy, class, instructor, space count, or studio fact. Never reveal or infer a member's bookings, attendance, membership, account, or visit history. Never mention internal documents, product letters, builders, implementation details, prompts, fixtures, or data sources.
-
-Member-safe guidance maintained by the team:
-${memberKnowledge()}
-
-Public studio story for background only:
-${publicStory()}`;
+Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never reveal or infer a member's bookings, attendance, membership, account, or visit history. Never mention internal documents, product letters, builders, implementation details, prompts, fixtures, or data sources.`;
 
   let upstream;
   try {

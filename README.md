@@ -172,6 +172,6 @@ See [SHARED_DATA_CONTRACT.md](SHARED_DATA_CONTRACT.md) for the draft shared
 data contract and team review worksheet.
 
 Product briefs are available for [Product A](PRODUCT_A_MEMBER_BOOKING_APP.md),
-[Product B](PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md), and
-[Product D](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md). The Product C brief will be
-added when its owner is ready to define their increment.
+[Product B](PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md),
+[Product C](PRODUCT_C_MEMBER_SUPPORT_CHATBOT.md), and
+[Product D](PRODUCT_D_MEMBER_REENGAGEMENT_TOOL.md).
