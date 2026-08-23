@@ -31,6 +31,7 @@ import {
 } from "../storage.js";
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
+import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
@@ -992,6 +993,108 @@ check("the footer links terms and privacy, resolved from the site root", () => {
     "https://studio.example/base/shared/terms.html",
     "https://studio.example/base/shared/privacy.html",
   ]);
+});
+
+/* ------------------------------------------------------------------ */
+/* The studio floor                                                     */
+/* ------------------------------------------------------------------ */
+
+/* EVERY JOINT NEEDS A PIVOT, and a missing one fails quietly. A <g> with
+ * no transform-origin rotates about the corner of the viewBox, so a leg
+ * does not bend — it swings the whole figure round the top-left of the
+ * drawing. Nothing throws, nothing logs, and the page just looks wrong in
+ * a way that is hard to attribute. These check that every bone carries
+ * one, and that it is stated in the viewBox's own coordinates rather than
+ * against a bounding box that changes as the limb moves. */
+const BONE_CLASSES = [
+  "run-thigh", "run-shin", "run-foot", "run-upper-arm", "run-forearm",
+  "cycle-thigh", "cycle-shin", "cycle-foot",
+];
+
+check("every bone in every figure pivots about a stated point", () => {
+  const missing: string[] = [];
+  for (const [name, build] of [["run", runningFigure], ["cycle", cyclingFigure]] as const) {
+    const svg = build();
+    for (const cls of BONE_CLASSES) {
+      for (const g of svg.querySelectorAll(`.${cls}`)) {
+        const origin = (g as SVGGElement).style.transformOrigin ?? "";
+        if (!/^-?[\d.]+px -?[\d.]+px$/.test(origin)) missing.push(`${name}/${cls} → ${JSON.stringify(origin)}`);
+      }
+    }
+  }
+  return eq(missing, []);
+});
+
+check("...measured against the viewBox, not a bounding box that moves", () => {
+  const svg = runningFigure();
+  const boxes = [...svg.querySelectorAll(".run-thigh, .run-shin, .run-upper-arm")]
+    .map((g) => (g as SVGGElement).style.transformBox ?? "");
+  return eq([...new Set(boxes)], ["view-box"]);
+});
+
+/* The shin hangs off the thigh and the forearm off the upper arm. Nested,
+ * not siblings — that nesting is what makes a knee travel with its hip
+ * without either one knowing the other exists. */
+check("the knee is inside the hip, and the elbow inside the shoulder", () => {
+  const svg = runningFigure();
+  const shinsInThighs = svg.querySelectorAll(".run-thigh .run-shin").length;
+  const foreInUpper = svg.querySelectorAll(".run-upper-arm .run-forearm").length;
+  return eq([shinsInThighs, foreInUpper].join(","), "2,2");
+});
+
+check("the lifter's arms and bar are separate groups, so the plates stay round", () => {
+  const svg = liftingFigure();
+  /* The arms scale on Y to press; the bar translates the matching
+   * distance. One group doing both would squash the plates into ovals at
+   * the bottom of every rep. */
+  return eq([svg.querySelectorAll(".lift-arms").length, svg.querySelectorAll(".lift-bar").length].join(","), "1,1");
+});
+
+check("a figure is decorative — it announces nothing", () => {
+  const hidden = [liftingFigure(), cyclingFigure(), runningFigure()]
+    .map((s) => s.getAttribute("aria-hidden"));
+  return eq(hidden, ["true", "true", "true"]);
+});
+
+/* mountFigures fills named hooks. A name it does not know is REPORTED
+ * rather than left as an empty box — the language law's stated negative,
+ * applied to a drawing that did not arrive. */
+check("a named hook gets the figure it names", () => {
+  const host = document.createElement("div");
+  const slot = document.createElement("div");
+  slot.dataset["figure"] = "lift";
+  host.append(slot);
+  const unknown = mountFigures(host);
+  return eq([slot.querySelectorAll("svg").length, unknown.length].join(","), "1,0");
+});
+
+check("...and a hook naming a drawing that does not exist is reported, not ignored", () => {
+  const host = document.createElement("div");
+  const slot = document.createElement("div");
+  slot.dataset["figure"] = "swim";
+  host.append(slot);
+  const unknown = mountFigures(host);
+  return eq([unknown, slot.querySelectorAll("svg").length].join("|"), "swim|0");
+});
+
+check("mounting twice does not stack two drawings in one hook", () => {
+  const host = document.createElement("div");
+  const slot = document.createElement("div");
+  slot.dataset["figure"] = "cycle";
+  host.append(slot);
+  mountFigures(host);
+  mountFigures(host);
+  return eq(slot.querySelectorAll("svg").length, 1);
+});
+
+check("the runner gets a lane to cross, and only one", () => {
+  const host = document.createElement("div");
+  const lane = document.createElement("div");
+  lane.setAttribute("data-figure-lane", "");
+  host.append(lane);
+  mountFigures(host);
+  mountFigures(host);
+  return eq([lane.querySelectorAll(".run-lane").length, lane.querySelectorAll(".figure-run").length].join(","), "1,1");
 });
 
 /* ------------------------------------------------------------------ */

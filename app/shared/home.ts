@@ -27,6 +27,24 @@ import {
   type PulseSession,
   type SessionChangeOrigin,
 } from "./auth/session.js";
+import { mountFigures } from "./components/figures.js";
+
+/* THE STUDIO FLOOR. The front door's markup names which figure goes where
+ * (`data-figure="lift"`, `data-figure="cycle"`, `data-figure-lane`) and
+ * this fills them — the same split the brand header uses, where the page
+ * owns the hook and the shared component owns what arrives in it.
+ *
+ * A NAME WITH NO FIGURE BEHIND IT IS SAID OUT LOUD. An empty box that was
+ * meant to hold a drawing looks exactly like a box that was meant to be
+ * empty, and the language law is explicit that a surface states what it
+ * checked rather than showing nothing. */
+const unknownFigures = mountFigures();
+if (unknownFigures.length > 0) {
+  console.warn(
+    `front door: ${unknownFigures.length} figure hook(s) name a drawing that does not exist — ` +
+      `${unknownFigures.join(", ")}. The names components/figures.ts knows are lift, cycle and run.`,
+  );
+}
 
 /** Where each actor's own home is, relative to the front door. */
 const HOME_FOR = {

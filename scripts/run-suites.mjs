@@ -173,6 +173,14 @@ function installBrowserStubs(baseDir) {
       this.attributes = new Map();
       this.listeners = [];
       this.ownText = "";
+      /* A property BAG, not a CSSStyleDeclaration. It records what a module
+       * assigns — components/figures.ts sets transform-box and
+       * transform-origin per joint, and a bone with no pivot rotates about
+       * the corner of the viewBox instead of about a hip, which is worth a
+       * check. It computes nothing: there is no cascade here, no cssText,
+       * and reading a property nobody set gives undefined rather than the
+       * browser's initial value. */
+      this.style = {};
       const element = this;
       this.classList = {
         add(...names) {
