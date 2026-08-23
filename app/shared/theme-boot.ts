@@ -264,14 +264,29 @@ function mountAppearanceControl(): void {
   const details = document.createElement("details");
   details.id = "appearance-control";
   details.className = "appearance-control";
+  /* A NAMED DOOR, not a glyph. This was a bare "◐" with the words only in a
+   * title attribute — which a person has to hover to discover, and a phone
+   * cannot hover at all. So the one control that changes what the whole site
+   * looks like was effectively hidden on every touch device we ship to. It
+   * says Settings now, because that is the word people already look for; the
+   * mark stays beside the word rather than instead of it. */
   const summary = document.createElement("summary");
-  summary.textContent = "◐";
-  summary.setAttribute("aria-label", "Appearance settings");
-  summary.setAttribute("title", "Appearance settings");
+  const mark = document.createElement("span");
+  mark.className = "settings-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "◐";
+  const label = document.createElement("span");
+  label.className = "settings-label";
+  label.textContent = "Settings";
+  summary.append(mark, label);
+  summary.setAttribute("aria-label", "Settings");
   details.appendChild(summary);
 
   const panel = document.createElement("div");
   panel.className = "appearance-panel";
+  /* Appearance is a SECTION inside settings, not the whole of it. Naming it
+   * leaves an obvious place for the next setting, instead of the panel
+   * quietly becoming a colour picker wearing a general name. */
   const heading = document.createElement("p");
   heading.className = "appearance-heading";
   heading.textContent = "Appearance";
