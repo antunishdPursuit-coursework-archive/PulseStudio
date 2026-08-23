@@ -115,6 +115,17 @@
       <div><strong>Fair cancellation</strong><span>Cancel up to 12 hours before class at no charge.</span></div>
     </section>
 
+    <!-- The studio floor. Decorative on purpose: it carries no words, so
+         it repeats none of the copy above it and says nothing a screen
+         reader has to sit through. What it does is show the studio
+         WORKING, which is the one thing a schedule and a list of features
+         cannot. shared/components/figures.ts draws the three; theme.css
+         moves them, all of it behind prefers-reduced-motion. -->
+    <section class="studio-floor" aria-hidden="true" data-figure-lane>
+      <div data-figure="lift"></div>
+      <div data-figure="cycle"></div>
+    </section>
+
     <div class="products-head" id="members">
       <h2>For members</h2>
       <p>Everything you need between classes — no app to install, no account

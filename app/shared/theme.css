@@ -603,3 +603,184 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .prose li { margin-bottom: 8px; }
 .prose .lede { margin-bottom: 16px; }
 .prose-date { color: var(--muted); font-size: 0.84rem; }
+
+/* ---- the studio floor -------------------------------------------------
+   Three figures in the mark's own line: one lifts, one rides, one runs the
+   length of the band. components/figures.ts draws them; this decides how
+   they move.
+
+   THE RESTING POSE IS A WHOLE DRAWING. Everything below the guard is
+   motion; everything above it is the picture. With reduced motion the
+   band still shows a person mid-press, a rider on a bike, and a runner in
+   stride — a still, not a broken animation. That is the same promise the
+   pulse mark makes a few rules up.
+
+   ONE BEAT FOR THE WHOLE STUDIO. The mark's spark runs every 3.6s; the
+   press and the pedal are multiples of it, so nothing on the page ever
+   quite syncs but nothing fights either. The crossing is deliberately far
+   slower — a runner who crosses in four seconds reads as a bug. */
+.figure { display: block; width: 100%; height: 100%; overflow: visible; }
+.figure line, .figure circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The arms scale on Y to press. Without this the stroke scales with
+     them and the arms get thin at the top of the lift. */
+  vector-effect: non-scaling-stroke;
+}
+/* THE FAR SIDE RECEDES. Two legs, a crank and two frame tubes all meet at
+   a bottom bracket, and at this size that is one blob rather than a rider.
+   Every side-view figure drawing solves it the same way: the limb on the
+   far side of the body is lighter, so the eye reads one leg in front of
+   another instead of four lines in a knot. It is depth, done with the one
+   property that costs nothing to animate. */
+.cycle-leg-far, .run-leg-far, .run-arm-far { opacity: 0.42; }
+
+/* The resting poses: a press half-extended, a stride mid-flight. Set here
+   rather than left at zero so the still picture is a POSE and not a figure
+   standing perfectly straight with its arms welded to a bar. */
+.lift-arms { transform: scaleY(0.86); }
+.lift-bar { transform: translateY(4.5px); }
+/* A knee bends ONE way. Every shin angle below is negative, and every
+   forearm angle is negative, because a joint that folds the wrong way is
+   the single thing that makes a rig read as broken rather than stylised. */
+.run-leg-near { transform: rotate(36deg); }
+.run-leg-far { transform: rotate(-30deg); }
+.run-leg-near .run-shin { transform: rotate(-74deg); }
+.run-leg-far .run-shin { transform: rotate(-14deg); }
+.run-foot { transform: rotate(-24deg); }
+.run-arm-near { transform: rotate(-42deg); }
+.run-arm-far { transform: rotate(36deg); }
+.run-arm-near .run-forearm { transform: rotate(-72deg); }
+.run-arm-far .run-forearm { transform: rotate(-84deg); }
+.cycle-leg-near { transform: rotate(-26deg); }
+.cycle-leg-far { transform: rotate(8deg); }
+.cycle-leg-near .cycle-shin { transform: rotate(-10deg); }
+.cycle-leg-far .cycle-shin { transform: rotate(-66deg); }
+.cycle-foot { transform: rotate(-30deg); }
+
+/* The band itself. A row on the studio's own ground line, with the runner
+   crossing behind the two who are working in place. */
+.studio-floor {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0 40px;
+  max-width: 760px;
+  margin: 26px auto 0;
+  padding: 0 20px 34px;
+  color: var(--muted);
+}
+/* One floor for all three, and every figure's box ends on it: the grid
+   bottom-aligns them, the run lane sits at the same offset, and the rule
+   below is drawn at that offset too. Before this the runner stood ten
+   pixels under the line and the lifter drew a second floor of its own. */
+.studio-floor [data-figure] { height: 132px; }
+.studio-floor [data-figure="lift"] { color: var(--kerrian); justify-self: end; width: 118px; }
+.studio-floor [data-figure="cycle"] { color: var(--dennis); justify-self: start; width: 152px; }
+.run-lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 34px;
+  height: 100px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.run-traveller { width: 78px; height: 100px; color: var(--rensley); }
+.run-traveller .figure { height: 100px; }
+/* The floor everyone is standing on. */
+.studio-floor::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 33px;
+  border-bottom: 3px solid var(--line);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lift-arms { animation: lift-press 3.6s ease-in-out infinite; }
+  .lift-bar { animation: lift-bar 3.6s ease-in-out infinite; }
+  @keyframes lift-press {
+    0%, 100% { transform: scaleY(0.62); }
+    45%      { transform: scaleY(1); }
+    62%      { transform: scaleY(1); }
+  }
+  @keyframes lift-bar {
+    0%, 100% { transform: translateY(12px); }
+    45%      { transform: translateY(0); }
+    62%      { transform: translateY(0); }
+  }
+
+  .cycle-wheel { animation: spin 1.8s linear infinite; }
+  .cycle-crank { animation: spin 1.2s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .cycle-leg-near { animation: pedal-thigh 1.2s linear infinite; }
+  .cycle-leg-far  { animation: pedal-thigh 1.2s linear infinite -0.6s; }
+  .cycle-leg-near .cycle-shin { animation: pedal-shin 1.2s linear infinite; }
+  .cycle-leg-far  .cycle-shin { animation: pedal-shin 1.2s linear infinite -0.6s; }
+  /* The thigh sweeps a small arc while the shin does most of the work —
+     which is what a pedal stroke looks like from the side: the knee barely
+     travels, the ankle goes round. */
+  @keyframes pedal-thigh {
+    0%, 100% { transform: rotate(-20deg); }
+    50%      { transform: rotate(6deg); }
+  }
+  @keyframes pedal-shin {
+    0%   { transform: rotate(-30deg); }
+    25%  { transform: rotate(-8deg); }
+    50%  { transform: rotate(-34deg); }
+    75%  { transform: rotate(-66deg); }
+    100% { transform: rotate(-30deg); }
+  }
+
+  /* Opposition is the whole thing: the near arm swings with the FAR leg.
+     Same duration, offset by half, on both pairs. */
+  .run-leg-near { animation: stride 0.62s ease-in-out infinite; }
+  .run-leg-far  { animation: stride 0.62s ease-in-out infinite -0.31s; }
+  .run-leg-near .run-shin { animation: stride-shin 0.62s ease-in-out infinite; }
+  .run-leg-far  .run-shin { animation: stride-shin 0.62s ease-in-out infinite -0.31s; }
+  .run-arm-near { animation: swing 0.62s ease-in-out infinite -0.31s; }
+  .run-arm-far  { animation: swing 0.62s ease-in-out infinite; }
+  @keyframes stride {
+    0%, 100% { transform: rotate(40deg); }
+    50%      { transform: rotate(-32deg); }
+  }
+  /* Knee bent hard on the way through, straight at the strike. Never
+     positive: a shin that swings forward past the thigh is a broken leg. */
+  @keyframes stride-shin {
+    0%   { transform: rotate(-14deg); }
+    30%  { transform: rotate(-82deg); }
+    60%  { transform: rotate(-64deg); }
+    100% { transform: rotate(-14deg); }
+  }
+  @keyframes swing {
+    0%, 100% { transform: rotate(-44deg); }
+    50%      { transform: rotate(38deg); }
+  }
+  /* A slight bob, so the runner rises and falls the way a stride does
+     rather than gliding along a rail. Twice the stride rate: one rise per
+     footfall, two per cycle. */
+  .run-traveller .figure { animation: run-bob 0.31s ease-in-out infinite; }
+  @keyframes run-bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+  }
+
+  .run-traveller { animation: run-across 19s linear infinite; }
+  @keyframes run-across {
+    from { transform: translateX(-90px); }
+    to   { transform: translateX(calc(100vw + 90px)); }
+  }
+}
+
+@media (max-width: 560px) {
+  .studio-floor { gap: 0 16px; }
+  .studio-floor [data-figure="lift"] { width: 92px; }
+  .studio-floor [data-figure="cycle"] { width: 118px; }
+}

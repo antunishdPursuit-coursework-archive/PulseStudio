@@ -1169,16 +1169,59 @@ for (const file of ENGINE_SOURCES) {
   /* Every animation of the runner sits AFTER the reduced-motion guard. The
    * base .pulse-mark-runner rule (opacity 0 — the resting state) sits
    * before it, which is what makes rest the default rather than a fallback. */
-  const guard = themeCss.indexOf("@media (prefers-reduced-motion: no-preference)");
-  const lastGuard = themeCss.lastIndexOf("@media (prefers-reduced-motion: no-preference)");
-  check("theme.css has the reduced-motion guard", guard >= 0, true);
+  /* EVERY GUARDED REGION, FOUND BY MATCHING BRACES — not by assuming there
+   * is one of them.
+   *
+   * This check used to compare each animation's position against
+   * lastIndexOf(guard), which is only correct while the file has exactly
+   * ONE reduced-motion block. The day a second one landed (the studio
+   * floor's) the mark's animation was suddenly "before the last guard" and
+   * a correct file failed. The assumption was the bug, so the assumption
+   * is gone: the ranges are computed, and an animation has to sit inside
+   * one of them. */
+  const guardRanges: Array<[number, number]> = [];
+  const GUARD = "@media (prefers-reduced-motion: no-preference)";
+  for (let at = themeCss.indexOf(GUARD); at >= 0; at = themeCss.indexOf(GUARD, at + 1)) {
+    let depth = 0;
+    let end = -1;
+    for (let i = themeCss.indexOf("{", at); i < themeCss.length && i >= 0; i += 1) {
+      if (themeCss[i] === "{") depth += 1;
+      else if (themeCss[i] === "}") { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    if (end > at) guardRanges.push([at, end]);
+  }
+  const insideAGuard = (i: number): boolean => guardRanges.some(([a, b]) => i > a && i < b);
+  check("theme.css has at least one reduced-motion guard", guardRanges.length > 0, true);
+  check("...and every one of them closes", guardRanges.every(([a, b]) => b > a), true);
+
   const restingRule = themeCss.indexOf(".pulse-mark-runner { opacity: 0; }");
-  check("the runner rests invisible, outside any guard",
-    restingRule >= 0 && restingRule < lastGuard, true);
-  const animLines = [...themeCss.matchAll(/animation:[^;]*pulse-mark-run/g)].map((m) => m.index ?? -1);
-  check("the mark's animation exists", animLines.length > 0, true);
-  check("...and every occurrence of it sits inside the guarded region",
-    animLines.every((i) => i > lastGuard), true);
+  check("the runner rests invisible, outside every guard",
+    restingRule >= 0 && !insideAGuard(restingRule), true);
+
+  /* NOT JUST THE MARK. Every `animation:` in the shared stylesheet has to
+   * be inside a guard — the mark's spark, the lifter's press, the pedal
+   * stroke, the stride and the crossing. One rule written outside is one
+   * thing that keeps moving for somebody who asked the whole site to stop. */
+  const allAnimations = [...themeCss.matchAll(/(^|[;{\s])animation:/g)].map((m) => m.index ?? -1);
+  check("theme.css declares animations at all", allAnimations.length > 0, true);
+  const unguarded = allAnimations.filter((i) => !insideAGuard(i));
+  check("...and every single one sits inside a reduced-motion guard", unguarded.length, 0);
+  const markAnimations = [...themeCss.matchAll(/animation:[^;]*pulse-mark-run/g)].map((m) => m.index ?? -1);
+  check("the mark's animation exists", markAnimations.length > 0, true);
+  check("...and it is one of the guarded ones", markAnimations.every(insideAGuard), true);
+
+  /* A KNEE BENDS ONE WAY. Every shin and every forearm angle in the file
+   * is zero or negative; a positive one folds a joint backwards, which is
+   * the single thing that makes a rig read as broken rather than drawn.
+   * Cheap to check, and impossible to see in a diff. */
+  const jointAngles: number[] = [];
+  for (const block of themeCss.split("}")) {
+    if (!/-shin|-forearm/.test(block)) continue;
+    for (const m of block.matchAll(/rotate\((-?[\d.]+)deg\)/g)) jointAngles.push(Number(m[1]));
+  }
+  check("the joint angles were actually found", jointAngles.length > 4, true);
+  check("...and no knee or elbow bends backwards",
+    jointAngles.filter((a) => a > 0), []);
   /* The keyframes never touch transform or layout — stroke and opacity only,
    * which is what "no layout movement" means as a greppable property.
    *
@@ -1210,6 +1253,7 @@ for (const file of ENGINE_SOURCES) {
     "../components/brand-header.ts",
     "../components/site-footer.ts",
     "../components/alert.ts",
+    "../components/figures.ts",
   ]) {
     const source = await (await fetch(file)).text();
     check(`${file} was actually read`, source.length > 200, true);

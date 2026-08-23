@@ -19,7 +19,7 @@ the legacy contract) is what all four products speak.
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name AND its contact details (`STUDIO_CONTACT` — address, email, the call and text numbers), rendered into every header and every footer at runtime. `dialable()` derives the `tel:`/`sms:` form from the readable one so a number is typed once. See `components/README.md` for the rebrand checklist and its two static remainders |
-| `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control), `site-footer.ts` (the ONE footer, on every page), `alert.ts` (Notice · Problem · Done, in a live region made empty at boot) — each documented in `components/README.md` |
+| `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control), `site-footer.ts` (the ONE footer, on every page), `alert.ts` (Notice · Problem · Done, in a live region made empty at boot), `figures.ts` (the studio floor — a lifter, a rider, and a runner who crosses the page, every joint a nested rotation) — each documented in `components/README.md` |
 | `storage.ts` | The four guarded doors onto `localStorage`: `readStored`, `writeStored`, `clearStored`, `storageWorks`. ONE implementation, arrived at the same way `color.ts` and `today.ts` did — `theme-boot.ts` and Product D's `main.ts` each had their own and the two had already drifted (see the storage bullet below). Carries `setStorageForChecks`, so the suite can hand it a store that throws |
 | `synthetic/` | The deterministic studio engine: seeded generation to 2000 members × 5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
@@ -313,6 +313,17 @@ the legacy contract) is what all four products speak.
   and the alert strip between), and never reaches inside a product's
   `<main>`. Every piece has an opt-out its owner can use without asking:
   `<body data-no-session>`, `<body data-no-footer>`.
+- **Nothing in `theme.css` may move outside a reduced-motion guard, and a
+  check computes the guards rather than assuming there is one.** The mark's
+  motion check compared each `animation:` against `lastIndexOf` of the
+  guard, which is right only while the file has exactly ONE guarded block.
+  The day the studio floor added a second, the mark's animation read as
+  "before the last guard" and a correct file failed. The ranges are brace-
+  matched now, and the rule widened while it was being fixed: EVERY
+  `animation:` in the shared stylesheet has to sit inside one, not just the
+  mark's. A related check reads every shin and forearm angle in the file
+  and fails on a positive one — a joint folding backwards is the single
+  thing that makes a rig read as broken, and it is invisible in a diff.
 - **The chip mounts by header class**: renaming `.topnav`, `.page-head`,
   or `.topbar` in a product silently removes sign-in from that page. The
   selector is in `theme-boot.ts`, NOT in `components/topbar.ts` — topbar
