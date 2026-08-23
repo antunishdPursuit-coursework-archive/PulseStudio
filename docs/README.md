@@ -12,7 +12,7 @@ Process documents for the people building Pulse Studio. These sit OUTSIDE
 | [published-baseline.json](./published-baseline.json) | Everything `app/` serves at a public URL that is not the website, with the owner of each and why it is allowed to sit there. This list only shrinks. |
 | [contrast-baseline.json](./contrast-baseline.json) | The accent colours that were below WCAG AA the day `check-contrast.mjs` landed, with the owner who can clear each one. A developer's colour is theirs, so nobody else clears these. This list only shrinks. |
 | [equivalent-mutants.md](./equivalent-mutants.md) | Survivors `npm run mutate` reports that nobody can close, with the reason each is unreachable — read before chasing one. Also every way the runner itself lied before each was fixed, listed there rather than counted here — this cell said "three" until 2026-08-22, when that document already held more. |
-| [member-support-haiku.md](./member-support-haiku.md) | How Product C runs with Haiku locally and which shared records may reach the service |
+| [the-server.md](./the-server.md) | How Product C runs with Haiku locally and which shared records may reach the service |
 | [REQUESTFOR-A-B-C.md](./REQUESTFOR-A-B-C.md) | What Product D needs from A, B and C, and what D gives back — one section per teammate, each ending in ONE ask |
 | [SENIOR-DEV-BRIEF.md](./SENIOR-DEV-BRIEF.md) | The whole of Product D in one file: what it does, how it is proven, and every open question — written to be read start to finish by someone new |
 
