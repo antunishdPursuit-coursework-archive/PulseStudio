@@ -4616,6 +4616,58 @@ check("clean records produce no data-quality line",
   check("...and explains why there is no filter",
     unknownView.filterLabel, "No class interest recorded — showing all approved routines");
   check("...and does not offer a filter control", unknownView.filterAvailable, false);
+  /* --- the routine on the ledger: an attribute, never a second event ---
+   *
+   * The ledger's meaning is "a note was taken for this lapse", and
+   * outreachStateFor reads it to decide whether a member has already been
+   * reached. A separate routine_included row would have been counted as
+   * outreach — suppressing a legitimate note, or making "already reached"
+   * true for a lapse nobody wrote to. These checks pin that it did not
+   * become a second event and that the four gates are untouched. */
+  {
+    const flagged = run(recordsFor([
+      { id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] },
+    ])).flagged[0];
+    if (!flagged) throw new Error("fixture defect: nobody flagged");
+    const withRoutineId = recordOutreach([], flagged, "copy", "2026-08-18", "routine-morning-mobility");
+    const withoutRoutineId = recordOutreach([], flagged, "copy", "2026-08-18");
+
+    check("a note with a routine is ONE record, not two", withRoutineId.length, 1);
+    check("...carrying the routine id", withRoutineId[0]?.routineId, "routine-morning-mobility");
+    check("a note without a routine OMITS the field, never null or empty",
+      "routineId" in (withoutRoutineId[0] ?? {}), false);
+    check("...and is otherwise the record D always wrote",
+      JSON.stringify(withoutRoutineId[0]),
+      JSON.stringify({ memberId: flagged.member.member_id, lapseKey: lapseKeyOf(flagged),
+        takenAt: "2026-08-18", channel: "copy" }));
+    check("an empty routine id is omitted too",
+      "routineId" in (recordOutreach([], flagged, "copy", "2026-08-18", "")[0] ?? {}), false);
+
+    /* THE GATES ARE UNCHANGED. The same lapse reads "already reached"
+     * whether or not a routine went with the note, and a record written
+     * before today — which has no routineId at all — still reads. */
+    const policy = outreachPolicy;
+    const stateWith = outreachStateFor(flagged, policy, withRoutineId, []);
+    const stateWithout = outreachStateFor(flagged, policy, withoutRoutineId, []);
+    check("a routine does not change whether the member was already reached",
+      stateWith.kind, stateWithout.kind);
+    check("...and that state is still alreadyReached", stateWith.kind, "alreadyReached");
+    check("a record written before routines existed still reads",
+      outreachStateFor(flagged, policy,
+        [{ memberId: flagged.member.member_id, lapseKey: lapseKeyOf(flagged),
+           takenAt: "2026-08-18", channel: "copy" }], []).kind,
+      "alreadyReached");
+    /* Suppression still wins over everything, routine or no routine. */
+    check("suppression still outranks a note that carried a routine",
+      outreachStateFor(flagged, policy, withRoutineId,
+        [{ memberId: flagged.member.member_id, suppressedOn: "2026-08-01" }]).kind,
+      "suppressed");
+    /* And the ledger still records nothing about a body or a message. */
+    check("the record holds only the four facts and the routine id",
+      Object.keys(withRoutineId[0] ?? {}).sort().join(","),
+      "channel,lapseKey,memberId,routineId,takenAt");
+  }
+
   /* --- the safety guidance, as approved for this increment --- */
   check("the guidance names what this is", SAFETY_HEADING, "General fitness information");
   check("it says plainly that it is not individualised medical advice",

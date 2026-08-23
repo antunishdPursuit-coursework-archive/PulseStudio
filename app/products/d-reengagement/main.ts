@@ -458,7 +458,7 @@ function renderFlagged(
     navigator.clipboard.writeText(draft).then(
       () => {
         copyBtn.textContent = "Copied ✓";
-        ledger = recordOutreach(ledger, f, "copy", studioToday());
+        ledger = recordOutreach(ledger, f, "copy", studioToday(), chosen?.id);
         persist();
         setTimeout(() => {
           focusMemberAfterRender = f.member.member_id;
@@ -496,7 +496,7 @@ function renderFlagged(
     anchor.addEventListener("click", () => {
       // Opening the mail client IS taking the draft — the note is in the
       // staff member's hands from here.
-      ledger = recordOutreach(ledger, f, "email", studioToday());
+      ledger = recordOutreach(ledger, f, "email", studioToday(), chosen?.id);
       persist();
       setTimeout(() => {
         focusMemberAfterRender = f.member.member_id;

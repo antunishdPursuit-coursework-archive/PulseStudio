@@ -52,6 +52,20 @@ export interface OutreachRecord {
   lapseKey: string;
   takenAt: string; // ISO date the draft was taken
   channel: "copy" | "email";
+  /** Which approved routine went with the note, when one did.
+   *
+   *  AN ATTRIBUTE OF THE NOTE, NOT A SECOND EVENT. A routine is included IN
+   *  a copied draft, so this is one more thing known about the same event —
+   *  which is why it does NOT change what the ledger means. A separate
+   *  `routine_included` row would have been counted by outreachStateFor as
+   *  outreach, so attaching a routine could have suppressed a legitimate
+   *  note, or made "already reached" read true for a lapse nobody wrote to.
+   *
+   *  Optional, because every record written before today lacks it, and
+   *  because a note without a routine is the common case. Nothing here
+   *  records the message text, anything about a body, or any claim that the
+   *  routine was opened, followed, or suited anybody. */
+  routineId?: string;
 }
 
 export interface SuppressionRecord {
@@ -107,16 +121,19 @@ export function recordOutreach(
   flagged: FlaggedMember,
   channel: "copy" | "email",
   takenAt: string,
+  routineId?: string,
 ): OutreachRecord[] {
-  return [
-    ...ledger,
-    {
-      memberId: flagged.member.member_id,
-      lapseKey: lapseKeyOf(flagged),
-      takenAt,
-      channel,
-    },
-  ];
+  /* The routine id is OMITTED when there is none, never written as null or
+   * an empty string — the same rule the routine contract follows, and the
+   * reason a record from before today still reads correctly. */
+  const record: OutreachRecord = {
+    memberId: flagged.member.member_id,
+    lapseKey: lapseKeyOf(flagged),
+    takenAt,
+    channel,
+  };
+  if (routineId !== undefined && routineId !== "") record.routineId = routineId;
+  return [...ledger, record];
 }
 
 /* ------------------------------------------------------------------ */
