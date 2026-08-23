@@ -1,11 +1,4 @@
 {
-  "note": "Tracked JavaScript under app/ that no compiler opens. .gitignore line 9 is app/**/*.js and the git law forbids committing compiled .js, but `git add -f` walks past an ignore rule and nothing looked afterwards until scripts/check-sources.mjs landed (2026-08-22). Everything here was already tracked that day. Each entry says which of the two problems it is, because the gate reads the file LIST and cannot tell them apart by looking — a person decided. This list is meant to SHRINK, and shrinking it belongs to the file's owner. Anything not on this list fails the gate.",
-  "allowed": [
-    {
-      "file": "app/products/b-dashboard/staff-dashboard.js",
-      "owner": "Manny",
-      "kind": "hand-written, no TypeScript source",
-      "why": "hand-written JavaScript with no .ts beside it, and the module b-dashboard/index.html actually loads. tsconfig.json includes only app/**/*.ts, so tsc never opens it: the staff dashboard ships 69 lines that no gate type-checks. Not a build artifact — there is nothing to regenerate it from. Rewriting it in TypeScript is Manny's call and would remove this line"
-    }
-  ]
+  "note": "Tracked JavaScript under app/ that no compiler opens. .gitignore line 9 is app/**/*.js and the git law forbids committing compiled .js, but `git add -f` walks past an ignore rule and nothing looked afterwards until scripts/check-sources.mjs landed (2026-08-22). Everything here was already tracked that day. Each entry says which of the two problems it is, because the gate reads the file LIST and cannot tell them apart by looking \u2014 a person decided. This list is meant to SHRINK, and shrinking it belongs to the file's owner. Anything not on this list fails the gate. The list is empty: every module the site runs now has a TypeScript source, and a new entry here is a regression rather than a plan.",
+  "allowed": []
 }
