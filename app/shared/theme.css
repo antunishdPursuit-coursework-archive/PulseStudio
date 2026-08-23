@@ -900,6 +900,24 @@ h1, h2, h3, .display, .page-head .role, .brand {
    it won: the panel rendered open on every page load until a person
    clicked anything. Watched in a browser, not assumed from the code. */
 .assistant-panel[hidden] { display: none; }
+
+/* THE STAFF DOOR. Styled once here because both staff surfaces mount the
+   same panel — see app/shared/auth/staff-gate.ts. The accent arrives from
+   the page's product class, so a person still sees whose screen they are
+   standing in front of while they sign in. */
+.staff-door { max-width: 34rem; margin: 8vh auto; padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.staff-door h2 { margin: 0 0 10px; color: var(--accent-strong, var(--accent, var(--fg))); }
+.staff-door-said { margin: 0 0 18px; color: var(--muted); line-height: 1.55; }
+.staff-door-form { display: flex; flex-direction: column; gap: 8px; }
+.staff-door-form label { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.staff-door-form input { padding: 10px 12px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.staff-door-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.staff-door-form button { margin-top: 6px; padding: 10px 16px; font: inherit; font-weight: 600; color: var(--accent-ink); background: var(--accent-strong, var(--accent)); border: 0; border-radius: 6px; cursor: pointer; }
+.staff-door-form button:disabled { cursor: default; opacity: .7; }
+.staff-door-problem { margin: 4px 0 0; color: var(--status-bad, var(--fg)); }
+/* The same trap the assistant panel hit twice: a class rule that sets
+   display beats the UA's [hidden] unless we say so here. */
+.staff-door-problem[hidden] { display: none; }
 .assistant-panel {
   position: fixed;
   right: 20px;

@@ -4,7 +4,10 @@
     {
       "name": "pulse-studio",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
       "port": 4173
     }
   ]
