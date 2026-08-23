@@ -274,9 +274,11 @@ not reliably.
 
 ## Bug classes swept whole
 
-Three families turned up more than once, so each was searched for
-exhaustively rather than waited for. Worth knowing which, because the sweep
-is the durable part — the individual fixes are just where it landed.
+Each family below was searched for exhaustively rather than waited for, most
+of them because the same shape had already turned up more than once. Worth
+knowing which, because the sweep is the durable part — the individual fixes
+are just where it landed. No count here: this sentence said "three" while the
+list grew to nine.
 
 - **`typeof null === "object"`.** Every typeof-object guard in the repo,
   checked wherever it reads untrusted input. Found in `serialize.ts`,
@@ -413,8 +415,9 @@ LOOKED AT, not a scoreboard. Run the tool for a number.
 | shared `session`, `normalize`, `serialize`, `text`, `lifecycle` | in full | one documented comment-only block |
 | shared `color` | in full, judged by check-contrast's self-test | four equivalents, each explained |
 | shared `scenarios`, `identity`, `csv-export`, `schedule` | in full | heuristics and guarded comparisons |
-| shared `synthetic/generate` | **in full, 165 sites — 52% caught** | 80 survivors, dominated by paired guards; NOT individually audited |
-| the ten gates | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
+| shared `synthetic/generate` | **in full, 165 sites — 56% caught** | 73 survivors, dominated by paired guards; NOT individually audited |
+| the gates, other than the two below | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
+| gates `check-mirrors` and `check-brand` | not measured | both arrived after the sweep; the row above said ten gates until 2026-08-22, by which point twelve were running |
 | `today`, `theme-boot`, `components/*`, `brand` | not measured | nothing to swap, or no suite reaches them |
 
 **A SAMPLE IS NOT A VERDICT, and this table proved it on itself.** The row
@@ -425,7 +428,19 @@ truth. The sampling option prints "SAMPLED — the percentage covers what was
 tried, not the module" for exactly this reason, and the warning was still
 not enough to stop the figure being written down as if it meant something.
 
-What the 80 survivors are, from reading the shapes rather than each one:
+**Re-measured 2026-08-22: 92 caught, 73 survived, 56%.** The move came from
+one change — the answer-key checks, which pinned `truth.expectedDashboardMetrics`
+against the dataset it describes. Twelve counts a product validates its dashboard
+against, and not one of them had been checked; three survivors had been sitting
+on the upcoming-sessions filter alone, because a count nothing reads is a count
+nothing can contradict. Seven died at once.
+
+The paragraph below was written against the 80. Its shapes still hold and its
+arithmetic no longer adds up to the total, which is what a survivor catalogue
+looks like when checks land — the shapes are the durable part, the tallies are
+not.
+
+What the survivors are, from reading the shapes rather than each one:
 this module is written in PAIRS. A loop bound `i < plans.length` sits above
 `if (!plan || !identity) continue`, and an index read `idx >= 0 ? xs[idx] :
 undefined` guards itself — so a single-token change to either half is
@@ -449,10 +464,13 @@ the shape of what is behind it.
   their root from `import.meta.url`, and both `.sh` files `cd` relative to
   their own location. Verified by running each from `/tmp`: both work and
   leave the tree unchanged.
-- **The reviewer bundle is not published.** `bundle-product-d.sh` writes
-  9,453 lines into `app/products/d-reengagement/` — inside the published
-  tree — and is safe only because `.gitignore` catches it, so the Pages
-  checkout never has it. 404 on the live site, confirmed. That safety is
+- **The reviewer bundle is not published.** `bundle-product-d.sh` writes the
+  product's tracked sources, plus the shared context they import, into
+  `app/products/d-reengagement/` — inside the published tree — and is safe
+  only because `.gitignore` catches it, so the Pages checkout never has it.
+  404 on the live site, confirmed. The script prints its own line count when
+  it runs, which is where to read it: this said 9,453 until 2026-08-22, by
+  which point the bundle was over ten thousand lines. That safety is
   one `.gitignore` edit away from disappearing, and the script now says so
   next to the comment explaining why the script itself moved out of `app/`.
 

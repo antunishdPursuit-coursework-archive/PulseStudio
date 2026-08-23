@@ -85,13 +85,17 @@ dashboard is live at a public URL and has no
 search engine may index a page showing member names, rosters, and attendance.
 Mine has that tag; yours is one line away from it.
 
-Until then I have blocked `/products/b-dashboard/` in `app/robots.txt`, which
-stops the crawl but is the weaker protection — the URL can still be listed.
-When you add the meta tag, **delete that Disallow line**: a page that is
+Until then, nothing covers it. `app/robots.txt` carries
+`Disallow: /PulseStudio/products/b-dashboard/`, and on this deploy that line
+protects nothing: a GitHub Pages PROJECT site's crawler reads the USER site's
+robots.txt in a different repository, so ours is never requested. This
+paragraph said the line stopped the crawl until 2026-08-22, and it never did —
+the section below, "the staff dashboard has no crawler protection at all", is
+the full account, and the reasoning is written into `app/robots.txt` itself.
+When you add the meta tag, **delete that Disallow line** anyway: a page that is
 blocked from crawling can never be read, so its noindex tag is never seen and
-never takes effect. Crawlable + noindex is the combination that actually
-keeps a page out of the index. The reasoning is written into
-`app/robots.txt` itself.
+never takes effect. Crawlable + noindex is the combination that actually keeps
+a page out of the index.
 
 Neither is a security control — a staff page holding real member data
 eventually belongs behind a sign-in.
@@ -202,14 +206,16 @@ hour it cost me — and because if either of you adds an `innerHTML` later,
 the thing to keep is the habit already in your code: escape at the
 interpolation, not at the source.
 
-## Everyone — the shared fixture goes stale on 2026-08-29 (2026-08-21)
+## Everyone — the shared fixture ages out on a clock (2026-08-21)
 
-Dated, so nobody meets it by surprise — and deliberately NOT a deadline on
-your build. In eight days this fixture stops demonstrating one thing it was
-built for. The gate says so on every run and keeps passing.
+Written down so nobody meets it by surprise — and deliberately NOT a deadline
+on your build. On a date `npm run check` prints on every run, this fixture
+stops demonstrating one thing it was built for, and keeps passing. This
+heading carried that date until 2026-08-22, when rolling the file forward
+moved it.
 
 The dates in that file are fixed and the calendar is not. Its newest attended
-class is 2026-08-15. Once that passes fourteen days, every member in the
+class is `ses_005`. Once that class passes fourteen days, every member in the
 fixture reads as long-quiet, and the deliberate near-miss the product briefs
 require — a member who attended RECENTLY and must therefore NOT be flagged —
 stops existing. The file stays perfectly VALID; it just stops demonstrating
@@ -218,17 +224,25 @@ the thing it was built to demonstrate.
 Nothing was watching for that, which is the actual problem. The unit suites
 pin "today" to a reference date so they cannot rot — correct, and it means
 they cannot warn either. `scripts/check-fixtures.mjs` now reads the real
-clock in that one place and prints the countdown on every run:
+clock in that one place and prints the countdown on every run. Read the
+numbers off the run rather than off this page — the shape is:
 
 ```
-check-fixtures: newest attended class is 2026-08-15, 6 days ago —
-8 days of usable life left (goes stale 2026-08-29).
+check-fixtures: newest attended class is <date>, <n> days ago — <n> days
+before it stops showing a recent attendee (<date>); <n> before it fails
+this gate.
 ```
 
-**The ask — a team decision, not a lane one:** roll the fixture's dates
-forward when it suits, or agree a different answer. Rolling forward is a
-team-owned data change and it changes what the staff dashboard shows live,
-which is why I have not done it unilaterally.
+**The ask — a team decision, not a lane one:** agree how this file gets rolled
+forward, or agree a different answer. It has been rolled once already —
+`ad5e112` moved every date +4 days on 2026-08-22 to clear a gate failure dated
+2026-10-15, and repaired three sessions marked `scheduled` that were already in
+the past. That is a team-owned data change I made alone, which is the argument
+for settling the rule rather than a precedent for doing it again. Nothing the
+site serves reads this file today — see the last section — so the roll moves
+records, not a screen. The durable answer is an anchor date resolved at load,
+written up in `app/shared/CLAUDE.md` as an open decision because the stored UTC
+offsets have to be recomputed along with it.
 
 **What the gate actually does, and what changed my mind.** The first version
 failed at fourteen days, which would have stopped the site deploying eight
@@ -456,32 +470,29 @@ file is yours.
 If you would rather keep the dotenv convention, say so and it stays — the
 gate no longer objects to it, and this note becomes the record of why.
 
-## Kerrian — a member booking a class reads your name (2026-08-21)
+## Kerrian — a member booking a class read your name (2026-08-21, cleared)
 
-`app/products/a-booking/index.html:14` carries
-`<span class="owner-badge">Kerrian</span>`. It is not hidden and it is not
+`app/products/a-booking/index.html` carried
+`<span class="owner-badge">Kerrian</span>`. It was not hidden and it was not
 small: I measured it in a browser at 74 by 26 pixels, sitting in the page
-header directly after BOOK A CLASS, so the header reads
+header directly after BOOK A CLASS, so the header read
 "BOOK A CLASS · Kerrian · Sign in".
 
 The audience law says a consumer-facing surface speaks TO its user and
 never ABOUT the project, and that authorship is carried by the builder's
 COLOUR plus `app/shared/storytold.html`. Your blue already does that job on
-every screen of Product A — the badge is the one part a member has no use
+every screen of Product A — the badge was the one part a member had no use
 for.
 
-**I have not touched it.** It is your file and your call, and I have put it
-in `docs/audience-baseline.json` so the new `scripts/check-audience.mjs`
-reports it as known rather than failing the build for everyone. Removing
-the span clears the line; drop it from the baseline in the same commit and
-the list gets shorter.
+**You removed it the same day**, in `c157ba9`, and I retired the baseline line
+it made stale in `b4001cb`. `docs/audience-baseline.json` now lists nothing at
+all — its `allowed` array is empty — so `scripts/check-audience.mjs` fails on
+any builder name that comes back rather than reporting it as known. There is no
+ask left here; this section stays as the record of what the gate is for.
 
 Worth knowing: Product D's unit-check page has the same badge, and it stays
 — a tests page is read by a developer, not a member, which is why the gate
 skips it. The difference is who is looking.
-
-**The one ask:** delete that span, or tell me the badge is deliberate and I
-will write the reason into the baseline so nobody raises it again.
 
 ## Everyone — I audited the data law, and it holds (2026-08-21)
 
@@ -584,6 +595,99 @@ still validates that file and still prints how long before it ages out —
 read that countdown as being about records, not about a screen, because no
 screen shows them. Worth knowing before anyone spends a day rolling those
 dates forward.
+
+## Everyone — an audit read your briefs against your code (2026-08-22)
+
+A sweep compared every checkable statement in this repository's prose to the
+code it describes. It raised 73 claims, an adversarial pass threw out 18, and
+55 survived. Thirteen of those are in your lanes.
+
+**I have not touched any of them.** Reading another lane is allowed and
+editing it is not, so this is a note, which is what my own brief says to do
+with a defect found in somebody else's folder. Every line number below is
+from 2026-08-22; each one names the code that contradicts it so you can check
+me rather than take my word.
+
+One of these matters more than the rest, and it is not the biggest list.
+**A folder brief is what an assistant reads before it edits that folder.** A
+brief that describes behaviour the code does not have will send somebody —
+or something — to "fix" a bug that is not there.
+
+### All three of you — the colour law in your brief has drifted
+
+`app/products/a-booking/CLAUDE.md:82`, `b-dashboard/CLAUDE.md:75`,
+`c-chatbot/CLAUDE.md:70` all summarise the repo-wide laws with "black or
+white backgrounds only".
+
+That has not been the colour law since the appearance amendment. Root
+`CLAUDE.md:42-44` says the built-in light and dark backgrounds are white and
+black, **and** that a person may select an accessible custom background/text
+pair through the shared appearance control. The machinery is real:
+`app/shared/theme-boot.ts` carries `CUSTOM_KEY` and applies the pair, and
+`app/shared/color.ts` has `nearestReadable` to keep a chosen pair legible.
+
+This is the same drift that bit the always-on Cursor rule, which told every
+Cursor user "backgrounds are black or white only" long after the law changed
+— the story now recorded in `.cursor/rules/team.mdc` instead of the law
+itself. Three folder briefs are saying it again.
+
+### Kerrian — Product A
+
+- **`PRODUCT_A_MEMBER_BOOKING_APP.md:5` says "Evidence level: Planned".**
+  Product A is built, published and live: `main.ts` runs booking, waitlist,
+  cancel, promotion and deep links, and the front door links to it.
+- **`PRODUCT_A_MEMBER_BOOKING_APP.md:62` lists waitlists as out of scope.**
+  They are shipped. `main.ts` has `joinWaitlist()`, `memberWaitlisted()`,
+  `waitlist()` and `promoteWaitlist()`, and the schedule renders "Join
+  waitlist" and "Waitlisted" controls.
+
+### Manny — Product B
+
+Seven, and the first three describe the same gap: the brief says the
+dashboard keeps nothing, and the shipped page keeps quite a lot.
+
+- **`CLAUDE.md:14` — "no persistence of any kind".** The page writes
+  `localStorage['pulse-schedule-b']`.
+- **`CLAUDE.md:64` — "reads and writes NO storage keys of its own".** Both
+  halves are wrong: it declares `pulse-schedule-b` at `staff-dashboard.js:5`,
+  writes it in `savePublishedSchedules` (line 31), reads it back on load
+  (line 35), and watches it in a `storage` listener.
+- **`CLAUDE.md:47` — "Publish is in-memory only … Nothing here persists".**
+  Confirming a draft calls `savePublishedSchedules()`; `readPublishedSchedules()`
+  restores those sessions on the next load.
+- **`CLAUDE.md:41` — "the dashboard shows the same week forever".** The
+  dataset is frozen, but the view is not one week: `renderWeekPicker()` builds
+  four week buttons and `#previousWeeks` / `#nextWeeks` page the window.
+- **`CLAUDE.md:43` — "every room label is the hardcoded studio name".** The
+  generator sessions and the demand panel do hardcode it, but the add-a-session
+  dialog has a free-text `room` input — `name="room"`, placeholder "Loft" — in
+  both `index.html:22` and `staff-dashboard.html:19`.
+- **`CLAUDE.md:23` — "required DOM ids exist in neither HTML file".** One of
+  the seven, `#sessions`, exists in both. The other six do not, so the point
+  stands; the count does not.
+- **`PRODUCT_B_STAFF_SCHEDULING_DASHBOARD.md:5` says "Evidence level:
+  Planned".** Product B is built and published.
+
+I checked the first three, the week picker and the room input myself against
+`staff-dashboard.js` and your two HTML files before writing this down.
+
+### Dennis — Product C
+
+- **`CLAUDE.md:32` cites "the comment at `main.ts:69-71`".** Those lines are
+  inside `studioDate()` and say nothing about timezones or DST. The comment
+  you mean is elsewhere in the file; the reference needs moving.
+
+### What I am asking for
+
+Nothing urgent, and nothing that blocks anybody. When you next open your own
+brief, correct the lines that describe your code wrongly — starting with the
+colour law, because all three of you carry it, and with Manny's persistence
+lines, because they are the ones most likely to send somebody to undo working
+behaviour.
+
+If you think any of these is wrong, say so on the PR. Eighteen of the
+seventy-three raised in this sweep were thrown out by a second pass whose job
+was to refute them, so being wrong about one of these is entirely possible.
 
 ## If you disagree with anything here
 

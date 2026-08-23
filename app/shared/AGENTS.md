@@ -20,7 +20,7 @@ the legacy contract) is what all four products speak.
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
 | `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control) — each documented in `components/README.md` |
-| `synthetic/` | The deterministic studio engine: seeded generation to 1000×5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
+| `synthetic/` | The deterministic studio engine: seeded generation to 2000 members × 5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
 
 ## The load-bearing facts (each one has bitten or will)
@@ -39,8 +39,12 @@ the legacy contract) is what all four products speak.
   a product import, a network call (`fetch(`, `XMLHttpRequest`,
   `WebSocket`, `EventSource`, `sendBeacon`), a clock read (`Date.now(`,
   `Date()`, `new Date()`, `new Date` with no parens, `performance.now(`),
-  and unseeded randomness (`Math.random(`, `crypto.getRandomValues`,
-  `randomUUID`) — even in a comment. `new Date(value)` is LEGAL and
+  unseeded randomness (`Math.random(`, `crypto.getRandomValues`,
+  `randomUUID`), and locale-dependent ordering (`localeCompare`,
+  `Intl.Collator`) — even in a comment. **This list said FOUR until
+  2026-08-22**, one day after the correction it records, because the fifth
+  rule landed and this sentence did not follow. Read the count off
+  `FORBIDDEN` in `synthetic/tests.ts`, never off this paragraph. `new Date(value)` is LEGAL and
   `normalize.ts` uses it twice: round-tripping a calendar date is
   arithmetic, not a clock read. Unseeded randomness was added to that list
   the same day; before then nothing checked for it, in an engine whose
@@ -91,11 +95,19 @@ the legacy contract) is what all four products speak.
   the pre-knob generator; ignored in edge-cases mode. Added for the
   capacity dashboard; proven by the "fill knob" block in
   `synthetic/tests.html`.
-- **The studio's rhythms are CALIBRATED, not invented** — see
-  `synthetic/CALIBRATION.md`. Slot priority comes from published real-gym
-  check-in distributions (a morning peak and a bigger evening peak). It is
-  a 2024 SNAPSHOT and nothing about it is live: the engine forbids network
-  calls and clock reads, and no surface may claim otherwise.
+- **The studio's rhythms are CALIBRATED against a SIMULATED dataset** — see
+  `synthetic/CALIBRATION.md`, corrected 2026-08-22. This bullet said "from
+  published real-gym check-in distributions" and that was wrong twice over.
+  The source dataset calls itself synthetic on its own card, so it is
+  published and openly licensed but is not an observation of any real gym;
+  and the check-in column it was supposedly read from has **no readable
+  summary on that page at all** — Kaggle renders its ten buckets with one
+  repeated date label. Slot priority (17:30 and 08:00 first) is still a
+  better default than the clock order it replaced, which gave a studio
+  nothing after 4pm. It is a CHOICE that reads well, not a measured
+  finding, and must not be described as one. It is a 2024 SNAPSHOT and
+  nothing about it is live: the engine forbids network calls and clock
+  reads, and no surface may claim otherwise.
 - **`overlapsAttended` in `generate.ts` is currently redundant**, in the
   same way the comment-only block in `writePulseSession` is. It refuses to
   record an attended class overlapping one the member already attended
@@ -132,8 +144,11 @@ the legacy contract) is what all four products speak.
   Edge-cases mode is excluded deliberately, because it injects a
   `future-attendance` defect on purpose — what is checked there is that
   every such row is DECLARED.
-- **`synthetic/page.ts` is not covered by any check, and the suite cannot
-  cover it.** It is the reporting UI's entry module, loaded only by
+- **`synthetic/page.ts` has exactly ONE check on it now, and the suite still
+  cannot cover the rest.** The one is the clock-read grep: `CLOCK_READERS`
+  in `synthetic/tests.ts` names `./page.ts`, so the UTC-today antipattern
+  cannot return. Everything below still holds — that check reads SOURCE
+  TEXT, it never runs the module.** It is the reporting UI's entry module, loaded only by
   `synthetic/index.html` in a browser, so nothing in `synthetic/tests.ts`
   imports it — proven twice over: breaking the compiled `page.js`
   syntactically leaves every synthetic check passing, and `npm run mutate`
@@ -149,10 +164,17 @@ the legacy contract) is what all four products speak.
   same day it found none, which is worth recording so nobody re-derives
   it: the form-reading path looks like the dangerous one — a raw
   `Number(countEl.value)` straight off a text input — and every hostile
-  value was measured going in. Blank, `abc`, `0`, `-5`, `7.5`, `1e9` and
+  value was measured going in. `abc`, `0`, `-5`, `7.5`, `1e9` and
   `Infinity` are all refused by `validateConfig` with a message naming the
   field, the page shows it, and both download doors close on the stale
-  bytes. The mode and history casts land in the same validator. What is
+  bytes. **BLANK IS NOT ONE OF THEM, and this sentence listed it as refused
+  until 2026-08-22.** A blank member count is the documented happy path:
+  `page.ts` reads `countEl.value.trim() === "" ? organicMemberCount(seed)
+  : Number(...)`, and the form's own label reads "blank lets the studio be
+  its own size". The mistake is worth keeping: it assumed `Number("")`
+  reached the validator as `0`, when a guard upstream means it never
+  arrives — a hostile-input list is only as good as the path it was
+  actually walked down. The mode and history casts land in the same validator. What is
   left here really is markup, a clock read, and a local save.
 - **The shared fixture ages out on a clock, and rolling it forward is a
   CHORE, not a fix.** `check-fixtures.mjs` fails once the newest attended

@@ -152,7 +152,7 @@
       <li data-beat="Role">Dana runs the front desk of a 60-member boutique fitness studio, and every morning she needs two answers before the 9am rush — which classes will fill today, and which members have quietly stopped coming.</li>
       <li data-beat="Problem">She can't answer either from one screen, because every booking, roster, member question, and absence is recorded in a different tool that never hands its records to the next one.</li>
       <li data-beat="Value">When the records flow instead, a spot booked at 9:02 moves her capacity board the same minute, and a member 15 days quiet gets a personal draft before they become 60 days gone.</li>
-      <li data-beat="Solution">Pulse Studio runs that flow as one line: a member books in <span class="chip a">A Booking</span>, the studio team runs the week on <span class="chip b">B The Dashboard</span>, <span class="chip c">C Support</span> answers members from the same schedule, and <span class="chip d">D Re-engagement</span> reads the whole attendance trail to flag who's gone quiet — draft ready, nothing sent by a machine.</li>
+      <li data-beat="Solution"><span data-studio-name>Pulse Studio</span> runs that flow as one line: a member books in <span class="chip a">A Booking</span>, the studio team runs the week on <span class="chip b">B The Dashboard</span>, <span class="chip c">C Support</span> answers members from the same schedule, and <span class="chip d">D Re-engagement</span> reads the whole attendance trail to flag who's gone quiet — draft ready, nothing sent by a machine.</li>
       <li data-beat="Watch">Watch the map below: every green segment pulses because that hand-off runs on the live site today, and the red segments stay dark because those hand-offs are not built yet.</li>
     </ol>
 
@@ -259,12 +259,12 @@
       <section class="on">
         <h2><span class="state">Green — fires today</span></h2>
         <ul>
-          <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip b">B</span> watches, <span class="chip c">C</span> answers from, and <span class="chip d">D</span> reconciles against independent truth.</li>
+          <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip c">C</span> answers from, and <span class="chip d">D</span> reconciles against independent truth. <em>(This bullet also claimed <span class="chip b">B</span> watches it, until an audit on August 22, 2026 — the Dashboard builds its own studio from its own seed, which is the red road below. A page cannot list the same hand-off as green above and red below.)</em></li>
           
           <li><strong><span class="chip a">A</span> → <span class="chip c">C</span>:</strong> support's spaces-left answers read Booking's own reservation log from this browser, with each member's latest reservation state winning.</li>
           <li><strong><span class="chip b">B</span> publishes for real:</strong> confirmed weekly schedules persist in this browser after a reload.</li>
           <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, and its <a href="./auth/tests.html">own suite</a> states how deeply it is checked.</li>
-          <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file — a clone renames the studio in four files total.</li>
+          <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file, and a gate holds the wire — a page that shows the name but is not wired to receive it fails the build. A clone edits four shared files; three product page titles are read before any module runs and stay a one-word edit each, in their owner’s lane.</li>
           <li><strong><span class="chip b">B</span> turns the fill on:</strong> the Dashboard uses the engine's occupancy knob to keep the upcoming week realistically filled.</li>
           <li><strong><span class="chip b">B</span> reads the log:</strong> the Dashboard does read Booking's reservation log defensively, with per-row reasons — the half that works while the studios still differ.</li>
           <li><strong>The occupancy engine:</strong> the generator can fill a week to a realistic mix on demand — deterministic, capacity-safe, and proven by the shared engine's own suite.</li>
@@ -272,7 +272,7 @@
         </ul>
       </section>
       <section class="off">
-        <h2><span class="state">Red — 2 waiting</span></h2>
+        <h2><span class="state">Red — 2 waiting, 1 of them a road</span></h2>
         <ul>
           <li><strong><span class="chip a">A</span> → <span class="chip b">B</span>, the road that looks built and is not:</strong>
           the Dashboard reads Booking's reservation log, but it builds its OWN
@@ -281,7 +281,9 @@
           class ids out of 75. A member books, the meter never moves. The fix is
           one config line in Manny's lane: drop the private seed and read the
           same studio everyone else does.</li>
-          <li><strong><span class="chip c">C</span> talks through Haiku locally:</strong>
+          <li><strong><span class="chip c">C</span> talks through Haiku locally</strong>
+          <em>(not a road on the map — C's hand-offs are wired and firing; what
+          is missing is somewhere to keep a key):</em>
           member support can answer from the current safe schedule, policies,
           and live browser reservations when the local server has an Anthropic
           key. The deployed GitHub Pages site cannot run that conversation yet

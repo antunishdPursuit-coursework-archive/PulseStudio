@@ -10,9 +10,11 @@
 # INSIDE the published tree. It is not served, and the only reason is that
 # .gitignore catches it: the Pages workflow builds from a checkout, so an
 # untracked file is not there to publish. That safety is one .gitignore
-# edit away from disappearing, and the file is 9,453 lines of source handed
-# to an outside reviewer. If it ever needs to be committed, move the output
-# to docs/ in the same change — do not un-ignore it where it sits.
+# edit away from disappearing, and the file is over ten thousand lines of
+# source handed to an outside reviewer — the count printed at the end of a
+# run is the live figure, and this comment said 9,453 until 2026-08-22. If
+# it ever needs to be committed, move the output to docs/ in the same
+# change — do not un-ignore it where it sits.
 #
 # WHY IT LIVES IN scripts/ AND NOT BESIDE THE PRODUCT. It used to sit at
 # app/products/d-reengagement/bundle.sh, and app/ IS the website — the Pages

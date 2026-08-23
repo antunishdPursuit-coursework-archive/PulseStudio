@@ -1397,10 +1397,14 @@ for (const file of ENGINE_SOURCES) {
 /* demandFactor — the calibrated rhythm, finally measured               */
 /* ------------------------------------------------------------------ */
 
-/* CALIBRATION.md says this studio's rhythms come from published real-gym
- * check-in distributions rather than invention, and demandFactor is where
- * that claim lives: generate.ts asks it whether each member turns up on
- * each day. Five of the six survivors in scenarios.ts sat on its one
+/* CALIBRATION.md says this studio's rhythms are calibrated rather than
+ * invented, and demandFactor is where that claim lives: generate.ts asks it
+ * whether each member turns up on each day. (This comment said "published
+ * real-gym check-in distributions" until 2026-08-22. The source dataset
+ * describes itself as synthetic, so the rhythms are borrowed from another
+ * model, not observed. What the block below measures is unaffected — it
+ * pins the seasonal shape the code actually produces, which is the only
+ * thing a check here could ever have proved.) Five of the six survivors in scenarios.ts sat on its one
  * holiday line, because BASE reaches only 180 days back from August and
  * December never falls inside it — so the year-end dip was modelled,
  * shipped, and never once exercised.

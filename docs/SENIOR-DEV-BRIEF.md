@@ -117,7 +117,7 @@ it is does not, and nobody reading this needs the number.
 | `live-studio.ts` | The default door: the running studio plus Booking's published reservation log. |
 | `generate.ts` | Seeded studio generator (60 fictional members) so the ranking is visible. |
 | `tests.ts` / `tests.html` | The browser suite, with a pinned reference date. It states its own count on the page and in `npm run check` — read it there, not here. |
-| `styles.css` | Violet-on-black/white, built entirely on shared theme tokens. |
+| `styles.css` | Violet on `var(--bg)`, built entirely on shared theme tokens. |
 | `index.html` | The page. Staff-only: carries `noindex, nofollow`. |
 | `README.md` | Folder documentation, rebrand checklist, plug-in spec. |
 | `docs/REQUESTFOR-A-B-C.md` | What we need from the other three developers. **In `docs/`, not here** — it sat in this folder and was served at a public URL until 2026-08-21. |
@@ -260,17 +260,21 @@ These cost real time. They are the most valuable part of this brief.
 - **No real studio has used this.** No real member has received a note. The
   product has never been in front of a real user — that is the biggest gap and
   it is human work, not code.
-- **The shared fixtures age.** `fixtures.json` has fixed 2026 dates. Two
-  active members can be flagged from it: Maria Santos (last attended
-  2026-08-01, so past 60 days on 2026-09-30) and James Okafor (2026-08-15,
-  past 60 on 2026-10-14). Sofia Reyes is canceled and never flags.
-  **So the list empties on 2026-10-15, not 2026-09-30** — this paragraph
-  said the earlier date until 2026-08-21, having taken the first member to
-  age out for the last. The unit checks are pinned and will not rot; the
-  live page on shared records is what goes empty. `scripts/check-fixtures.mjs`
-  prints the countdown on every run, so the number is read from the gate
-  rather than from here. Refreshing the team-owned fixture is the fix —
-  **never hardcode a fake "today"**.
+- **The shared fixtures age, and no page reads them.** `fixtures.json` has
+  fixed 2026 dates, and two active members could be flagged from it — Maria
+  Santos and James Okafor; Priya Patel is paused and Sofia Reyes is canceled,
+  so neither ever flags. What that costs has changed. This product's default
+  door is the running studio, not `loadFixtures()`, and as of 2026-08-22 no
+  page in the repo reaches the legacy fixture at all, so nothing a staff
+  member opens goes empty when it ages. What ages out is the GATE:
+  `scripts/check-fixtures.mjs` fails once the newest attended class is more
+  than 60 days old, and that blocks every deploy until somebody rolls the
+  file forward. Read the countdown there. This paragraph carried the dates in
+  prose instead and was wrong twice — it named the first member to age out
+  rather than the last until 2026-08-21, and then every date in it went stale
+  on 2026-08-22, when the fixture was rolled forward four days. The unit
+  checks are pinned and will not rot. Refreshing the team-owned fixture is
+  the fix — **never hardcode a fake "today"**.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
@@ -300,12 +304,15 @@ These cost real time. They are the most valuable part of this brief.
 Raised since, each in `docs/REQUESTFOR-A-B-C.md` and each belonging to
 somebody else — none is mine to close:
 
-- **A member booking a class reads a builder's name.** Kerrian's page
-  header carries an `.owner-badge` reading "Kerrian", measured in a browser
-  at 74x26 pixels. The audience law says authorship is carried by the
-  builder's COLOUR, which his blue already does on every screen of Product
-  A. Baselined so `check-audience.mjs` reports it rather than failing the
-  build for everybody.
+- **A member booking a class read a builder's name, and no longer does.**
+  Kerrian's page header carried an `.owner-badge` reading "Kerrian", raised
+  here because the audience law says authorship is carried by the builder's
+  COLOUR, which his blue already does on every screen of Product A. He
+  removed the span, and `docs/audience-baseline.json` now has an empty
+  `allowed` list, so `check-audience.mjs` fails the build on the next builder
+  name rather than reporting a known one. Product D's own `tests.html` keeps
+  its badge and the gate skips it on purpose — a check page is read by a
+  developer, not a member.
 - **Dennis's dotenv template is named after a banned word.** The language
   gate no longer objects — a path is a name, not the word — but whether the
   repo should hold that filename is his call, and `.env.fixture` would
@@ -475,8 +482,13 @@ the **rule and the ranking are the right ones for a gym**, which is the part no
 test can answer.
 
 **6. What matters most right now:** correctness first, then readiness for real
-studio use, then privacy. Maintainability matters but the codebase is 2,150
-lines and deliberately simple — do not trade clarity for abstraction.
+studio use, then privacy. Maintainability matters. The design is deliberately
+simple — no framework, no bundler, pure functions with "today" as a parameter —
+but the product is not small, and much of its bulk is the browser suite. This
+line said "2,150 lines" until 2026-08-22, by which point the TypeScript in
+`app/products/d-reengagement/` alone was more than four times that. Read it
+with `wc -l app/products/d-reengagement/*.ts`, not from here. Do not trade
+clarity for abstraction.
 
 **7. Performance is out of scope** (60 members, client-side, nothing measurable).
 **Security is in scope but narrowly:** the data never leaves the browser, so the
@@ -650,6 +662,11 @@ team-owned `package.json` — which, realistically, means manual. Three
 hand-chosen mutations that survive are worth more than a tool's score.
 
 **34. Exclude pure visual taste.** Raise visual issues only when they
-demonstrate a law violation (backgrounds must be black or white; features carry
-the owner's colour), an accessibility problem, or a workflow failure — for
-instance, evidence a staff member cannot read at a glance.
+demonstrate a law violation (backgrounds come from `var(--bg)` — the built-in
+light and dark are white and black, and a person may choose an accessible
+custom background/text pair through the shared appearance control; features
+carry the owner's colour), an accessibility problem, or a workflow failure —
+for instance, evidence a staff member cannot read at a glance. This line said
+"backgrounds must be black or white" until 2026-08-22, which is the drift the
+root `CLAUDE.md` already records against the always-on Cursor rule: a law
+copied into a second document goes on telling people the old one.

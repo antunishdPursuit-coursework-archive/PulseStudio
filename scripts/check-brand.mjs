@@ -101,18 +101,28 @@ export function brandMarkup(html) {
   const spanMatch = new RegExp(
     `<span[^>]*${classToken("brand-word")}[^>]*>([^<]*)(?:<span[^>]*>([^<]*)</span>)?`,
   ).exec(withoutComments);
+  /* `[data-studio-name]` elements are filled with the plain studio name.
+   * An EMPTY one is a deliberate choice — the renderer supplies the text and
+   * a no-JS visitor sees nothing rather than something wrong. A NON-empty one
+   * is a fallback, and a fallback is a thing that can go stale. */
+  const plainFallbacks = [
+    ...withoutComments.matchAll(
+      /<[a-z][a-z0-9]*[^>]*\sdata-studio-name(?=[\s=>])[^>]*>([^<]*)</gi,
+    ),
+  ].map((m) => (m[1] ?? "").trim()).filter((t) => t !== "");
   return {
     brandWord,
     homeBrand,
     studioName,
     wired,
+    plainFallbacks,
     lead: spanMatch === null ? null : (spanMatch[1] ?? "").trim(),
     accent: spanMatch === null ? null : (spanMatch[2] ?? "").trim(),
   };
 }
 
 /** Every problem with one page, given the brand words it should show. */
-export function pageProblems(html, expected) {
+export function pageProblems(html, expected, studioName = null) {
   const m = brandMarkup(html);
   const shows = m.brandWord || m.studioName;
   const problems = [];
@@ -134,6 +144,16 @@ export function pageProblems(html, expected) {
         `${JSON.stringify(`${expected.lead} ${expected.accent}`.trim())} — a visitor without JavaScript ` +
         "sees the old studio name",
     );
+  }
+  const plainName =
+    studioName ?? `${expected.lead} ${expected.accent}`.trim();
+  for (const text of m.plainFallbacks) {
+    if (text.toUpperCase() !== plainName.toUpperCase()) {
+      problems.push(
+        `a [data-studio-name] fallback reads ${JSON.stringify(text)} but brand.ts now says ` +
+          `${JSON.stringify(plainName)} — a visitor without JavaScript sees the old studio name`,
+      );
+    }
   }
   return problems;
 }
@@ -161,6 +181,23 @@ async function selfTest() {
     ["a one-word rebrand catches the leftover second word", GOOD, { lead: "VERO", accent: "" }, 1],
     ["a page with only data-studio-name still needs the wire",
       '<html><body><p data-studio-name></p></body></html>', EXPECTED, 1],
+    /* An EMPTY data-studio-name is deliberate: the renderer supplies the text,
+     * so a no-JS visitor sees nothing rather than something wrong. */
+    ["an empty data-studio-name is not a stale fallback",
+      `<html><body><p data-studio-name></p>${WIRED}</body></html>`, EXPECTED, 0],
+    ["a data-studio-name carrying the current name passes",
+      `<html><body><p data-studio-name>Pulse Studio</p>${WIRED}</body></html>`, EXPECTED, 0],
+    /* THE FAULT THIS EXTENSION EXISTS FOR: a shared page spelling the studio
+     * out in prose, left behind by a rebrand. */
+    ["a data-studio-name left behind by a rebrand is caught",
+      `<html><body><p data-studio-name>Pulse Studio</p>${WIRED}</body></html>`,
+      { lead: "VERO", accent: "FITNESS" }, 1],
+    ["...and an unwired one with a stale name reports both",
+      '<html><body><p data-studio-name>Pulse Studio</p></body></html>',
+      { lead: "VERO", accent: "FITNESS" }, 2],
+    /* A lookalike attribute must not be read as a fallback. */
+    ["a lookalike attribute carries no fallback",
+      `<html><body><p data-studio-name-legacy>Pulse Studio</p>${WIRED}</body></html>`, EXPECTED, 0],
     ["...and passes once it is wired",
       `<html><body><p data-studio-name></p>${WIRED}</body></html>`, EXPECTED, 0],
     /* A page that shows the name nowhere is not this gate's business. */
@@ -275,7 +312,7 @@ async function run() {
     const html = readFileSync(join(ROOT, page), "utf8");
     const m = brandMarkup(html);
     if (m.brandWord || m.studioName) showing += 1;
-    for (const problem of pageProblems(html, expected)) problems.push({ page, problem });
+    for (const problem of pageProblems(html, expected, studioName)) problems.push({ page, problem });
   }
 
   console.log(
