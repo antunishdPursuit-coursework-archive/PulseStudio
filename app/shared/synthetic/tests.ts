@@ -18,7 +18,7 @@ import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn, periodProblems } from "./lifecycle.js";
 import { demandFactor } from "./scenarios.js";
 import { buildSchedule, roomsPerSlot } from "./schedule.js";
-import { dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
+import { dateOfDayNumber, dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
 
 interface CheckResult {
@@ -1330,6 +1330,49 @@ for (const file of ENGINE_SOURCES) {
     mean(hush) < mean(after), true);
   check("...by a visible margin, not a rounding error",
     mean(hush) < 0.75 * ((mean(before) + mean(after)) / 2), true);
+  /* THE EDGES OF THE HUSH, WHICH THE MEANS ABOVE CANNOT SEE.
+   *
+   * Those compare a fourteen-day window against its neighbours, so one
+   * boundary day moving in or out barely shifts the average. Mutation
+   * found all three edges unheld: `dayOfMonth >= 20` could become `> 20`
+   * (dropping the 20th), `<= 2` could become `< 2` (dropping the 2nd), and
+   * `month === 12` could become `!==` (hushing every month but December).
+   * Each is a day the studio either does or does not expect to be quiet.
+   *
+   * A single pair of dates cannot settle it: demandFactor carries per-day
+   * variation, and two ordinary Fridays a week apart already differ by a
+   * fifth. Each day is compared against ITS OWN WEEKDAY in the four weeks
+   * either side, skipping other hush days, which cancels both the weekday
+   * shape and the season. Measured: hush days land at 0.53, 0.69 and 0.53;
+   * the days just outside at 0.88 and 1.08. */
+  const againstOwnWeekday = (iso: string): number => {
+    const target = dayNumberOf(iso);
+    const here = demandFactor(seed, target);
+    const peers: number[] = [];
+    for (const offset of [-28, -21, -14, -7, 7, 14, 21, 28]) {
+      const day = target + offset;
+      const date = dateOfDayNumber(day);
+      const month = Number(date.slice(5, 7));
+      const dayOfMonth = Number(date.slice(8, 10));
+      if ((month === 12 && dayOfMonth >= 20) || (month === 1 && dayOfMonth <= 2)) continue;
+      peers.push(demandFactor(seed, day));
+    }
+    return here / (peers.reduce((a, b) => a + b, 0) / peers.length);
+  };
+
+  check("the hush starts ON the 20th, not the day after",
+    againstOwnWeekday("2025-12-20") < 0.75, true);
+  check("...and ends ON the 2nd, not the day before",
+    againstOwnWeekday("2026-01-02") < 0.75, true);
+  check("...with the middle of it quiet as well",
+    againstOwnWeekday("2025-12-31") < 0.75, true);
+  /* The other side of each edge, or a rule that hushed the whole year
+   * would pass every line above. */
+  check("the day before it is an ordinary day",
+    againstOwnWeekday("2025-12-19") > 0.8, true);
+  check("...and so is the day after",
+    againstOwnWeekday("2026-01-03") > 0.8, true);
+
   check("the fortnights either side of it are themselves alike, so the dip is the hush and not the season",
     Math.abs(mean(before) - mean(after)) < 0.1, true);
 
