@@ -21,6 +21,23 @@ import {
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudioMembers } from "./studio.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
+import {
+  PROBE_KEY,
+  clearStored,
+  readStored,
+  setStorageForChecks as setSharedStorageForChecks,
+  storageWorks,
+  writeStored,
+} from "../storage.js";
+import { FOOTER_GROUPS, isCurrentPage, siteFooter } from "../components/site-footer.js";
+import {
+  ALERT_LEVELS,
+  ALERT_REGION_ID,
+  alertElement,
+  dismissAlert,
+  openAlerts,
+  showAlert,
+} from "../components/alert.js";
 
 type Check = { name: string; run: () => string | true };
 const checks: Check[] = [];
@@ -675,6 +692,293 @@ check("an ordinary member answer passes the guard", () =>
 check("staff answers are not filtered", () =>
   eq(answerProblems("Priya Patel: three no-shows, at-risk.",
     audiencePolicy("staff", "staff-facing"), ["Priya Patel"]), []));
+
+
+/* ------------------------------------------------------------------ */
+/* The guarded storage doors                                            */
+/* ------------------------------------------------------------------ */
+
+/* THESE MOVED HERE FROM TWO PLACES AT ONCE, and the move is what they are
+ * checking. theme-boot.ts and Product D's main.ts each carried their own
+ * readStored / writeStored / clearStored / storageWorks, and the two had
+ * DRIFTED: D split the write from the cleanup inside storageWorks after
+ * finding that a store which accepted the write and refused the delete
+ * reported "this browser is not saving site data" — the opposite of what
+ * had just happened. theme-boot's copy still had them in one try. Neither
+ * copy had a single check on it, because both sat in a module no suite can
+ * import (each reads `document` at load).
+ *
+ * The fixtures below are the ones this file already keeps for the session
+ * contract, which is the reason the doors landed in this suite rather than
+ * a new one: the interesting storage failures were already modelled here. */
+
+check("a working store round-trips a value", () => {
+  setSharedStorageForChecks(null);
+  writeStored("pulse-check-probe", "kept");
+  const got = readStored("pulse-check-probe");
+  clearStored("pulse-check-probe");
+  return eq(got, "kept");
+});
+
+check("a throwing store reads as nothing rather than crashing", () => {
+  setSharedStorageForChecks(throwingStorage);
+  const got = readStored("anything");
+  setSharedStorageForChecks(null);
+  return eq(got, null);
+});
+
+check("a write that lands says so", () => {
+  setSharedStorageForChecks(writesButNeverDeletes);
+  writesButNeverDeletes.values.clear();
+  const got = writeStored("k", "v");
+  setSharedStorageForChecks(null);
+  return eq(got, true);
+});
+
+check("a write that is refused says so instead of throwing", () => {
+  setSharedStorageForChecks(readOnlyStorage);
+  const got = writeStored("k", "v");
+  setSharedStorageForChecks(null);
+  return eq(got, false);
+});
+
+check("a delete that is refused says so instead of throwing", () => {
+  setSharedStorageForChecks(writesButNeverDeletes);
+  const got = clearStored("k");
+  setSharedStorageForChecks(null);
+  return eq(got, false);
+});
+
+check("storageWorks is true when the browser really does save", () => {
+  setSharedStorageForChecks(writesButNeverDeletes);
+  writesButNeverDeletes.values.clear();
+  const got = storageWorks();
+  setSharedStorageForChecks(null);
+  return eq(got, true);
+});
+
+/* THE REGRESSION THE SPLIT TRY EXISTS FOR. This exact store — writes
+ * accepted, deletes refused — is what made the one-try version report a
+ * blocked browser to somebody whose browser had just saved their choice.
+ * The check above is the same fixture; this one names why it matters, and
+ * both fail together if the two try blocks are ever merged again. */
+check("...even when that browser refuses to delete the probe afterwards", () => {
+  setSharedStorageForChecks(writesButNeverDeletes);
+  writesButNeverDeletes.values.clear();
+  const answer = storageWorks();
+  const leftBehind = writesButNeverDeletes.values.get(PROBE_KEY) ?? null;
+  setSharedStorageForChecks(null);
+  if (answer !== true) return "reported a blocked browser about a store that had just accepted the write";
+  /* Stated rather than assumed: the probe IS left behind here, and that is
+   * the accepted cost. Nothing in this repo reads that key. */
+  return eq(leftBehind, "1");
+});
+
+check("storageWorks is false when the browser refuses the write", () => {
+  setSharedStorageForChecks(readOnlyStorage);
+  const got = storageWorks();
+  setSharedStorageForChecks(null);
+  return eq(got, false);
+});
+
+check("...and false when it refuses everything", () => {
+  setSharedStorageForChecks(throwingStorage);
+  const got = storageWorks();
+  setSharedStorageForChecks(null);
+  return eq(got, false);
+});
+
+check("a working browser is left with no probe behind", () => {
+  setSharedStorageForChecks(null);
+  localStorage.removeItem(PROBE_KEY);
+  storageWorks();
+  return eq(localStorage.getItem(PROBE_KEY), null);
+});
+
+/* The probe key is the one the cross-tab session listener deliberately
+ * ignores — app/shared/CLAUDE.md records why: a listener waking on every
+ * key would re-render four products whenever any one of them touched
+ * storage. Pinned to the literal, not to the constant, so renaming the
+ * constant cannot make this check agree with itself. */
+check("the probe key is the one the session listener ignores", () =>
+  eq(PROBE_KEY, "pulse-storage-probe"));
+
+/* ------------------------------------------------------------------ */
+/* The one footer                                                       */
+/* ------------------------------------------------------------------ */
+
+/* ONE FOOTER FOR THIRTEEN PAGES, which is only true while every href
+ * resolves from every depth the site has. The pages sit at the root, one
+ * folder down, and two folders down; a link built relative to the PAGE
+ * rather than to the module would be right at one depth and quietly wrong
+ * at the other two — a footer full of 404s that no gate opens a browser to
+ * see. So the resolution is checked at all three. */
+
+const ROOT_AT = (depth: string): string => new URL(depth, "https://studio.example/base/").href;
+
+check("the footer builds one element with every group", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const headings = [...f.querySelectorAll(".site-footer-heading")].map((h) => h.textContent);
+  return eq(headings, FOOTER_GROUPS.map((g) => g.heading));
+});
+
+check("every group link is rendered, none silently dropped", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const rendered = f.querySelectorAll(".site-footer-group a").length;
+  return eq(rendered, FOOTER_GROUPS.reduce((n, g) => n + g.links.length, 0));
+});
+
+/* THE PROPERTY, STATED SO IT CAN FAIL: the hrefs come from the site ROOT
+ * and never from the page. Three pages at three depths are rendered with
+ * the one root the module resolves for itself; if any href were built
+ * relative to the page instead — a bare "products/a-booking/", or a
+ * new URL(..., location.href) — the three lists would part company here.
+ *
+ * The first version of this check passed the same page URL three times and
+ * therefore could not fail at all. That mistake has been made twice in this
+ * repository; it is written down rather than quietly corrected. */
+check("every link resolves from the site root, not from the page it is on", () => {
+  const root = ROOT_AT("./");
+  const hrefsOn = (page: string): string[] =>
+    [...siteFooter(root, page).querySelectorAll(".site-footer-group a")]
+      .map((a) => (a as HTMLAnchorElement).href);
+  const fromRoot = hrefsOn("https://studio.example/base/").join("|");
+  const fromProduct = hrefsOn("https://studio.example/base/products/b-dashboard/").join("|");
+  const fromDeep = hrefsOn("https://studio.example/base/shared/synthetic/tests.html").join("|");
+  if (fromRoot !== fromProduct) return `a product page got different links: ${fromProduct}`;
+  if (fromRoot !== fromDeep) return `a two-deep page got different links: ${fromDeep}`;
+  return eq(fromRoot.split("|")[0], "https://studio.example/base/products/a-booking/");
+});
+
+check("no footer link is left relative, which would break at depth", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const bad = [...f.querySelectorAll("a")]
+    .map((a) => a.getAttribute("href") ?? "")
+    .filter((h) => !h.startsWith("http"));
+  return eq(bad, []);
+});
+
+check("the page you are on is marked, not hidden", () => {
+  const here = "https://studio.example/base/products/a-booking/index.html";
+  const f = siteFooter(ROOT_AT("./"), here);
+  const marked = [...f.querySelectorAll("a[aria-current=\"page\"]")].map((a) => a.textContent);
+  return eq(marked, ["Book a class"]);
+});
+
+check("index.html and the bare folder are the same page", () =>
+  eq(isCurrentPage("https://s/x/index.html", "https://s/x/"), true));
+check("...and a fragment does not make it a different one", () =>
+  eq(isCurrentPage("https://s/x/", "https://s/x/#staff"), true));
+check("...nor does a query string", () =>
+  eq(isCurrentPage("https://s/x/", "https://s/x/?from=mail"), true));
+check("...while two different pages stay different", () =>
+  eq(isCurrentPage("https://s/x/", "https://s/y/"), false));
+
+check("the footer's studio word comes from brand.ts, not from a string here", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const word = f.querySelector(".brand-word")?.textContent ?? "";
+  /* studioWordParts uppercases and splits the name from shared/brand.ts.
+   * Checking the SHAPE rather than the literal keeps this true for a clone
+   * that renamed the studio, which is the whole point of the seam. */
+  return eq(word === word.toUpperCase() && word.length > 0, true);
+});
+
+check("the footer carries the mark, and only one of it", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  return eq(f.querySelectorAll("svg.pulse-mark").length, 1);
+});
+
+check("the footer states the studio's outreach promise", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const said = f.querySelector(".site-footer-promise")?.textContent ?? "";
+  return eq(said.includes("A person at the studio reads and decides"), true);
+});
+
+/* WHAT THE PROMISE MUST NOT SAY. The first draft claimed nothing leaves the
+ * browser, which is false — the support assistant posts each question to a
+ * studio endpoint. A comfortable sentence in a footer is still a claim. */
+check("...and does not claim that nothing leaves the browser", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const said = (f.querySelector(".site-footer-promise")?.textContent ?? "").toLowerCase();
+  return eq(/never leaves|stays in your browser|nothing leaves/.test(said), false);
+});
+
+/* ------------------------------------------------------------------ */
+/* Alerts                                                               */
+/* ------------------------------------------------------------------ */
+
+check("a problem interrupts and a notice waits its turn", () =>
+  eq([ALERT_LEVELS.problem.role, ALERT_LEVELS.problem.live,
+      ALERT_LEVELS.notice.role, ALERT_LEVELS.notice.live].join(","),
+     "alert,assertive,status,polite"));
+
+check("every level carries a visible word, because colour alone is not a label", () =>
+  eq(Object.values(ALERT_LEVELS).every((l) => l.word.trim().length > 0), true));
+
+check("an alert renders its word, its message and its detail", () => {
+  const el = alertElement({ id: "x", level: "problem", message: "It is not working.", detail: "5 checked." });
+  return eq([el.querySelector(".alert-word")?.textContent,
+             el.querySelector(".alert-message")?.textContent,
+             el.querySelector(".alert-detail")?.textContent].join("|"),
+            "Problem|It is not working.|5 checked.");
+});
+
+check("no detail means no empty line", () => {
+  const el = alertElement({ id: "x", level: "notice", message: "Only this." });
+  return eq(el.querySelector(".alert-detail"), null);
+});
+
+check("an alert can be dismissed, and says what it is dismissing", () => {
+  const el = alertElement({ id: "x", level: "notice", message: "Say something." });
+  const button = el.querySelector(".alert-dismiss");
+  return eq(button?.getAttribute("aria-label"), "Dismiss: Say something.");
+});
+
+check("...unless dismissing it would hide something still true", () => {
+  const el = alertElement({ id: "x", level: "problem", message: "Still broken.", dismissible: false });
+  return eq(el.querySelector(".alert-dismiss"), null);
+});
+
+check("raising the same condition twice replaces it instead of stacking", () => {
+  showAlert({ id: "check-dup", level: "notice", message: "first" });
+  showAlert({ id: "check-dup", level: "notice", message: "second" });
+  const region = document.getElementById(ALERT_REGION_ID);
+  const found = region?.querySelectorAll("[data-alert-id=\"check-dup\"]") ?? [];
+  const text = region?.querySelector("[data-alert-id=\"check-dup\"] .alert-message")?.textContent;
+  dismissAlert("check-dup");
+  return eq([found.length, text].join("|"), "1|second");
+});
+
+check("dismissing tells you whether there was anything to dismiss", () => {
+  showAlert({ id: "check-gone", level: "notice", message: "here" });
+  const first = dismissAlert("check-gone");
+  const second = dismissAlert("check-gone");
+  return eq([first, second].join(","), "true,false");
+});
+
+check("the open alerts are listed in the order they were raised", () => {
+  showAlert({ id: "check-a", level: "notice", message: "a" });
+  showAlert({ id: "check-b", level: "problem", message: "b" });
+  const listed = openAlerts().filter((id) => id.startsWith("check-"));
+  dismissAlert("check-a");
+  dismissAlert("check-b");
+  return eq(listed, ["check-a", "check-b"]);
+});
+
+check("the region is made once and reused, not once per alert", () => {
+  showAlert({ id: "check-one", level: "notice", message: "one" });
+  showAlert({ id: "check-two", level: "notice", message: "two" });
+  const regions = document.querySelectorAll(`#${ALERT_REGION_ID}`).length;
+  dismissAlert("check-one");
+  dismissAlert("check-two");
+  return eq(regions, 1);
+});
+
+/* Non-vacuous: the checks above raise real alerts on this page, so the last
+ * word has to be that they cleaned up after themselves. A suite that leaves
+ * its own messages on screen is a suite whose next reader distrusts it. */
+check("the checks leave no alert of their own on this page", () =>
+  eq(openAlerts().filter((id) => id.startsWith("check-")), []));
 
 const results = checks.map(({ name, run }) => {
   let verdict: string | true;

@@ -19,7 +19,8 @@ the legacy contract) is what all four products speak.
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
 | `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
 | `brand.ts` | THE clone seam: the studio's name, rendered into every header at runtime — see `components/README.md` for the four-file rebrand checklist |
-| `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control) — each documented in `components/README.md` |
+| `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control), `site-footer.ts` (the ONE footer, on every page), `alert.ts` (Notice · Problem · Done, in a live region made empty at boot) — each documented in `components/README.md` |
+| `storage.ts` | The four guarded doors onto `localStorage`: `readStored`, `writeStored`, `clearStored`, `storageWorks`. ONE implementation, arrived at the same way `color.ts` and `today.ts` did — `theme-boot.ts` and Product D's `main.ts` each had their own and the two had already drifted (see the storage bullet below). Carries `setStorageForChecks`, so the suite can hand it a store that throws |
 | `synthetic/` | The deterministic studio engine: seeded generation to 2000 members × 5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
 
@@ -285,6 +286,33 @@ the legacy contract) is what all four products speak.
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
   any new injection.
+- **The guarded storage doors were written twice and had drifted.**
+  `theme-boot.ts` and `d-reengagement/main.ts` each carried
+  `readStored`/`writeStored`/`clearStored`/`storageWorks`. Product D's
+  `storageWorks` split the write from the cleanup, after finding that a
+  store which ACCEPTED the write and refused the delete reported "this
+  browser is not saving site data" — the opposite of what had just
+  happened. theme-boot's copy still had both in one try, so the same
+  browser got the right answer on one page and the wrong one on the next.
+  Neither copy had a single check on it: both lived in a module no suite
+  can import, because each reads `document` at load. They are now
+  `app/shared/storage.ts`, with the split kept and checks under "The
+  guarded storage doors" in `auth/tests.ts` — including the
+  writes-but-refuses-deletes store that caused it. (No count here: the
+  standard in `docs/README.md` is that a number in prose is a second thing
+  to keep true, and this file has broken it before.) Product A's `reservations.ts` still calls
+  `localStorage.setItem` with no guard at all; that is Kerrian's lane and
+  is named in `docs/REQUESTFOR-A-B-C.md`.
+- **Chrome is created by shared code inside every product's page, and that
+  is the design.** The sign-in chip, the appearance control, the favicon
+  link for pages that declare none, the alert region and the site footer
+  are all built by `theme-boot` into pages it does not own. The line
+  `components/README.md` drew — fill a page's markup, never create
+  structure in it — was already false when written, and it now says the
+  thing that was always meant: shared code owns the CHROME (above, below,
+  and the alert strip between), and never reaches inside a product's
+  `<main>`. Every piece has an opt-out its owner can use without asking:
+  `<body data-no-session>`, `<body data-no-footer>`.
 - **The chip mounts by header class**: renaming `.topnav`, `.page-head`,
   or `.topbar` in a product silently removes sign-in from that page. The
   selector is in `theme-boot.ts`, NOT in `components/topbar.ts` — topbar
@@ -298,6 +326,10 @@ the legacy contract) is what all four products speak.
 `pulse-session` (the ONE session key — hostile-input rules apply),
 `pulse-theme`, and `pulse-theme-custom` (the saved custom background/text
 pair). `pulse-reservations-a` belongs to Product A and is data, not identity.
+`pulse-storage-probe` is written and taken straight back out by
+`storage.ts`'s `storageWorks()`; the cross-tab session listener ignores it
+on purpose, and `PROBE_KEY` is the constant to read rather than the string
+to retype.
 
 ## Gate
 

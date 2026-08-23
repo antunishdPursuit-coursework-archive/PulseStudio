@@ -30,6 +30,13 @@
 export { STUDIO_NAME } from "../../shared/brand.js";
 export { todayIsoInZone } from "../../shared/today.js";
 
+/* Guarded browser storage, shared. This product wrote its own four doors
+ * and theme-boot wrote the same four, which is two rules to keep true — and
+ * they had already diverged, in this product's favour: the split try inside
+ * storageWorks was found here first. The implementation moved to shared and
+ * kept that fix; this line is the seam a standalone port re-points. */
+export { readStored, writeStored, clearStored, storageWorks } from "../../shared/storage.js";
+
 /* The RUNNING studio — the same cached dataset Booking books against and
  * the top-bar sign-in lists (shared/auth/studio.ts). This product's
  * default records are built FROM it (see live-studio.ts), so
