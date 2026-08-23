@@ -1,7 +1,13 @@
-.page-head .home-brand { align-items: center; color: var(--fg); display: inline-flex; font-size: 1.25rem; font-weight: 700; gap: 8px; letter-spacing: 0; text-decoration: none; }
-.page-head .home-brand .home-arrow, .page-head .home-brand .brand-word span { color: var(--accent); }
-.page-head .home-brand:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.page-head .role { color: var(--accent); font-family: inherit; font-size: 1.25rem; font-style: normal; font-weight: 700; line-height: 1.5; }
+/* Product A — booking-page styling. Every color is a theme token.
+   The header rules that used to sit here (home-brand, focus ring, .role)
+   were byte-for-byte copies of what theme.css already owns — recorded debt
+   in docs/styles-baseline.json — and the .role copy overrode the shared
+   display face and its small-screen size. Deleted rather than kept in
+   sync: the shared theme is the one rule to keep true. The old
+   #schedule:empty::before rule set a color but never a `content`, so no
+   pseudo-element was ever generated — the empty states are stated in words
+   by renderSchedule/renderMine, where the language law wants them. */
+
 .next-class { border-left: 4px solid var(--accent); padding-left: 12px; font-size: 1.05rem; }
 .next-class strong { color: var(--accent); }
 .lede { color: var(--muted); max-width: 40rem; margin: 0 0 16px; }
@@ -74,11 +80,3 @@ h2 { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; colo
 
 .card.highlight { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.error {
-  color: var(--fg);
-  border-left: 4px solid var(--accent);
-  padding-left: 12px;
-}
-
-#schedule:empty::before,
-#mine:empty::before { color: var(--muted); }
