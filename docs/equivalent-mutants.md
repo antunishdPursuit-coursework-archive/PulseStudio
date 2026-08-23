@@ -401,6 +401,27 @@ is the durable part — the individual fixes are just where it landed.
   different screens. **Measure where a branch is reachable before
   arranging for it to be reachable where you happen to be looking.**
 
+## Where the survey has actually reached (2026-08-22)
+
+Scores move when checks are added, so these are a record of what has been
+LOOKED AT, not a scoreboard. Run the tool for a number.
+
+| Module | Measured | Anything left |
+| --- | --- | --- |
+| d-reengagement `logic`, `csv`, `outreach`, `config`, `live-studio` | in full | explained below or closed |
+| d-reengagement `generate` | in full | archetype heuristics and one unreachable boundary |
+| shared `session`, `normalize`, `serialize`, `text`, `lifecycle` | in full | one documented comment-only block |
+| shared `color` | in full, judged by check-contrast's self-test | four equivalents, each explained |
+| shared `scenarios`, `identity`, `csv-export`, `schedule` | in full | heuristics and guarded comparisons |
+| shared `synthetic/generate` | **sampled, 1 site in 10 of 165** | the sampled survivor is the documented victim-picker |
+| the ten gates | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
+| `today`, `theme-boot`, `components/*`, `brand` | not measured | nothing to swap, or no suite reaches them |
+
+The one genuinely unsampled body of code is the other nine tenths of
+`synthetic/generate.ts`. A full sweep there is 165 suite runs at roughly
+twelve seconds each — half an hour — and the tenth that was sampled came
+back at 94%.
+
 ## Swept clean, so nobody sweeps them again
 
 - **The filing law's other two directories.** `scripts/` holds only tooling
