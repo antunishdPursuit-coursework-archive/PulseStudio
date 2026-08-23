@@ -19,6 +19,7 @@ import {
 import type { HomeRoutine } from "./routines.js";
 import { NOT_REVIEWED, ROUTINE_LIBRARY, SAFETY_NOTICE } from "./routine-library.js";
 import { draftWithRoutine, routineUrl } from "./outreach.js";
+import { SAFETY_HEADING, SAFETY_INTRO, SAFETY_POINTS } from "./routines.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
@@ -4615,6 +4616,27 @@ check("clean records produce no data-quality line",
   check("...and explains why there is no filter",
     unknownView.filterLabel, "No class interest recorded — showing all approved routines");
   check("...and does not offer a filter control", unknownView.filterAvailable, false);
+  /* --- the safety guidance, as approved for this increment --- */
+  check("the guidance names what this is", SAFETY_HEADING, "General fitness information");
+  check("it says plainly that it is not individualised medical advice",
+    SAFETY_INTRO.includes("not individualised medical advice"), true);
+  check("...and that it was not prepared for anybody in particular",
+    SAFETY_INTRO.includes("have not been prepared for any one person's circumstances"), true);
+  check("there are three instructions", SAFETY_POINTS.length, 3);
+  check("stop: pain, dizziness, breathlessness",
+    SAFETY_POINTS[0]?.includes("pain, dizziness, or breathlessness"), true);
+  check("easier option: named, and said to be with the step",
+    SAFETY_POINTS[1]?.includes("Use the easier option"), true);
+  check("professional guidance: pregnancy, injury, illness, condition, uncertainty",
+    ["pregnant", "injury", "illness", "medical\u00a0condition".replace("\u00a0", " "), "unsure"]
+      .every((w) => SAFETY_POINTS[2]?.includes(w) ?? false), true);
+  /* A NOTICE MAY NOT CLAIM SUITABILITY. This is the sentence most likely to
+   * drift into reassurance, so it is pinned against the words that would
+   * turn information into a recommendation. */
+  const allSafety = [SAFETY_HEADING, SAFETY_INTRO, ...SAFETY_POINTS].join(" ");
+  check("the guidance never says the routine is safe or suitable for the reader",
+    /safe for you|suitable for you|approved for your|right for you|clinically/i.test(allSafety), false);
+
   /* --- adding a routine to the draft --- */
   const plainDraft = "Hi Ada – it's been 20 days since your last yoga class.";
   const url = routineUrl("https://studio.example/", "routine-morning-mobility");

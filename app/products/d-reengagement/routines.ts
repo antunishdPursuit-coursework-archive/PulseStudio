@@ -413,3 +413,24 @@ export function routinePanelView(
     routines: shown,
   };
 }
+
+/* ---------- the safety guidance shown with every routine ---------- */
+
+/** The wording approved for this increment. It states what the routine IS —
+ *  general information — and it never claims the routine suits the person
+ *  reading it. A notice cannot make something suitable; it can only be
+ *  honest about what was and was not considered. */
+export const SAFETY_HEADING = "General fitness information";
+
+export const SAFETY_INTRO =
+  "These routines are general fitness information from the studio. They are not " +
+  "individualised medical advice, and they have not been prepared for any one " +
+  "person's circumstances.";
+
+export const SAFETY_POINTS: readonly string[] = [
+  "Stop and rest if a movement causes pain, dizziness, or breathlessness that feels unusual for you.",
+  "Use the easier option whenever a step feels like too much. It is listed with the step.",
+  "Speak to a qualified professional — your doctor, physiotherapist, or a studio instructor — " +
+    "before starting, if you are pregnant, recovering from injury or illness, managing a medical " +
+    "condition, or simply unsure.",
+];
