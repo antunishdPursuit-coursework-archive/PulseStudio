@@ -35,6 +35,7 @@ import {
   readPulseSession,
   subscribeToPulseSession,
 } from "../auth/session.js";
+import { readStaffGate, signOutStaff } from "../auth/staff-gate.js";
 import {
   signInAsFrontDesk,
   signInAsMember,
@@ -75,8 +76,28 @@ export function mountSessionControl(host: Element): void {
 
 /* The control has exactly two states, and both state who you are — a
    stated result, never a mystery: signed out shows "Sign in"; signed in
-   shows the member's display_name (with a
-   staff tag when the login is staff) and a Sign out. */
+   shows the member's display_name and a Sign out.
+
+   WHO IS ALLOWED TO CALL SOMEBODY STAFF, AND WHY IT IS NOT THIS FILE.
+
+   This control used to print "staff · front desk" whenever the BROWSER's
+   remembered session said `actor_type: "staff"`. That session lives in
+   localStorage. Anybody can write it. So the header was asserting an
+   authority it had no way to hold, and once the staff surfaces grew a real
+   door the two disagreed out loud: the header said "staff · front desk ·
+   Sign out" on a page whose own body said "sign in to see this". Two
+   answers to one question on one screen, which is how a person learns to
+   believe neither.
+
+   There is exactly one thing that can answer "is this staff?" now — the
+   server, which holds the passphrase and signs the cookie. So the tag is
+   NOT drawn from the local session at all. It is drawn only after
+   readStaffGate() comes back confirming a session this browser could not
+   have forged, and until then nothing is claimed. Rendering the unproven
+   state first and correcting it later would flash a lie, however briefly.
+
+   The local session keeps its real job: remembering a NAME so member
+   surfaces can greet a person. A name is not a permission. */
 function render(root: HTMLElement): void {
   /* readPulseSession() also handles recovery: a malformed, legacy, or
      stale value reads as null (and is cleaned up), so this render can
@@ -101,19 +122,30 @@ function render(root: HTMLElement): void {
   dot.setAttribute("aria-hidden", "true");
   who.appendChild(dot);
   who.appendChild(document.createTextNode(session.display_name));
+  /* No tag yet, on purpose. If the server confirms a staff session it is
+     appended below, after the answer arrives. */
   if (session.actor_type === "staff") {
-    /* actor type AND role, readable at a glance */
-    const tag = document.createElement("em");
-    tag.className = "pulse-session-role";
-    tag.textContent = "staff · front desk";
-    who.appendChild(tag);
+    void readStaffGate().then((gate) => {
+      if (!gate.signedIn) return;
+      if (!who.isConnected) return; // a re-render happened first
+      const tag = document.createElement("em");
+      tag.className = "pulse-session-role";
+      tag.textContent = "staff · front desk";
+      who.appendChild(tag);
+    });
   }
 
   const out = document.createElement("button");
   out.type = "button";
   out.className = "pulse-session-signout";
   out.textContent = "Sign out";
-  out.addEventListener("click", () => clearPulseSession());
+  /* Sign out means BOTH: the name this browser remembers, and the session
+     the server signed. Clearing one and leaving the other is how a person
+     ends up still holding staff access after they thought they left. */
+  out.addEventListener("click", () => {
+    clearPulseSession();
+    void signOutStaff().then(() => { window.location.reload(); });
+  });
 
   root.appendChild(who);
   root.appendChild(out);

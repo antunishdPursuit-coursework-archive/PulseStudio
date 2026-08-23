@@ -1318,6 +1318,32 @@ for (const file of ENGINE_SOURCES) {
   check("it holds no key or credential-shaped literal",
     /anthropic-version|x-api-key|sk-ant-/i.test(assistantSource), false);
 
+  /* A NAME IS NOT A PERMISSION, AND THE HEADER MUST NOT CONFUSE THE TWO.
+   *
+   * The top bar used to print "staff · front desk" straight from the
+   * browser's remembered session — a localStorage value anybody can write.
+   * Once the staff surfaces grew a real door, the two disagreed on one
+   * screen: the header claimed staff while the page below it asked the
+   * person to sign in. The tag is now drawn only after the SERVER confirms
+   * a session it signed itself.
+   *
+   * These read the shipped source rather than the behaviour because the
+   * failure they guard is a shape: somebody simplifying the async answer
+   * back into a synchronous one from the local session. That reads like a
+   * tidy-up and is a privilege claim. */
+  const topbarSource = await (await fetch("../components/topbar.ts")).text();
+  check("the top bar was actually read", topbarSource.length > 200, true);
+  /* The IMPORT, not the name. An earlier version of this check looked for
+     the string "readStaffGate" and was satisfied by the comment above it
+     explaining what it does — a check a comment can pass is not a check.
+     An import is a structural dependency prose cannot fake. */
+  check("it imports the door from shared rather than deciding for itself",
+    topbarSource.includes('from "../auth/staff-gate.js"'), true);
+  check("...and the staff tag is only appended inside that answer",
+    /readStaffGate\(\)[\s\S]{0,400}pulse-session-role/.test(topbarSource), true);
+  check("signing out ends the server session, not just the remembered name",
+    topbarSource.includes("signOutStaff") && topbarSource.includes("clearPulseSession"), true);
+
   /* A RECURRING CLASS OF BUG, PINNED BY THE TWO CASES THAT ALREADY
    * HAPPENED. `hidden` is a UA-stylesheet `display: none` at the lowest
    * possible specificity; a plain class rule setting `display:` on the
