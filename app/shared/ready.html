@@ -88,11 +88,15 @@
     <div class="verdict">
       <h2>Presentable today — not finished, and this page says which is which.</h2>
       <p>Every step of the walkthrough below runs on the live site today —
-      with ONE exception, called out in red inside the walkthrough itself and
-      again below: a member's booking cannot reach the Dashboard's meters,
-      because the Dashboard still builds its own studio. An adversarial audit
-      on August 20, 2026 caught that this page had claimed otherwise; the
-      claim is gone and the gap is stated. Presenting the red as red is the
+      with TWO exceptions, each called out in red inside the walkthrough
+      itself and again below. First: a member's booking cannot reach the
+      Dashboard's meters, because the Dashboard still builds its own studio.
+      Second, found by a second audit on August 22, 2026: the assistant
+      cannot answer on the deployed site, because it posts every question to
+      an address the static build does not publish. This paragraph said ONE
+      exception until that audit, and step 5 below claimed the assistant
+      answered — so the board was overstating itself in exactly the way it
+      warns against. Presenting the red as red is the
       discipline — and if the verdict ever claims more than the proofs show,
       the verdict is what gets fixed.</p>
     </div>
@@ -146,7 +150,7 @@
       <li><strong>Sign in from the top bar</strong> as a member: the front door greets them by name and takes them straight to their classes; the same persona follows every page.</li>
       <li><strong>Book a class</strong> <span class="chip a">Booking</span> — the week day by day, spots left, and a confirmation naming the class, time, and instructor. Your reservations appear under the schedule with a cancel on each.</li>
       <li><strong>Open the Dashboard</strong> <span class="chip b">Dashboard</span> — the week's fill rates and the classes needing attention. <strong>Say the gap out loud here:</strong> this board still builds its own studio, so the booking from step 3 is not on it yet — one config line away, and the honest thing to show.</li>
-      <li><strong>Ask the assistant</strong> <span class="chip c">Support</span> a schedule question — answered from today's real schedule, refusals stated.</li>
+      <li><strong>Ask the assistant</strong> <span class="chip c">Support</span> a schedule question. <strong>Say the second gap out loud here:</strong> on the deployed site this answers nothing — every question is posted to an address a static build does not publish, so the page states that support is unavailable rather than inventing a reply. Running locally with a key, it answers from the current schedule and states its refusals.</li>
       <li><strong>Sign in as Front Desk and open Re-engagement</strong> <span class="chip d">Re-engage</span> — the quiet ranked with evidence; a member who booked back in is named and left alone; copy the draft.</li>
       <li><strong>Close on the story:</strong> <a href="./storytold.html">storytold</a> — the five beats and the map where every finished hand-off literally fires.</li>
     </ol>
@@ -195,8 +199,13 @@
       GitHub's legacy builder still records the repo root as its Pages source
       underneath the Actions deploy. If anyone flips Settings → Pages → Source
       back, those eight dead files become the live site and <code>app/</code>
-      demotes to a subfolder. Nothing in the code prevents it; worth knowing
-      before anyone touches that screen.</li>
+      demotes to a subfolder. The code still cannot PREVENT that — no workflow
+      can overrule a repo setting — but since 2026-08-22 it no longer stays
+      quiet about it: the build reads the Pages source, publishes only when it
+      is GitHub Actions, and writes “deploy skipped — Pages source is X” into
+      the run summary otherwise. A failed read of that setting now stops the
+      run instead of being folded into a green one. Worth knowing before
+      anyone touches that screen.</li>
       <li><strong>Two law ratifications</strong> — the appearance amendment and the audience law await the four builders' explicit yes on their PRs.</li>
       <li><strong><span class="chip b">B</span> housekeeping</strong> — the
       stale second page is not just deployed, it answers:

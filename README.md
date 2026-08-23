@@ -126,6 +126,38 @@ only for a staff page that does not have the tag yet, because blocking is the
 weaker fallback: it stops the content being fetched, but the URL can still be
 listed. Read the comments in that file before changing it.
 
+## Where the data comes from
+
+**Every person in this repo is invented.** No real member's record is here,
+and nothing is downloaded at runtime — the site is static and the studio
+engine is forbidden by its own suite from making a network call or reading
+the clock. Records are generated from a seed, so the same seed gives the
+same studio on any machine.
+
+The *shapes* those invented records follow were calibrated against one
+openly licensed public dataset:
+
+| | |
+| --- | --- |
+| Dataset | **Gym Membership Dataset**, by Tarek Adam |
+| Where | <https://www.kaggle.com/datasets/ka66ledata/gym-membership-dataset> |
+| Licence | CC0 1.0 Public Domain — no attribution required; given anyway |
+| What was taken | Published column summaries only — weekly visit frequency and the share of members attending group classes. **No rows were copied.** |
+
+**Read the licence line and then read this one: that dataset describes
+itself as synthetic.** It is a simulated gym membership database published
+for practice with data analysis. So the studio's shapes are borrowed from
+somebody else's model, not measured from a real gym, and no surface in this
+repo may say otherwise. `app/shared/synthetic/CALIBRATION.md` records what
+was taken, what was deliberately left alone and why — including one figure
+that turned out not to be derivable from the source at all, and the
+correction that followed.
+
+That file is the place to look before adding another source. It also lists
+the datasets rejected on licensing grounds, which matters for a repo shown
+to real studios: a NonCommercial or ShareAlike source would reach for this
+project's own licensing.
+
 ## Current phase
 
 Problem framing and shared project setup. The team will agree on the shared
