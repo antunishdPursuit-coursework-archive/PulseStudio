@@ -32,6 +32,9 @@ import {
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
+import { assistantFor, bookForMember, bookingIntent, openingLine } from "../components/assistant.js";
+import { generateStudio } from "../synthetic/generate.js";
+import { DEFAULT_CONFIG } from "../synthetic/config.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
@@ -1148,6 +1151,172 @@ check("the runner gets a lane to cross, and only one", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* The assistant launcher                                               */
+/* ------------------------------------------------------------------ */
+
+/* THE AUDIENCE ASYMMETRY, checked the same way assistant-audience.ts is
+ * checked above: placement can only NARROW what an actor is shown, never
+ * widen it. A staff person on a member-facing page is still shown the
+ * visitor/member assistant — the screen may be turned toward a member. */
+check("nobody signed in is a visitor on a member-facing page", () =>
+  eq(assistantFor(null, "member-facing"), "visitor"));
+check("a signed-in member is the booking assistant", () =>
+  eq(assistantFor("member", "member-facing"), "member"));
+check("staff AND a staff-facing page is the staff assistant", () =>
+  eq(assistantFor("staff", "staff-facing"), "staff"));
+check("a staff person on a member-facing page never becomes the staff assistant", () =>
+  eq(assistantFor("staff", "member-facing"), "visitor"));
+check("a member on a staff-facing page never becomes the staff assistant either", () =>
+  eq(assistantFor("member", "staff-facing"), "visitor"));
+check("every opening line names what that assistant may actually do", () => {
+  const lines = [openingLine("visitor", null), openingLine("member", "Ada"), openingLine("staff", null)];
+  if (lines.some((l) => l.trim() === "")) return "an assistant opened with nothing to say";
+  if (!(lines[2] ?? "").toLowerCase().includes("capacity")) return "the staff line does not mention capacity";
+  if (!(lines[1] ?? "").includes("book")) return "the member line never mentions booking";
+  return true;
+});
+
+/* BOOKING, AGAINST A REAL GENERATED STUDIO — not a hand-built fixture, so
+ * a fill-count off by one shows up here the way it would on the live page.
+ * upcomingFillTarget guarantees a mix of open and full classes. */
+const assistantStudio = generateStudio({
+  ...DEFAULT_CONFIG,
+  seed: "assistant-launcher-checks",
+  asOfDate: "2026-08-19",
+  memberCount: 60,
+  upcomingFillTarget: 0.5,
+}).dataset;
+
+/* bookingIntent/bookForMember take a resolved Session — a module-private
+ * shape assistant.ts builds from a dataset via resolveSessions(), which is
+ * not exported (the launcher's DOM wiring is the only caller). What is
+ * checked here is the two EXPORTED pure functions against hand-built
+ * values in exactly the shape resolveSessions() produces, so the rule
+ * itself — not the private plumbing around it — is what is pinned. */
+function assistantSession(overrides: {
+  id?: string; classType?: string; startsAt?: string; capacity?: number; bookedCount?: number;
+  status?: "scheduled" | "completed" | "canceled";
+} = {}) {
+  const id = overrides.id ?? "class-session:900001";
+  const classType = overrides.classType ?? "Yoga";
+  const startsAt = overrides.startsAt ?? `${assistantStudio.meta.asOfDate}T09:00:00`;
+  const capacity = overrides.capacity ?? 10;
+  const status = overrides.status ?? "scheduled";
+  return {
+    raw: { id, classTypeId: "x", instructorId: "x", startsAt, durationMinutes: 60, capacity, status },
+    classType,
+    level: "All levels",
+    startsAt,
+    endsAt: startsAt,
+    capacity,
+    bookedCount: overrides.bookedCount ?? 0,
+  };
+}
+
+check('"book yoga tomorrow" finds tomorrow\'s yoga session', () => {
+  const day = Number(assistantStudio.meta.asOfDate.slice(8, 10)) + 1;
+  const tomorrow = `${assistantStudio.meta.asOfDate.slice(0, 8)}${String(day).padStart(2, "0")}`;
+  const s = assistantSession({ startsAt: `${tomorrow}T09:00:00` });
+  const found = bookingIntent("can you book yoga tomorrow", [s], assistantStudio.meta.asOfDate);
+  return eq(found?.raw.id, s.raw.id);
+});
+check("merely mentioning a class is not a booking request", () =>
+  eq(bookingIntent("what levels does yoga have", [assistantSession()], assistantStudio.meta.asOfDate), null));
+check("a class type the studio does not run finds nothing", () =>
+  eq(bookingIntent("book underwater basket weaving today", [assistantSession()], assistantStudio.meta.asOfDate), null));
+check("with no day named, a matching session is still offered", () =>
+  eq(bookingIntent("book me into yoga", [assistantSession()], assistantStudio.meta.asOfDate) !== null, true));
+check("a past session is never offered, even matching by name", () =>
+  eq(bookingIntent("book yoga", [assistantSession({ startsAt: "2020-01-01T09:00:00" })], assistantStudio.meta.asOfDate), null));
+
+check("booking a class with room succeeds and returns the row", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const result = bookForMember("member:checks-1", assistantSession({ id: "class-session:900002", capacity: 10, bookedCount: 2 }));
+  const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+  localStorage.removeItem(key);
+  if (!result.ok) return `expected success, got: ${result.why}`;
+  return eq([stored.length, stored[0]?.member_id, stored[0]?.reservation_status], [1, "member:checks-1", "reserved"]);
+});
+
+check("a full class is refused, and nothing is written", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const full = assistantSession({ id: "class-session:900003", capacity: 5, bookedCount: 5 });
+  const result = bookForMember("member:checks-2", full);
+  const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+  localStorage.removeItem(key);
+  if (result.ok) return "a full class accepted a booking";
+  return eq(stored.length, 0);
+});
+
+/* THE COUNT THAT MATTERS IS THE UNION, NOT JUST THE GENERATOR'S OWN. A
+ * class the generator reports empty (bookedCount 0) can still be full
+ * because Booking's own runtime log already filled it — a check that only
+ * read bookedCount would wrongly accept a second booking here. */
+check("a class the runtime log already fills is refused too", () => {
+  const key = "pulse-reservations-a";
+  const target = assistantSession({ id: "class-session:900004", capacity: 1, bookedCount: 0 });
+  localStorage.setItem(key, JSON.stringify([
+    { reservation_id: "res_x", member_id: "member:someone-else", session_id: target.raw.id, reservation_status: "reserved", reserved_at: target.startsAt, canceled_at: null },
+  ]));
+  const result = bookForMember("member:checks-3", target);
+  localStorage.removeItem(key);
+  if (result.ok) return "a class already filled by the runtime log accepted a second booking";
+  return eq(result.ok === false && result.why.includes("full"), true);
+});
+
+check("booking the same class twice is refused the second time as already-held", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const target = assistantSession({ id: "class-session:900005", capacity: 10, bookedCount: 0 });
+  const first = bookForMember("member:checks-4", target);
+  const second = bookForMember("member:checks-4", target);
+  localStorage.removeItem(key);
+  if (!first.ok) return "the first booking should have succeeded";
+  return eq([second.ok, second.ok === false && second.why.includes("already")], [false, true]);
+});
+
+check("a cancel makes the spot bookable again — last row wins", () => {
+  const key = "pulse-reservations-a";
+  const target = assistantSession({ id: "class-session:900006", capacity: 1, bookedCount: 0 });
+  const first = bookForMember("member:checks-5", target);
+  if (!first.ok) return "setup failed: first booking did not succeed";
+  const rows = JSON.parse(localStorage.getItem(key) ?? "[]");
+  rows.push({ ...rows[0], reservation_status: "canceled", canceled_at: target.startsAt });
+  localStorage.setItem(key, JSON.stringify(rows));
+  const second = bookForMember("member:checks-5", target);
+  localStorage.removeItem(key);
+  return eq(second.ok, true);
+});
+
+check("a browser that refuses to save reports that, not a false success", () => {
+  const throwing = {
+    getItem(): string | null { return null; },
+    setItem(): void { throw new Error("storage refused"); },
+    removeItem(): void { /* nothing was written */ },
+  };
+  setSharedStorageForChecks(throwing);
+  const result = bookForMember("member:checks-6", assistantSession({ id: "class-session:900007" }));
+  setSharedStorageForChecks(null);
+  if (result.ok) return "reported success while storage refused the write";
+  return eq(result.why.includes("not saving"), true);
+});
+
+/* THE OUTBOUND GUARD, exercised the way the launcher exercises it — the
+ * same policy object, the same function, so a member policy that stopped
+ * catching a leak would fail here exactly as it would in the panel. */
+check("a member policy still catches a roster leak in an assistant reply", () =>
+  eq(answerProblems("Twelve booked, three no-shows this week.", audiencePolicy("member", "member-facing")).length > 0, true));
+check("...and still catches another member's name", () =>
+  eq(answerProblems("Ask Priya Patel about it.", audiencePolicy("member", "member-facing"), ["Priya Patel"]).length > 0, true));
+check("an ordinary member answer still passes", () =>
+  eq(answerProblems("Yoga is Thursday at 9, and there is a spot.", audiencePolicy("member", "member-facing")), []));
+check("staff on a staff-facing page may hear capacity language", () =>
+  eq(answerProblems("Fill rate is 80% with two at-risk members.", audiencePolicy("staff", "staff-facing")), []));
+
+/* ------------------------------------------------------------------ */
+/* Alerts                                                               *//* ------------------------------------------------------------------ */
 /* Alerts                                                               */
 /* ------------------------------------------------------------------ */
 
