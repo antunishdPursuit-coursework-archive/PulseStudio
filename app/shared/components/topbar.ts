@@ -47,8 +47,16 @@ const DIALOG_ID = "pulse-session-dialog";
 
 /* Mount the control into a page's existing header. Idempotent — a second
    call on the same page does nothing, so theme-boot can call it blindly.
-   If the header also holds the appearance control, the session control slots
-   in before it so the control keeps its familiar end-of-row seat. */
+   If the header also holds the light/dark switch, the session control slots
+   in before it so the switch keeps its familiar end-of-row seat.
+
+   THAT SELECTOR CHANGED ON 2026-08-23 and would have failed silently if it
+   had not: it read `.appearance-control`, the <details> drawer that used to
+   hold the whole settings surface in the header. The drawer is gone —
+   settings is its own page now and the header keeps two buttons — so the
+   old selector matched nothing, the session control appended instead of
+   inserting, and the switch moved. Nothing would have thrown; the header
+   would just have been in a different order on every page. */
 export function mountSessionControl(host: Element): void {
   if (document.getElementById(CONTROL_ID)) return;
   injectStylesOnce();
@@ -57,7 +65,7 @@ export function mountSessionControl(host: Element): void {
   root.id = CONTROL_ID;
   root.className = "pulse-session";
 
-  const appearance = host.querySelector(".appearance-control");
+  const appearance = host.querySelector("#appearance-modes");
   if (appearance !== null) host.insertBefore(root, appearance);
   else host.appendChild(root);
 

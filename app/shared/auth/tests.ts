@@ -29,7 +29,7 @@ import {
   storageWorks,
   writeStored,
 } from "../storage.js";
-import { FOOTER_GROUPS, isCurrentPage, siteFooter } from "../components/site-footer.js";
+import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
@@ -902,6 +902,20 @@ check("...and does not claim that nothing leaves the browser", () => {
   const said = (f.querySelector(".site-footer-promise")?.textContent ?? "").toLowerCase();
   return eq(/never leaves|stays in your browser|nothing leaves/.test(said), false);
 });
+
+/* SETTINGS IS REACHED FROM THE FOOTER, on every page, because the header
+ * stopped carrying it. The top bar keeps light and dark; everything past
+ * that is one page, and the only thing pointing at it from thirteen pages
+ * is this link. If it breaks, settings becomes a URL people have to know. */
+check("the footer carries the way to settings", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const found = [...f.querySelectorAll(".site-footer-base a")]
+    .map((a) => `${a.textContent}|${(a as HTMLAnchorElement).href}`);
+  return eq(found[0], "Settings|https://studio.example/base/shared/settings.html");
+});
+
+check("...and it is the one shared settings page, not a per-page guess", () =>
+  eq(SETTINGS_HREF, "shared/settings.html"));
 
 /* ------------------------------------------------------------------ */
 /* Alerts                                                               */
