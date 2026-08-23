@@ -216,14 +216,12 @@
     </section>
   </main>
 
-  <footer>
-    <span class="foot-brand" data-studio-name>Pulse Studio</span>
-    <a href="./products/a-booking/">Book a class</a>
-    <a href="./products/c-chatbot/">Ask us</a>
-    <a href="#staff">Staff tools</a>
-    <a href="./shared/storytold.html">How this studio's software flows</a>
-    <a href="https://github.com/antunishdPursuit/PulseStudio">Source</a>
-  </footer>
+  <!-- No <footer> here on purpose. The front door used to carry the only
+       footer on the site, and the other thirteen pages ended at </main>.
+       shared/components/site-footer.ts now builds one footer for all of
+       them and theme-boot appends it — including this page, which is why
+       this markup is gone rather than kept alongside. A page that writes
+       its own <footer> keeps it and the shared one stands down. -->
 
   <script type="module" src="./shared/theme-boot.js"></script>
   <script type="module" src="./shared/home.js"></script>

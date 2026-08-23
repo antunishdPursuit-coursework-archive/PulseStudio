@@ -107,6 +107,27 @@
    * docs/contrast-baseline.json with the owner who can clear them, because
    * a developer's colour is theirs to change. */
   --rensley-strong: #743df5;   /* 5.63:1 on white, white ink 5.63:1 */
+
+  /* STATUS IS NOT A FIFTH DEVELOPER. The colour law spends colour on
+   * PEOPLE — four accents, one per builder, and never a fifth. These two
+   * are the carve-out the same law already makes on storytold.html, which
+   * says it out loud: "Green and red here are status marks only; the four
+   * builder colors keep meaning who built what." An alert's severity is
+   * not authorship, and the readiness board has shown open gaps in red
+   * since before either of these tokens existed.
+   *
+   * THEY ARE ALSO NOT CHECKED BY THE GATE. check-contrast.mjs measures the
+   * four named developer accents and nothing else, by design — so these
+   * two were measured by hand against the ground each one is used on, and
+   * the ratio is written beside it the way the accents' are. Both are used
+   * for a rule and a single word, never for body text on a fill.
+   *
+   * THE WORD CARRIES THE MEANING, NOT THE COLOUR. Every alert prints
+   * "Notice", "Problem" or "Done" beside the rule, so a person who cannot
+   * separate these two hues reads the same alert as everyone else. That is
+   * why there are two colours and three levels rather than three of each. */
+  --status-bad:  #b42318;      /* 6.57:1 on white */
+  --status-good: #067647;      /* 5.69:1 on white */
 }
 
 /* CUSTOM OWNS ITS WHOLE PALETTE, so it opts out of this block entirely.
@@ -124,6 +145,8 @@
     --muted: #a3a3a3;
     --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
     --rensley-ink: #0a0a0a;
+    --status-bad:  #ff7b72;     /* 8.33:1 on black */
+    --status-good: #3fb950;     /* 8.27:1 on black */
   }
 }
 
@@ -134,6 +157,8 @@
   --muted: #a3a3a3;
   --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
   --rensley-ink: #0a0a0a;
+  --status-bad:  #ff7b72;     /* 8.33:1 on black */
+  --status-good: #3fb950;     /* 8.27:1 on black */
 }
 
 :root[data-theme="custom"] {
@@ -155,6 +180,8 @@
 :root[data-theme="custom"][data-custom-tone="dark"] {
   --rensley-strong: #9e77f8;
   --rensley-ink: #0a0a0a;
+  --status-bad:  #ff7b72;
+  --status-good: #3fb950;
 }
 
 /* ANTON HAS ONE WEIGHT, so the browser must not invent the others: 800 and
@@ -429,4 +456,119 @@ h1, h2, h3, .display, .page-head .role, .brand {
     70%  { opacity: 0;    stroke-dashoffset: 0; }
     100% { opacity: 0;    stroke-dashoffset: 0; }
   }
+}
+
+/* ---- alerts -----------------------------------------------------------
+   The region is EMPTY until something is wrong, and it takes no space
+   until then — a permanently reserved strip at the top of every page is a
+   layout shift waiting for its first message. :empty is what makes that
+   free: no padding, no border, no margin, nothing to see, and the element
+   still in the document since first paint so a screen reader is already
+   listening (components/alert.ts explains why that matters).
+
+   The two status hues are the carve-out documented with the tokens above.
+   They colour a 4px rule and one word — never body text on a fill — so the
+   sentence a person has to read is always --fg on --bg. */
+.alert-region { display: grid; gap: 10px; margin: 14px auto 0; max-width: 960px; padding: 0 20px; }
+.alert-region:empty { display: none; }
+.alert {
+  align-items: start;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  color: var(--fg);
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: auto 1fr auto;
+  padding: 12px 14px;
+}
+.alert-problem { border-left-color: var(--status-bad); }
+.alert-done { border-left-color: var(--status-good); }
+.alert-word {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding-top: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.alert-problem .alert-word { color: var(--status-bad); }
+.alert-done .alert-word { color: var(--status-good); }
+.alert-notice .alert-word { color: var(--muted); }
+.alert-body { min-width: 0; }
+.alert-message { margin: 0; font-size: 0.94rem; }
+.alert-detail { margin: 4px 0 0; color: var(--muted); font-size: 0.84rem; }
+.alert-dismiss {
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 2px 7px;
+}
+.alert-dismiss:hover { color: var(--fg); }
+.alert-dismiss:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
+
+/* ---- the site footer --------------------------------------------------
+   ONE footer for the whole studio, built by components/site-footer.ts and
+   appended by theme-boot, so all thirteen pages end the same way without a
+   line of markup in any product folder. The styles live here rather than
+   in the component for the reason check-styles.mjs exists: a footer pasted
+   into four stylesheets is four footers that drift.
+
+   It inherits --accent from the page's own body class, so the brand word
+   at the bottom of a product page is that builder's colour exactly as the
+   one at the top is — .home-brand already owns that rule and this reuses
+   it rather than restating it. Nothing here introduces a new colour
+   pairing: links are --muted, headings and hover are --fg. */
+.site-footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-top: 64px;
+}
+.site-footer-inner {
+  display: grid;
+  gap: 28px 32px;
+  grid-template-columns: minmax(200px, 1.4fr) repeat(3, minmax(130px, 1fr));
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 34px 20px 22px;
+}
+.site-footer .home-brand { font-size: 1.1rem; }
+.site-footer-promise { margin: 12px 0 0; max-width: 34ch; }
+.site-footer-heading {
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+.site-footer-group ul { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
+.site-footer a { color: var(--muted); text-decoration: none; }
+.site-footer a:hover { color: var(--fg); text-decoration: underline; }
+.site-footer a:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
+/* The link back to the page you are already on stays a link — every route
+   here is reachable by URL and hiding one would be the first lie about
+   that — but it says so rather than pretending to go somewhere. */
+.site-footer a[aria-current="page"] { color: var(--fg); text-decoration: underline; }
+.site-footer-base {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 14px 20px 34px;
+}
+.site-footer-name { margin-right: auto; }
+
+@media (max-width: 860px) {
+  .site-footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .site-footer-brand { grid-column: 1 / -1; }
 }

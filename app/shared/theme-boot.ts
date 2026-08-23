@@ -25,6 +25,9 @@ import {
 } from "./color.js";
 import { mountSessionControl } from "./components/topbar.js";
 import { renderStudioBrand } from "./components/brand-header.js";
+import { readStored, writeStored, storageWorks } from "./storage.js";
+import { mountSiteFooter } from "./components/site-footer.js";
+import { ensureAlertRegion, showAlert } from "./components/alert.js";
 
 /* Every page's branded home links render their word from shared/brand.ts
  * — the clone seam: rename the studio in ONE file and every header
@@ -35,31 +38,16 @@ const root = document.documentElement;
 const THEME_KEY = "pulse-theme";
 const CUSTOM_KEY = "pulse-theme-custom";
 
-/* STORAGE IS A PRIVILEGE, NOT A GUARANTEE. A browser with site data blocked
- * (private windows, enterprise policy, a sandboxed frame) throws on the very
- * ACCESS to localStorage — not just on write. This module runs on every page
- * in the studio and mounts the sign-in chip and the appearance control, so an
- * unguarded throw here does not degrade one feature: it aborts the module and
- * every page loses its header controls at once. Both directions are therefore
- * guarded, and a refusal to remember is treated as "nothing remembered". */
-function readStored(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-/** True when the preference was actually stored. Callers that show the person
- *  a result use it to avoid claiming a choice was remembered when it was not. */
-function writeStored(key: string, value: string): boolean {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/* THE GUARDED DOORS MOVED to shared/storage.ts, where Product D's identical
+ * copy of them now points too. They were written twice and had already
+ * drifted: D's storageWorks split the write from the cleanup after finding
+ * that a store which ACCEPTED the write and refused the delete reported
+ * "this browser is not saving site data", and this module's copy still had
+ * them in one try block. One implementation, and the better one.
+ *
+ * Why this module cannot simply BE that file: it reads `document` at load,
+ * so nothing can import it — the same reason color.ts exists apart from
+ * here. */
 
 /* Whether the LAST applyTheme() actually reached storage. The appearance
  * control states the truth rather than implying a choice will survive a
@@ -413,5 +401,28 @@ const sessionHost = document.querySelector(".topnav, .page-head, .topbar");
 if (sessionHost !== null && !document.body.hasAttribute("data-no-session")) {
   mountSessionControl(sessionHost);
 }
+
+/* The alert region goes in EMPTY and stays that way unless something is
+ * actually wrong — it collapses to nothing while it holds nothing, so it
+ * costs no space and shifts no layout. It exists this early because a live
+ * region has to be in the document BEFORE its first message for a screen
+ * reader to announce that message; see components/alert.ts. */
+ensureAlertRegion();
+
+/* The first thing worth saying out loud on every page: a browser that will
+ * not keep site data cannot keep an appearance choice or a sign-in either,
+ * and until now it said so only to somebody who opened Settings. */
+if (!storageWorks()) {
+  showAlert({
+    id: "storage-blocked",
+    level: "notice",
+    message:
+      "This browser is not saving site data, so an appearance choice or a sign-in will not be remembered after you leave this page.",
+    detail: "Everything else on this page works normally.",
+  });
+}
+
+/* Last, so the footer lands under whatever the page has already drawn. */
+mountSiteFooter();
 
 export {};

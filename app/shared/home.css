@@ -306,23 +306,13 @@ body.home { overflow-x: hidden; }
 .home .builders strong { display: block; margin-bottom: 2px; }
 .home .builders span { color: var(--muted); font-size: 0.88rem; }
 
-/* ---------- footer ---------- */
-
-.home footer {
-  max-width: 960px;
-  margin: 70px auto 0;
-  padding: 26px 24px 46px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 22px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-.home footer a { color: var(--muted); }
-.home footer a:hover, .home footer a:focus-visible { color: var(--fg); }
-.home footer .foot-brand { margin-right: auto; color: var(--fg); font-weight: 600; }
+/* ---------- footer ----------
+   Deleted 2026-08-23, and the deletion is the point: `.home footer` beat
+   `.site-footer` on specificity, so leaving these rules here would have
+   let the front door quietly restyle the shared footer for itself — the
+   exact drift scripts/check-styles.mjs was written to stop, one level up
+   from where it looks. The footer for every page, this one included, is
+   shared/theme.css. */
 
 /* ---------- responsive ---------- */
 

@@ -7,6 +7,8 @@
 | `brand-header.ts` | Renders the studio's name into every branded home link (`.home-brand .brand-word`), refreshes their aria-labels, and fills any `[data-studio-name]` with the plain name — all from `../brand.ts` | Automatic: `theme-boot.js` calls `renderStudioBrand()` on every page |
 | `logo.ts` | The pulse mark as a callable SVG (`pulseLogo(size)`), same path as `app/favicon.svg`, stroke = `currentColor` | Import and append where a mark is wanted |
 | `topbar.ts` | The sign-in control: Sign in button → member picker dialog; signed in → name chip + Sign out. Self-injected styles, accent-aware | Automatic: `theme-boot.js` mounts it into `.topnav`/`.page-head` (opt out: `<body data-no-session>`) |
+| `site-footer.ts` | The ONE footer for the whole studio: the mark, the studio word, three named link groups, the outreach promise, and the source link. Every href resolves from the site root so the same list works at three page depths | Automatic: `theme-boot.js` appends it (a page that writes its own `<footer>` keeps it; `<body data-no-footer>` refuses one) |
+| `alert.ts` | Notice · Problem · Done. A message that says what is true, in a live region created empty at boot so a screen reader is already listening. Nothing here disappears on a timer | Automatic region; `showAlert()` / `dismissAlert()` from anywhere |
 
 ## The clone story (change everything from the least files)
 
@@ -67,15 +69,47 @@ Fitness home", and D's runtime title became "Member Re-engagement — Vero
 Fitness". The gate failed at the same moment with four stale fallbacks
 named, one per product page. Both were then reverted.
 
-A suite cannot take this over. `scripts/run-suites.mjs` gives each suite a
-stub DOM with no `querySelectorAll` and no `setAttribute`, deliberately —
-widening it until it could host `renderStudioBrand` would prove the stub
-works, not the page.
+A suite still cannot take this over, and the reason changed on 2026-08-23,
+so the old one is recorded rather than replaced. It used to be that
+`scripts/run-suites.mjs` gave each suite a stub DOM with no
+`querySelectorAll` and no `setAttribute` — that is no longer true. The stub
+is now a small real tree (parents, children, attributes, and a selector
+engine that THROWS on any selector it cannot parse rather than answering
+"no matches"), because the footer and the alert box are worth checking and
+every property worth pinning about them is a property of a tree.
+
+The argument survives the fact. What the brand seam needs proving about is
+that FOUR PAGES ON DISK are wired to a module, and the fallback markup in
+those pages is byte-identical to what the module writes. A stub DOM can
+only ever host the module; it cannot open the pages. That is
+`scripts/check-brand.mjs`'s job, and it reads the pages.
 
 ## The rule for adding a component
 
-One file, one job, named for the job. It may FILL markup a page owns; it
-never creates page structure inside someone's lane. If it needs styles the
-page must have before the module loads, the styles go in `theme.css`;
-styles that only matter once the component exists may self-inject
-(`topbar.ts` does).
+One file, one job, named for the job. If it needs styles the page must have
+before the module loads, the styles go in `theme.css`; styles that only
+matter once the component exists may self-inject (`topbar.ts` does).
+
+**On creating structure in someone else's page — the rule, corrected
+2026-08-23.** This said a component "may FILL markup a page owns; it never
+creates page structure inside someone's lane", and that sentence was
+already false when it was written: `topbar.ts` builds a sign-in chip and a
+picker dialog inside four product headers, `theme-boot` builds the
+appearance control and, for the four pages that declare no icon, a
+`<link rel="icon">`. None of that markup is filled — it is created, in
+somebody else's page, by shared code.
+
+What the rule is actually protecting is a product's OWN CONTENT. So it is
+now written as the two things that were always meant:
+
+- **Shared code may create the CHROME** — the strip above the page, the
+  strip below it, and the alert region between them. Chrome is identical on
+  every page and belongs to nobody, which is exactly why one module builds
+  it instead of four folders pasting it.
+- **Shared code may never reach INSIDE a product's content.** It appends to
+  `<body>` or fills a named hook (`.home-brand`, `[data-studio-name]`); it
+  does not walk into `<main>` and rearrange what an owner put there.
+
+Every piece of chrome carries an opt-out its owner can use without asking
+anybody — `<body data-no-session>`, `<body data-no-footer>` — and adding
+one to the list is a team-owned change stated in the pull request.

@@ -135,6 +135,58 @@ jointly held.
 
 ---
 
+## Everyone — your pages grew a footer and an alert region (2026-08-23)
+
+**A team-owned change with a visible effect on all four products, so it is
+stated here as well as in the pull request.** Nothing inside any of your
+folders was edited: `git diff` on `a-booking/`, `b-dashboard/` and
+`c-chatbot/` is empty for this change. What changed is `theme-boot.js`,
+which every one of your pages already loads.
+
+**What appears on your pages now.**
+
+- **One site footer**, at the bottom of every page: the mark, the studio
+  word in your product's accent, three named link groups (For members ·
+  For staff · About this software), the studio's outreach promise, and the
+  source link. It is `app/shared/components/site-footer.ts` — one file, one
+  list of links, thirteen pages. It appends to `<body>`; it never reaches
+  inside your `<main>`.
+- **An alert region**, directly under your header, EMPTY and collapsed to
+  zero height unless something raises a message. Today one thing does: a
+  browser that refuses to save site data now says so on the page, instead
+  of only inside the appearance panel where nobody who had not opened it
+  ever found out.
+
+**Two ways out, and you do not need to ask anybody to use either.** A page
+that writes its own `<footer>` keeps it and the shared one stands down; a
+page with `<body data-no-footer>` gets none. Neither is used today.
+
+**What I would like you to do:** open your pages and look at the bottom of
+them. A green gate does not open a browser, and I have looked at all
+thirteen at two widths, but they are your pages and you know what they are
+supposed to look like. If the footer fights your layout, say so on the PR
+and I will fix it in the shared file rather than asking you to work around
+it.
+
+### Kerrian — one thing found while consolidating storage
+
+`app/products/a-booking/reservations.ts:22` calls
+`localStorage.setItem(RUNTIME_KEY, JSON.stringify(rows))` with no guard.
+A browser with site data blocked — a private window, an enterprise policy,
+a sandboxed frame — throws there, and the throw escapes into whatever asked
+to save a reservation. The read at line 12 IS guarded, so this is one half
+of a pair.
+
+`app/shared/storage.ts` now exists for exactly this: `writeStored(key,
+value)` returns `false` instead of throwing, so a page can say "this
+browser is not saving site data" rather than breaking. It was written by
+merging the two copies that `theme-boot.ts` and Product D each had — and
+those two had already drifted from each other, which is the argument for
+one copy. Yours would be a two-line change in your own lane, and it is
+yours to make or refuse.
+
+---
+
 ## Everyone — the shared fixture ages out on a clock (2026-08-21)
 
 Written down so nobody meets it by surprise — and deliberately NOT a deadline

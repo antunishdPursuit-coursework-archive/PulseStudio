@@ -21,6 +21,18 @@ Both of the last two moved here from `app/products/d-reengagement/` on
 live site served them: anyone could fetch the team's internal brief from the
 public URL. Nothing under `app/` is private, so nothing internal goes there.
 
+## Pages worth reading that are not in here
+
+These ship on the site rather than in `docs/`, because `app/` is the
+website and everything under it has a public address. They are listed here
+because a teammate looking for them looks in this folder first.
+
+| Page | What it is for |
+| --- | --- |
+| [the brand book](https://antunishdpursuit.github.io/PulseStudio/shared/brand-sheet.html) (`app/shared/brand-sheet.html`) | The mark, the two typefaces, every accent hex with its measured contrast ratio, the motion rule, the asset set and the studio's voice. Five pages, A4 landscape, prints to PDF exactly as it renders. Read it before building a surface or picking a colour — and read the colour page before arguing about an accent, because it prints the ratios rather than the intentions. It is exempt from `check-audience.mjs` (it names each builder, because the colour law ties a colour to a person), which is why it is a reference and not a customer screen |
+| [the readiness board](https://antunishdpursuit.github.io/PulseStudio/shared/ready.html) (`app/shared/ready.html`) | Every open gap, in red, with an owner |
+| [storytold](https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html) (`app/shared/storytold.html`) | How a member's tap becomes a booking, a filled class, an answered question and a note — green segments are hand-offs that fire today |
+
 **The rules themselves live elsewhere, on purpose:** `CLAUDE.md` at the repo
 root is the working agreement every AI and developer reads first, and
 `app/shared/CLAUDE.md` covers shared ground. A process doc explains HOW to
@@ -102,6 +114,31 @@ cost somebody a day:
   It is deliberately NOT in `npm run check`: the number is a survey of the
   suite, not a property of the code, and failing a build on it would teach
   people to delete checks to keep a percentage up.
+  **The runner's stub DOM was widened on 2026-08-23, and the reason is this
+  standard rather than convenience.** `scripts/run-suites.mjs` used to give
+  each suite four methods — append, appendChild, textContent, classList.add
+  — which is enough for a suite that only writes a result line. The moment
+  a shared COMPONENT became worth checking (the site footer, the alert
+  box), every check on one threw "Cannot set properties of undefined",
+  which reads as a broken runner rather than a broken check — the worst of
+  both, since it neither passes honestly nor fails honestly.
+
+  It is now a small real tree with a selector engine, and the load-bearing
+  decision in it is what happens to a selector the engine cannot parse:
+  **it throws.** A stub that answered "no matches" would turn every check
+  using such a selector into a silent pass, which is the failure mode this
+  whole page is about. `node scripts/run-suites.mjs --self-test` still
+  plants a failing check and proves the runner would exit 1; the three
+  plants that proved the new component checks can fail — a merged try block
+  in `storageWorks`, a footer link resolved against the page, an alert that
+  stacks instead of replacing — each took down the checks that name them,
+  and none took down anything else.
+
+  What the stub still cannot do is written at the top of the file: no
+  layout, no styles, no event dispatch, and `a.href` is whatever was
+  assigned rather than what a browser would resolve. A green here is not a
+  page anyone has looked at.
+
 - **A stated negative beats an absence.** "0 new duplicates in 4
   stylesheets" is a result; a silent pass is not.
 - **Never write a count you cannot keep true.** Numbers in prose go stale;

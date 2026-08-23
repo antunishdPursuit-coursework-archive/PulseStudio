@@ -8,6 +8,7 @@
  */
 
 import { counted } from "./deps.js";
+import { readStored, writeStored, clearStored, storageWorks } from "./deps.js";
 import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";
@@ -77,11 +78,16 @@ function requiredElement<T extends Element>(selector: string): T {
  * stated and reset, never silently trusted. */
 let storageWarning = "";
 
-/* STORAGE CAN REFUSE, AND THE REFUSAL MUST BE SAID OUT LOUD.
+/* STORAGE CAN REFUSE, AND THE REFUSAL MUST BE SAID OUT LOUD, and the four
+ * guarded doors that do it now come from shared, through deps.ts like
+ * everything else outside this folder. They were written here and again in
+ * theme-boot, and the two had diverged — the split try inside storageWorks
+ * was found HERE and never reached the other copy, so one page reported a
+ * blocked browser correctly and the other reported the opposite. Moving
+ * them kept this product's version and gave it checks it never had: they
+ * sat in main.ts, which no suite can import.
  *
- * A browser with site data blocked (a private window, an enterprise policy,
- * a sandboxed frame) throws on the ACCESS to localStorage, not merely on the
- * write. Two consequences were live here and are now closed:
+ * The reasons those guards exist are worth keeping where the damage was:
  *   - the old catch block called localStorage.removeItem(), so a throwing
  *     store threw a SECOND time out of loadList, out of module top-level,
  *     and the page rendered nothing at all — a blank screen, which the
@@ -89,43 +95,6 @@ let storageWarning = "";
  *   - persist() was unguarded, so "Do not contact" could appear to work and
  *     be forgotten on reload. A suppression that silently fails is the one
  *     failure this product must never have: it is a member's "no". */
-function readStored(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function clearStored(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Nothing to reset: a store that will not be read cannot hold a value.
-  }
-}
-
-/** True when this browser will remember anything at all. Checked once so the
- *  page can state the limit beside the result instead of pretending. */
-function storageWorks(): boolean {
-  /* THE WRITE IS THE QUESTION; the cleanup is not. Wrapping both in one try
-   * meant a store that accepted the write and refused the delete reported
-   * "this browser is not saving site data" — the opposite of what had just
-   * happened. The probe key is transient and namespaced; if it is ever left
-   * behind, nothing reads it. */
-  const probe = "pulse-storage-probe";
-  try {
-    localStorage.setItem(probe, "1");
-  } catch {
-    return false;
-  }
-  try {
-    localStorage.removeItem(probe);
-  } catch {
-    // Left behind, and harmless: nothing in this repo reads that key.
-  }
-  return true;
-}
 
 /* The plumbing only. What to DO with a store that hands back the wrong
  * thing is recoverStoredList in outreach.ts, where the unit checks can
@@ -146,16 +115,14 @@ if (!storageWorks()) {
 }
 
 function persist(): void {
-  try {
-    localStorage.setItem("pulse-outreach-ledger", JSON.stringify(ledger));
-    localStorage.setItem("pulse-suppressions", JSON.stringify(suppressions));
-  } catch {
-    /* Said once, and it stays said: a silent failure here would let a
-     * member's "do not contact" be forgotten without anyone knowing. */
-    if (!storageWarning.includes("not saving site data")) {
-      storageWarning +=
-        " This browser is not saving site data, so notes taken and do-not-contact choices last only until this page is closed.";
-    }
+  const wrote =
+    writeStored("pulse-outreach-ledger", JSON.stringify(ledger)) &&
+    writeStored("pulse-suppressions", JSON.stringify(suppressions));
+  /* Said once, and it stays said: a silent failure here would let a
+   * member's "do not contact" be forgotten without anyone knowing. */
+  if (!wrote && !storageWarning.includes("not saving site data")) {
+    storageWarning +=
+      " This browser is not saving site data, so notes taken and do-not-contact choices last only until this page is closed.";
   }
 }
 /* THE STUDIO'S DAY, NOT THE VIEWER'S AND NOT UTC.

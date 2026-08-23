@@ -1201,7 +1201,16 @@ for (const file of ENGINE_SOURCES) {
 
   /* The mark's own modules: no inline handlers, no HTML injection, no
    * script inside the svg. textContent-and-attributes only. */
-  for (const file of ["../components/logo.ts", "../components/brand-header.ts"]) {
+  /* Every shared component that writes into a live page, not just the two
+   * that draw the mark: the footer and the alert box are appended to all
+   * thirteen pages by theme-boot, so a string of HTML in either of them
+   * would be a string of HTML on every page in the studio. */
+  for (const file of [
+    "../components/logo.ts",
+    "../components/brand-header.ts",
+    "../components/site-footer.ts",
+    "../components/alert.ts",
+  ]) {
     const source = await (await fetch(file)).text();
     check(`${file} was actually read`, source.length > 200, true);
     check(`${file} sets no inline event handler`,
@@ -1219,6 +1228,34 @@ for (const file of ENGINE_SOURCES) {
     boot.includes('querySelector(\'link[rel~="icon"]\')'), true);
   check("...resolved relative to the module, not the page",
     boot.includes('new URL("../favicon.svg", import.meta.url)'), true);
+
+  /* ONE FOOTER AND ONE ALERT REGION, ON EVERY PAGE WIRED TO THIS MODULE.
+   * The bottom of the site is a shared component for the same reason the
+   * top is: thirteen pages had thirteen endings, twelve of which were
+   * </main>. These pin the wiring rather than the look — the look is in
+   * theme.css and a browser is the only thing that can judge it. */
+  check("theme-boot mounts the one shared footer", boot.includes("mountSiteFooter()"), true);
+  check("...and puts the alert region in before anything can need it",
+    boot.indexOf("ensureAlertRegion()") < boot.indexOf("mountSiteFooter()"), true);
+  check("...and neither is built with a string of HTML",
+    /innerHTML|insertAdjacentHTML|document\.write/.test(boot), false);
+
+  /* The footer resolves the site root from ITS OWN location. Resolved from
+   * the page instead, every link would be right at one depth and 404 at the
+   * other two — and no gate here opens a browser to find that out. */
+  const footerSource = await (await fetch("../components/site-footer.ts")).text();
+  check("the footer resolves the site root from the module, not the page",
+    footerSource.includes('new URL("../../", import.meta.url)'), true);
+  check("...and reads the studio's name from the clone seam",
+    footerSource.includes('from "../brand.js"'), true);
+
+  /* The guarded storage doors are ONE implementation now. theme-boot and
+   * Product D each had their own and the two had drifted; a second copy
+   * appearing here is the drift starting again. */
+  check("theme-boot takes its storage doors from the shared module",
+    boot.includes('from "./storage.js"'), true);
+  check("...and opens none of its own",
+    /localStorage\.(getItem|setItem|removeItem)/.test(boot), false);
 }
 
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
