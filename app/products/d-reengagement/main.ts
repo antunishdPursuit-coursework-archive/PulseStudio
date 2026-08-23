@@ -230,6 +230,17 @@ const chosenRoutine = new Map<string, string>();
 /** Whether the class-interest filter is on, per member. Off by default:
  *  showing everything is the honest starting point. */
 const routineFilterOn = new Map<string, boolean>();
+/* Whether the panel was left open, per member. A rebuilt card would
+ * otherwise collapse it under a person who had just opened it. */
+const routinePanelOpen = new Map<string, boolean>();
+/* Which routine control to put the keyboard back on after a rebuild.
+ *
+ * WITHOUT THIS, INCLUDING A ROUTINE THROWS A KEYBOARD USER OUT. Measured in
+ * a browser: activating "Include this routine" rebuilt the card, collapsed
+ * the panel, and left focus on the member article — so the person had to
+ * re-open the panel and tab back in to do anything else. A mouse user would
+ * never have noticed. */
+let focusRoutineAfterRender: string | null = null;
 
 /** The optional routine panel. Markup only — every decision it renders was
  *  made by routinePanelView(), which the suite can load and this file
@@ -245,6 +256,8 @@ function renderRoutinePanel(
 
   const panel = document.createElement("details");
   panel.className = "routines";
+  panel.open = routinePanelOpen.get(memberId) ?? false;
+  panel.addEventListener("toggle", () => routinePanelOpen.set(memberId, panel.open));
   const summary = document.createElement("summary");
   summary.textContent = "Approved home routines (optional)";
   panel.append(summary);
@@ -268,8 +281,14 @@ function renderRoutinePanel(
     toggle.textContent = filterOn
       ? "Show all approved routines"
       : "Show only routines related to classes this member has attended";
+    toggle.dataset["routineControl"] = "filter";
     toggle.addEventListener("click", () => {
       routineFilterOn.set(memberId, !filterOn);
+      /* Recorded HERE, not left to the toggle event: `toggle` fires as a
+       * separate task, and the rebuild beats it. Using a control inside the
+       * panel is itself proof the panel is open. */
+      routinePanelOpen.set(memberId, true);
+      focusRoutineAfterRender = "filter";
       onChange();
     });
     panel.append(toggle);
@@ -318,9 +337,12 @@ function renderRoutinePanel(
     const isChosen = chosen === r.id;
     pick.textContent = isChosen ? "Included in draft — remove" : "Include this routine";
     pick.setAttribute("aria-pressed", isChosen ? "true" : "false");
+    pick.dataset["routineControl"] = r.id;
     pick.addEventListener("click", () => {
       if (isChosen) chosenRoutine.delete(memberId);
       else chosenRoutine.set(memberId, r.id);
+      routinePanelOpen.set(memberId, true);
+      focusRoutineAfterRender = r.id;
       onChange();
     });
     item.append(pick);
@@ -600,6 +622,21 @@ function restoreFocusAfterRender(): void {
     `[data-member="${CSS.escape(focusMemberAfterRender)}"]`,
   );
   focusMemberAfterRender = null;
+  /* A routine control was used: put the keyboard back ON IT, inside the
+   * rebuilt card, rather than on the card. Falling back to the card is the
+   * right answer when the control is gone — clearing a filter can remove
+   * the very routine that was showing. */
+  if (focusRoutineAfterRender !== null && target !== null) {
+    const control = target.querySelector<HTMLElement>(
+      `[data-routine-control="${CSS.escape(focusRoutineAfterRender)}"]`,
+    );
+    focusRoutineAfterRender = null;
+    if (control !== null) {
+      control.focus();
+      return;
+    }
+  }
+  focusRoutineAfterRender = null;
   // The card may legitimately be gone — a suppressed member leaves the
   // list. Falling back to the list itself keeps the keyboard in the region
   // the person was working in rather than at the top of the document.
