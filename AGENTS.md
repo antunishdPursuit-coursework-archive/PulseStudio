@@ -121,6 +121,7 @@ instead of doing it.
   | `scripts/check-sources.mjs` | the git law — no committed build output, and every module the site runs has a TypeScript source |
   | `scripts/check-reachable.mjs` | the filing law — no module under `app/` that no page reaches |
   | `scripts/check-mirrors.mjs` | every `AGENTS.md` is still a byte-equivalent mirror of its `CLAUDE.md` |
+  | `scripts/check-brand.mjs` | the clone seam — a page that shows the studio's name is wired to receive it |
   | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
 
   Every gate carries `--self-test`, which plants known-bad input and proves

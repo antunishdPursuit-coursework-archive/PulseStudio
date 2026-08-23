@@ -438,7 +438,7 @@ export function outcomesLine(results: OutreachResults): string {
   return (
     joinSentence(
       [
-        `Outreach so far: ${total} ${total === 1 ? "note" : "notes"} taken`,
+        `Outreach so far: ${counted(total, "note")} taken`,
         `${results.returned} came back${median}`,
         `${results.stillQuiet} still quiet`,
         /* Never dropped in silence: a ledger entry whose member is not in

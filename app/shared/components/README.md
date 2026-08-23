@@ -26,14 +26,51 @@ That is the whole rebrand **for everything shared**. Two honest remainders,
 each in an owner's lane rather than here (an audit caught this page claiming
 otherwise):
 
-- **Each product page's `<title>`** still spells the studio out, because a
-  document title is read before any module runs. Four one-word edits, one
-  per owner.
+- **Three product pages' `<title>`** still spell the studio out, because a
+  document title is read before any module runs. This said FOUR until
+  2026-08-22, and it was already three: `d-reengagement` ships the title
+  `Member Re-engagement` with no studio name in it and sets the full title
+  at runtime from `brand.ts`, so it has no remainder to edit. That is the
+  pattern that removes this bullet entirely — a static title carrying only
+  the page's own name, the studio's added by the module. The other three
+  are a one-word edit each, in their owner's lane:
+
+  | Page | Its `<title>` today |
+  | --- | --- |
+  | `a-booking` | `Book a class — Pulse Studio` |
+  | `b-dashboard` | `Pulse Studio · Staff dashboard` |
+  | `c-chatbot` | `Member Support — Pulse Studio` |
 - **Anything a product hardcodes in its own copy.** The gate cannot see
   prose, so a rebrand ends with one grep for the old studio name.
 
 If you find a *shared* file asking to be edited on a rebrand, that is a bug
 in this structure — say so instead of adding it to the list.
+
+## The seam was watched working, and it cannot be watched by eye
+
+`scripts/check-brand.mjs` holds the wire from `brand.ts` to every header.
+It exists because THE FALLBACK IS A PERFECT IMPOSTOR: each product page
+ships static markup reading `PULSE<span>STUDIO</span>`, and
+`renderStudioBrand()` writes back exactly those bytes, down to the
+`aria-label` the page already carries. So a page that is not wired at all
+looks identical to one that works, in every browser, forever — until
+somebody rebrands and four headers keep the old name.
+
+Two things were tried as proof and are recorded here because they LOOK
+like proof and are not: the rendered brand word, and the `aria-label`.
+Both are byte-identical to what the page already ships.
+
+What actually proves it, done on 2026-08-22: set `STUDIO_NAME` to another
+name, rebuild, reload. Every header followed — the brand word became
+`VERO<span>FITNESS</span>`, the `aria-label` became "Return to Vero
+Fitness home", and D's runtime title became "Member Re-engagement — Vero
+Fitness". The gate failed at the same moment with four stale fallbacks
+named, one per product page. Both were then reverted.
+
+A suite cannot take this over. `scripts/run-suites.mjs` gives each suite a
+stub DOM with no `querySelectorAll` and no `setAttribute`, deliberately —
+widening it until it could host `renderStudioBrand` would prove the stub
+works, not the page.
 
 ## The rule for adding a component
 
