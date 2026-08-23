@@ -995,6 +995,56 @@ check("the footer links terms and privacy, resolved from the site root", () => {
   ]);
 });
 
+/* ONE DOOR INTO THE STAFF ROOM. A signed-in member used to be shown the
+ * dashboard three ways — front-door card, footer list, sign-in landing —
+ * on a page that had just greeted them by name. The law keeps every route
+ * reachable, so nothing may DISAPPEAR: for a member the staff group folds
+ * to one link that is the heading itself. Staff and the signed-out see the
+ * group whole. These pin the fold, the reachability, and the asymmetry. */
+check("a signed-out reader sees the staff group whole", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", null);
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  return eq(staff?.querySelectorAll("ul a").length, 2);
+});
+
+check("a staff reader sees it whole too", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "staff");
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  return eq([staff?.querySelectorAll("ul a").length, staff?.dataset["folded"] ?? "false"].join("|"), "2|false");
+});
+
+check("a member sees the staff group folded to one door", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  const door = staff?.querySelector(".site-footer-heading a") as HTMLAnchorElement | null;
+  return eq(
+    [staff?.dataset["folded"], staff?.querySelectorAll("ul").length, door?.textContent, door?.href].join("|"),
+    "true|0|For staff|https://studio.example/base/products/b-dashboard/",
+  );
+});
+
+/* THE ROUTE IS STILL THERE. Folding is not hiding: the dashboard href a
+ * member is shown is the same one staff are shown, and it resolves. */
+check("...and the door still reaches the dashboard, not a dead end", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const hrefs = [...f.querySelectorAll("a")].map((a) => (a as HTMLAnchorElement).href);
+  return eq(hrefs.includes("https://studio.example/base/products/b-dashboard/"), true);
+});
+
+check("only the staff group folds; the member's own links never do", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const folded = [...f.querySelectorAll<HTMLElement>(".site-footer-group")]
+    .filter((g) => g.dataset["folded"] === "true")
+    .map((g) => g.getAttribute("aria-label"));
+  return eq(folded, ["For staff"]);
+});
+
 /* ------------------------------------------------------------------ */
 /* The studio floor                                                     */
 /* ------------------------------------------------------------------ */

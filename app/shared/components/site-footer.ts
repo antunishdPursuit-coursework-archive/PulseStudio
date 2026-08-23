@@ -38,6 +38,7 @@
  */
 
 import { pulseLogo } from "./logo.js";
+import { readPulseSession, subscribeToPulseSession } from "../auth/session.js";
 import { STUDIO_CONTACT, addressLine, dialable, studioWordParts } from "../brand.js";
 
 export interface FooterLink {
@@ -49,7 +50,15 @@ export interface FooterLink {
 export interface FooterGroup {
   heading: string;
   links: readonly FooterLink[];
+  /** Who the group is for. A group marked "staff" folds to one link when a
+   *  member is signed in; anything else shows whole to everybody. */
+  audience?: "staff";
 }
+
+/** Who is reading, as far as the page can tell. `null` is nobody signed in.
+ *  Passed in rather than read here so the suite can render a footer for a
+ *  member without signing one in. */
+export type FooterReader = "member" | "staff" | null;
 
 /* THE WHOLE FOOTER, AS DATA. Adding a link is a line here and nothing
  * else — no page edited, no stylesheet touched, and every one of the
@@ -80,6 +89,12 @@ export const FOOTER_GROUPS: readonly FooterGroup[] = [
   },
   {
     heading: "For staff",
+    /* FOLDS FOR A SIGNED-IN MEMBER. The law keeps every route reachable
+     * (a session is convenience, never access control), and this keeps it:
+     * for a member the two links become one — the heading itself, pointed
+     * at the dashboard — so the staff room has a door and not a corridor of
+     * them. Staff and the signed-out see both links, as before. */
+    audience: "staff",
     links: [
       { label: "The Dashboard", href: "products/b-dashboard/" },
       { label: "Re-engagement", href: "products/d-reengagement/" },
@@ -174,7 +189,7 @@ function linkItem(item: FooterLink, root: string, pageHref: string): HTMLLIEleme
 /** Build the footer. `root` is the site root as an absolute URL; `pageHref`
  *  is the page being rendered. Both are parameters rather than reads of
  *  `location` so the suite can build this footer for a page it is not on. */
-export function siteFooter(root: string, pageHref: string): HTMLElement {
+export function siteFooter(root: string, pageHref: string, reader: FooterReader = null): HTMLElement {
   const footer = document.createElement("footer");
   footer.className = "site-footer";
   footer.dataset["pulseFooter"] = "";
@@ -223,10 +238,25 @@ export function siteFooter(root: string, pageHref: string): HTMLElement {
     nav.setAttribute("aria-label", group.heading);
     const heading = document.createElement("h2");
     heading.className = "site-footer-heading";
-    heading.textContent = group.heading;
-    const list = document.createElement("ul");
-    for (const item of group.links) list.append(linkItem(item, root, pageHref));
-    nav.append(heading, list);
+    const folded = group.audience === "staff" && reader === "member";
+    if (folded) {
+      /* The heading becomes the door: one link, to the first destination,
+       * carrying the group's own name. Nothing is removed from the site;
+       * one thing is removed from this member's view. */
+      const first = group.links[0];
+      if (first !== undefined) {
+        heading.append(footerLink({ label: group.heading, href: first.href }, root, pageHref));
+      } else {
+        heading.textContent = group.heading;
+      }
+      nav.dataset["folded"] = "true";
+      nav.append(heading);
+    } else {
+      heading.textContent = group.heading;
+      const list = document.createElement("ul");
+      for (const item of group.links) list.append(linkItem(item, root, pageHref));
+      nav.append(heading, list);
+    }
     inner.append(nav);
   }
 
@@ -305,5 +335,18 @@ export function mountSiteFooter(): void {
    * give a different answer on every one of the three depths this runs at,
    * which is the bug this line exists to not have. */
   const root = new URL("../../", import.meta.url).href;
-  document.body.append(siteFooter(root, location.href));
+  document.body.append(siteFooter(root, location.href, currentReader()));
+  /* Sign in or out, and the footer follows — on this tab and on every other
+   * tab of the studio, because the session listener fires for both. */
+  subscribeToPulseSession(() => {
+    const previous = document.querySelector("footer.site-footer[data-pulse-footer]");
+    if (previous === null) return;
+    previous.replaceWith(siteFooter(root, location.href, currentReader()));
+  });
+}
+
+/** Who is signed in right now, in the footer's own terms. */
+function currentReader(): FooterReader {
+  const session = readPulseSession();
+  return session === null ? null : session.actor_type;
 }
