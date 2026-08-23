@@ -5,30 +5,42 @@
    shared fixtures. The log is append-only: member book / waitlist / cancel
    only — this page never seeds occupancy on load. Members see only their
    own reservation records. Sign-in is the shared pulse-session; this page
-   never keeps a second key. */
+   never keeps a second key.
+
+   The RULES live in rules.ts, with no DOM and no clock, so the unit suite
+   (tests.html) can hold them to the brief's acceptance checks. This file
+   reads the log and the studio clock ONCE per render, hands both in, and
+   renders what comes back. */
 
 import type { Reservation } from "../../shared/contract.js";
 import { currentSession, onSessionChange } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
+import { dismissAlert, showAlert } from "../../shared/components/alert.js";
 import type {
-  SyntheticBooking,
   SyntheticClassSession,
   SyntheticMember,
 } from "../../shared/synthetic/contracts.js";
+import { loadRuntimeReservations, saveRuntimeReservations } from "./reservations.js";
 import {
-  latestReservation,
-  loadRuntimeReservations,
-  saveRuntimeReservations,
-} from "./reservations.js";
+  type BookingContext,
+  bookSession,
+  cancelReservation,
+  confirmedMemberIds,
+  joinWaitlist,
+  memberReservations,
+  memberStatus,
+  membershipProblem,
+  openSessions,
+  remainingSpots,
+  sessionDate,
+  staleDeepLinkMessage,
+  studioNowTimestamp,
+} from "./rules.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) throw new Error(`Member booking could not find ${selector}.`);
   return element;
-}
-
-function timestampNow(): string {
-  return new Date().toISOString().slice(0, 19);
 }
 
 function escapeHtml(value: string): string {
@@ -69,8 +81,14 @@ const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]))
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
 const memberById = new Map(dataset.members.map((item) => [item.id, item]));
 
+/* The studio's own cancellation policy — the same current record the
+ * support surface answers from, rendered beside the Cancel buttons so the
+ * rule is on the surface that takes the cancel, not only in a chat. */
+const cancellationPolicy = dataset.studioPolicies.find(
+  (policy) => policy.topic === "cancellation" && policy.isCurrent,
+);
+
 const statusEl = requiredElement<HTMLParagraphElement>("#status");
-const errorEl = requiredElement<HTMLParagraphElement>("#error");
 const confirmationEl = requiredElement<HTMLElement>("#confirmation");
 const daysEl = requiredElement<HTMLElement>("#days");
 const dayTitleEl = requiredElement<HTMLElement>("#day-title");
@@ -80,68 +98,24 @@ const mineEl = requiredElement<HTMLElement>("#mine");
 
 const requestedSessionId = new URLSearchParams(location.search).get("session");
 
-function studioBooked(sessionId: string): SyntheticBooking[] {
-  return dataset.bookings.filter(
-    (booking) => booking.classSessionId === sessionId && booking.status === "booked",
-  );
-}
-
-function memberStatus(memberId: string, sessionId: string): Reservation["reservation_status"] | "none" {
-  const latest = latestReservation(loadRuntimeReservations(), sessionId, memberId);
-  if (latest) return latest.reservation_status;
-  if (studioBooked(sessionId).some((booking) => booking.memberId === memberId)) return "reserved";
-  return "none";
-}
-
-function memberHoldsSpot(memberId: string, sessionId: string): boolean {
-  return memberStatus(memberId, sessionId) === "reserved";
-}
-
-function memberWaitlisted(memberId: string, sessionId: string): boolean {
-  return memberStatus(memberId, sessionId) === "waitlisted";
-}
-
-function confirmedMemberIds(sessionId: string): string[] {
-  const ids = new Set<string>();
-  for (const booking of studioBooked(sessionId)) ids.add(booking.memberId);
-  for (const row of loadRuntimeReservations()) {
-    if (row.session_id === sessionId) ids.add(row.member_id);
-  }
-  return [...ids].filter((memberId) => memberHoldsSpot(memberId, sessionId));
-}
-
-function remainingSpots(session: SyntheticClassSession): number {
-  return Math.max(0, session.capacity - confirmedMemberIds(session.id).length);
-}
-
-function waitlist(sessionId: string): Reservation[] {
-  const ids = new Set<string>();
-  for (const booking of studioBooked(sessionId)) ids.add(booking.memberId);
-  for (const row of loadRuntimeReservations()) {
-    if (row.session_id === sessionId) ids.add(row.member_id);
-  }
-  return [...ids]
-    .map((memberId) => latestReservation(loadRuntimeReservations(), sessionId, memberId))
-    .filter((row): row is Reservation => row?.reservation_status === "waitlisted")
-    .sort((left, right) => left.reserved_at.localeCompare(right.reserved_at));
-}
-
-function upcomingSessions(): SyntheticClassSession[] {
-  return dataset.classSessions
-    .filter((session) => session.status === "scheduled")
-    .sort((left, right) => left.startsAt.localeCompare(right.startsAt));
-}
-
-function sessionDate(session: SyntheticClassSession): string {
-  return session.startsAt.slice(0, 10);
-}
+/* Everything the rules may look at, rebuilt at the top of every render:
+ * the log is read from storage ONCE per render instead of once per rule
+ * call (a signed-in render used to issue ~600 getItem+parse calls, each
+ * parsing the whole log), and "now" is read once so one render never
+ * straddles a minute boundary. */
+let ctx: BookingContext = {
+  sessions: dataset.classSessions,
+  bookings: dataset.bookings,
+  rows: [],
+  nowLocal: studioNowTimestamp(dataset.meta.timezone),
+};
 
 function scheduleDays(): string[] {
-  return [...new Set(upcomingSessions().map(sessionDate))];
+  return [...new Set(openSessions(ctx).map(sessionDate))];
 }
 
 function sessionsOnDay(day: string): SyntheticClassSession[] {
-  return upcomingSessions().filter((session) => sessionDate(session) === day);
+  return openSessions(ctx).filter((session) => sessionDate(session) === day);
 }
 
 function formatDayChip(day: string): string {
@@ -195,19 +169,34 @@ function bookingMember(): SyntheticMember | undefined {
   return memberById.get(session.member_id);
 }
 
+/* Refusals go through the shared alert region — one wording, one live
+ * region, already role="alert" for the problem level — instead of the old
+ * silent <p id="error"> no screen reader was ever told about. */
 function showError(message: string): void {
-  errorEl.hidden = false;
-  errorEl.textContent = message;
+  showAlert({ id: "booking-error", level: "problem", message });
 }
 
 function clearError(): void {
-  errorEl.hidden = true;
-  errorEl.textContent = "";
+  dismissAlert("booking-error");
+}
+
+/* Append and SAY SO when the browser would not take it. writeStored
+ * reports a refused write as false rather than throwing; claiming a spot
+ * was reserved when nothing was recorded would be the lie the stated-
+ * negative rule exists to prevent. The wording matches the sentence
+ * theme-boot raises on the same condition. On success the render context
+ * adopts the re-read log, so another tab's writes are kept, not clobbered. */
+function appendRows(newRows: Reservation[]): void {
+  const all = loadRuntimeReservations();
+  all.push(...newRows);
+  if (!saveRuntimeReservations(all)) {
+    throw new Error("This browser is not saving site data, so the studio could not record that reservation.");
+  }
+  ctx.rows = all;
 }
 
 function pill(session: SyntheticClassSession): { text: string; className: string } {
-  if (session.status === "canceled") return { text: "Canceled", className: "full" };
-  const left = remainingSpots(session);
+  const left = remainingSpots(ctx, session);
   const reserved = session.capacity - left;
   if (left <= 0) return { text: `Full · ${session.capacity} reserved`, className: "full" };
   if (left <= 4) return { text: `${reserved} reserved · ${left} of ${session.capacity} left`, className: "warn" };
@@ -215,98 +204,29 @@ function pill(session: SyntheticClassSession): { text: string; className: string
 }
 
 function remainingOnDay(day: string): number {
-  return sessionsOnDay(day).reduce((total, session) => total + remainingSpots(session), 0);
+  return sessionsOnDay(day).reduce((total, session) => total + remainingSpots(ctx, session), 0);
 }
 
 function fullOnDay(day: string): number {
-  return sessionsOnDay(day).filter((session) => remainingSpots(session) <= 0).length;
-}
-
-function appendReservation(reservation: Reservation): void {
-  const rows = loadRuntimeReservations();
-  rows.push(reservation);
-  saveRuntimeReservations(rows);
-}
-
-function bookSession(memberId: string, session: SyntheticClassSession): Reservation {
-  if (session.status === "canceled") throw new Error("This class was canceled.");
-  if (session.status !== "scheduled") throw new Error("This class is not open for reservations.");
-  if (memberHoldsSpot(memberId, session.id)) throw new Error("You already have a spot in this class.");
-  if (memberWaitlisted(memberId, session.id)) throw new Error("You are already on the waitlist.");
-  if (remainingSpots(session) <= 0) throw new Error("This class is full. Join the waitlist instead.");
-
-  const reservation: Reservation = {
-    reservation_id: newReservationId(),
-    member_id: memberId,
-    session_id: session.id,
-    reservation_status: "reserved",
-    reserved_at: timestampNow(),
-    canceled_at: null,
-  };
-  appendReservation(reservation);
-  return reservation;
-}
-
-function joinWaitlist(memberId: string, session: SyntheticClassSession): Reservation {
-  if (session.status !== "scheduled") throw new Error("This class is not open for reservations.");
-  if (memberHoldsSpot(memberId, session.id)) throw new Error("You already have a spot in this class.");
-  if (memberWaitlisted(memberId, session.id)) throw new Error("You are already on the waitlist.");
-  if (remainingSpots(session) > 0) throw new Error("This class still has open spots. Book it instead.");
-
-  const reservation: Reservation = {
-    reservation_id: newReservationId(),
-    member_id: memberId,
-    session_id: session.id,
-    reservation_status: "waitlisted",
-    reserved_at: timestampNow(),
-    canceled_at: null,
-  };
-  appendReservation(reservation);
-  return reservation;
-}
-
-function promoteWaitlist(sessionId: string): void {
-  const next = waitlist(sessionId)[0];
-  if (!next) return;
-  appendReservation({
-    ...next,
-    reservation_id: newReservationId(),
-    reservation_status: "reserved",
-    reserved_at: timestampNow(),
-    canceled_at: null,
-  });
-}
-
-function cancelReservation(memberId: string, sessionId: string): void {
-  const status = memberStatus(memberId, sessionId);
-  if (status !== "reserved" && status !== "waitlisted") {
-    throw new Error("No reservation found to cancel.");
-  }
-  const previous = latestReservation(loadRuntimeReservations(), sessionId, memberId);
-  appendReservation({
-    reservation_id: previous?.reservation_id ?? newReservationId(),
-    member_id: memberId,
-    session_id: sessionId,
-    reservation_status: "canceled",
-    reserved_at: previous?.reserved_at ?? timestampNow(),
-    canceled_at: timestampNow(),
-  });
-  if (status === "reserved") promoteWaitlist(sessionId);
-}
-
-function memberReservations(memberId: string): { session: SyntheticClassSession; status: Reservation["reservation_status"] }[] {
-  const held: { session: SyntheticClassSession; status: Reservation["reservation_status"] }[] = [];
-  for (const session of upcomingSessions()) {
-    const status = memberStatus(memberId, session.id);
-    if (status === "reserved" || status === "waitlisted") {
-      held.push({ session, status });
-    }
-  }
-  return held;
+  return sessionsOnDay(day).filter((session) => remainingSpots(ctx, session) <= 0).length;
 }
 
 let lastConfirmation: { sessionId: string; reservationId: string; waitlisted: boolean } | null = null;
 let selectedDay = "";
+/* Cancel asks once before it acts: the first press arms THIS session's
+ * button, the second confirms. State, not window.confirm, so the policy
+ * sentence stays readable while the person decides. */
+let cancelArmed: string | null = null;
+/* Where focus should land after the next render. Every interaction here
+ * rebuilds the DOM with innerHTML, which silently dropped keyboard focus
+ * to <body> after every successful click; each handler now names its
+ * follow-up target and render() restores it. Cards carry tabindex="-1" so
+ * a card can catch focus when the pressed button no longer exists. */
+let focusAfterRender: string | null = null;
+/* The deep-link scroll fires once, not on every render — it used to yank
+ * the page back to the linked card after every book, cancel and day
+ * change, including moments after the confirmation rendered up top. */
+let deepLinkScrolled = false;
 
 function requestedSessionDay(): string {
   if (!requestedSessionId) return "";
@@ -358,16 +278,19 @@ function renderDays(): void {
   daysEl.querySelectorAll<HTMLButtonElement>("[data-day]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedDay = button.dataset.day ?? "";
+      focusAfterRender = `[data-day="${selectedDay}"]`;
       clearError();
       render();
     });
   });
 }
 
-function renderSchedule(memberId: string): void {
-  const allUpcoming = upcomingSessions();
+function renderSchedule(member: SyntheticMember | undefined): void {
+  const memberId = member?.id ?? "";
+  const memberProblem = member ? membershipProblem(member) : null;
+  const allUpcoming = openSessions(ctx);
   if (allUpcoming.length === 0) {
-    scheduleEl.innerHTML = `<p class="status">${dataset.classSessions.length} class sessions checked, 0 currently scheduled.</p>`;
+    scheduleEl.innerHTML = `<p class="status">${dataset.classSessions.length} class sessions checked, 0 still to come.</p>`;
     return;
   }
   const sessions = sessionsOnDay(selectedDay);
@@ -378,28 +301,28 @@ function renderSchedule(memberId: string): void {
   scheduleEl.innerHTML = sessions
     .map((session) => {
       const label = sessionLabel(session);
-      const spots = remainingSpots(session);
-      const held = memberId !== "" && memberHoldsSpot(memberId, session.id);
-      const queued = memberId !== "" && memberWaitlisted(memberId, session.id);
-      const canceled = session.status === "canceled";
+      const spots = remainingSpots(ctx, session);
+      const status = memberId ? memberStatus(ctx, memberId, session.id) : "none";
       const full = spots <= 0;
       const highlight = requestedSessionId === session.id ? " highlight" : "";
       const badge = pill(session);
       let action = "";
       if (!memberId) {
         action = `<button class="btn ghost" type="button" disabled>Member sign-in required.</button>`;
-      } else if (canceled) {
-        action = `<button class="btn ghost" type="button" disabled>Canceled</button>`;
-      } else if (held) {
+      } else if (memberProblem) {
+        /* Said before the click, not only after: the same sentence
+         * bookSession would refuse with. */
+        action = `<span class="meta">${escapeHtml(memberProblem)}</span>`;
+      } else if (status === "reserved") {
         action = `<button class="btn ghost" type="button" disabled>Booked</button>`;
-      } else if (queued) {
+      } else if (status === "waitlisted") {
         action = `<button class="btn ghost" type="button" disabled>Waitlisted</button>`;
       } else if (full) {
         action = `<button class="btn" type="button" data-wait="${escapeHtml(session.id)}">Join waitlist</button>`;
       } else {
         action = `<button class="btn" type="button" data-book="${escapeHtml(session.id)}">Book</button>`;
       }
-      return `<article class="card${highlight}" ${requestedSessionId === session.id ? 'id="requested-session"' : ""}>
+      return `<article class="card${highlight}" tabindex="-1" data-session-card="${escapeHtml(session.id)}" ${requestedSessionId === session.id ? 'id="requested-session"' : ""}>
         <div class="session">
           <div>
             <h3>${escapeHtml(label.name)}</h3>
@@ -417,10 +340,15 @@ function renderSchedule(memberId: string): void {
   scheduleEl.querySelectorAll<HTMLButtonElement>("[data-book]").forEach((button) => {
     button.addEventListener("click", () => {
       const session = sessions.find((item) => item.id === button.dataset.book);
-      if (!session) return;
+      if (!session || !member) return;
       try {
-        const reservation = bookSession(memberId, session);
+        const reservation = bookSession(ctx, member, session, {
+          reservationId: newReservationId(),
+          at: ctx.nowLocal,
+        });
+        appendRows([reservation]);
         lastConfirmation = { sessionId: session.id, reservationId: reservation.reservation_id, waitlisted: false };
+        focusAfterRender = `[data-session-card="${session.id}"]`;
         clearError();
         render();
       } catch (error: unknown) {
@@ -431,10 +359,15 @@ function renderSchedule(memberId: string): void {
   scheduleEl.querySelectorAll<HTMLButtonElement>("[data-wait]").forEach((button) => {
     button.addEventListener("click", () => {
       const session = sessions.find((item) => item.id === button.dataset.wait);
-      if (!session) return;
+      if (!session || !member) return;
       try {
-        const reservation = joinWaitlist(memberId, session);
+        const reservation = joinWaitlist(ctx, member, session, {
+          reservationId: newReservationId(),
+          at: ctx.nowLocal,
+        });
+        appendRows([reservation]);
         lastConfirmation = { sessionId: session.id, reservationId: reservation.reservation_id, waitlisted: true };
+        focusAfterRender = `[data-session-card="${session.id}"]`;
         clearError();
         render();
       } catch (error: unknown) {
@@ -450,38 +383,71 @@ function renderMine(memberId: string): void {
     mineEl.innerHTML = "";
     return;
   }
-  const held = memberReservations(memberId);
+  const held = memberReservations(ctx, memberId);
   mineWrap.hidden = false;
   if (held.length === 0) {
-    mineEl.innerHTML = `<p class="status">${upcomingSessions().length} scheduled classes checked, 0 reserved under your name.</p>`;
+    mineEl.innerHTML = `<p class="status">${openSessions(ctx).length} scheduled classes checked, 0 reserved under your name.</p>`;
     return;
   }
   const next = held.find(({ status }) => status === "reserved");
   const nextLine = next
     ? `<p class="next-class">Your next class: <strong>${escapeHtml(sessionLabel(next.session).name)}</strong> — ${escapeHtml(formatWhen(next.session))} with ${escapeHtml(sessionLabel(next.session).instructor)}.</p>`
     : "";
+  /* The studio's cancellation rule, from the same current policy record the
+   * support chat answers from — stated beside the buttons it governs. */
+  const policyLine = cancellationPolicy
+    ? `<p class="lede">${escapeHtml(cancellationPolicy.answer)}</p>`
+    : "";
   mineEl.innerHTML =
     nextLine +
+    policyLine +
     held
     .map(({ session, status }) => {
       const label = sessionLabel(session);
       const state = status === "waitlisted" ? "Waitlisted" : "Reserved";
-      return `<article class="card">
+      const armed = cancelArmed === session.id;
+      const buttons = armed
+        ? `<button class="btn" type="button" data-cancel-confirm="${escapeHtml(session.id)}">Confirm cancel</button>
+           <button class="btn ghost" type="button" data-cancel-keep="${escapeHtml(session.id)}">Keep it</button>`
+        : `<button class="btn ghost" type="button" data-cancel="${escapeHtml(session.id)}">Cancel</button>`;
+      return `<article class="card" tabindex="-1" data-mine-card="${escapeHtml(session.id)}">
         <div class="session">
           <div>
             <h3>${escapeHtml(label.name)}</h3>
             <p class="meta">${escapeHtml(formatWhen(session))} · ${escapeHtml(label.instructor)} · ${state}</p>
           </div>
-          <button class="btn ghost" type="button" data-cancel="${escapeHtml(session.id)}">Cancel</button>
+          <div class="session-actions">${buttons}</div>
         </div>
       </article>`;
     })
     .join("");
   mineEl.querySelectorAll<HTMLButtonElement>("[data-cancel]").forEach((button) => {
     button.addEventListener("click", () => {
+      cancelArmed = button.dataset.cancel ?? null;
+      focusAfterRender = `[data-cancel-confirm="${cancelArmed ?? ""}"]`;
+      clearError();
+      render();
+    });
+  });
+  mineEl.querySelectorAll<HTMLButtonElement>("[data-cancel-keep]").forEach((button) => {
+    button.addEventListener("click", () => {
+      cancelArmed = null;
+      focusAfterRender = `[data-cancel="${button.dataset.cancelKeep ?? ""}"]`;
+      clearError();
+      render();
+    });
+  });
+  mineEl.querySelectorAll<HTMLButtonElement>("[data-cancel-confirm]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const sessionId = button.dataset.cancelConfirm ?? "";
       try {
-        cancelReservation(memberId, button.dataset.cancel ?? "");
+        appendRows(cancelReservation(ctx, memberId, sessionId, ctx.nowLocal, newReservationId));
+        cancelArmed = null;
         lastConfirmation = null;
+        /* The card this button lived in is gone after the render; the
+         * schedule card for the same class is still there and can hold
+         * focus, so the keyboard does not fall back to <body>. */
+        focusAfterRender = `[data-session-card="${sessionId}"]`;
         clearError();
         render();
       } catch (error: unknown) {
@@ -492,11 +458,13 @@ function renderMine(memberId: string): void {
 }
 
 function render(): void {
+  ctx.rows = loadRuntimeReservations();
+  ctx.nowLocal = studioNowTimestamp(dataset.meta.timezone);
   const member = bookingMember();
   const memberId = member?.id ?? "";
-  const sessions = upcomingSessions();
-  const openSpots = sessions.reduce((total, session) => total + remainingSpots(session), 0);
-  const fullStudio = sessions.filter((session) => remainingSpots(session) <= 0).length;
+  const sessions = openSessions(ctx);
+  const openSpots = sessions.reduce((total, session) => total + remainingSpots(ctx, session), 0);
+  const fullStudio = sessions.filter((session) => remainingSpots(ctx, session) <= 0).length;
   renderConfirmation(member);
   renderDays();
   if (!selectedDay) {
@@ -510,15 +478,40 @@ function render(): void {
   if (session?.role === "staff") {
     statusEl.textContent = `Staff session signed in. Member sign-in required. ${statusEl.textContent}`;
   }
-  renderSchedule(memberId);
+  renderSchedule(member);
   renderMine(memberId);
-  if (requestedSessionId) {
-    document.getElementById("requested-session")?.scrollIntoView({ block: "center" });
+  /* A link to a class that has since started, completed, or never existed
+   * used to fall back to the first day in silence; the miss is now stated,
+   * the fallback stays. Dismissed again if a later render can show it. */
+  const staleMessage = staleDeepLinkMessage(ctx, requestedSessionId, formatDayChip(selectedDay));
+  if (staleMessage) {
+    showAlert({
+      id: "session-not-on-schedule",
+      level: "notice",
+      message: staleMessage,
+      detail: `${scheduleDays().length} upcoming days are below — pick another time.`,
+    });
+  } else {
+    dismissAlert("session-not-on-schedule");
+  }
+  if (requestedSessionId && !deepLinkScrolled) {
+    const target = document.getElementById("requested-session");
+    if (target) {
+      target.scrollIntoView({ block: "center" });
+      deepLinkScrolled = true;
+    }
+  }
+  if (focusAfterRender) {
+    /* When the named target is not on this render (a cancel for a class on
+     * an unselected day), the status line catches focus instead of <body>. */
+    (document.querySelector<HTMLElement>(focusAfterRender) ?? statusEl).focus();
+    focusAfterRender = null;
   }
 }
 
 onSessionChange(() => {
   lastConfirmation = null;
+  cancelArmed = null;
   clearError();
   render();
 });
