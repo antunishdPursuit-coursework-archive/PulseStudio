@@ -86,10 +86,27 @@ list: on the day it landed no product folder violated any of them.
   keep reading the front page. Landing is not gating: it happens only on
   the act of signing in, only in the tab where it happened, never on page
   load or sign-out, and every route stays reachable by link and by URL.
-- Surfaces may ADAPT to the signed-in actor (`actor_type`: member or
+- MEMBER surfaces may ADAPT to the signed-in actor (`actor_type`: member or
   staff) — different emphasis, different words — but never hide or block a
-  route: the browser session is convenience, not access control, and
-  pretending otherwise would break the truth law.
+  route. The browser session is convenience, not access control.
+- STAFF surfaces are GATED, and the gate is real. This rule used to read
+  "never hide or block a route", full stop, and the reasoning was sound
+  while this was only static files: nothing a page checks about itself can
+  stop a person who can edit the page, so a browser-side gate would have
+  been a picture of a gate, and drawing one would have broken the truth
+  law. The studio runs a server now. It holds the staff passphrase, it
+  signs the session cookie, and it refuses `data/staff-records.json` to a
+  request that cannot present one — a decision made where a visitor cannot
+  reach it. So `app/shared/auth/staff-gate.ts` mounts a door on the
+  dashboard and the re-engagement tool, and neither draws anything until
+  the server says yes. Where there is no server, the door stays shut and
+  says so; it never fails open.
+- Records that name a person do NOT live under `app/`. Everything there is
+  served at a URL, which is why members, memberships, reservations and
+  attendance moved to `data/staff-records.json` — outside `app/`, where the
+  static handler answers 403 and only `/api/staff/records` reaches them.
+  `app/shared/fixtures.json` keeps what any visitor may read: the
+  timetable, who teaches, and the studio's policies.
 - Staff surfaces say "staff" plainly. Member surfaces never show another
   member's data. The front door leads with members; staff tools sit behind
   a clearly named door.
