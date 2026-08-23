@@ -11,12 +11,18 @@ at all is declared in `docs/proposal-branches.json`, and
 `scripts/check-lanes.mjs` prints every crossing on every run, so none of it is
 silent.
 
-| Branch | Whose folder it works on |
-| --- | --- |
-| `do-not-merge/a` | `app/products/a-booking/` — Kerrian |
-| `do-not-merge/b` | `app/products/b-dashboard/` — Manny |
-| `do-not-merge/c` | `app/products/c-chatbot/` — Dennis |
-| `do-not-merge/v0.0.2` | all four at once, plus `app/shared/` |
+**Take everything from `do-not-merge/v0.0.2`.** It is the only branch that
+carries all four product folders AND the `app/shared/` they all import. The
+three per-product branches came first and are now behind on shared ground — a
+folder taken from one of them, with that branch's `app/shared/`, is missing the
+footer, the alert region, the settings page and the assistant service.
+
+| Branch | What it carries | Take from it? |
+| --- | --- | --- |
+| `do-not-merge/v0.0.2` | all four folders **and** the current `app/shared/` | **yes — this one** |
+| `do-not-merge/a` | `app/products/a-booking/` — Kerrian | only to read the history |
+| `do-not-merge/b` | `app/products/b-dashboard/` — Manny | only to read the history |
+| `do-not-merge/c` | `app/products/c-chatbot/` — Dennis | only to read the history |
 
 ## The one thing that will break if you skip it
 
@@ -53,8 +59,11 @@ checked out.
 **Just your folder, plus shared:**
 
 ```bash
-git checkout do-not-merge/a -- app/products/a-booking app/shared
+git checkout do-not-merge/v0.0.2 -- app/products/a-booking app/shared
 ```
+
+Manny substitutes `b-dashboard`, Dennis `c-chatbot`. The `app/shared` on the
+end is not optional — see the section above.
 
 **One commit you liked, not the whole branch:**
 
@@ -65,7 +74,7 @@ git cherry-pick <sha>
 **Read it first, decide later:**
 
 ```bash
-git diff main..do-not-merge/a -- app/products/a-booking
+git diff main..do-not-merge/v0.0.2 -- app/products/a-booking
 ```
 
 Then, before you commit anything:
