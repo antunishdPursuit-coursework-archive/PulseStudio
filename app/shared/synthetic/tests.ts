@@ -1053,6 +1053,107 @@ for (const file of ENGINE_SOURCES) {
   }
 }
 
+/* THE ANSWER KEY HAS TO AGREE WITH THE DATA IT IS THE KEY TO.
+ *
+ * `truth.expectedDashboardMetrics` is twelve counts a product validates
+ * its own dashboard against. Nothing checked any of them. That is the
+ * worst place in the engine to have no checks: a wrong answer key does
+ * not fail, it quietly CERTIFIES a wrong dashboard, and the product that
+ * trusted it has no second opinion to notice with.
+ *
+ * Found by mutation — three survivors sat on the upcoming-sessions filter
+ * alone, because a count nothing reads is a count nothing can contradict.
+ *
+ * RECOMPUTED FROM THE RECORDS, never restated. A check that copied the
+ * generator's own expression would agree with any mistake inside it. The
+ * partitions are asserted whole as well as piece by piece, so a single
+ * filter cannot drift without the total refusing to add up. */
+{
+  const asOf = "2026-08-22";
+  const asOfDay = dayNumberOf(asOf);
+  const bundle = generateStudio({
+    ...DEFAULT_CONFIG,
+    seed: "dashboard-metrics",
+    asOfDate: asOf,
+    memberCount: 200,
+    historyDays: 365,
+    mode: "clean",
+  });
+  const metrics = bundle.truth.expectedDashboardMetrics;
+  const data = bundle.dataset;
+  const startsOn = (session: { startsAt: string }): number =>
+    dayNumberOf(dateOfTimestamp(session.startsAt));
+
+  /* THE KEY NAMES ARE A PROSE PROMISE, and the type cannot hold them:
+   * `expectedDashboardMetrics` is a `Record<string, number>`, so the only
+   * statement of which keys exist is the doc comment above `SyntheticTruth`
+   * in contracts.ts. A consumer reading a key that got renamed gets
+   * `undefined` and no error. Read that comment and hold the record to it,
+   * the same way the engine audit above holds the sources to their rules. */
+  const contractSource = await (await fetch("./contracts.ts")).text();
+  check("contracts.ts was actually read", contractSource.length > 200, true);
+  const promised = (/expectedDashboardMetrics keys:([\s\S]*?)\./.exec(contractSource)?.[1] ?? "")
+    .replace(/\*/g, " ").split(",").map((k) => k.trim()).filter((k) => k !== "");
+  check("the doc comment lists twelve metric keys", promised.length, 12);
+  check("the answer key holds exactly the keys contracts.ts promises",
+    Object.keys(metrics).slice().sort().join(","), promised.slice().sort().join(","));
+
+  /* -1 for a key that is not there: no count can be negative, so a missing
+   * key fails every comparison below instead of silently reading as 0 and
+   * matching an empty studio. */
+  const m = (key: string): number => metrics[key] ?? -1;
+
+  /* NON-VACUOUS FIRST. Every equality below would hold in a studio of
+   * nothing, so establish there is a studio behind them. */
+  check("there is a real studio behind these counts",
+    data.members.length > 100 && data.attendance.length > 1000 && data.classSessions.length > 1000,
+    true);
+
+  check("active, paused and canceled account for every member",
+    m("activeMembers") + m("pausedMembers") + m("canceledMembers"), data.members.length);
+  check("...and each is the number the member records hold",
+    [m("activeMembers"), m("pausedMembers"), m("canceledMembers")].join(","),
+    ["active", "paused", "canceled"]
+      .map((s) => data.members.filter((x) => x.currentStatusSnapshot === s).length).join(","));
+
+  check("upcoming scheduled sessions are those scheduled on or after the as-of date",
+    m("upcomingScheduledSessions"),
+    data.classSessions.filter((s) => s.status === "scheduled" && startsOn(s) >= asOfDay).length);
+  check("completed sessions are those marked completed",
+    m("completedSessions"), data.classSessions.filter((s) => s.status === "completed").length);
+  /* The partition is what stops one filter drifting unseen: every session
+   * is upcoming-scheduled, completed, canceled, or still "scheduled" in the
+   * past — and that last group should not exist at all. */
+  const canceledSessions = data.classSessions.filter((s) => s.status === "canceled").length;
+  const scheduledInPast = data.classSessions.filter(
+    (s) => s.status === "scheduled" && startsOn(s) < asOfDay).length;
+  check("every session falls in exactly one of the four groups",
+    m("upcomingScheduledSessions") + m("completedSessions") + canceledSessions + scheduledInPast,
+    data.classSessions.length);
+  check("no session is still 'scheduled' in the past", scheduledInPast, 0);
+
+  check("attendance records are counted whole",
+    m("totalAttendanceRecords"), data.attendance.length);
+  check("attended, no-show and unknown account for every attendance record",
+    m("totalAttended") + m("totalNoShows")
+      + data.attendance.filter((a) => a.status === "unknown").length,
+    m("totalAttendanceRecords"));
+  check("...and attended is the number the records hold",
+    m("totalAttended"), data.attendance.filter((a) => a.status === "attended").length);
+  check("bookings are counted whole", m("totalBookings"), data.bookings.length);
+
+  /* The peak is the one metric that is a maximum rather than a count, so
+   * an off-by-one in the comparison would not disturb any total above. */
+  const attendedBySession = new Map<string, number>();
+  for (const a of data.attendance) {
+    if (a.status !== "attended") continue;
+    attendedBySession.set(a.classSessionId, (attendedBySession.get(a.classSessionId) ?? 0) + 1);
+  }
+  check("the peak is the most any one class ever had attend",
+    m("peakSessionAttendance"), Math.max(0, ...attendedBySession.values()));
+  check("...and it is not merely the capacity", m("peakSessionAttendance") > 0, true);
+}
+
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
  *
  * validate.ts skips attendance dated on the as-of date — `day >= asOfDay

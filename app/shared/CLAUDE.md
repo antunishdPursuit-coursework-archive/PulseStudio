@@ -233,6 +233,29 @@ the legacy contract) is what all four products speak.
   and is NOT in the suite; what the suite pins is the property that tells
   the two schemes apart at sixty members, where phantoms sit at
   999982..999999 and the old scheme gave ~900776.
+- **The answer key is now checked against its own dataset**, added
+  2026-08-22. `truth.expectedDashboardMetrics` is twelve counts a product
+  validates its dashboard against, and until that day NOT ONE of them was
+  checked — found by mutation, where three survivors sat on the
+  upcoming-sessions filter alone. A wrong answer key is the worst kind of
+  wrong thing here: it does not fail, it certifies a wrong dashboard, and
+  the product that trusted it has no second opinion to notice with. The
+  checks recompute each count from the records rather than restating the
+  generator's expression, which would have agreed with any mistake inside
+  it, and they assert the PARTITIONS whole — every session is
+  upcoming-scheduled, completed, canceled or (never) scheduled in the
+  past; every attendance row is attended, no-show or unknown — so one
+  filter cannot drift without a total refusing to add up.
+
+  Two things there are deliberate. The key NAMES are a prose promise the
+  type cannot hold, because the field is a `Record<string, number>`: the
+  only statement of which keys exist is the doc comment above
+  `SyntheticTruth` in `contracts.ts`, and a consumer reading a renamed key
+  gets `undefined` and no error. The suite reads that comment and holds
+  the record to it. And a key that is missing reads as `-1`, not `0`,
+  because no count can be negative — `0` would quietly match an empty
+  studio.
+
 - **Edge-cases mode must reconcile EXACTLY** — every declared defect
   found, nothing undeclared; EC7/EC8 conditionally skip declaration when
   the population can't support the injection. Copy that discipline for
