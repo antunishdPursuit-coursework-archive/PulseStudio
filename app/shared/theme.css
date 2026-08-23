@@ -697,8 +697,8 @@ h1, h2, h3, .display, .page-head .role, .brand {
    arm reaching for the handle — the geometry itself IS that reach, so only
    the leg and the lean need a rotation here. */
 .row-torso { transform: rotate(8deg); }
-.row-thigh { transform: rotate(-18deg); }
-.row-shin { transform: rotate(52deg); }
+.row-thigh { transform: rotate(58deg); }
+.row-shin { transform: rotate(-58deg); }
 .row-foot { transform: rotate(-14deg); }
 
 /* The band itself. A row on the studio's own ground line, with the runner
@@ -799,12 +799,12 @@ h1, h2, h3, .display, .page-head .role, .brand {
     100%    { transform: rotate(0deg); }
   }
   @keyframes row-thigh-drive {
-    0%, 40% { transform: rotate(-18deg); }
+    0%, 40% { transform: rotate(58deg); }
     75%     { transform: rotate(4deg); }
     100%    { transform: rotate(-18deg); }
   }
   @keyframes row-shin-drive {
-    0%, 40% { transform: rotate(52deg); }
+    0%, 40% { transform: rotate(-58deg); }
     75%     { transform: rotate(-4deg); }
     100%    { transform: rotate(52deg); }
   }
