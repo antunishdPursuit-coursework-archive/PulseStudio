@@ -644,20 +644,21 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .prose-date { color: var(--muted); font-size: 0.84rem; }
 
 /* ---- the studio floor -------------------------------------------------
-   Three figures in the mark's own line: one lifts, one rides, one runs the
-   length of the band. components/figures.ts draws them; this decides how
-   they move.
+   Four figures in the mark's own line, one per builder's colour: one
+   lifts, one rows, one rides, one runs the length of the band.
+   components/figures.ts draws them; this decides how they move.
 
    THE RESTING POSE IS A WHOLE DRAWING. Everything below the guard is
    motion; everything above it is the picture. With reduced motion the
-   band still shows a person mid-press, a rider on a bike, and a runner in
-   stride — a still, not a broken animation. That is the same promise the
-   pulse mark makes a few rules up.
+   band still shows a person mid-press, mid-pull, a rider on a bike, and a
+   runner in stride — a still, not a broken animation. That is the same
+   promise the pulse mark makes a few rules up.
 
    ONE BEAT FOR THE WHOLE STUDIO. The mark's spark runs every 3.6s; the
-   press and the pedal are multiples of it, so nothing on the page ever
-   quite syncs but nothing fights either. The crossing is deliberately far
-   slower — a runner who crosses in four seconds reads as a bug. */
+   press, the pull and the pedal are multiples of it, so nothing on the
+   page ever quite syncs but nothing fights either. The crossing is
+   deliberately far slower — a runner who crosses in four seconds reads as
+   a bug. */
 .figure { display: block; width: 100%; height: 100%; overflow: visible; }
 .figure line, .figure circle {
   fill: none;
@@ -699,26 +700,34 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .cycle-leg-near .cycle-shin { transform: rotate(-10deg); }
 .cycle-leg-far .cycle-shin { transform: rotate(-66deg); }
 .cycle-foot { transform: rotate(-30deg); }
+/* The rower's resting pose is the catch: knees drawn up, torso forward,
+   arm reaching for the handle — the geometry itself IS that reach, so only
+   the leg and the lean need a rotation here. */
+.row-torso { transform: rotate(8deg); }
+.row-thigh { transform: rotate(-18deg); }
+.row-shin { transform: rotate(52deg); }
+.row-foot { transform: rotate(-14deg); }
 
 /* The band itself. A row on the studio's own ground line, with the runner
-   crossing behind the two who are working in place. */
+   crossing behind the three who are working in place. */
 .studio-floor {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 0 40px;
-  max-width: 760px;
+  max-width: 900px;
   margin: 26px auto 0;
   padding: 0 20px 34px;
   color: var(--muted);
 }
-/* One floor for all three, and every figure's box ends on it: the grid
+/* One floor for all four, and every figure's box ends on it: the grid
    bottom-aligns them, the run lane sits at the same offset, and the rule
    below is drawn at that offset too. Before this the runner stood ten
    pixels under the line and the lifter drew a second floor of its own. */
 .studio-floor [data-figure] { height: 132px; }
 .studio-floor [data-figure="lift"] { color: var(--kerrian); justify-self: end; width: 118px; }
+.studio-floor [data-figure="row"] { color: var(--manny); justify-self: center; width: 132px; }
 .studio-floor [data-figure="cycle"] { color: var(--dennis); justify-self: start; width: 152px; }
 .run-lane {
   position: absolute;
@@ -778,6 +787,35 @@ h1, h2, h3, .display, .page-head .role, .brand {
     100% { transform: rotate(-30deg); }
   }
 
+  /* The rower: catch, drive, finish, recovery — held at the catch a beat
+     longer than the drive takes, the way an actual stroke does, rather
+     than a symmetric back-and-forth. All four parts share one timeline so
+     the pull always finishes exactly as the legs straighten. */
+  .row-torso { animation: row-torso-swing 1.6s ease-in-out infinite; }
+  .row-arms  { animation: row-arms-pull 1.6s ease-in-out infinite; }
+  .row-thigh { animation: row-thigh-drive 1.6s ease-in-out infinite; }
+  .row-shin  { animation: row-shin-drive 1.6s ease-in-out infinite; }
+  @keyframes row-torso-swing {
+    0%, 40% { transform: rotate(8deg); }
+    75%     { transform: rotate(-16deg); }
+    100%    { transform: rotate(8deg); }
+  }
+  @keyframes row-arms-pull {
+    0%, 40% { transform: rotate(0deg); }
+    75%     { transform: rotate(-95deg); }
+    100%    { transform: rotate(0deg); }
+  }
+  @keyframes row-thigh-drive {
+    0%, 40% { transform: rotate(-18deg); }
+    75%     { transform: rotate(4deg); }
+    100%    { transform: rotate(-18deg); }
+  }
+  @keyframes row-shin-drive {
+    0%, 40% { transform: rotate(52deg); }
+    75%     { transform: rotate(-4deg); }
+    100%    { transform: rotate(52deg); }
+  }
+
   /* Opposition is the whole thing: the near arm swings with the FAR leg.
      Same duration, offset by half, on both pairs. */
   .run-leg-near { animation: stride 0.62s ease-in-out infinite; }
@@ -821,6 +859,7 @@ h1, h2, h3, .display, .page-head .role, .brand {
 @media (max-width: 560px) {
   .studio-floor { gap: 0 16px; }
   .studio-floor [data-figure="lift"] { width: 92px; }
+  .studio-floor [data-figure="row"] { width: 100px; }
   .studio-floor [data-figure="cycle"] { width: 118px; }
 }
 

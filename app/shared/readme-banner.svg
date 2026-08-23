@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" role="img" aria-label="Pulse Studio">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Pulse Studio">
   <!-- THE README'S HEADER IMAGE. Kept apart from shared/og-image.svg on
        purpose: that file is the source of the static og-image.png a
        social-card crawler fetches, and neither a crawler nor a raster can
@@ -8,9 +8,11 @@
 
        ONE FILE, NOT A LIGHT/DARK PAIR. GitHub's <picture>+prefers-color-
        scheme pattern needs two images and markup to choose between them;
-       a single SVG that answers the same media query INSIDE its own
-       <style> needs neither, the same way app/favicon.svg already answers
-       it for the browser tab. Fewer files, fewer things to keep in sync.
+       a single SVG answering the same media query INSIDE its own <style>
+       needs neither. :root here IS this document's outermost <svg> — an
+       SVG loaded as its own top-level document treats the root element as
+       :root — so `color` is set once there and every ink stroke/fill below
+       reads currentColor instead of repeating a hex per element.
 
        THE ANIMATION SURVIVES ONLY BECAUSE THIS IS A SEPARATE FILE.
        GitHub sanitizes an inline <svg> written directly into Markdown —
@@ -19,41 +21,72 @@
        document and runs its CSS exactly as it would any other image with
        internal styles, animation included.
 
-       THE FIGURES ARE THE STUDIO FLOOR from components/figures.ts, hand-
-       copied rather than executed: figures.ts builds them with
-       document.createElementNS at runtime, which only runs inside a page,
-       never inside a static file a browser treats as an image. The bones,
-       pivots and keyframes below are the same numbers that file and
-       theme.css already use — not a new drawing, a second rendering of
-       the one that exists. Every animation sits behind prefers-reduced-
-       motion, same as there, and the resting pose (no motion) is a
-       complete drawing on its own: a person mid-press, a rider on a bike,
-       a runner in stride.
+       THE MARK IS THE LIVE ONE. app/shared/components/logo.ts draws a
+       second copy of PULSE_MARK_PATH, class pulse-mark-runner, that a
+       guarded animation sends a spark along — theme.css's pulse-mark-run,
+       reproduced byte-for-byte below rather than a plain static line, so
+       this is the same mark the front door renders and not a second one
+       quietly drifting from it.
 
-       COLOURS ARE THE THREE THE STUDIO FLOOR ALREADY USES — kerrian's
-       blue on the lift, dennis's green on the ride, rensley's violet on
-       the run — the same pairing theme.css assigns them, not a new one.
-       No fifth colour, no accent invented for this file alone.
+       THE FOUR FIGURES ARE THE STUDIO FLOOR from components/figures.ts —
+       one per builder's colour, hand-copied rather than executed: that
+       file builds them with document.createElementNS at runtime, which
+       only runs inside a page, never inside a file a browser treats as an
+       image. Every bone is drawn straight from its pivot; the pose lives
+       only in the transform, the same convention that module states for
+       itself. The runner crosses the WHOLE canvas, off one edge and past
+       the other, so it enters and leaves rather than appearing mid-air —
+       local units, not vw, because this is fixed artwork with its own
+       1200-wide space, not the live page's real viewport.
 
-       THE RUN CROSSES IN LOCAL UNITS, NOT vw. The live studio floor spans
-       the real browser viewport, so its lane travels in vw; this is fixed
-       artwork with its own 1200-wide coordinate space, so the crossing
-       below travels between two points in THAT space instead. -->
+       ONE STROKE LANGUAGE, ONE CLOCK. Every figure shares the same
+       stroke-width, cap and join, and the same nested-rotation rig, so
+       they read as one hand at four speeds rather than four unrelated
+       drawings: a press with a hold at the top, a pull with a longer catch
+       than drive, a pedal stroke that stays perfectly even (a wheel turns
+       at one speed or it looks broken), a stride with a stance phase and
+       a quicker flight phase. Nothing here uses one flat linear loop for
+       everything.
+
+       COLOURS ARE THE FOUR BUILDER ACCENTS AND NOTHING ELSE — Kerrian's
+       blue on the lift, Manny's amber on the row, Dennis's green on the
+       ride, Rensley's violet on the run — the exact hexes theme.css
+       assigns them for decorative stroke. No fifth colour, no accent
+       invented for this file alone. -->
   <style>
-    .bg { fill: #ffffff; }
-    .ink { fill: #0a0a0a; }
-    .sub { fill: #5b5b5b; }
-    .mark { stroke: #0a0a0a; }
-    .floor-line { stroke: #d4d4d4; }
+    :root {
+      color: #0a0a0a;
+      --bg: #ffffff;
+      --sub: #5b5b5b;
+      --line: #d4d4d4;
+    }
     @media (prefers-color-scheme: dark) {
-      .bg { fill: #000000; }
-      .ink { fill: #ffffff; }
-      .sub { fill: #a3a3a3; }
-      .mark { stroke: #ffffff; }
-      .floor-line { stroke: #333333; }
+      :root { color: #ffffff; --bg: #000000; --sub: #a3a3a3; --line: #333333; }
+    }
+    .bg { fill: var(--bg); }
+    .ink { fill: currentColor; }
+    .sub { fill: var(--sub); }
+    .floor-line { stroke: var(--line); }
+    .mark, .mark-runner { stroke: currentColor; }
+
+    /* ---- the live mark: byte-for-byte theme.css, scaled with the group ---- */
+    .mark-runner { opacity: 0; }
+    @media (prefers-reduced-motion: no-preference) {
+      .mark-runner {
+        stroke-dasharray: 10 62;
+        stroke-dashoffset: 72;
+        animation: pulse-mark-run 3.6s linear infinite;
+      }
+      @keyframes pulse-mark-run {
+        0%   { opacity: 0;    stroke-dashoffset: 72; }
+        12%  { opacity: 0.9; }
+        55%  { opacity: 0.9;  }
+        70%  { opacity: 0;    stroke-dashoffset: 0; }
+        100% { opacity: 0;    stroke-dashoffset: 0; }
+      }
     }
 
-    /* ---- the figures: geometry + resting pose, from theme.css ---- */
+    /* ---- the figures: shared stroke language, from theme.css ---- */
     .figure line, .figure circle {
       fill: none;
       stroke: currentColor;
@@ -64,41 +97,78 @@
     }
     .cycle-leg-far, .run-leg-far, .run-arm-far { opacity: 0.42; }
 
+    /* resting poses */
     .lift-arms { transform: scaleY(0.86); }
     .lift-bar { transform: translateY(4.5px); }
-    .run-leg-near { transform: rotate(36deg); }
-    .run-leg-far { transform: rotate(-30deg); }
-    .run-leg-near .run-shin { transform: rotate(-74deg); }
-    .run-leg-far .run-shin { transform: rotate(-14deg); }
-    .run-foot { transform: rotate(-24deg); }
-    .run-arm-near { transform: rotate(-42deg); }
-    .run-arm-far { transform: rotate(36deg); }
-    .run-arm-near .run-forearm { transform: rotate(-72deg); }
-    .run-arm-far .run-forearm { transform: rotate(-84deg); }
+    .row-torso { transform: rotate(8deg); }
+    .row-thigh { transform: rotate(-18deg); }
+    .row-shin { transform: rotate(52deg); }
+    .row-foot { transform: rotate(-14deg); }
     .cycle-leg-near { transform: rotate(-26deg); }
     .cycle-leg-far { transform: rotate(8deg); }
     .cycle-leg-near .cycle-shin { transform: rotate(-10deg); }
     .cycle-leg-far .cycle-shin { transform: rotate(-66deg); }
     .cycle-foot { transform: rotate(-30deg); }
+    /* A clear scissor split at rest — one leg forward, one back — rather
+       than two folded knees, which is the pose that reads as a crouch. */
+    .run-leg-near { transform: rotate(38deg); }
+    .run-leg-far { transform: rotate(-34deg); }
+    .run-leg-near .run-shin { transform: rotate(-12deg); }
+    .run-leg-far .run-shin { transform: rotate(-40deg); }
+    .run-foot { transform: rotate(-20deg); }
+    .run-arm-near { transform: rotate(-30deg); }
+    .run-arm-far { transform: rotate(40deg); }
+    .run-arm-near .run-forearm { transform: rotate(-72deg); }
+    .run-arm-far .run-forearm { transform: rotate(-84deg); }
 
     @media (prefers-reduced-motion: no-preference) {
       .lift-arms { animation: lift-press 3.6s ease-in-out infinite; }
       .lift-bar { animation: lift-bar 3.6s ease-in-out infinite; }
       @keyframes lift-press {
-        0%, 100% { transform: scaleY(0.62); }
-        45%      { transform: scaleY(1); }
-        62%      { transform: scaleY(1); }
+        0%, 8%  { transform: scaleY(0.6); }
+        38%     { transform: scaleY(1); }
+        62%     { transform: scaleY(1); }
+        92%, 100% { transform: scaleY(0.6); }
       }
       @keyframes lift-bar {
-        0%, 100% { transform: translateY(12px); }
-        45%      { transform: translateY(0); }
-        62%      { transform: translateY(0); }
+        0%, 8%  { transform: translateY(12px); }
+        38%     { transform: translateY(0); }
+        62%     { transform: translateY(0); }
+        92%, 100% { transform: translateY(12px); }
       }
 
+      /* Catch, drive, finish, recovery — held at the catch longer than the
+         drive takes, the way an actual stroke does. */
+      .row-torso { animation: row-torso-swing 1.6s ease-in-out infinite; }
+      .row-arms  { animation: row-arms-pull 1.6s ease-in-out infinite; }
+      .row-thigh { animation: row-thigh-drive 1.6s ease-in-out infinite; }
+      .row-shin  { animation: row-shin-drive 1.6s ease-in-out infinite; }
+      @keyframes row-torso-swing {
+        0%, 40% { transform: rotate(8deg); }
+        75%     { transform: rotate(-16deg); }
+        100%    { transform: rotate(8deg); }
+      }
+      @keyframes row-arms-pull {
+        0%, 40% { transform: rotate(0deg); }
+        75%     { transform: rotate(-95deg); }
+        100%    { transform: rotate(0deg); }
+      }
+      @keyframes row-thigh-drive {
+        0%, 40% { transform: rotate(-18deg); }
+        75%     { transform: rotate(4deg); }
+        100%    { transform: rotate(-18deg); }
+      }
+      @keyframes row-shin-drive {
+        0%, 40% { transform: rotate(52deg); }
+        75%     { transform: rotate(-4deg); }
+        100%    { transform: rotate(52deg); }
+      }
+
+      /* A wheel turns at one speed or it reads as broken — linear is the
+         correct, not the lazy, choice here. */
       .cycle-wheel { animation: spin 1.8s linear infinite; }
       .cycle-crank { animation: spin 1.2s linear infinite; }
       @keyframes spin { to { transform: rotate(360deg); } }
-
       .cycle-leg-near { animation: pedal-thigh 1.2s linear infinite; }
       .cycle-leg-far  { animation: pedal-thigh 1.2s linear infinite -0.6s; }
       .cycle-leg-near .cycle-shin { animation: pedal-shin 1.2s linear infinite; }
@@ -115,6 +185,8 @@
         100% { transform: rotate(-30deg); }
       }
 
+      /* Contact (foot down, brief), drive, then a quicker flight phase —
+         not a symmetric back-and-forth. */
       .run-leg-near { animation: stride 0.62s ease-in-out infinite; }
       .run-leg-far  { animation: stride 0.62s ease-in-out infinite -0.31s; }
       .run-leg-near .run-shin { animation: stride-shin 0.62s ease-in-out infinite; }
@@ -122,43 +194,47 @@
       .run-arm-near { animation: swing 0.62s ease-in-out infinite -0.31s; }
       .run-arm-far  { animation: swing 0.62s ease-in-out infinite; }
       @keyframes stride {
-        0%, 100% { transform: rotate(40deg); }
-        50%      { transform: rotate(-32deg); }
+        0%   { transform: rotate(38deg); }
+        38%  { transform: rotate(30deg); }
+        75%  { transform: rotate(-34deg); }
+        100% { transform: rotate(38deg); }
       }
       @keyframes stride-shin {
-        0%   { transform: rotate(-14deg); }
-        30%  { transform: rotate(-82deg); }
-        60%  { transform: rotate(-64deg); }
-        100% { transform: rotate(-14deg); }
+        0%   { transform: rotate(-12deg); }
+        38%  { transform: rotate(-18deg); }
+        60%  { transform: rotate(-84deg); }
+        85%  { transform: rotate(-40deg); }
+        100% { transform: rotate(-12deg); }
       }
       @keyframes swing {
-        0%, 100% { transform: rotate(-44deg); }
-        50%      { transform: rotate(38deg); }
+        0%   { transform: rotate(-30deg); }
+        38%  { transform: rotate(-22deg); }
+        75%  { transform: rotate(40deg); }
+        100% { transform: rotate(-30deg); }
       }
-
       .run-traveller .figure { animation: run-bob 0.31s ease-in-out infinite; }
       @keyframes run-bob {
         0%, 100% { transform: translateY(0); }
         50%      { transform: translateY(-4px); }
       }
+      /* Off one edge of the CANVAS and past the other — not a boxed lane —
+         so the runner enters and leaves the frame instead of appearing in
+         the middle of it. */
       .run-traveller { animation: run-across 19s linear infinite; }
       @keyframes run-across {
-        from { transform: translateX(490px); }
-        to   { transform: translateX(1150px); }
+        from { transform: translateX(-150px); }
+        to   { transform: translateX(1350px); }
       }
     }
   </style>
 
-  <defs>
-    <clipPath id="run-lane-clip">
-      <rect x="580" y="595" width="560" height="155"/>
-    </clipPath>
-  </defs>
+  <rect class="bg" width="1200" height="800"/>
 
-  <rect class="bg" width="1200" height="760"/>
-
-  <g transform="translate(228 150) scale(7.6)">
+  <!-- the mark, centred on the wordmark below it, carrying its own beat -->
+  <g transform="translate(478 150) scale(7.6)">
     <path class="mark" d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="mark-runner" d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke-width="2.6"
           stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
@@ -169,10 +245,51 @@
     book classes, ask anything, stay seen
   </text>
 
-  <line class="floor-line" x1="60" y1="742" x2="1140" y2="742" stroke-width="3" stroke-linecap="round"/>
+  <line class="floor-line" x1="60" y1="770" x2="1140" y2="770" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- the run: rensley's violet, crossing the whole canvas, behind the rest -->
+  <g class="run-traveller" style="transform-box:view-box">
+    <svg x="0" y="620" width="133" height="150" viewBox="0 0 104 117" preserveAspectRatio="xMidYMax meet"
+         class="figure figure-run" style="color:#8b5cf6" aria-hidden="true" focusable="false">
+      <g class="figure-body">
+        <circle cx="62" cy="20" r="8.5"/>
+        <line x1="59" y1="28" x2="46" y2="64"/>
+      </g>
+      <g class="run-upper-arm run-arm-near" style="transform-box:view-box; transform-origin:56px 36px">
+        <line x1="56" y1="36" x2="56" y2="56"/>
+        <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
+          <line x1="56" y1="56" x2="56" y2="73"/>
+        </g>
+      </g>
+      <g class="run-upper-arm run-arm-far" style="transform-box:view-box; transform-origin:56px 36px">
+        <line x1="56" y1="36" x2="56" y2="56"/>
+        <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
+          <line x1="56" y1="56" x2="56" y2="73"/>
+        </g>
+      </g>
+      <g class="run-thigh run-leg-near" style="transform-box:view-box; transform-origin:46px 64px">
+        <line x1="46" y1="64" x2="46" y2="92"/>
+        <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
+          <line x1="46" y1="92" x2="46" y2="114"/>
+          <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
+            <line x1="46" y1="114" x2="56" y2="114"/>
+          </g>
+        </g>
+      </g>
+      <g class="run-thigh run-leg-far" style="transform-box:view-box; transform-origin:46px 64px">
+        <line x1="46" y1="64" x2="46" y2="92"/>
+        <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
+          <line x1="46" y1="92" x2="46" y2="114"/>
+          <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
+            <line x1="46" y1="114" x2="56" y2="114"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </g>
 
   <!-- the lift: kerrian's blue, working in place -->
-  <svg x="150" y="605" width="150" height="137" viewBox="0 0 100 107" preserveAspectRatio="xMidYMax meet"
+  <svg x="290" y="620" width="140" height="150" viewBox="0 0 100 107" preserveAspectRatio="xMidYMax meet"
        class="figure figure-lift" style="color:#3b82f6" aria-hidden="true" focusable="false">
     <g class="figure-body">
       <circle cx="50" cy="40" r="8"/>
@@ -191,8 +308,35 @@
     </g>
   </svg>
 
+  <!-- the row: manny's amber, working in place -->
+  <svg x="500" y="620" width="160" height="150" viewBox="0 0 120 107" preserveAspectRatio="xMidYMax meet"
+       class="figure figure-row" style="color:#f59e0b" aria-hidden="true" focusable="false">
+    <g class="figure-body">
+      <line x1="14" y1="100" x2="100" y2="100"/>
+      <circle cx="8" cy="84" r="7"/>
+      <line x1="8" y1="77" x2="8" y2="30"/>
+      <line x1="8" y1="30" x2="22" y2="32"/>
+    </g>
+    <g class="row-torso" style="transform-box:view-box; transform-origin:62px 60px">
+      <line x1="62" y1="60" x2="62" y2="30"/>
+      <circle cx="62" cy="22" r="8"/>
+      <g class="row-arms" style="transform-box:view-box; transform-origin:62px 30px">
+        <line x1="62" y1="30" x2="22" y2="32"/>
+      </g>
+    </g>
+    <g class="row-thigh" style="transform-box:view-box; transform-origin:62px 60px">
+      <line x1="62" y1="60" x2="62" y2="84"/>
+      <g class="row-shin" style="transform-box:view-box; transform-origin:62px 84px">
+        <line x1="62" y1="84" x2="62" y2="100"/>
+        <g class="row-foot" style="transform-box:view-box; transform-origin:62px 100px">
+          <line x1="62" y1="100" x2="80" y2="100"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+
   <!-- the ride: dennis's green, working in place -->
-  <svg x="340" y="605" width="210" height="137" viewBox="0 0 140 111" preserveAspectRatio="xMidYMax meet"
+  <svg x="730" y="620" width="180" height="150" viewBox="0 0 140 111" preserveAspectRatio="xMidYMax meet"
        class="figure figure-cycle" style="color:#10b981" aria-hidden="true" focusable="false">
     <g class="figure-body">
       <line x1="68" y1="88" x2="30" y2="88"/>
@@ -247,47 +391,4 @@
       <line x1="80" y1="29" x2="102" y2="50"/>
     </g>
   </svg>
-
-  <!-- the run: rensley's violet, crossing the lane -->
-  <g clip-path="url(#run-lane-clip)">
-    <g class="run-traveller" style="transform-box:view-box">
-      <svg x="0" y="605" width="90" height="137" viewBox="0 0 104 117" preserveAspectRatio="xMidYMax meet"
-           class="figure figure-run" style="color:#8b5cf6" aria-hidden="true" focusable="false">
-        <g class="figure-body">
-          <circle cx="62" cy="20" r="8.5"/>
-          <line x1="59" y1="28" x2="46" y2="64"/>
-        </g>
-        <g class="run-upper-arm run-arm-near" style="transform-box:view-box; transform-origin:56px 36px">
-          <line x1="56" y1="36" x2="56" y2="56"/>
-          <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
-            <line x1="56" y1="56" x2="56" y2="73"/>
-          </g>
-        </g>
-        <g class="run-upper-arm run-arm-far" style="transform-box:view-box; transform-origin:56px 36px">
-          <line x1="56" y1="36" x2="56" y2="56"/>
-          <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
-            <line x1="56" y1="56" x2="56" y2="73"/>
-          </g>
-        </g>
-        <g class="run-thigh run-leg-near" style="transform-box:view-box; transform-origin:46px 64px">
-          <line x1="46" y1="64" x2="46" y2="92"/>
-          <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
-            <line x1="46" y1="92" x2="46" y2="114"/>
-            <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
-              <line x1="46" y1="114" x2="56" y2="114"/>
-            </g>
-          </g>
-        </g>
-        <g class="run-thigh run-leg-far" style="transform-box:view-box; transform-origin:46px 64px">
-          <line x1="46" y1="64" x2="46" y2="92"/>
-          <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
-            <line x1="46" y1="92" x2="46" y2="114"/>
-            <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
-              <line x1="46" y1="114" x2="56" y2="114"/>
-            </g>
-          </g>
-        </g>
-      </svg>
-    </g>
-  </g>
 </svg>

@@ -1,8 +1,9 @@
 /* Pulse Studio — the studio floor. TEAM-OWNED.
  *
- * Three figures in the studio's own line: one lifts, one rides, one runs
- * the length of the page. Same stroke language as the mark in logo.ts —
- * round caps, round joins, currentColor — so they read as one hand.
+ * Four figures in the studio's own line, one per builder's colour: one
+ * lifts, one rows, one rides, one runs the length of the page. Same stroke
+ * language as the mark in logo.ts — round caps, round joins, currentColor —
+ * so they read as one hand.
  *
  * HAND-ROLLED, AND THAT IS THE POINT. A Lottie or Rive runtime is tens of
  * kilobytes of JavaScript plus a JSON payload, and either one hosted on a
@@ -111,7 +112,57 @@ export function liftingFigure(): SVGSVGElement {
   return svg;
 }
 
-/* ---------- two: the ride ---------- */
+/* ---------- two: the row ---------- */
+
+/** A rower on a slide machine — the fourth colour, Manny's amber, the one
+ *  the colour law was missing here: four builders, and until now three
+ *  figures.
+ *
+ *  SIMPLIFIED ON PURPOSE. A real rowing stroke slides the seat along the
+ *  rail; at this size that is a second moving frame of reference for very
+ *  little legibility gained, so the hip stays put and the drive lives
+ *  entirely in three rotations instead — torso lean, arm pull, leg
+ *  drive — timed off the same clock in theme.css so they read as one
+ *  stroke rather than three limbs moving on their own schedules.
+ *
+ *  THE ARM IS ONE BONE, NOT TWO. Every other figure's limbs get an upper
+ *  and a lower segment because the joint bending is the thing being shown;
+ *  a rowing pull reads from the HAND traveling to the chest, and a second
+ *  elbow segment at this scale adds a joint nobody would see move. */
+export function rowingFigure(): SVGSVGElement {
+  const svg = frame("0 0 120 107", "figure-row");
+
+  const rig = make("g", { class: "figure-body" });
+  rig.append(make("line", { x1: 14, y1: 100, x2: 100, y2: 100 })); // the slide rail
+  rig.append(make("circle", { cx: 8, cy: 84, r: 7 }));             // the flywheel housing
+  rig.append(make("line", { x1: 8, y1: 77, x2: 8, y2: 30 }));      // the mast the cable runs up
+  rig.append(make("line", { x1: 8, y1: 30, x2: 22, y2: 32 }));     // the cable, mast to handle rest
+  svg.append(rig);
+
+  const torso = make("g", { class: "row-torso" });
+  torso.style.transformBox = "view-box";
+  torso.style.transformOrigin = "62px 60px"; // the hip — legs pivot here too, independently
+  torso.append(make("line", { x1: 62, y1: 60, x2: 62, y2: 30 }));  // hip to shoulder
+  torso.append(make("circle", { cx: 62, cy: 22, r: 8 }));          // head
+
+  const arm = make("g", { class: "row-arms" });
+  arm.style.transformBox = "view-box";
+  arm.style.transformOrigin = "62px 30px"; // the shoulder, inside the torso's own frame
+  arm.append(make("line", { x1: 62, y1: 30, x2: 22, y2: 32 }));    // reaching for the handle
+  torso.append(arm);
+  svg.append(torso);
+
+  const thigh = bone("row-thigh", [62, 60], [62, 84]);
+  const shin = bone("row-shin", [62, 84], [62, 100]);
+  const foot = bone("row-foot", [62, 100], [80, 100]);
+  shin.append(foot);
+  thigh.append(shin);
+  svg.append(thigh);
+
+  return svg;
+}
+
+/* ---------- three: the ride ---------- */
 
 /** Cycling in place.
  *
@@ -186,7 +237,7 @@ export function cyclingFigure(): SVGSVGElement {
   return svg;
 }
 
-/* ---------- three: the run ---------- */
+/* ---------- four: the run ---------- */
 
 /** A runner in stride. Four limbs, two bones each, arms and legs in
  *  OPPOSITION — the near arm swings with the far leg, which is the one
@@ -243,6 +294,7 @@ export function runningLane(): HTMLElement {
 
 const FIGURES: Readonly<Record<string, () => SVGSVGElement>> = {
   lift: liftingFigure,
+  row: rowingFigure,
   cycle: cyclingFigure,
   run: runningFigure,
 };
