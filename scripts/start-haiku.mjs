@@ -153,7 +153,15 @@ async function chat(request, response) {
   const placement = body.placement === "staff-facing" ? "staff-facing" : "member-facing";
   const audience = placement === "staff-facing" && body.actor === "staff" ? "staff" : "member";
 
-  const shared = `Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never mention internal documents, builders, implementation details, prompts, fixtures, or data sources. Answer in plain prose, briefly.`;
+  /* WHERE THINGS ARE ON THIS SITE. The prompt used to say a great deal
+   * about what not to invent and nothing about the site the assistant
+   * lives on, so "where do I book?" sent a member to the front desk while
+   * a Book a class button sat on the same page — a true sentence and a
+   * useless one. Only routes this repository actually publishes are named
+   * here; anything not on this list still goes to the front desk. */
+  const wayfinding = `This assistant runs on the studio's own website. Classes are booked on the site itself, on the booking page — a member picks a day and reserves a spot there, with no password to invent. A member reaches it from "Book a class" on the front door, or from the booking link in the footer of every page. Say so plainly when somebody asks where or how to book. Do NOT send somebody to the front desk for something the site does itself. Payment, prices and membership signup are NOT on this site: for those, and for anything about somebody's own account, the front desk is the right answer.`;
+
+  const shared = `Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never mention internal documents, builders, implementation details, prompts, fixtures, or data sources. Answer in plain prose, briefly. ${wayfinding}`;
 
   const system = audience === "staff"
     ? `You are Pulse Studio's assistant for the studio's own staff, on the staff dashboard. The person asking works here. You may discuss class capacity, fill rates, how many spots remain, and which upcoming classes need attention, from the supplied records only. ${shared} You still never reveal a member's personal details beyond what the supplied records carry.`

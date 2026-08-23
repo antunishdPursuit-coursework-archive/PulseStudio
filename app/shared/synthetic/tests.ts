@@ -1328,6 +1328,28 @@ for (const file of ENGINE_SOURCES) {
     homeCss.includes(".home .home-product[hidden] { display: none; }"), true);
   check("the assistant panel's override still exists",
     themeCss.includes(".assistant-panel[hidden] { display: none; }"), true);
+
+  /* THE ASSISTANT'S DIRECTIONS HAVE TO POINT AT REAL PAGES. The system
+   * prompt tells the model that booking happens on this site rather than
+   * at the front desk — a wayfinding claim, and the kind of sentence that
+   * rots silently when a route moves. It said the opposite until somebody
+   * asked "where do I book?" on a page with a Book a class button on it.
+   * These read the shipped server prompt and hold it to routes this
+   * repository actually publishes. */
+  const serverSource = await (await fetch("../../../scripts/start-haiku.mjs")).text();
+  /* Fetched, not assumed: the booking page the prompt points a member at
+   * has to be a page this site actually serves. A 404 here means the
+   * assistant is giving directions to a room that is not there. */
+  const bookingPageExists = (await fetch("../../products/a-booking/index.html")).ok;
+  check("the assistant service was actually read", serverSource.length > 500, true);
+  check("it tells the model booking happens on this site",
+    /booking page/i.test(serverSource) && /do NOT send somebody to the front desk/i.test(serverSource), true);
+  check("...and the booking page it names is one this site publishes",
+    bookingPageExists, true);
+  /* The other half, so the fix cannot swing too far: money is NOT on this
+   * site, and the front desk must stay the answer for it. */
+  check("...while payment still goes to the front desk",
+    /Payment, prices and membership signup are NOT on this site/i.test(serverSource), true);
 }
 
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
