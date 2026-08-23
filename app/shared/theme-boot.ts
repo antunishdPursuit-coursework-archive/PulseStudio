@@ -385,10 +385,17 @@ function mountAppearanceControl(): void {
  * icon relative to THIS file (which lives beside it), and only when no icon
  * link exists, so an owner's own line always wins.
  *
- * THE HONEST LIMIT: b-dashboard/staff-dashboard.html loads no theme-boot at
- * all, so nothing here reaches it — it keeps its 404 until its owner adds
- * either the script or the link. This comment said "every page" until a
- * review caught it naming a page this module never touches. */
+ * WHICH PAGES THIS REACHES: every page that loads theme-boot, which is now
+ * all thirteen. This comment has been wrong twice in one day, in opposite
+ * directions — it said "every page" when staff-dashboard.html loaded no
+ * theme-boot, and then went on naming that page as the exception after the
+ * page was wired up. A sentence about which files load a module is exactly
+ * the sentence that rots when a file changes, so read it off the pages:
+ *
+ *   git grep -l "theme-boot.js" -- app  (the .html files it lists)
+ *
+ * check-published holds the property that matters — every published page has
+ * SOME favicon path, its own markup or this function. */
 function ensureFavicon(): void {
   if (document.querySelector('link[rel~="icon"]') !== null) return;
   const link = document.createElement("link");

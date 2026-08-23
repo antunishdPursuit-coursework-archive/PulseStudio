@@ -65,6 +65,8 @@ const NOT_CONSUMER_FACING = {
     "the one page the audience law names as carrying the builders' story",
   "app/shared/ready.html":
     "the team's own readiness board — owners, open defects, round-two notes. It is linked from the root README on purpose so anybody can check it, which also means it sits on the studio's public domain; that placement is a team question, not an audience-law failure",
+  "app/shared/brand-sheet.html":
+    "the brand book. It names each builder because the COLOUR LAW does: a colour belongs to a person, and only that person clears their own contrast entry — a sheet that hid whose colour is whose would be documenting a different rule than the one the repo enforces. Marked noindex, and it is a reference for whoever builds a surface, not a surface itself",
 };
 /* A unit-check page states its own count to a developer. Nobody books a
  * class on one. */
