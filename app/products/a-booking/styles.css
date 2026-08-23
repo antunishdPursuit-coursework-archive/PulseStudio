@@ -45,7 +45,6 @@ h2 { font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; colo
   justify-content: space-between;
   gap: 12px;
 }
-.session h3 { margin: 0; font-size: 1.05rem; }
 .session .meta { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; }
 .session-actions { display: flex; align-items: center; gap: 10px; }
 

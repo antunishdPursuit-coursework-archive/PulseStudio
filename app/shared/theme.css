@@ -422,6 +422,13 @@ h1, h2, h3, .display, .page-head .role, .brand {
    shows one, so it is styled ONCE here — a copy pasted into a product's
    own stylesheet is the drift this file exists to prevent. */
 .page-head .role { color: var(--accent-strong, var(--accent, var(--fg))); font-size: 1.3rem; font-style: normal; }
+
+/* A CLASS SESSION IS THE SAME THING ON EVERY SCREEN. Booking lists them,
+   the dashboard rosters them, and both had written this identical rule in
+   their own folder — which is the drift check-styles exists to catch. The
+   heading of a session card belongs here, once, so the two can never
+   disagree about what a session looks like. */
+.session h3 { margin: 0; font-size: 1.05rem; }
 /* On a narrow screen the page's name takes its own line rather than
    squeezing whoever is signed in into a column of single words. */
 @media (max-width: 860px) {
