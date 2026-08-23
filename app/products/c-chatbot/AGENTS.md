@@ -10,9 +10,10 @@ brief first; this file adds what is true about THIS folder.
 ## What this product is (proven in code, not aspiration)
 
 A single-page member support chat that loads the shared fixture through
-`loadFixtures()`, sends only scheduled `class_session` records and current
+`loadFixtures()`, sends only upcoming scheduled `class_session` records and current
 `studio_policy` records to Claude Haiku, and keeps a fail-closed privacy
-refusal in the browser. The deployed GitHub Pages site has no backend and
+refusal in the browser. Its pure support rules live in `support.ts` and are
+checked by `tests.ts`. The deployed GitHub Pages site has no backend and
 states that conversational support is unavailable. The local server lives in
 `scripts/start-haiku.mjs`; setup is documented in
 `docs/member-support-haiku.md` by team agreement.
@@ -38,6 +39,8 @@ states that conversational support is unavailable. The local server lives in
 - **The privacy guard fails closed without member records.** Generic patterns
   refuse attendance, history, account, membership, booking, reservation, and
   questions shaped like "did Maria come last week?" before any network call.
+  The shared outbound guard also rejects staff-only language in a reply, but
+  Product C does not load the member roster for name matching.
 - **No instructor or availability claims.** Those require collections outside
   this product's agreed boundary.
 
