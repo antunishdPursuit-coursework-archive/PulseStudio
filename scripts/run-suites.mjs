@@ -150,6 +150,17 @@ function installBrowserStubs(baseDir) {
     return true;
   }
 
+  /* A REAL TEXT NODE, because the footer needs one: an <address> is two
+   * lines with a <br> between them, which cannot be expressed as a string
+   * on the parent. Text nodes join `children` and the selector walk skips
+   * them — it filters on `instanceof StubElement` — so nothing that
+   * queries the tree has to know they are there. */
+  class StubText {
+    constructor(data) { this.data = String(data); this.parentNode = null; }
+    get textContent() { return this.data; }
+    set textContent(value) { this.data = String(value); }
+  }
+
   class StubElement {
     constructor(tagName = "div") {
       this.tagName = String(tagName).toUpperCase();
@@ -231,6 +242,7 @@ function installBrowserStubs(baseDir) {
       node.parentNode = this;
       return node;
     }
+    removeChildNode(node) { return this.removeChild(node); }
     append(...nodes) { for (const n of nodes) this.children.push(this.#adopt(n)); }
     appendChild(node) { this.children.push(this.#adopt(node)); return node; }
     prepend(...nodes) { for (const n of nodes.reverse()) this.children.unshift(this.#adopt(n)); }
@@ -292,6 +304,7 @@ function installBrowserStubs(baseDir) {
     head,
     documentElement: new StubElement("html"),
     createElement: (tag) => new StubElement(tag),
+    createTextNode: (data) => new StubText(data),
     createElementNS: (_ns, tag) => new StubElement(tag),
     querySelector: (sel) => body.querySelector(sel),
     querySelectorAll: (sel) => body.querySelectorAll(sel),

@@ -38,7 +38,7 @@
  */
 
 import { pulseLogo } from "./logo.js";
-import { studioWordParts } from "../brand.js";
+import { STUDIO_CONTACT, addressLine, dialable, studioWordParts } from "../brand.js";
 
 export interface FooterLink {
   label: string;
@@ -86,10 +86,17 @@ export const FOOTER_GROUPS: readonly FooterGroup[] = [
     ],
   },
   {
-    heading: "About this software",
+    heading: "The studio",
     links: [
       { label: "How the records flow", href: "shared/storytold.html" },
-      { label: "Brand and colours", href: "shared/brand-sheet.html" },
+      { label: "Brand assets", href: "shared/brand-sheet.html" },
+    ],
+  },
+  {
+    heading: "Legal",
+    links: [
+      { label: "Terms of service", href: "shared/terms.html" },
+      { label: "Privacy policy", href: "shared/privacy.html" },
     ],
   },
 ];
@@ -115,6 +122,21 @@ export const SETTINGS_HREF = "shared/settings.html";
  * posts each question to a studio endpoint. A footer is the last thing a
  * careful reader checks, so a comfortable sentence that is not quite true
  * is worse here than nowhere. */
+/* THE CONTACT BAND IS REAL TEXT, AND THAT IS A DECISION.
+ *
+ * An address and a phone number in a footer exist to be COPIED — into a
+ * maps app, into a contacts entry, into a message. So every character of
+ * them is an ordinary text node in the document, and nothing here sets
+ * `user-select`, listens for `copy`, or hides a word inside a CSS
+ * `content:` property.
+ *
+ * That last one is worth naming because it is the technique people reach
+ * for when they want text that looks copyable and is not: generated
+ * content renders, takes up space and even highlights inside a selection,
+ * but it is not in the DOM, so it never reaches the clipboard. It is
+ * indistinguishable from a browser bug to the person it happens to. A
+ * check in auth/tests.ts holds this: every visible string in the footer
+ * has to come back out of `textContent`. */
 export const FOOTER_PROMISE =
   "Nothing here messages you on its own. A person at the studio reads and decides every note.";
 
@@ -208,6 +230,55 @@ export function siteFooter(root: string, pageHref: string): HTMLElement {
     inner.append(nav);
   }
 
+  /* Where the studio is, and the three ways to reach it. A band of its own
+   * under the links, because an address wants room to be an address rather
+   * than a fifth column squeezed to 130px. */
+  const contact = document.createElement("div");
+  contact.className = "site-footer-contact";
+
+  const visit = document.createElement("div");
+  visit.className = "site-footer-block";
+  const visitHeading = document.createElement("h2");
+  visitHeading.className = "site-footer-heading";
+  visitHeading.textContent = "Visit";
+  /* A real <address> element: it is what this is, and it is what a screen
+   * reader and a browser's own "copy address" affordances look for. */
+  const postal = document.createElement("address");
+  postal.className = "site-footer-address";
+  postal.append(document.createTextNode(STUDIO_CONTACT.streetAddress));
+  postal.append(document.createElement("br"));
+  postal.append(
+    document.createTextNode(
+      `${STUDIO_CONTACT.addressLocality}, ${STUDIO_CONTACT.addressRegion} ${STUDIO_CONTACT.postalCode}`,
+    ),
+  );
+  visit.append(visitHeading, postal);
+
+  const reach = document.createElement("div");
+  reach.className = "site-footer-block";
+  const reachHeading = document.createElement("h2");
+  reachHeading.className = "site-footer-heading";
+  reachHeading.textContent = "Contact";
+  const reachList = document.createElement("ul");
+  reachList.className = "site-footer-reach";
+  /* Each one is a link a phone can act on AND the plain readable value —
+   * `tel:` and `sms:` carry the dialable form, the label carries the form
+   * a person reads back to somebody. */
+  for (const [label, href] of [
+    [STUDIO_CONTACT.email, `mailto:${STUDIO_CONTACT.email}`],
+    [`Call: ${STUDIO_CONTACT.callPhone}`, `tel:${dialable(STUDIO_CONTACT.callPhone)}`],
+    [`Text: ${STUDIO_CONTACT.textPhone}`, `sms:${dialable(STUDIO_CONTACT.textPhone)}`],
+  ] as const) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = href;
+    a.textContent = label;
+    li.append(a);
+    reachList.append(li);
+  }
+  reach.append(reachHeading, reachList);
+  contact.append(visit, reach);
+
   const base = document.createElement("div");
   base.className = "site-footer-base";
   const name = document.createElement("span");
@@ -221,7 +292,7 @@ export function siteFooter(root: string, pageHref: string): HTMLElement {
   source.textContent = "Source";
   base.append(name, settings, source);
 
-  footer.append(inner, base);
+  footer.append(inner, contact, base);
   return footer;
 }
 

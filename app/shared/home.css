@@ -324,6 +324,15 @@ body.home { overflow-x: hidden; }
   .home .builders { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
+  /* THE FRONT DOOR'S HEADER IS THE ONE THAT DOES NOT WRAP.
+     `.page-head` has wrapped since its own 860px rule and `.topbar` since
+     its owner's 800px one; this bar was flex with nowrap and simply ran off
+     the side. Measured at 375px on 2026-08-23: 392px of content in a 371px
+     viewport, with the light/dark switch the part hanging over the edge —
+     which is the control a person on a phone most wants to reach.
+     It got worse when settings left the header (one 42px button became
+     two), and it was already over by 21px before that. */
+  .home .topnav { flex-wrap: wrap; gap: 10px 14px; }
   .home .topnav .nav-links { display: none; }
   .home .hero { padding-top: 56px; }
 }

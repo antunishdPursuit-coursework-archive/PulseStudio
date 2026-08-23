@@ -532,9 +532,9 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .site-footer-inner {
   display: grid;
   gap: 28px 32px;
-  grid-template-columns: minmax(200px, 1.4fr) repeat(3, minmax(130px, 1fr));
+  grid-template-columns: minmax(190px, 1.5fr) repeat(4, minmax(112px, 1fr));
   margin: 0 auto;
-  max-width: 960px;
+  max-width: 1060px;
   padding: 34px 20px 22px;
 }
 .site-footer .home-brand { font-size: 1.1rem; }
@@ -556,18 +556,50 @@ h1, h2, h3, .display, .page-head .role, .brand {
    here is reachable by URL and hiding one would be the first lie about
    that — but it says so rather than pretending to go somewhere. */
 .site-footer a[aria-current="page"] { color: var(--fg); text-decoration: underline; }
+/* Where the studio is and how to reach it — a band of its own, because an
+   address wants to be an address rather than a fifth column squeezed to
+   112px. Every character of it is an ordinary text node: nothing here sets
+   user-select, and no word is hidden inside a `content:` property, which is
+   the trick that makes text look copyable and not be. A footer address that
+   will not copy into a maps app is a footer address that does not work. */
+.site-footer-contact {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 22px 32px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 auto;
+  max-width: 1060px;
+  padding: 22px 20px;
+}
+.site-footer-address { font-style: normal; line-height: 1.6; }
+.site-footer-reach { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
+
 .site-footer-base {
   border-top: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
   margin: 0 auto;
-  max-width: 960px;
+  max-width: 1060px;
   padding: 14px 20px 34px;
 }
 .site-footer-name { margin-right: auto; }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .site-footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .site-footer-brand { grid-column: 1 / -1; }
 }
+@media (max-width: 520px) {
+  .site-footer-inner, .site-footer-contact { grid-template-columns: 1fr; }
+}
+
+/* ---- reading pages ----------------------------------------------------
+   The terms and the privacy policy: one column, measured for reading rather
+   than for filling a screen. Shared infrastructure, so no product accent. */
+.prose { max-width: 68ch; margin: 0 auto; padding: 8px 20px 16px; }
+.prose h2 { margin: 30px 0 8px; font-size: 1.05rem; }
+.prose p { margin: 0 0 12px; }
+.prose ul { margin: 0 0 12px; padding-left: 20px; }
+.prose li { margin-bottom: 8px; }
+.prose .lede { margin-bottom: 16px; }
+.prose-date { color: var(--muted); font-size: 0.84rem; }

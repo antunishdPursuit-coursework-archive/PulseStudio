@@ -30,6 +30,7 @@ import {
   writeStored,
 } from "../storage.js";
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
+import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
@@ -816,9 +817,13 @@ check("the probe key is the one the session listener ignores", () =>
 
 const ROOT_AT = (depth: string): string => new URL(depth, "https://studio.example/base/").href;
 
-check("the footer builds one element with every group", () => {
+check("the footer builds one element with every link group", () => {
   const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
-  const headings = [...f.querySelectorAll(".site-footer-heading")].map((h) => h.textContent);
+  /* Scoped to the GROUPS. The contact band below them carries headings of
+   * the same class — Visit, Contact — and an unscoped selector counted
+   * those as link groups the moment that band was added. */
+  const headings = [...f.querySelectorAll(".site-footer-group .site-footer-heading")]
+    .map((h) => h.textContent);
   return eq(headings, FOOTER_GROUPS.map((g) => g.heading));
 });
 
@@ -850,11 +855,19 @@ check("every link resolves from the site root, not from the page it is on", () =
   return eq(fromRoot.split("|")[0], "https://studio.example/base/products/a-booking/");
 });
 
+/* EVERY href CARRIES ITS OWN SCHEME. A relative href in a shared footer is
+ * right at one page depth and a 404 at the other two, and no gate here
+ * opens a browser to find that out.
+ *
+ * The test is "has a scheme", not "starts with http": the contact band's
+ * links are mailto:, tel: and sms:, which are absolute and correct. The
+ * first version of this check tested for http and started failing the
+ * moment the studio's phone number arrived. */
 check("no footer link is left relative, which would break at depth", () => {
   const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
   const bad = [...f.querySelectorAll("a")]
     .map((a) => a.getAttribute("href") ?? "")
-    .filter((h) => !h.startsWith("http"));
+    .filter((h) => !/^[a-z][a-z0-9+.-]*:/.test(h));
   return eq(bad, []);
 });
 
@@ -916,6 +929,70 @@ check("the footer carries the way to settings", () => {
 
 check("...and it is the one shared settings page, not a per-page guess", () =>
   eq(SETTINGS_HREF, "shared/settings.html"));
+
+/* THE FOOTER'S INFORMATION HAS TO BE COPYABLE, and that is a property with
+ * a real failure mode rather than a nicety. An address and a phone number
+ * in a footer exist to be lifted into a maps app, a contacts entry or a
+ * message. The way sites break this without meaning to is CSS `content:` —
+ * a word set on ::before renders, takes up space, and even highlights
+ * inside a selection, but it is not in the DOM and never reaches the
+ * clipboard. It looks like a browser bug to the person it happens to.
+ *
+ * So the check is: every detail the footer shows must come back out of
+ * textContent. If somebody moves one into a stylesheet, this fails. */
+check("the studio's address is real text, not a CSS decoration", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const said = f.textContent ?? "";
+  const missing = [
+    STUDIO_CONTACT.streetAddress,
+    STUDIO_CONTACT.addressLocality,
+    STUDIO_CONTACT.postalCode,
+    STUDIO_CONTACT.email,
+    STUDIO_CONTACT.callPhone,
+    STUDIO_CONTACT.textPhone,
+  ].filter((detail) => !said.includes(detail));
+  return eq(missing, []);
+});
+
+check("...and it is inside an <address>, which is what it is", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const postal = f.querySelector(".site-footer-address");
+  return eq((postal?.textContent ?? "").includes(STUDIO_CONTACT.postalCode), true);
+});
+
+check("a phone can act on both numbers, and the readable form survives", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const reach = [...f.querySelectorAll(".site-footer-reach a")].map(
+    (a) => `${(a as HTMLAnchorElement).getAttribute("href")}`,
+  );
+  return eq(reach, [
+    `mailto:${STUDIO_CONTACT.email}`,
+    "tel:+19733378259",
+    "sms:+19735765370",
+  ]);
+});
+
+/* Punctuation is for the reader; a dialer wants digits. Derived from the
+ * readable form rather than stored twice, so the two cannot disagree. */
+check("a dialable number is digits and a country code", () =>
+  eq(dialable("(973) 337-8259"), "+19733378259"));
+check("...and an already-international number is not given a second one", () =>
+  eq(dialable("+44 20 7946 0018"), "+442079460018"));
+check("the address renders in the order an envelope wants it", () =>
+  eq(addressLine(), "50 Upper Montclair Plaza, Montclair, NJ 07043"));
+
+/* The legal pages are linked from every page's footer, and a footer link to
+ * a page that does not exist is worse than no link at all. */
+check("the footer links terms and privacy, resolved from the site root", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const legal = [...f.querySelectorAll(".site-footer-group a")]
+    .map((a) => (a as HTMLAnchorElement).href)
+    .filter((h) => h.includes("terms") || h.includes("privacy"));
+  return eq(legal, [
+    "https://studio.example/base/shared/terms.html",
+    "https://studio.example/base/shared/privacy.html",
+  ]);
+});
 
 /* ------------------------------------------------------------------ */
 /* Alerts                                                               */
