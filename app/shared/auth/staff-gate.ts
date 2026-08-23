@@ -40,9 +40,21 @@ export interface StaffGate {
 const SESSION_ENDPOINT = "/api/staff/session";
 const UNREACHABLE: StaffGate = { configured: false, signedIn: false, reachable: false };
 
+/* ONE ANSWER PER PAGE LOAD. The top bar re-renders on every session change
+   and each render used to ask the server again, so a page could fire this
+   half a dozen times to learn the same thing. Both sign-in and sign-out
+   reload the page, so the answer cannot go stale within one load — which is
+   exactly the condition that makes caching it safe rather than clever. */
+let pending: Promise<StaffGate> | null = null;
+
 /** Ask the server who this is. Never throws: a door that errors is a door
     nobody can describe, and every caller here has to render something. */
 export async function readStaffGate(): Promise<StaffGate> {
+  if (pending === null) pending = askStaffGate();
+  return await pending;
+}
+
+async function askStaffGate(): Promise<StaffGate> {
   let response: Response;
   try {
     response = await fetch(SESSION_ENDPOINT, { credentials: "same-origin" });
@@ -80,7 +92,10 @@ export async function signInStaff(passphrase: string): Promise<SignInResult> {
   } catch {
     return { ok: false, message: "The studio's server did not answer." };
   }
-  if (response.ok) return { ok: true, message: "" };
+  if (response.ok) {
+    pending = null; // the answer just changed
+    return { ok: true, message: "" };
+  }
   let message = "That passphrase was not accepted.";
   try {
     const body = (await response.json()) as { error?: unknown };
@@ -92,6 +107,7 @@ export async function signInStaff(passphrase: string): Promise<SignInResult> {
 }
 
 export async function signOutStaff(): Promise<void> {
+  pending = null; // the answer is about to change
   try {
     await fetch(SESSION_ENDPOINT, { method: "DELETE", credentials: "same-origin" });
   } catch {
