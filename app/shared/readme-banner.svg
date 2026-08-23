@@ -1,0 +1,293 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" role="img" aria-label="Pulse Studio">
+  <!-- THE README'S HEADER IMAGE. Kept apart from shared/og-image.svg on
+       purpose: that file is the source of the static og-image.png a
+       social-card crawler fetches, and neither a crawler nor a raster can
+       run a media query or a keyframe, so its light-only, motion-free
+       design stays exactly as it is. This file has one reader — a browser
+       rendering README.md on github.com — so it can afford both.
+
+       ONE FILE, NOT A LIGHT/DARK PAIR. GitHub's <picture>+prefers-color-
+       scheme pattern needs two images and markup to choose between them;
+       a single SVG that answers the same media query INSIDE its own
+       <style> needs neither, the same way app/favicon.svg already answers
+       it for the browser tab. Fewer files, fewer things to keep in sync.
+
+       THE ANIMATION SURVIVES ONLY BECAUSE THIS IS A SEPARATE FILE.
+       GitHub sanitizes an inline <svg> written directly into Markdown —
+       any <style> or keyframe in it is stripped. Loaded instead through
+       <img src="app/shared/readme-banner.svg">, the browser fetches this
+       document and runs its CSS exactly as it would any other image with
+       internal styles, animation included.
+
+       THE FIGURES ARE THE STUDIO FLOOR from components/figures.ts, hand-
+       copied rather than executed: figures.ts builds them with
+       document.createElementNS at runtime, which only runs inside a page,
+       never inside a static file a browser treats as an image. The bones,
+       pivots and keyframes below are the same numbers that file and
+       theme.css already use — not a new drawing, a second rendering of
+       the one that exists. Every animation sits behind prefers-reduced-
+       motion, same as there, and the resting pose (no motion) is a
+       complete drawing on its own: a person mid-press, a rider on a bike,
+       a runner in stride.
+
+       COLOURS ARE THE THREE THE STUDIO FLOOR ALREADY USES — kerrian's
+       blue on the lift, dennis's green on the ride, rensley's violet on
+       the run — the same pairing theme.css assigns them, not a new one.
+       No fifth colour, no accent invented for this file alone.
+
+       THE RUN CROSSES IN LOCAL UNITS, NOT vw. The live studio floor spans
+       the real browser viewport, so its lane travels in vw; this is fixed
+       artwork with its own 1200-wide coordinate space, so the crossing
+       below travels between two points in THAT space instead. -->
+  <style>
+    .bg { fill: #ffffff; }
+    .ink { fill: #0a0a0a; }
+    .sub { fill: #5b5b5b; }
+    .mark { stroke: #0a0a0a; }
+    .floor-line { stroke: #d4d4d4; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #000000; }
+      .ink { fill: #ffffff; }
+      .sub { fill: #a3a3a3; }
+      .mark { stroke: #ffffff; }
+      .floor-line { stroke: #333333; }
+    }
+
+    /* ---- the figures: geometry + resting pose, from theme.css ---- */
+    .figure line, .figure circle {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .cycle-leg-far, .run-leg-far, .run-arm-far { opacity: 0.42; }
+
+    .lift-arms { transform: scaleY(0.86); }
+    .lift-bar { transform: translateY(4.5px); }
+    .run-leg-near { transform: rotate(36deg); }
+    .run-leg-far { transform: rotate(-30deg); }
+    .run-leg-near .run-shin { transform: rotate(-74deg); }
+    .run-leg-far .run-shin { transform: rotate(-14deg); }
+    .run-foot { transform: rotate(-24deg); }
+    .run-arm-near { transform: rotate(-42deg); }
+    .run-arm-far { transform: rotate(36deg); }
+    .run-arm-near .run-forearm { transform: rotate(-72deg); }
+    .run-arm-far .run-forearm { transform: rotate(-84deg); }
+    .cycle-leg-near { transform: rotate(-26deg); }
+    .cycle-leg-far { transform: rotate(8deg); }
+    .cycle-leg-near .cycle-shin { transform: rotate(-10deg); }
+    .cycle-leg-far .cycle-shin { transform: rotate(-66deg); }
+    .cycle-foot { transform: rotate(-30deg); }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .lift-arms { animation: lift-press 3.6s ease-in-out infinite; }
+      .lift-bar { animation: lift-bar 3.6s ease-in-out infinite; }
+      @keyframes lift-press {
+        0%, 100% { transform: scaleY(0.62); }
+        45%      { transform: scaleY(1); }
+        62%      { transform: scaleY(1); }
+      }
+      @keyframes lift-bar {
+        0%, 100% { transform: translateY(12px); }
+        45%      { transform: translateY(0); }
+        62%      { transform: translateY(0); }
+      }
+
+      .cycle-wheel { animation: spin 1.8s linear infinite; }
+      .cycle-crank { animation: spin 1.2s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .cycle-leg-near { animation: pedal-thigh 1.2s linear infinite; }
+      .cycle-leg-far  { animation: pedal-thigh 1.2s linear infinite -0.6s; }
+      .cycle-leg-near .cycle-shin { animation: pedal-shin 1.2s linear infinite; }
+      .cycle-leg-far  .cycle-shin { animation: pedal-shin 1.2s linear infinite -0.6s; }
+      @keyframes pedal-thigh {
+        0%, 100% { transform: rotate(-20deg); }
+        50%      { transform: rotate(6deg); }
+      }
+      @keyframes pedal-shin {
+        0%   { transform: rotate(-30deg); }
+        25%  { transform: rotate(-8deg); }
+        50%  { transform: rotate(-34deg); }
+        75%  { transform: rotate(-66deg); }
+        100% { transform: rotate(-30deg); }
+      }
+
+      .run-leg-near { animation: stride 0.62s ease-in-out infinite; }
+      .run-leg-far  { animation: stride 0.62s ease-in-out infinite -0.31s; }
+      .run-leg-near .run-shin { animation: stride-shin 0.62s ease-in-out infinite; }
+      .run-leg-far  .run-shin { animation: stride-shin 0.62s ease-in-out infinite -0.31s; }
+      .run-arm-near { animation: swing 0.62s ease-in-out infinite -0.31s; }
+      .run-arm-far  { animation: swing 0.62s ease-in-out infinite; }
+      @keyframes stride {
+        0%, 100% { transform: rotate(40deg); }
+        50%      { transform: rotate(-32deg); }
+      }
+      @keyframes stride-shin {
+        0%   { transform: rotate(-14deg); }
+        30%  { transform: rotate(-82deg); }
+        60%  { transform: rotate(-64deg); }
+        100% { transform: rotate(-14deg); }
+      }
+      @keyframes swing {
+        0%, 100% { transform: rotate(-44deg); }
+        50%      { transform: rotate(38deg); }
+      }
+
+      .run-traveller .figure { animation: run-bob 0.31s ease-in-out infinite; }
+      @keyframes run-bob {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-4px); }
+      }
+      .run-traveller { animation: run-across 19s linear infinite; }
+      @keyframes run-across {
+        from { transform: translateX(490px); }
+        to   { transform: translateX(1150px); }
+      }
+    }
+  </style>
+
+  <defs>
+    <clipPath id="run-lane-clip">
+      <rect x="580" y="595" width="560" height="155"/>
+    </clipPath>
+  </defs>
+
+  <rect class="bg" width="1200" height="760"/>
+
+  <g transform="translate(228 150) scale(7.6)">
+    <path class="mark" d="M2 16h5.5l3-8.5 5 17 3.5-10 2.5 1.5H30" fill="none" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="600" y="470" text-anchor="middle" class="ink"
+        font-family="Anton, Impact, system-ui, sans-serif" font-size="96" letter-spacing="3">PULSE STUDIO</text>
+  <text x="600" y="530" text-anchor="middle" class="sub"
+        font-family="Epilogue, system-ui, sans-serif" font-size="34">
+    book classes, ask anything, stay seen
+  </text>
+
+  <line class="floor-line" x1="60" y1="742" x2="1140" y2="742" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- the lift: kerrian's blue, working in place -->
+  <svg x="150" y="605" width="150" height="137" viewBox="0 0 100 107" preserveAspectRatio="xMidYMax meet"
+       class="figure figure-lift" style="color:#3b82f6" aria-hidden="true" focusable="false">
+    <g class="figure-body">
+      <circle cx="50" cy="40" r="8"/>
+      <line x1="50" y1="48" x2="50" y2="76"/>
+      <line x1="50" y1="76" x2="38" y2="104"/>
+      <line x1="50" y1="76" x2="62" y2="104"/>
+    </g>
+    <g class="lift-arms" style="transform-box:view-box; transform-origin:50px 56px">
+      <line x1="50" y1="56" x2="26" y2="20"/>
+      <line x1="50" y1="56" x2="74" y2="20"/>
+    </g>
+    <g class="lift-bar">
+      <line x1="14" y1="20" x2="86" y2="20"/>
+      <line x1="20" y1="9" x2="20" y2="31"/>
+      <line x1="80" y1="9" x2="80" y2="31"/>
+    </g>
+  </svg>
+
+  <!-- the ride: dennis's green, working in place -->
+  <svg x="340" y="605" width="210" height="137" viewBox="0 0 140 111" preserveAspectRatio="xMidYMax meet"
+       class="figure figure-cycle" style="color:#10b981" aria-hidden="true" focusable="false">
+    <g class="figure-body">
+      <line x1="68" y1="88" x2="30" y2="88"/>
+      <line x1="68" y1="88" x2="56" y2="56"/>
+      <line x1="68" y1="88" x2="98" y2="54"/>
+      <line x1="56" y1="56" x2="98" y2="54"/>
+      <line x1="56" y1="56" x2="30" y2="88"/>
+      <line x1="98" y1="54" x2="110" y2="88"/>
+      <line x1="46" y1="44" x2="60" y2="48"/>
+      <line x1="56" y1="56" x2="53" y2="46"/>
+      <line x1="92" y1="48" x2="106" y2="53"/>
+      <g class="cycle-wheel" style="transform-box:view-box; transform-origin:30px 88px">
+        <circle cx="30" cy="88" r="20"/>
+        <line x1="16" y1="74" x2="44" y2="102"/>
+        <line x1="44" y1="74" x2="16" y2="102"/>
+      </g>
+      <g class="cycle-wheel" style="transform-box:view-box; transform-origin:110px 88px">
+        <circle cx="110" cy="88" r="20"/>
+        <line x1="96" y1="74" x2="124" y2="102"/>
+        <line x1="124" y1="74" x2="96" y2="102"/>
+      </g>
+    </g>
+    <g class="cycle-crank" style="transform-box:view-box; transform-origin:68px 88px">
+      <line x1="68" y1="74" x2="68" y2="102"/>
+      <line class="cycle-pedal" x1="63" y1="74" x2="73" y2="74"/>
+      <line class="cycle-pedal" x1="63" y1="102" x2="73" y2="102"/>
+      <circle cx="68" cy="88" r="4"/>
+    </g>
+    <g>
+      <g class="cycle-thigh cycle-leg-near" style="transform-box:view-box; transform-origin:52px 46px">
+        <line x1="52" y1="46" x2="52" y2="70"/>
+        <g class="cycle-shin" style="transform-box:view-box; transform-origin:52px 70px">
+          <line x1="52" y1="70" x2="52" y2="92"/>
+          <g class="cycle-foot" style="transform-box:view-box; transform-origin:52px 92px">
+            <line x1="52" y1="92" x2="62" y2="92"/>
+          </g>
+        </g>
+      </g>
+      <g class="cycle-thigh cycle-leg-far" style="transform-box:view-box; transform-origin:52px 46px">
+        <line x1="52" y1="46" x2="52" y2="70"/>
+        <g class="cycle-shin" style="transform-box:view-box; transform-origin:52px 70px">
+          <line x1="52" y1="70" x2="52" y2="92"/>
+          <g class="cycle-foot" style="transform-box:view-box; transform-origin:52px 92px">
+            <line x1="52" y1="92" x2="62" y2="92"/>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="figure-body">
+      <circle cx="88" cy="22" r="8"/>
+      <line x1="52" y1="46" x2="82" y2="27"/>
+      <line x1="80" y1="29" x2="102" y2="50"/>
+    </g>
+  </svg>
+
+  <!-- the run: rensley's violet, crossing the lane -->
+  <g clip-path="url(#run-lane-clip)">
+    <g class="run-traveller" style="transform-box:view-box">
+      <svg x="0" y="605" width="90" height="137" viewBox="0 0 104 117" preserveAspectRatio="xMidYMax meet"
+           class="figure figure-run" style="color:#8b5cf6" aria-hidden="true" focusable="false">
+        <g class="figure-body">
+          <circle cx="62" cy="20" r="8.5"/>
+          <line x1="59" y1="28" x2="46" y2="64"/>
+        </g>
+        <g class="run-upper-arm run-arm-near" style="transform-box:view-box; transform-origin:56px 36px">
+          <line x1="56" y1="36" x2="56" y2="56"/>
+          <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
+            <line x1="56" y1="56" x2="56" y2="73"/>
+          </g>
+        </g>
+        <g class="run-upper-arm run-arm-far" style="transform-box:view-box; transform-origin:56px 36px">
+          <line x1="56" y1="36" x2="56" y2="56"/>
+          <g class="run-forearm" style="transform-box:view-box; transform-origin:56px 56px">
+            <line x1="56" y1="56" x2="56" y2="73"/>
+          </g>
+        </g>
+        <g class="run-thigh run-leg-near" style="transform-box:view-box; transform-origin:46px 64px">
+          <line x1="46" y1="64" x2="46" y2="92"/>
+          <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
+            <line x1="46" y1="92" x2="46" y2="114"/>
+            <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
+              <line x1="46" y1="114" x2="56" y2="114"/>
+            </g>
+          </g>
+        </g>
+        <g class="run-thigh run-leg-far" style="transform-box:view-box; transform-origin:46px 64px">
+          <line x1="46" y1="64" x2="46" y2="92"/>
+          <g class="run-shin" style="transform-box:view-box; transform-origin:46px 92px">
+            <line x1="46" y1="92" x2="46" y2="114"/>
+            <g class="run-foot" style="transform-box:view-box; transform-origin:46px 114px">
+              <line x1="46" y1="114" x2="56" y2="114"/>
+            </g>
+          </g>
+        </g>
+      </svg>
+    </g>
+  </g>
+</svg>

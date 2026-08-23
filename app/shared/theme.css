@@ -77,8 +77,8 @@
 
   /* one color per developer */
   --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
-  --manny:   #f59e0b;  --manny-ink:   #0a0a0a;
-  --dennis:  #10b981;  --dennis-ink:  #0a0a0a;
+  --manny:   #f59e0b;  --manny-ink:   #ffffff;
+  --dennis:  #10b981;  --dennis-ink:  #ffffff;
   --rensley: #8b5cf6;  --rensley-ink: #ffffff;
 
   /* THE READABLE COMPANION, and why a second token instead of a new hex.
@@ -103,10 +103,13 @@
    * black, and every step that helps one hurts the other. So the dark
    * blocks below move it back up and flip the ink.
    *
-   * Only Product D defines one today. The other three are recorded in
-   * docs/contrast-baseline.json with the owner who can clear them, because
-   * a developer's colour is theirs to change. */
+   * All four define one now, and docs/contrast-baseline.json is empty as a
+   * result — it was never meant to hold anything permanently. Each hue was
+   * darkened for light and left alone for dark, where it already reads. */
   --rensley-strong: #743df5;   /* 5.63:1 on white, white ink 5.63:1 */
+  --kerrian-strong: #0b63f3;   /* 5.13:1 on white, white ink 5.13:1 */
+  --manny-strong:   #996206;   /* 5.12:1 on white, white ink 5.12:1 */
+  --dennis-strong:  #0b7c56;   /* 5.21:1 on white, white ink 5.21:1 */
 
   /* STATUS IS NOT A FIFTH DEVELOPER. The colour law spends colour on
    * PEOPLE — four accents, one per builder, and never a fifth. These two
@@ -145,6 +148,15 @@
     --muted: #a3a3a3;
     --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
     --rensley-ink: #0a0a0a;
+    /* The other three identity hues already read on black (blue 5.71:1,
+       amber 9.78:1, green 8.28:1), so the companion IS the identity here.
+       Only Kerrian's ink has to flip: white on that blue is 3.68:1. */
+    --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+    --kerrian-ink: #0a0a0a;
+    --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+    --manny-ink: #0a0a0a;
+    --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
     --status-bad:  #ff7b72;     /* 8.33:1 on black */
     --status-good: #3fb950;     /* 8.27:1 on black */
   }
@@ -157,6 +169,12 @@
   --muted: #a3a3a3;
   --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
   --rensley-ink: #0a0a0a;
+  --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+  --kerrian-ink: #0a0a0a;
+  --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+  --manny-ink: #0a0a0a;
+  --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
   --status-bad:  #ff7b72;     /* 8.33:1 on black */
   --status-good: #3fb950;     /* 8.27:1 on black */
 }
@@ -180,6 +198,12 @@
 :root[data-theme="custom"][data-custom-tone="dark"] {
   --rensley-strong: #9e77f8;
   --rensley-ink: #0a0a0a;
+  --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+  --kerrian-ink: #0a0a0a;
+  --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+  --manny-ink: #0a0a0a;
+  --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
   --status-bad:  #ff7b72;
   --status-good: #3fb950;
 }
@@ -263,9 +287,9 @@ h1, h2, h3, .display, .page-head .role, .brand {
 }
 
 /* developer scoping — the color law in one class */
-.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
-.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink); }
-.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink); }
+.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); --accent-strong: var(--kerrian-strong); }
+.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink);   --accent-strong: var(--manny-strong); }
+.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink);  --accent-strong: var(--dennis-strong); }
 .product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); --accent-strong: var(--rensley-strong); }
 
 /* shared building blocks — every control a developer ships uses their accent */
