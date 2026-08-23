@@ -102,8 +102,12 @@ first edit. Gate before committing: `npm run check`. Run it with
 `npm install && npm run build && npm run start`, then open
 http://localhost:4173.
 
-Every push to `main` runs the gate and, if it passes, publishes the built site
-(`.github/workflows/pages.yml`). A red gate never reaches the live URL.
+Every pull request runs the gate, and every push to `main` runs it again and
+then publishes the built site (`.github/workflows/pages.yml`). A red gate
+never reaches the live URL. Those are two jobs on purpose: the gate claims no
+deploy permission, so it can run on a branch, while only `main` reaches the
+publishing half. Before that split there was no way to learn whether a branch
+was green except to merge it and watch the live site.
 Compiled `.js` stays out of the repo on purpose — the source is the source,
 and CI does the building.
 

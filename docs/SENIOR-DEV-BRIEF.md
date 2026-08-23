@@ -356,6 +356,7 @@ three suites:
 | `check-secrets.mjs` | credential material in any tracked file |
 | `check-sources.mjs` | a NEW tracked `.js` under `app/` — committed build output, or hand-written JavaScript no compiler reads |
 | `check-reachable.mjs` | a NEW module under `app/` that no page reaches (needs a build; types-only modules are not dead code) |
+| `check-mirrors.mjs` | an `AGENTS.md` that has stopped being a byte-equivalent mirror of its `CLAUDE.md` — the file every non-Claude assistant reads and edits |
 | `run-suites.mjs` | any of the three browser suites, run headlessly |
 
 Each gate carries `--self-test`, which plants known-bad input and proves it
