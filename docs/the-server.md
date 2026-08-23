@@ -1,8 +1,8 @@
-# The assistant service — local, and hosted
+# The studio's server — local, and hosted
 
-The studio's assistant answers from `scripts/start-haiku.mjs`: a small Node
-server that serves `app/` and answers `POST /api/chat` by calling Claude
-Haiku with the studio's key. **The key lives in that process's environment
+One Node process, `scripts/start-haiku.mjs`, does three jobs: it serves
+`app/`, it answers `POST /api/chat` for the member support assistant, and it
+guards the staff door at `/api/staff/*`. `npm start` runs it. **The key lives in that process's environment
 and nowhere else.** It is never in the repository, never in a build, never
 in the page. A browser gets an answer; it never gets the key.
 
@@ -37,6 +37,7 @@ Three environment variables are the whole configuration:
 | Variable | What it does | Default |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | The key. Set it in the host's runtime configuration — never in a file this repository tracks. | unset → `/api/chat` answers 503 and the page says so |
+| `STAFF_PASSPHRASE` | The staff door. Unset → the dashboard and the re-engagement tool show a closed door saying nobody can sign in yet. They never fail open. | unset → staff surfaces stay shut |
 | `HOST` | The interface to listen on. A host that fronts this with its own reverse proxy sets its container's interface. | `127.0.0.1` |
 | `PORT` | The port. | `4173` |
 | `ALLOWED_ORIGINS` | Comma-separated page origins allowed to call `/api/chat` from a **different** origin. Only needed when the static pages are served from one origin and this from another. | unset → same-origin only |
@@ -69,3 +70,48 @@ on the list gets no CORS header and the browser refuses the call.
 
 The browser also refuses private-member questions before any network
 request is made; that guard is Product C's and lives in its folder.
+
+
+## The staff door, and why a static host cannot open it
+
+`data/staff-records.json` holds every record that names a person — members,
+memberships, reservations, attendance. It sits OUTSIDE `app/` on purpose.
+Everything under `app/` is served at a URL, so while those records lived in
+`app/shared/fixtures.json` anyone could read them by typing the path, and a
+sign-in screen on the dashboard would only have hidden the view.
+
+Now the only route to them is `GET /api/staff/records`, and this process
+refuses it without a session it signed itself:
+
+- `POST /api/staff/session` takes a passphrase, compares it through
+  fixed-length digests so timing leaks nothing, and sets a `__Host-` prefixed
+  cookie carrying an HMAC-signed expiry. The signing key is generated per
+  process, so a restart revokes everyone and there is no key to store.
+- `__Host-` requires `Secure`, which means sign-in works over HTTPS or on
+  localhost and refuses anywhere else. A deployment on plain HTTP should fail
+  to sign in rather than hand out a session anyone on the wire can copy.
+- `app/shared/auth/staff-gate.ts` mounts the door on both staff surfaces.
+  Neither draws anything until the server says yes.
+
+**A static host publishes `app/` and runs no process.** There, `/api/staff/*`
+does not exist, the door reports exactly that, and the staff surfaces stay
+shut. That is the correct outcome, not a defect: without a process there is
+nowhere to keep a secret, so there is no honest way to open that door.
+
+The member-facing site — the timetable, booking, the front page — works fine
+on a static host. Staff surfaces need this process.
+
+## What a host has to give it
+
+The run contract is three lines and names no provider, because a provider's
+name in a repository is a fact that goes stale the day it changes:
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+Then set `ANTHROPIC_API_KEY`, `STAFF_PASSPHRASE`, `HOST` and `PORT` in that
+host's own environment, and terminate TLS in front of it. Any host that can
+run a Node process and hold environment variables can run this.

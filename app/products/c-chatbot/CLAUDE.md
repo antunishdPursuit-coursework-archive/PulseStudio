@@ -15,7 +15,7 @@ answer. The audience and the outbound answer guard come from the shared
 `assistant-audience.ts`. The deployed GitHub Pages site has no backend and
 states that conversational support is unavailable. The local server lives in
 `scripts/start-haiku.mjs`; setup is documented in
-`docs/member-support-haiku.md` by team agreement.
+`docs/the-server.md` by team agreement.
 
 ## Lane law
 
