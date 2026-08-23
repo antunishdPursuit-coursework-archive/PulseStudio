@@ -204,7 +204,14 @@ async function chat(request, response) {
     json(response, 502, { error: "Haiku returned an empty answer." });
     return;
   }
-  json(response, 200, { answer: answer.trim(), model, audience });
+  const clean = answer.trim();
+  json(response, 200, {
+    answer: clean,
+    model,
+    audience,
+    /* The page swaps in its own refusal wording when this is true. */
+    nameRefused: answerNamesAnotherMember(clean, body.self),
+  });
 }
 
 /** The one bit of CORS this needs: an allow-listed page origin, or nothing.
@@ -274,6 +281,45 @@ function serveFile(request, response) {
  * and so cannot show you who looked at what. Say that plainly rather than
  * implying an audit trail that does not exist.
  * ------------------------------------------------------------------ */
+
+/* THE NAME HALF OF THE PRIVACY GUARD LIVES HERE, WHERE THE NAMES ARE.
+ *
+ * It used to run in the browser on the member support page, which meant
+ * that page downloaded EVERY member's display name in order to protect
+ * member names — a bigger leak than the one it prevented, and against the
+ * data law besides ("members see only their own data").
+ *
+ * The answer already passes through this process, and this process already
+ * holds the roster. So the check moved here. What goes back to the page is
+ * a FLAG, never the roster and never the offending name: the page owns the
+ * wording of a refusal, this owns the decision. */
+let rosterNames = null;
+function memberDisplayNames() {
+  if (rosterNames !== null) return rosterNames;
+  try {
+    const raw = JSON.parse(readFileSync(resolve(root, "data", "staff-records.json"), "utf8"));
+    rosterNames = Array.isArray(raw.members)
+      ? raw.members.map((m) => String(m.display_name ?? "")).filter((n) => n.length > 1)
+      : [];
+  } catch {
+    /* No roster readable means no name check. Say it in the log rather
+     * than silently downgrading the guard to nothing. */
+    console.warn("Member roster unreadable: the assistant's name guard is not running.");
+    rosterNames = [];
+  }
+  return rosterNames;
+}
+
+/** True when the answer names a member who is not the person asking. */
+function answerNamesAnotherMember(answer, ownName) {
+  const own = typeof ownName === "string" ? ownName.trim().toLowerCase() : "";
+  const haystack = answer.toLowerCase();
+  return memberDisplayNames().some((name) => {
+    const needle = name.toLowerCase();
+    if (needle === own) return false;
+    return haystack.includes(needle);
+  });
+}
 
 const staffPassphrase = process.env["STAFF_PASSPHRASE"] ?? "";
 

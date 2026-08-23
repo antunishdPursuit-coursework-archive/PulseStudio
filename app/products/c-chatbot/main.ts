@@ -1,4 +1,4 @@
-import type { FixtureSet } from "../../shared/contract.js";
+import type { PublicFixtures } from "../../shared/contract.js";
 import { loadFixtures } from "../../shared/data.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
 import { readPulseSession } from "../../shared/auth/session.js";
@@ -33,7 +33,7 @@ greeting.textContent = policy.greeting;
 scope.textContent = policy.scope;
 input.maxLength = QUESTION_MAX_LENGTH;
 
-let fixtures: FixtureSet | null = null;
+let fixtures: PublicFixtures | null = null;
 
 function studioDate(timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -55,12 +55,22 @@ function isChatResponse(value: unknown): value is { answer: string } {
   );
 }
 
-async function haikuAnswer(question: string, records: FixtureSet): Promise<string> {
+/* Returns the answer AND the server's verdict on whether it named another
+   member. The decision is the server's — it holds the roster; the wording
+   of a refusal stays here, where the audience policy lives. */
+async function haikuAnswer(
+  question: string,
+  records: PublicFixtures,
+  self: string | null,
+): Promise<{ answer: string; nameRefused: boolean }> {
   const response = await fetch(CHAT_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       question,
+      /* The asker's OWN name, so the server's roster check never refuses a
+         person for hearing their own name back. Nothing else about them. */
+      self,
       context: safeStudioContext(records, studioDate(records.timezone), Date.now()),
     }),
   });
@@ -68,7 +78,10 @@ async function haikuAnswer(question: string, records: FixtureSet): Promise<strin
   if (!response.ok || !isChatResponse(result)) {
     throw new Error("Conversational member support is unavailable.");
   }
-  return result.answer;
+  return {
+    answer: result.answer,
+    nameRefused: (result as { nameRefused?: unknown }).nameRefused === true,
+  };
 }
 
 function addMessage(text: string, role: "user" | "assistant"): void {
@@ -101,22 +114,16 @@ form.addEventListener("submit", async (event) => {
   form.setAttribute("aria-busy", "true");
   status.textContent = "Checking the current studio information.";
   try {
-    const answer = await haikuAnswer(question, fixtures);
-    /* THE NAME HALF OF THE GUARD NEEDS NAMES TO CHECK AGAINST, and this
-     * used to call answerProblems() with none — so only the staff-
-     * vocabulary patterns ever fired, and a member's name slipping into a
-     * reply (however it got there; the model is not asked for one, but a
-     * guard that only works when nothing goes wrong is not a guard) would
-     * have reached the screen unchecked. The context sent to the model
-     * never carries a member record, but the guard runs on the TEXT that
-     * comes back, so it needs the studio's own roster to compare against —
-     * every signed-in member's own is excluded, never refused for saying
-     * their own name back to them. */
-    const otherMemberNames = fixtures.members
-      .map((member) => member.display_name)
-      .filter((name) => name !== session?.display_name);
+    const { answer, nameRefused } = await haikuAnswer(question, fixtures, session?.display_name ?? null);
+    /* THE GUARD IS IN TWO HALVES, IN TWO PLACES, EACH WHERE ITS EVIDENCE
+     * IS. The staff-vocabulary half runs here on the finished text. The
+     * NAME half runs on the server, because it needs the studio's roster
+     * and this is a member-facing page — downloading every member's name in
+     * order to protect member names was a bigger leak than the one it
+     * prevented, and the data law forbids it outright. The server sends
+     * back a verdict, never the roster and never the name it matched. */
     addMessage(
-      answerProblems(answer, policy, otherMemberNames).length > 0 ? policy.refusal : answer,
+      nameRefused || answerProblems(answer, policy, []).length > 0 ? policy.refusal : answer,
       "assistant",
     );
     status.textContent = recordStatus(fixtures, Date.now(), true);

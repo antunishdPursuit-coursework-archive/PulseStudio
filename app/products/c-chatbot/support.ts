@@ -9,7 +9,7 @@
  * arguments; tests.ts reaches each one with a known answer.
  */
 
-import type { ClassSession, FixtureSet, StudioPolicy } from "../../shared/contract.js";
+import type { ClassSession, PublicFixtures, StudioPolicy } from "../../shared/contract.js";
 import { counted } from "../../shared/text.js";
 
 /** Curly apostrophes become straight ones BEFORE any pattern runs, so the
@@ -85,7 +85,7 @@ export interface SafeStudioContext {
   studio_policies: StudioPolicy[];
 }
 
-export function safeStudioContext(records: FixtureSet, currentDate: string, now: number): SafeStudioContext {
+export function safeStudioContext(records: PublicFixtures, currentDate: string, now: number): SafeStudioContext {
   return {
     timezone: records.timezone,
     current_date: currentDate,
@@ -108,7 +108,7 @@ export function safeStudioContext(records: FixtureSet, currentDate: string, now:
 
 /** The counted status line, from the same selection the model receives —
  *  the two once disagreed because each filtered on its own. */
-export function recordStatus(records: FixtureSet, now: number, conversationAvailable: boolean): string {
+export function recordStatus(records: PublicFixtures, now: number, conversationAvailable: boolean): string {
   const sessions = records.class_sessions.filter((session) => upcoming(session, now)).length;
   const policies = records.studio_policies.filter((policy) => policy.is_current).length;
   const what = `${counted(sessions, "upcoming class", "upcoming classes")} and ${counted(policies, "current policy", "current policies")}`;

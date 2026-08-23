@@ -70,14 +70,39 @@ export interface StudioPolicy {
   is_current: boolean;
 }
 
-export interface FixtureSet {
+/* THE RECORDS ARE ONE VOCABULARY IN TWO FILES, AND THE TYPES SAY WHICH.
+ *
+ * Everything under app/ is served at a URL. So the records that NAME A
+ * PERSON live in data/staff-records.json, outside app/, behind
+ * /api/staff/records; the rest stay in app/shared/fixtures.json where any
+ * visitor may read them.
+ *
+ * These are separate types because a single one LIED. FixtureSet used to
+ * declare `members` while loadFixtures() had stopped returning them, so
+ * `fixtures.members.map(...)` type-checked and threw in the browser — dead
+ * quiet at compile time, broken on the screen. Split, the compiler catches
+ * the read instead of the customer. */
+
+/** What loadFixtures() returns: the timetable, who teaches, the policies.
+    Public by design — this is what a member needs to browse and book. */
+export interface PublicFixtures {
   timezone: string;
   note: string;
-  members: Member[];
-  memberships: Membership[];
   instructors: Instructor[];
   class_sessions: ClassSession[];
-  reservations: Reservation[];
-  attendance: Attendance[];
   studio_policies: StudioPolicy[];
 }
+
+/** What /api/staff/records returns, to an authenticated staff session only.
+    Every field here names a person. */
+export interface StaffRecords {
+  members: Member[];
+  memberships: Membership[];
+  reservations: Reservation[];
+  attendance: Attendance[];
+}
+
+/** Both halves together — the studio's complete record set. The synthetic
+    engine builds one of these, the fixture gate validates one, and nothing
+    ever FETCHES one in a single request. */
+export interface FixtureSet extends PublicFixtures, StaffRecords {}
