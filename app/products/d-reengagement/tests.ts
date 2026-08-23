@@ -17,6 +17,7 @@ import {
   findRoutine, loadLibrary, normalizeClassInterest, routineProblems, routinesForInterest,
 } from "./routines.js";
 import type { HomeRoutine } from "./routines.js";
+import { NOT_REVIEWED, ROUTINE_LIBRARY, SAFETY_NOTICE } from "./routine-library.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
@@ -4535,6 +4536,45 @@ check("clean records produce no data-quality line",
   const noneApproved = loadLibrary([routine({ id: "routine-x", status: "draft" })]);
   check("a library with nothing approved offers nothing",
     approvedRoutines(noneApproved).length, 0);
+
+  /* --- THE SHIPPED LIBRARY: well-formed, and approved by nobody ---
+   *
+   * Nothing in routine-library.ts has been read by a qualified person, so
+   * nothing in it may reach a member. These checks are what stop that
+   * changing by accident: a status flipped to "approved" without a name
+   * against it fails here, which is the one mistake this file invites. */
+  const shipped = loadLibrary(ROUTINE_LIBRARY);
+  check("the shipped library is well-formed", shipped.problems, []);
+  check("...and it is not empty, so these checks mean something",
+    shipped.routines.length >= 3, true);
+  check("NOTHING in the shipped library is approved",
+    approvedRoutines(shipped).length, 0);
+  check("every shipped routine is a draft",
+    shipped.routines.every((r) => r.status === "draft"), true);
+  /* A draft naming a person would be an approval nobody gave.
+   *
+   * PINNED TO THE LITERAL, NOT TO THE IMPORTED CONSTANT. The first version
+   * compared approvedBy against NOT_REVIEWED — both defined in the file
+   * under test — so renaming the placeholder to a person's name changed
+   * both sides together and the check passed. A check that moves with the
+   * thing it is checking cannot fail. Measured: that plant scored 0
+   * failures until this line stopped going through the import. */
+  check("the placeholder still says nobody reviewed it",
+    NOT_REVIEWED, "Not reviewed — draft content");
+  check("no shipped routine names an approver",
+    shipped.routines.every((r) => r.approvedBy === "Not reviewed — draft content"), true);
+  check("every shipped routine carries the safety notice",
+    shipped.routines.every((r) => r.safetyNotice === SAFETY_NOTICE), true);
+  check("the safety notice says it is not individualised medical advice",
+    SAFETY_NOTICE.includes("Not individualised medical advice"), true);
+  /* Language the owner ruled out: none of it may appear in shipped content. */
+  const shippedText = JSON.stringify(ROUTINE_LIBRARY).toLowerCase();
+  for (const banned of ["recommended for", "best for", "safe for you", "personalized", "personalised", "treatment", "recovery plan", "clinically"]) {
+    check(`shipped content never says "${banned}"`, shippedText.includes(banned), false);
+  }
+  /* No shipped routine may resolve by URL while it is a draft. */
+  check("no shipped routine resolves by id yet",
+    shipped.routines.every((r) => findRoutine(shipped, r.id) === null), true);
 }
 
 /* EVERY CHECK MUST RUN BEFORE THE VERDICT IS COUNTED. The routine block was
