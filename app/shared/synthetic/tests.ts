@@ -1154,6 +1154,73 @@ for (const file of ENGINE_SOURCES) {
   check("...and it is not merely the capacity", m("peakSessionAttendance") > 0, true);
 }
 
+/* THE MARK MAY MOVE ONLY FOR PEOPLE WHO HAVE NOT ASKED IT NOT TO.
+ *
+ * The pulse mark carries a guarded animation: a spark travels the line, and
+ * everything that moves lives inside a prefers-reduced-motion: no-preference
+ * block in theme.css. These checks read the shipped sources the way the
+ * engine audit above does, and pin the three ways that promise could rot:
+ * the animation escaping the guard, the resting state depending on the
+ * animation, and the mark acquiring script it must never have. */
+{
+  const themeCss = await (await fetch("../theme.css")).text();
+  check("theme.css was actually read", themeCss.length > 200, true);
+
+  /* Every animation of the runner sits AFTER the reduced-motion guard. The
+   * base .pulse-mark-runner rule (opacity 0 — the resting state) sits
+   * before it, which is what makes rest the default rather than a fallback. */
+  const guard = themeCss.indexOf("@media (prefers-reduced-motion: no-preference)");
+  const lastGuard = themeCss.lastIndexOf("@media (prefers-reduced-motion: no-preference)");
+  check("theme.css has the reduced-motion guard", guard >= 0, true);
+  const restingRule = themeCss.indexOf(".pulse-mark-runner { opacity: 0; }");
+  check("the runner rests invisible, outside any guard",
+    restingRule >= 0 && restingRule < lastGuard, true);
+  const animLines = [...themeCss.matchAll(/animation:[^;]*pulse-mark-run/g)].map((m) => m.index ?? -1);
+  check("the mark's animation exists", animLines.length > 0, true);
+  check("...and every occurrence of it sits inside the guarded region",
+    animLines.every((i) => i > lastGuard), true);
+  /* The keyframes never touch transform or layout — stroke and opacity only,
+   * which is what "no layout movement" means as a greppable property.
+   *
+   * THE FIRST VERSION OF THIS CHECK COULD NOT FAIL. With the @keyframes
+   * block deleted, indexOf returns -1, slice(-1) returns the file's last
+   * character, and the regex correctly finds no transform in one character —
+   * so a DEAD animation (a dangling animation: reference to keyframes that
+   * no longer exist, which CSS silently no-ops) shipped green through all
+   * five checks. A review agent proved it by simulation. The existence
+   * check below is what makes the content check able to fail at all. */
+  const framesAt = themeCss.indexOf("@keyframes pulse-mark-run");
+  check("the keyframes the animation names actually exist", framesAt >= 0, true);
+  const frames = framesAt >= 0 ? themeCss.slice(framesAt) : "";
+  const frameEnd = frames.indexOf("}\n}");
+  check("...and the keyframes block closes", frameEnd >= 0, true);
+  const frameBlock = frameEnd >= 0 ? frames.slice(0, frameEnd + 3) : "";
+  check("...and it is not empty", frameBlock.length > 40, true);
+  check("the animation moves stroke and opacity, never transform or size",
+    /transform|width|height|margin|top|left/.test(frameBlock), false);
+
+  /* The mark's own modules: no inline handlers, no HTML injection, no
+   * script inside the svg. textContent-and-attributes only. */
+  for (const file of ["../components/logo.ts", "../components/brand-header.ts"]) {
+    const source = await (await fetch(file)).text();
+    check(`${file} was actually read`, source.length > 200, true);
+    check(`${file} sets no inline event handler`,
+        /setAttribute\(["']on/i.test(source), false);
+    check(`${file} never writes HTML as a string`,
+      /innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(source), false);
+  }
+
+  /* Every page wired to theme-boot gets an icon: the ensure function exists,
+   * targets rel icon, and resolves the shared file relative to the module
+   * rather than to whatever page happens to be open. */
+  const boot = await (await fetch("../theme-boot.ts")).text();
+  check("theme-boot ensures a favicon", boot.includes("function ensureFavicon"), true);
+  check("...only when the page declares none",
+    boot.includes('querySelector(\'link[rel~="icon"]\')'), true);
+  check("...resolved relative to the module, not the page",
+    boot.includes('new URL("../favicon.svg", import.meta.url)'), true);
+}
+
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.
  *
  * validate.ts skips attendance dated on the as-of date — `day >= asOfDay

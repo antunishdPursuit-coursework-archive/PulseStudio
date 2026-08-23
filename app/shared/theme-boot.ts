@@ -376,6 +376,29 @@ function mountAppearanceControl(): void {
   refresh();
 }
 
+/* EVERY PAGE GETS AN ICON, whether or not its markup declares one. Four
+ * product pages ship no <link rel="icon">, so every browser that opens them
+ * asks for /favicon.ico and logs a 404 against an icon the site actually
+ * has. The durable fix is the one-line link in each owner's head — named in
+ * docs/TASKS.md — but the 404 is fleet-wide TODAY, and this module already
+ * runs on every page WIRED TO IT, so it closes the gap for those: resolve the shared
+ * icon relative to THIS file (which lives beside it), and only when no icon
+ * link exists, so an owner's own line always wins.
+ *
+ * THE HONEST LIMIT: b-dashboard/staff-dashboard.html loads no theme-boot at
+ * all, so nothing here reaches it — it keeps its 404 until its owner adds
+ * either the script or the link. This comment said "every page" until a
+ * review caught it naming a page this module never touches. */
+function ensureFavicon(): void {
+  if (document.querySelector('link[rel~="icon"]') !== null) return;
+  const link = document.createElement("link");
+  link.rel = "icon";
+  link.type = "image/svg+xml";
+  link.href = new URL("../favicon.svg", import.meta.url).href;
+  document.head.append(link);
+}
+
+ensureFavicon();
 initialTheme();
 mountAppearanceControl();
 
