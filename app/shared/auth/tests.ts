@@ -20,6 +20,7 @@ import {
 } from "./session.js";
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudioMembers } from "./studio.js";
+import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 
 type Check = { name: string; run: () => string | true };
 const checks: Check[] = [];
@@ -609,6 +610,71 @@ check("...while a staff session survives, having no member to go stale", () => {
   writePulseSession(FRONT_DESK);
   return eq(currentSession()?.role, "staff");
 });
+
+/* ------------------------------------------------------------------ */
+/* Who the assistant is talking to                                      */
+/* ------------------------------------------------------------------ */
+
+/* THE DATA LAW, AT THE ONE PLACE MOST LIKELY TO BREAK IT. An assistant that
+ * answers from studio records is the easiest surface in this repo on which
+ * to show a member somebody else's roster by accident. These checks pin the
+ * asymmetry that makes that hard: placement can NARROW what may be said and
+ * can never widen it, so a member on a staff page is still a member. */
+
+check("staff answers need a staff page AND a staff person", () =>
+  eq(audienceFor("staff", "staff-facing"), "staff"));
+check("a member on a staff page is still a member", () =>
+  eq(audienceFor("member", "staff-facing"), "member"));
+/* The one people get wrong: the screen may be turned toward a member, so a
+ * staff person on a member-facing page gets member answers. */
+check("a staff person on a member page gets member answers", () =>
+  eq(audienceFor("staff", "member-facing"), "member"));
+check("nobody signed in is a member audience", () =>
+  eq(audienceFor(null, "staff-facing"), "member"));
+
+check("a member policy may not use staff records", () =>
+  eq(audiencePolicy("member", "member-facing").mayUseStaffRecords, false));
+check("...nor name another member", () =>
+  eq(audiencePolicy("member", "member-facing").mayNameOtherMembers, false));
+check("a staff policy may do both", () => {
+  const p = audiencePolicy("staff", "staff-facing");
+  return eq([p.mayUseStaffRecords, p.mayNameOtherMembers].join(","), "true,true");
+});
+check("the greeting uses a first name only when there is one", () =>
+  eq(audiencePolicy("member", "member-facing", "Ada").greeting.startsWith("Hi Ada"), true));
+check("...and assumes nothing about an unsigned reader", () =>
+  eq(audiencePolicy(null, "member-facing").greeting.includes("Hi "), false));
+/* A refusal states what it checked rather than shrugging. */
+check("a refusal says where the answer would have come from", () =>
+  eq(audiencePolicy("member", "member-facing").refusal.includes("studio's records"), true));
+
+/* The outgoing guard. Deciding the audience is the easy half; the failure
+ * mode is an answer composed for staff reaching a member's screen after the
+ * decision was made. */
+check("a member's answer may not name another member", () =>
+  eq(answerProblems("Priya Patel has not been in for a while.",
+    audiencePolicy("member", "member-facing"), ["Priya Patel"]).length > 0, true));
+check("...and matching ignores case", () =>
+  eq(answerProblems("ask priya patel about it",
+    audiencePolicy("member", "member-facing"), ["Priya Patel"]).length > 0, true));
+check("a member's answer may not carry roster vocabulary", () =>
+  eq(answerProblems("Twelve booked and three no-shows.",
+    audiencePolicy("member", "member-facing")).length > 0, true));
+check("...nor cancellation risk", () =>
+  eq(answerProblems("She is at-risk of cancelling.",
+    audiencePolicy("member", "member-facing")).length > 0, true));
+check("...nor fill rate", () =>
+  eq(answerProblems("That class has a low fill rate.",
+    audiencePolicy("member", "member-facing")).length > 0, true));
+/* An ordinary member answer passes, or the guard would refuse everything and
+ * prove nothing. */
+check("an ordinary member answer passes the guard", () =>
+  eq(answerProblems("Yoga is on Thursday at 9:00 AM, and there are spots left.",
+    audiencePolicy("member", "member-facing"), ["Priya Patel"]), []));
+/* Staff are allowed all of it — that is the whole point of the flag. */
+check("staff answers are not filtered", () =>
+  eq(answerProblems("Priya Patel: three no-shows, at-risk.",
+    audiencePolicy("staff", "staff-facing"), ["Priya Patel"]), []));
 
 const results = checks.map(({ name, run }) => {
   let verdict: string | true;

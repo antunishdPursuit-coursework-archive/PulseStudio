@@ -293,6 +293,12 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .status { color: var(--muted); border-left: 4px solid var(--accent, var(--line)); padding-left: 12px; }
 
 .appearance-control { position: relative; }
+/* The settings door reads as a word, not a symbol. The mark is decorative and
+   the label is what a person looks for; on a narrow screen the label is what
+   survives, because a lone glyph is what made this hard to find. */
+.appearance-control summary { display: inline-flex; align-items: center; gap: 6px; }
+.settings-mark { font-size: 1.05em; line-height: 1; }
+.settings-label { font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em; }
 .appearance-control summary {
   display: grid;
   place-items: center;
