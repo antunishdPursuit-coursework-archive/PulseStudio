@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/shared/og-image.svg" alt="Pulse Studio" width="620">
+  <img src="app/shared/readme-banner.svg" alt="Pulse Studio" width="620">
 </p>
 
 # Pulse Studio
