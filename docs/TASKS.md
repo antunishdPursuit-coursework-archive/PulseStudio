@@ -82,21 +82,12 @@ never the roster, never the name it matched.
 
 ## Rensley — Product D
 
-**1. Get a qualified person to approve routine content.** All three routines
+**Get a qualified person to approve routine content.** All three routines
 ship as `draft`, so the panel reads "0 approved routines. Nothing to include
 yet." That is correct and it is not finished. **This one cannot be closed by
 whoever is writing the code** — it needs somebody qualified to sign off on
 exercise content going to members. Naming that here rather than quietly
 flipping a flag.
-
-**2. Enter and Space on the routine controls: still unverified, honestly.**
-Measured this round: they are native `<details>`/`<summary>`, they toggle on
-click, nothing intercepts keys, and the summary takes focus with `tabIndex 0`
-— which is every precondition for native keyboard activation. What could not
-be produced is a TRUSTED key event; automation delivers a synthetic one, and
-a synthetic keypress does not drive native `<details>` behaviour. So the
-preconditions are verified and the activation is not. It stays on this list
-until somebody presses the key with a finger.
 
 ---
 
