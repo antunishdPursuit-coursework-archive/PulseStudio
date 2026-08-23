@@ -101,8 +101,8 @@
     .lift-arms { transform: scaleY(0.86); }
     .lift-bar { transform: translateY(4.5px); }
     .row-torso { transform: rotate(8deg); }
-    .row-thigh { transform: rotate(-18deg); }
-    .row-shin { transform: rotate(52deg); }
+    .row-thigh { transform: rotate(58deg); }
+    .row-shin { transform: rotate(-58deg); }
     .row-foot { transform: rotate(-14deg); }
     .cycle-leg-near { transform: rotate(-26deg); }
     .cycle-leg-far { transform: rotate(8deg); }
@@ -154,12 +154,12 @@
         100%    { transform: rotate(0deg); }
       }
       @keyframes row-thigh-drive {
-        0%, 40% { transform: rotate(-18deg); }
+        0%, 40% { transform: rotate(58deg); }
         75%     { transform: rotate(4deg); }
         100%    { transform: rotate(-18deg); }
       }
       @keyframes row-shin-drive {
-        0%, 40% { transform: rotate(52deg); }
+        0%, 40% { transform: rotate(-58deg); }
         75%     { transform: rotate(-4deg); }
         100%    { transform: rotate(52deg); }
       }
