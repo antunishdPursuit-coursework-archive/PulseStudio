@@ -15,7 +15,12 @@ the builder's name stays off the page). Signed-in members see "Your
 classes" above the public schedule, with a next-class line when they hold
 a reserved spot. Day chips say Today / Tomorrow. Book / waitlist / cancel
 with a full guard chain, automatic waitlist promotion, and `?session=<id>`
-deep links.
+deep links — a link whose class is no longer on the schedule states the
+miss through the shared alert region instead of falling back in silence.
+A class leaves the schedule the moment it starts (the studio's clock, not
+the visitor's), a member whose membership is not active is told so in
+place of the Book button, and Cancel states the studio's current
+cancellation policy and asks for a confirming second press.
 Occupancy is the generator's own bookings plus rows the signed-in member
 (or waitlist promotion) writes — never a random fill on first open. No
 server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
@@ -32,8 +37,10 @@ server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
 
 | File | What it is |
 | --- | --- |
-| `main.ts` | All product logic: schedule, booking rules, capacity math, waitlist promotion, session-gated UI |
-| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save, `latestReservation()` (last row wins) |
+| `rules.ts` | The booking rules, with no DOM and no clock: schedule cutoff, capacity math, the guard chains, waitlist promotion, the studio-local stamp. Everything comes in as arguments so the suite can hold it |
+| `main.ts` | The page: reads the log and the studio clock once per render, hands both to the rules, renders what comes back, restores keyboard focus after each re-render |
+| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save through the shared guarded doors (`app/shared/storage.ts`), `latestReservation()` (last row wins) |
+| `tests.ts` + `tests.html` | The unit checks — the brief's acceptance list held for real, "now" pinned so verdicts never drift. Open tests.html, read the count in `#summary` |
 | `index.html` | The page shell; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
 | `styles.css` | Product-local styling; every color is a theme token |
 
@@ -63,7 +70,10 @@ The upgrade path, whenever Kerrian wants it: switch to
 - **Times are studio-local wall clocks with no offset.** Formatters append
   `Z` and use `timeZone: "UTC"` so the written hour prints as written,
   including in winter. Day chips use `dataset.meta.asOfDate` for Today /
-  Tomorrow. Do not reintroduce a hardcoded `-04:00`.
+  Tomorrow. Do not reintroduce a hardcoded `-04:00`. The log is STAMPED
+  studio-local too — `studioNowTimestamp()` in rules.ts formats in
+  `dataset.meta.timezone`; rows written before 2026-08-23 carry the old
+  UTC stamps, up to five hours ahead of the studio's clock.
 
 Do not restore first-open occupancy seeding. An empty
 `pulse-reservations-a` means nobody has booked from this browser yet; D

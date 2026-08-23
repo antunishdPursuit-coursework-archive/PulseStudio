@@ -1,8 +1,8 @@
 # Product A: Member Booking App
 
 **Owner:** Kerrian
-**Phase:** Problem framing
-**Evidence level:** Planned
+**Phase:** Shipped — first release
+**Evidence level:** Running code, checked by `app/products/a-booking/tests.html`
 
 ## First user and outcome
 
@@ -22,9 +22,17 @@ class and reserve a spot when capacity is available. After booking, the member
 can see their own reservation and confirmation; the MVP does not expose other
 members' names, bookings, or attendance.
 
-For the shared-fixture first release, the team must decide how the signed-in
-member is selected without building a full authentication system. Real authentication is outside
-this first increment unless the team explicitly approves it.
+For the shared-fixture first release, the signed-in member comes from the
+shared `pulse-session` contract (`app/shared/auth/session.ts`) — the top-bar
+sign-in every product reads. Booking identity is the member ids of
+`sharedStudio()`, the same generator call the sign-in dialog lists. Real
+authentication remains outside this increment.
+
+When a scheduled class has no spots left, a signed-in member may join the
+waitlist. Canceling a reserved spot promotes the earliest waitlisted member
+automatically. A member holds at most one row per session: booked, waitlisted,
+or canceled, last row wins. A member whose membership is not active is told so
+in place of the Book button and cannot take a seat.
 
 ## Golden path
 
@@ -59,11 +67,17 @@ not reveal member-specific data.
 
 ## Non-goals for this increment
 
-Payments, membership signup, full production authentication, waitlists,
+Payments, membership signup, full production authentication,
 automated reminders, recurring bookings, and attendance tracking are not part
 of the first fixture-backed MVP.
 
 ## Open decisions for Kerrian and the team
 
-Agree on the member-selection method, whether availability counts are
-public, the cancellation rule, and whether waitlists are deferred entirely.
+The cancellation rule. Today the code lets a member cancel any time — the
+Cancel button states the studio's current cancellation policy and asks for a
+confirming second press, but no cutoff is enforced, because the policy record
+carries the rule only as prose. Enforcing it needs a machine-readable cutoff
+on the shared policy record, which is a team decision. The other three
+decisions this section used to hold are settled in shipped code: member
+selection is the shared `pulse-session`, availability counts are public, and
+waitlists ship with automatic promotion.
