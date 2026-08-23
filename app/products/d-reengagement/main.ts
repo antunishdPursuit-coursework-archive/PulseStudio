@@ -60,6 +60,8 @@ import {
   type KeptRows,
   type OutreachRecord,
   type SuppressionRecord,
+  draftWithRoutine,
+  routineUrl,
 } from "./outreach.js";
 
 /** Find a required element up front, loudly — a missing mount point is a
@@ -424,7 +426,14 @@ function renderFlagged(
     return card;
   }
 
-  const draft = buildDraftText(f, data, today);
+  /* The draft a staff member copies, with the routine they chose appended
+   * underneath it. Nothing is appended when nothing was chosen, which is
+   * the default and stays the common case. */
+  const chosen = chosenRoutineFor(f.member.member_id);
+  const baseDraft = buildDraftText(f, data, today);
+  const draft = chosen === null
+    ? baseDraft
+    : draftWithRoutine(baseDraft, chosen.title, routineUrl(brand.studioUrl, chosen.id));
   const draftBlock = document.createElement("pre");
   draftBlock.className = "draft";
   draftBlock.textContent = draft;

@@ -18,6 +18,7 @@ import {
 } from "./routines.js";
 import type { HomeRoutine } from "./routines.js";
 import { NOT_REVIEWED, ROUTINE_LIBRARY, SAFETY_NOTICE } from "./routine-library.js";
+import { draftWithRoutine, routineUrl } from "./outreach.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
@@ -4614,6 +4615,35 @@ check("clean records produce no data-quality line",
   check("...and explains why there is no filter",
     unknownView.filterLabel, "No class interest recorded — showing all approved routines");
   check("...and does not offer a filter control", unknownView.filterAvailable, false);
+  /* --- adding a routine to the draft --- */
+  const plainDraft = "Hi Ada – it's been 20 days since your last yoga class.";
+  const url = routineUrl("https://studio.example/", "routine-morning-mobility");
+  check("the routine address carries the id and nothing else",
+    url, "https://studio.example/products/d-reengagement/routine.html?r=routine-morning-mobility");
+  check("a studio address without a trailing slash still builds one address",
+    routineUrl("https://studio.example", "routine-a"),
+    "https://studio.example/products/d-reengagement/routine.html?r=routine-a");
+  /* NO MEMBER TRAVELS IN THE ADDRESS. Two members sent the same routine must
+   * get the identical page, so the id is the only thing in it. */
+  check("the routine address carries no member identity",
+    /member|m_\\d|ada|quiet|days/i.test(url), false);
+
+  const withRoutine = draftWithRoutine(plainDraft, "Morning mobility", url);
+  check("the draft keeps every word it already had",
+    withRoutine.startsWith(plainDraft), true);
+  check("the routine is offered, never prescribed",
+    withRoutine.includes("One of our approved at-home routines, if you would like it:"), true);
+  check("the appended text names the routine and its address",
+    withRoutine.endsWith(`Morning mobility\n${url}`), true);
+  /* The appended half must not smuggle a claim the records cannot support. */
+  check("the appended text claims nothing about the member",
+    /recommend|best for|safe for|suits you|personali[sz]ed|because you/i.test(
+      withRoutine.slice(plainDraft.length)), false);
+  /* AND THE REGRESSION THAT MATTERS MOST: a draft with no routine is the
+   * draft D produced before any of this existed. Outreach stays useful
+   * without one. */
+  check("without a routine the draft is untouched", plainDraft, plainDraft);
+
   check("one approved routine reads as singular",
     routinePanelView(loadLibrary([routine({ id: "routine-1", status: "approved" })]), UNKNOWN_INTEREST, false).heading,
     "1 approved routine");

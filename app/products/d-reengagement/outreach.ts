@@ -18,6 +18,33 @@ import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
 import { dayNumberFromIso, firstNameOf, joinSentence, type FlaggedMember } from "./logic.js";
 
+/** Where a routine lives, for a member who wants to open it.
+ *
+ *  GENERIC BY CONSTRUCTION. The address carries a routine id and nothing
+ *  else — no member id, no name, no attendance figure — so two members sent
+ *  the same routine open the identical page, and the page cannot know who
+ *  is reading it. The personal words stay in the copied message, which
+ *  travels between two people and never touches this site. */
+export function routineUrl(studioUrl: string, routineId: string): string {
+  const base = studioUrl.endsWith("/") ? studioUrl : `${studioUrl}/`;
+  return `${base}products/d-reengagement/routine.html?r=${encodeURIComponent(routineId)}`;
+}
+
+/** The copied draft with a routine added underneath it.
+ *
+ *  ONLY A TITLE AND AN ADDRESS. Not a reason it was chosen, not a claim it
+ *  suits anybody — a staff member picked it, and the sentence says so
+ *  plainly. The draft is unchanged when no routine was chosen, and a check
+ *  pins that byte-for-byte, because outreach has to stay useful without
+ *  one. */
+export function draftWithRoutine(
+  draft: string,
+  routineTitle: string,
+  url: string,
+): string {
+  return `${draft}\n\nOne of our approved at-home routines, if you would like it:\n${routineTitle}\n${url}`;
+}
+
 export interface OutreachRecord {
   memberId: string;
   /** Identity of the LAPSE, not the member: memberId + the last-attended
