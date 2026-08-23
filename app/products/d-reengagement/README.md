@@ -96,6 +96,10 @@ never what a machine did.
 | `generate.ts` | Seeded studio generator — see the tool at real scale, reproducibly |
 | `logic.ts` | Pure rule functions — no DOM, no clock, no fetch; "today" is a parameter |
 | `outreach.ts` | The outreach discipline, pure: once per lapse, do-not-contact, consent window, opt-in — and the closed loop that judges every note against the records |
+| `live-studio.ts` | The running-studio door: the shared studio plus Booking's own reservation log, read from this browser and never written |
+| `routines.ts` | The at-home routine vocabulary: types, validation, the exact-match class-interest aliases, the one canonical order, and what the panel shows |
+| `routine-library.ts` | The routines themselves. Every entry is a DRAFT — nothing here has been approved by a qualified person, so nothing reaches a member |
+| `routine-page.ts` / `routine.html` | The one page a member may open: a generic routine, with no member, attendance, membership or outreach information on it or in its address |
 | `main.ts` | The page: loads shared records, renders flags, evidence, drafts |
 | `styles.css` | Violet-on-black/white styling over the shared theme tokens |
 | `tests.ts` / `tests.html` | Browser-run unit checks with a pinned reference date |

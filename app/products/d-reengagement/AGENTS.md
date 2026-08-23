@@ -154,6 +154,45 @@ people, and an email keeps its dots. Canonical equivalence and whitespace
 are not judgements about who somebody is; they are one string wearing
 different bytes.
 
+## At-home routines: curated content, never a claim about a member
+
+Added 2026-08-22. Staff may include one approved routine beside an outreach
+draft. The rule that governs every line of it: **a routine is not a fact
+about a member.** No field in these records says what physical activity
+suits anybody, so the code is built so D cannot make that claim.
+
+- **It filters, it never ranks.** `routinesForInterest` returns the approved
+  list with entries removed, in canonical order, and a check asserts the
+  subsequence property. A filtered list that came back reordered would be a
+  recommendation wearing a filter's coat.
+- **It never selects.** A person picks. Nothing defaults to a routine.
+- **The only link to a member is observed class interest** — that they
+  attended yoga, which the records do say. Never age, membership tier,
+  booking behaviour, instructor, or how far attendance has fallen.
+- **Matching is exact.** `normalizeClassInterest` folds through the same
+  `identityKey` the CSV door uses, then looks the name up. "Vinyasa Flow" is
+  unknown until somebody writes the alias down. Unknown shows everything and
+  says why.
+- **Nothing is approved.** Every library entry is a draft, so the panel reads
+  "0 approved routines. Nothing to include yet." Approving one means changing
+  the words if they need it, a real name, and the status — together. Changing
+  the status alone is the mistake the checks exist to make loud, and
+  `approvedBy` is pinned to a literal so it cannot drift into a name.
+- **`approvedAt` is an assertion, not decoration.** It claims a person read
+  that text on that day. Editing a step, an instruction, a difficulty or the
+  safety notice invalidates it: set the status back to draft. No gate can
+  enforce that — it is a review rule, and the honest limit is that
+  `approvedBy` is a label typed by whoever edited the file, since this repo
+  has no staff identity system.
+- **The routine page knows nothing about anybody.** It reads an id from the
+  address and renders that routine. Drafts answer exactly like unknown ids so
+  the address cannot be used to discover unapproved content; retired ones
+  still resolve, because somebody may hold an old link.
+- **The ledger gained one optional field, not an event.** `routineId` is an
+  attribute of the note that was taken. A separate `routine_included` row
+  would have been read as outreach by `outreachStateFor` and could have
+  suppressed a legitimate note.
+
 ## Composite keys are NESTED here, never joined with a separator
 
 Two maps in this product key on more than one value, and both learned the
