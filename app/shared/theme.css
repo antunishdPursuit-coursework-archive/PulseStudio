@@ -319,46 +319,45 @@ h1, h2, h3, .display, .page-head .role, .brand {
 /* status lines state what ran — a stated result, never a blank panel */
 .status { color: var(--muted); border-left: 4px solid var(--accent, var(--line)); padding-left: 12px; }
 
-.appearance-control { position: relative; }
-/* The settings door reads as a word, not a symbol. The mark is decorative and
-   the label is what a person looks for; on a narrow screen the label is what
-   survives, because a lone glyph is what made this hard to find. */
-.appearance-control summary { display: inline-flex; align-items: center; gap: 6px; }
-.settings-mark { font-size: 1.05em; line-height: 1; }
-.settings-label { font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em; }
-.appearance-control summary {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 38px;
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1.25rem;
-  list-style: none;
-}
-.appearance-control summary::-webkit-details-marker { display: none; }
-.appearance-control summary:focus-visible,
+/* ---- appearance -------------------------------------------------------
+   TWO SURFACES, ONE SETTING, AND THE SPLIT IS THE POINT.
+
+   Every page's top bar used to carry the WHOLE settings surface: a
+   <details> drawer holding the mode buttons, two canvas colour fields, a
+   custom-colour button and a status line, hanging off a header that also
+   has to hold a brand, a sign-in chip and a product's own navigation. A
+   drawer is also a place a person has to find before they can use it — the
+   same objection that turned the bare "◐" glyph into a labelled door, one
+   level up.
+
+   So: the header keeps LIGHT and DARK, the switch people reach for daily,
+   and everything past it lives at shared/settings.html, which the footer
+   links from all thirteen pages. `.appearance-panel` is a section on that
+   page now rather than a dropdown, which is why it has no position, no
+   z-index and no shadow. The `.settings-mark` / `.settings-label` pair the
+   old door used is gone with it. */
 .appearance-mode:focus-visible,
 .appearance-custom:focus-visible,
 .appearance-hue:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 2px; }
 .appearance-panel {
-  position: absolute;
-  z-index: 20;
-  right: 0;
-  top: calc(100% + 8px);
-  width: 250px;
-  padding: 14px;
+  max-width: 320px;
   color: var(--fg);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--fg) 18%, transparent);
+  padding: 16px;
 }
-.appearance-heading { margin: 0 0 10px; font-weight: 700; }
-.appearance-modes { margin-bottom: 12px; }
+.appearance-heading { margin: 0 0 10px; font-size: 1rem; font-weight: 700; }
+.appearance-modes { display: flex; gap: 8px; margin-bottom: 12px; }
+/* In a header the two buttons sit beside the sign-in chip, so they take no
+   bottom margin and no more room than the switch needs. */
+.header-modes { margin-bottom: 0; }
+
+/* The settings page itself. Shared infrastructure, so no product accent:
+   black, white and neutrals, like every other page nobody owns. */
+.settings-main { max-width: 640px; margin: 0 auto; padding: 24px 20px 8px; }
+.settings-main .lede { margin-top: 0; color: var(--muted); }
+.settings-note { margin: 18px 0 0; max-width: 46ch; color: var(--muted); font-size: 0.86rem; }
 .appearance-mode, .appearance-custom {
   min-height: 36px;
   color: var(--fg);

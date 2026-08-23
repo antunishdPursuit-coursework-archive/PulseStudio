@@ -245,37 +245,64 @@ function drawEditor(editor: ColorEditor, other: string): void {
   context.shadowBlur = 0;
 }
 
-function mountAppearanceControl(): void {
-  const host = document.querySelector(".topnav, .page-head, .topbar");
-  if (host === null || document.getElementById("appearance-control") !== null) return;
+/** Which appearance is ACTUALLY in force right now.
+ *
+ *  A stored choice wins. With nothing stored the page is on its built-in
+ *  default, and the built-in default is LIGHT unless the operating system
+ *  asks for dark — `:root` in theme.css carries the light palette and only
+ *  a `prefers-color-scheme: dark` query moves it. The toggle has to read
+ *  the same way, or on a first visit it would report a state the page is
+ *  not in. */
+function themeInForce(): Theme {
+  const chosen = root.dataset.theme as Theme | undefined;
+  if (chosen !== undefined) return chosen;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
-  const details = document.createElement("details");
-  details.id = "appearance-control";
-  details.className = "appearance-control";
-  /* A NAMED DOOR, not a glyph. This was a bare "◐" with the words only in a
-   * title attribute — which a person has to hover to discover, and a phone
-   * cannot hover at all. So the one control that changes what the whole site
-   * looks like was effectively hidden on every touch device we ship to. It
-   * says Settings now, because that is the word people already look for; the
-   * mark stays beside the word rather than instead of it. */
-  const summary = document.createElement("summary");
-  const mark = document.createElement("span");
-  mark.className = "settings-mark";
-  mark.setAttribute("aria-hidden", "true");
-  mark.textContent = "◐";
-  const label = document.createElement("span");
-  label.className = "settings-label";
-  label.textContent = "Settings";
-  summary.append(mark, label);
-  summary.setAttribute("aria-label", "Settings");
-  details.appendChild(summary);
+/** The header's whole appearance control: light, dark, and nothing else.
+ *
+ *  IT USED TO BE THE LOT. A <details> in the top bar of every page held the
+ *  mode buttons, two canvas colour fields and a status line — the entire
+ *  settings surface, hanging off a header that also has to hold a brand, a
+ *  sign-in chip and a product's own navigation. Everything past light and
+ *  dark now lives at shared/settings.html, which the footer links from
+ *  every page; the header keeps the one switch people reach for daily.
+ *
+ *  The buttons state the current appearance by disabling the one already in
+ *  force, which is why themeInForce() has to be honest about the untouched
+ *  first visit rather than assuming light. */
+function headerModes(): HTMLElement {
+  const modes = document.createElement("div");
+  modes.id = "appearance-modes";
+  modes.className = "appearance-modes header-modes";
+  modes.setAttribute("role", "group");
+  modes.setAttribute("aria-label", "Appearance");
+  const light = modeButton("light", "☀", "Light mode");
+  const dark = modeButton("dark", "☾", "Dark mode");
+  function refresh(): void {
+    const now = themeInForce();
+    light.disabled = now === "light";
+    dark.disabled = now === "dark";
+  }
+  light.addEventListener("click", () => { applyTheme("light"); refresh(); });
+  dark.addEventListener("click", () => { applyTheme("dark"); refresh(); });
+  modes.append(light, dark);
+  refresh();
+  return modes;
+}
 
-  const panel = document.createElement("div");
+/** The full appearance section, expanded, for the settings page.
+ *
+ *  This is the old header panel with the <details> taken off it. Nothing
+ *  about the colour arithmetic changed; what changed is that it is a place
+ *  a person can go to rather than a drawer they have to find. */
+function appearanceSection(): HTMLElement {
+  const panel = document.createElement("section");
   panel.className = "appearance-panel";
   /* Appearance is a SECTION inside settings, not the whole of it. Naming it
    * leaves an obvious place for the next setting, instead of the panel
    * quietly becoming a colour picker wearing a general name. */
-  const heading = document.createElement("p");
+  const heading = document.createElement("h2");
   heading.className = "appearance-heading";
   heading.textContent = "Appearance";
   const modes = document.createElement("div");
@@ -359,9 +386,28 @@ function mountAppearanceControl(): void {
   bindEditor(text.editor, () => hslToHex(background.editor.state));
 
   panel.append(heading, modes, background.field, text.field, useCustom, status);
-  details.appendChild(panel);
-  host.appendChild(details);
   refresh();
+  return panel;
+}
+
+/** ONE appearance control per page, and which one depends on the page.
+ *
+ *  The settings page declares `<div id="appearance-settings">` and gets the
+ *  whole section there; its header gets nothing, because the page IS the
+ *  control and two of them would disagree the moment one was used. Every
+ *  other page gets light/dark in the header and reaches the rest through
+ *  the Settings link the shared footer carries. */
+function mountAppearance(): void {
+  const settingsHost = document.getElementById("appearance-settings");
+  if (settingsHost !== null) {
+    if (settingsHost.querySelector(".appearance-panel") === null) {
+      settingsHost.append(appearanceSection());
+    }
+    return;
+  }
+  const host = document.querySelector(".topnav, .page-head, .topbar");
+  if (host === null || document.getElementById("appearance-modes") !== null) return;
+  host.appendChild(headerModes());
 }
 
 /* EVERY PAGE GETS AN ICON, whether or not its markup declares one. Four
@@ -395,7 +441,7 @@ function ensureFavicon(): void {
 
 ensureFavicon();
 initialTheme();
-mountAppearanceControl();
+mountAppearance();
 
 const sessionHost = document.querySelector(".topnav, .page-head, .topbar");
 if (sessionHost !== null && !document.body.hasAttribute("data-no-session")) {

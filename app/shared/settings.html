@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings — Pulse Studio</title>
+  <meta name="description" content="Choose how Pulse Studio looks: light, dark, or your own background and text colours.">
+  <!-- Not worth a search result, and it must stay crawlable for this tag to
+       be read — the same reasoning app/sitemap.xml states for every page it
+       leaves out. It is reachable by link from every page's footer and by
+       URL, which is what the audience law asks of a route. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./theme.css">
+</head>
+<!-- Shared infrastructure carries NO product colour — black, white and
+     neutrals only. Only a product page sets product-a|b|c|d. -->
+<body>
+  <header class="page-head">
+    <a class="home-brand" href="../index.html" aria-label="Return to Pulse Studio home"><span class="home-arrow" aria-hidden="true">←</span><span class="brand-word">PULSE<span>STUDIO</span></span></a>
+    <h1>Settings</h1>
+  </header>
+
+  <main class="settings-main">
+    <p class="lede">These choices are kept in this browser and follow you
+    across every page of the studio. Nothing here is sent anywhere.</p>
+
+    <!-- theme-boot finds this by id and renders the appearance section into
+         it. The markup this page owns is the mount point and the words
+         around it; the control itself is shared, so it cannot drift from
+         the one the rest of the site obeys. -->
+    <div id="appearance-settings"></div>
+
+    <p class="settings-note">The light and dark switch in the top bar of
+    every page changes the same setting as the one here. With nothing chosen,
+    the studio is light unless this device asks for dark.</p>
+  </main>
+
+  <script type="module" src="./theme-boot.js"></script>
+</body>
+</html>

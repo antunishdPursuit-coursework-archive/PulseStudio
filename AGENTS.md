@@ -49,6 +49,32 @@ instead of doing it.
   `var(--accent-ink)`. Anyone looking at any screen can tell who built what.
 - Never restyle another developer's color or add a fifth.
 
+## The settings law
+
+- Settings has ONE home: `app/shared/settings.html`, linked from the footer
+  of every page. A product NEVER builds its own settings, appearance, or
+  theme control — not a switch, not a picker, not a remembered preference.
+  Two settings screens are two answers to the same question, and the person
+  using the site finds out which one lost.
+- The page header carries the **light/dark switch and nothing else**. It
+  used to carry the whole settings surface in a drop-down, wedged beside a
+  brand, a sign-in chip and a product's own navigation, where a person had
+  to find the drawer before they could use any of it. That was the mistake;
+  this is the correction.
+- **Light is the default. Dark only when the device asks.** A person's own
+  choice beats both and follows them across every page. In CSS that means
+  the bare `:root` in `app/shared/theme.css` carries the light palette and
+  every dark value sits behind `prefers-color-scheme: dark` or an explicit
+  `[data-theme="dark"]` — never the other way round.
+- `pulse-theme` and `pulse-theme-custom` belong to `app/shared/theme-boot.ts`.
+  No product reads or writes them.
+- A NEW setting is a section on that one page, added in shared ground with
+  team agreement stated in the PR. It is never a second page and never a
+  control in a product folder.
+
+`scripts/check-settings.mjs` holds all five, and it started with an empty
+list: on the day it landed no product folder violated any of them.
+
 ## The audience law
 
 - Every consumer-facing surface speaks TO its user — a member or a staff
@@ -120,6 +146,7 @@ instead of doing it.
   | `scripts/check-reachable.mjs` | the filing law — no module under `app/` that no page reaches |
   | `scripts/check-mirrors.mjs` | every `AGENTS.md` is still a byte-equivalent mirror of its `CLAUDE.md` |
   | `scripts/check-brand.mjs` | the clone seam — a page that shows the studio's name is wired to receive it |
+  | `scripts/check-settings.mjs` | the settings law — settings lives in exactly one place, the header carries light/dark only, and light is the built-in default |
   | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
 
   Every gate carries `--self-test`, which plants known-bad input and proves

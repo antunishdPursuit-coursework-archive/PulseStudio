@@ -97,6 +97,14 @@ export const FOOTER_GROUPS: readonly FooterGroup[] = [
 /** The repository. Absolute because it is not on this origin. */
 export const SOURCE_URL = "https://github.com/antunishdPursuit/PulseStudio";
 
+/* Settings sits in the base row rather than in a group, because it is a
+ * utility of the site rather than a place in it — the same shelf as the
+ * source link. It is here at all because the header stopped carrying the
+ * whole settings surface: the top bar keeps light and dark, and everything
+ * past that (a custom background and text pair, and whatever settings come
+ * next) lives on one page the footer reaches from all thirteen. */
+export const SETTINGS_HREF = "shared/settings.html";
+
 /* The studio's one promise about outreach, in the words a member would use
  * for it. It is here rather than in a product because it is true of the
  * whole site: the data law says Product D drafts for staff review only and
@@ -123,13 +131,21 @@ export function isCurrentPage(linkHref: string, pageHref: string): boolean {
   return normalise(linkHref) === normalise(pageHref);
 }
 
-function link(item: FooterLink, root: string, pageHref: string): HTMLLIElement {
-  const li = document.createElement("li");
+/** One link, resolved. Returns the anchor itself, because two callers want
+ *  it in different wrappers — a list item inside a group, and bare in the
+ *  base row. It used to return the <li> and the base row unwrapped it with
+ *  firstElementChild, which is a shape the caller should not have to know. */
+function footerLink(item: FooterLink, root: string, pageHref: string): HTMLAnchorElement {
   const a = document.createElement("a");
   a.href = new URL(item.href, root).href;
   a.textContent = item.label;
   if (isCurrentPage(a.href, pageHref)) a.setAttribute("aria-current", "page");
-  li.append(a);
+  return a;
+}
+
+function linkItem(item: FooterLink, root: string, pageHref: string): HTMLLIElement {
+  const li = document.createElement("li");
+  li.append(footerLink(item, root, pageHref));
   return li;
 }
 
@@ -187,7 +203,7 @@ export function siteFooter(root: string, pageHref: string): HTMLElement {
     heading.className = "site-footer-heading";
     heading.textContent = group.heading;
     const list = document.createElement("ul");
-    for (const item of group.links) list.append(link(item, root, pageHref));
+    for (const item of group.links) list.append(linkItem(item, root, pageHref));
     nav.append(heading, list);
     inner.append(nav);
   }
@@ -197,12 +213,13 @@ export function siteFooter(root: string, pageHref: string): HTMLElement {
   const name = document.createElement("span");
   name.className = "site-footer-name";
   name.textContent = `${parts.lead}${parts.accent === "" ? "" : ` ${parts.accent}`}`;
+  const settings = footerLink({ label: "Settings", href: SETTINGS_HREF }, root, pageHref);
   const source = document.createElement("a");
   source.className = "site-footer-source";
   source.href = SOURCE_URL;
   source.rel = "noopener";
   source.textContent = "Source";
-  base.append(name, source);
+  base.append(name, settings, source);
 
   footer.append(inner, base);
   return footer;
