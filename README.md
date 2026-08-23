@@ -118,6 +118,15 @@ staff dashboard and the re-engagement tool are **staff-only**: they show
 rosters, attendance, and cancellation risk, and `app/sitemap.xml` lists the
 public pages only.
 
+**The site talks to nobody.** Measured 2026-08-23 across every shipped module:
+three network calls exist and all three are same-origin — the support
+assistant to its own endpoint, and the legacy loader to a local file. No
+analytics, no tag manager, no cookies, no Shared Storage, no third-party host
+of any kind. The only outside addresses in the source are XML namespaces, our
+own published URL, and reserved `.invalid` domains used by checks. Anything a
+browser's console reports beyond that list came from an extension, not from
+here.
+
 Every staff page should carry
 `<meta name="robots" content="noindex, nofollow">` in its own `<head>` — that
 is the guaranteed way to stay out of a search index, and it only works if the

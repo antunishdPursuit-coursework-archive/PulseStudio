@@ -662,6 +662,40 @@ Subtle, in the footer, and reading `Build unknown` whenever verification is
 unavailable. I will not add one until this exists, because a label that cannot
 be verified is a claim, and this product has spent the week removing those.
 
+## Everyone — we ship no Content-Security-Policy (2026-08-23)
+
+Small, and it needs one line per owner rather than a shared edit, which is why
+it is a request.
+
+None of our pages sets a CSP and GitHub Pages sends none, so a browser will
+run any script that reaches the document. Nothing reaches it today — the site
+loads only its own modules, and `check-published` and `check-sources` hold
+that — but a policy is what makes it a property rather than a fact that
+happens to hold.
+
+The tag, in each page's `<head>`:
+
+```html
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+```
+
+Every page already satisfies it: no inline scripts, no inline styles, no
+third-party hosts. So this is one line in one `<head>` per page, and nothing
+should break — but it is your `<head>`, in your folder, so it is your line to
+add.
+
+**What it does NOT do, so nobody approves it for the wrong reason.** It will
+not stop a browser extension. Chrome content scripts run in an isolated world
+and are exempt from the page's policy, and an extension's console noise is
+not something a page can refuse. This is protection against a script getting
+INTO the document — an injected string, a compromised dependency we do not
+have yet, a future page that reaches for a CDN. It is worth having for those,
+and for nothing else.
+
+If we ever add the routine page's own hosting, or anything that fetches, this
+gets revisited rather than loosened by habit.
+
 ## Closed — settled, kept as one line each
 
 These had their own sections until 2026-08-23. They are done, and a finished
