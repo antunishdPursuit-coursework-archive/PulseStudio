@@ -18,6 +18,33 @@ import type { OutreachPolicy } from "./config.js";
 import type { FixtureSet } from "./deps.js";
 import { dayNumberFromIso, firstNameOf, joinSentence, type FlaggedMember } from "./logic.js";
 
+/** Where a routine lives, for a member who wants to open it.
+ *
+ *  GENERIC BY CONSTRUCTION. The address carries a routine id and nothing
+ *  else — no member id, no name, no attendance figure — so two members sent
+ *  the same routine open the identical page, and the page cannot know who
+ *  is reading it. The personal words stay in the copied message, which
+ *  travels between two people and never touches this site. */
+export function routineUrl(studioUrl: string, routineId: string): string {
+  const base = studioUrl.endsWith("/") ? studioUrl : `${studioUrl}/`;
+  return `${base}products/d-reengagement/routine.html?r=${encodeURIComponent(routineId)}`;
+}
+
+/** The copied draft with a routine added underneath it.
+ *
+ *  ONLY A TITLE AND AN ADDRESS. Not a reason it was chosen, not a claim it
+ *  suits anybody — a staff member picked it, and the sentence says so
+ *  plainly. The draft is unchanged when no routine was chosen, and a check
+ *  pins that byte-for-byte, because outreach has to stay useful without
+ *  one. */
+export function draftWithRoutine(
+  draft: string,
+  routineTitle: string,
+  url: string,
+): string {
+  return `${draft}\n\nOne of our approved at-home routines, if you would like it:\n${routineTitle}\n${url}`;
+}
+
 export interface OutreachRecord {
   memberId: string;
   /** Identity of the LAPSE, not the member: memberId + the last-attended
@@ -25,6 +52,20 @@ export interface OutreachRecord {
   lapseKey: string;
   takenAt: string; // ISO date the draft was taken
   channel: "copy" | "email";
+  /** Which approved routine went with the note, when one did.
+   *
+   *  AN ATTRIBUTE OF THE NOTE, NOT A SECOND EVENT. A routine is included IN
+   *  a copied draft, so this is one more thing known about the same event —
+   *  which is why it does NOT change what the ledger means. A separate
+   *  `routine_included` row would have been counted by outreachStateFor as
+   *  outreach, so attaching a routine could have suppressed a legitimate
+   *  note, or made "already reached" read true for a lapse nobody wrote to.
+   *
+   *  Optional, because every record written before today lacks it, and
+   *  because a note without a routine is the common case. Nothing here
+   *  records the message text, anything about a body, or any claim that the
+   *  routine was opened, followed, or suited anybody. */
+  routineId?: string;
 }
 
 export interface SuppressionRecord {
@@ -80,16 +121,19 @@ export function recordOutreach(
   flagged: FlaggedMember,
   channel: "copy" | "email",
   takenAt: string,
+  routineId?: string,
 ): OutreachRecord[] {
-  return [
-    ...ledger,
-    {
-      memberId: flagged.member.member_id,
-      lapseKey: lapseKeyOf(flagged),
-      takenAt,
-      channel,
-    },
-  ];
+  /* The routine id is OMITTED when there is none, never written as null or
+   * an empty string — the same rule the routine contract follows, and the
+   * reason a record from before today still reads correctly. */
+  const record: OutreachRecord = {
+    memberId: flagged.member.member_id,
+    lapseKey: lapseKeyOf(flagged),
+    takenAt,
+    channel,
+  };
+  if (routineId !== undefined && routineId !== "") record.routineId = routineId;
+  return [...ledger, record];
 }
 
 /* ------------------------------------------------------------------ */

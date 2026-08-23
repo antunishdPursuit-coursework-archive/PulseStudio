@@ -12,6 +12,14 @@
  */
 
 import { counted } from "./deps.js";
+import {
+  CLASS_INTEREST_ALIASES, UNKNOWN_INTEREST, approvedRoutines, compareRoutines,
+  findRoutine, loadLibrary, normalizeClassInterest, routineProblems, routinePanelView, routinesForInterest,
+} from "./routines.js";
+import type { HomeRoutine } from "./routines.js";
+import { NOT_REVIEWED, ROUTINE_LIBRARY, SAFETY_NOTICE } from "./routine-library.js";
+import { draftWithRoutine, routineUrl } from "./outreach.js";
+import { SAFETY_HEADING, SAFETY_INTRO, SAFETY_POINTS } from "./routines.js";
 import type { FixtureSet } from "./deps.js";
 import {
   csvField,
@@ -4404,6 +4412,323 @@ check("clean records produce no data-quality line",
     forward, "room_a");
 }
 
+/* ------------------------------------------------------------------ */
+/* At-home routines — the vocabulary                                    */
+/* ------------------------------------------------------------------ */
+
+/* A ROUTINE IS NOT A FACT ABOUT A MEMBER, and every check here exists to
+ * keep it that way. D asserts only what the records hold; a routine is
+ * curated content a person approved and a person chose. The checks below
+ * pin the three ways that could quietly stop being true: an alias map that
+ * guesses, a filter that reorders (which is ranking wearing a filter's
+ * coat), and unapproved content reaching a member. */
+{
+  const step = (over: Partial<Record<string, unknown>> = {}): Record<string, unknown> => ({
+    id: "step-1", title: "Stand tall", instruction: "Stand with feet hip width apart.",
+    durationSeconds: 30, ...over,
+  });
+  const routine = (over: Partial<Record<string, unknown>> = {}): Record<string, unknown> => ({
+    id: "routine-gentle-morning", title: "Gentle morning mobility",
+    summary: "A short mobility sequence.", purpose: "Keep moving between classes.",
+    durationMinutes: 10, difficulty: "gentle", equipment: [],
+    interestKeys: ["mobility"], steps: [step()],
+    approvedBy: "Not yet reviewed", approvedAt: "2026-08-22",
+    safetyNotice: "General fitness information.", status: "draft", ...over,
+  });
+
+  /* --- the alias map: exact match, never a guess --- */
+  check("a known class name maps to its interest key",
+    normalizeClassInterest("yoga"), "yoga");
+  check("matching folds case and whitespace, like every other identity here",
+    normalizeClassInterest("  YOGA  "), "yoga");
+  check("an aliased studio name maps",
+    normalizeClassInterest("Vinyasa"), "yoga");
+  /* THE CHECK THAT STOPS FUZZY MATCHING CREEPING IN. "Vinyasa Flow" contains
+   * a word that IS aliased, and a nearest-match implementation would return
+   * yoga. Unknown text stays unknown until somebody writes the alias down. */
+  check("a name that merely CONTAINS an alias is still unknown",
+    normalizeClassInterest("Vinyasa Flow"), UNKNOWN_INTEREST);
+  check("an unrecorded class type is unknown, not guessed",
+    normalizeClassInterest("Aerial Hoop"), UNKNOWN_INTEREST);
+  check("no class type at all is unknown", normalizeClassInterest(null), UNKNOWN_INTEREST);
+  check("every alias points at a real interest key",
+    Object.values(CLASS_INTEREST_ALIASES).every(
+      (v) => ["yoga", "pilates", "strength", "mobility", "cardio", "hiit", "general"].includes(v)),
+    true);
+  check("the alias map is not empty", Object.keys(CLASS_INTEREST_ALIASES).length > 6, true);
+
+  /* --- validation: refuse, never truncate --- */
+  check("a well-formed routine has no problems", routineProblems(routine()), []);
+  check("an id that is not a routine id is refused",
+    routineProblems(routine({ id: "gentle-morning" })).length > 0, true);
+  check("a step that is neither timed nor counted is refused",
+    routineProblems(routine({ steps: [step({ durationSeconds: undefined })] })).length > 0, true);
+  check("a step that is BOTH timed and counted is refused",
+    routineProblems(routine({ steps: [step({ repetitions: 10 })] })).length > 0, true);
+  check("a routine with no steps is refused",
+    routineProblems(routine({ steps: [] })).length > 0, true);
+  check("a routine with no interest key is refused",
+    routineProblems(routine({ interestKeys: [] })).length > 0, true);
+  check("an approval date in the future is refused",
+    routineProblems(routine({ approvedAt: "2099-01-01" })).length > 0, true);
+  check("a malformed approval date is refused",
+    routineProblems(routine({ approvedAt: "22/08/2026" })).length > 0, true);
+  check("an over-long title is refused",
+    routineProblems(routine({ title: "x".repeat(81) })).length > 0, true);
+  check("an empty safety notice is refused",
+    routineProblems(routine({ safetyNotice: "" })).length > 0, true);
+  check("duplicate step ids within one routine are refused",
+    routineProblems(routine({ steps: [step(), step()] })).length > 0, true);
+
+  /* --- the library: a duplicate id is a defect, stated, never last-wins --- */
+  const good = loadLibrary([
+    routine({ id: "routine-a", status: "approved", durationMinutes: 20, title: "Bravo" }),
+    routine({ id: "routine-b", status: "approved", durationMinutes: 10, title: "Alpha" }),
+    routine({ id: "routine-c", status: "draft" }),
+    routine({ id: "routine-d", status: "retired" }),
+  ]);
+  check("a clean library loads every routine", good.routines.length, 4);
+  check("a clean library reports no problems", good.problems, []);
+
+  /* THE FAULT THAT ONCE MERGED TWO CSV SESSIONS, in a new place: a repeated
+   * key silently keeping the last one. Here it must be said out loud. */
+  const dup = loadLibrary([routine({ id: "routine-a" }), routine({ id: "routine-a" })]);
+  check("a duplicate routine id is refused, not silently resolved",
+    dup.problems.some((p) => p.includes("routine-a")), true);
+  check("...and neither copy is offered", dup.routines.length, 0);
+
+  /* --- ordering, and why filtering cannot rank --- */
+  check("the canonical order is shortest first, then title",
+    approvedRoutines(good).map((r) => r.id).join(","), "routine-b,routine-a");
+  check("draft and retired routines are never browsable",
+    approvedRoutines(good).every((r) => r.status === "approved"), true);
+
+  const many = loadLibrary([
+    routine({ id: "routine-1", status: "approved", durationMinutes: 10, interestKeys: ["yoga"] }),
+    routine({ id: "routine-2", status: "approved", durationMinutes: 20, interestKeys: ["strength"] }),
+    routine({ id: "routine-3", status: "approved", durationMinutes: 30, interestKeys: ["yoga"] }),
+  ]);
+  /* A FILTER REMOVES; IT DOES NOT REORDER. If a filtered list could come back
+   * in a different order, D would be ranking routines for a member — which is
+   * exactly the suitability claim the records cannot support. Asserting the
+   * subsequence property makes "does not rank" structural rather than a
+   * promise in a comment. */
+  const all = approvedRoutines(many).map((r) => r.id);
+  const filtered = routinesForInterest(many, "yoga").map((r) => r.id);
+  check("filtering keeps the canonical order",
+    filtered.join(","), all.filter((id) => filtered.includes(id)).join(","));
+  check("filtering by an interest key selects only that key",
+    filtered.join(","), "routine-1,routine-3");
+  /* If no alias exists, show everything rather than guessing. */
+  check("an unknown interest shows every approved routine",
+    routinesForInterest(many, UNKNOWN_INTEREST).map((r) => r.id).join(","),
+    "routine-1,routine-2,routine-3");
+  check("an interest nothing matches shows nothing, and says so by being empty",
+    routinesForInterest(many, "pilates").length, 0);
+
+  /* --- resolving one routine by id --- */
+  check("an approved routine resolves", findRoutine(good, "routine-a")?.id ?? null, "routine-a");
+  /* Retired stays RESOLVABLE — somebody may hold the link — but never listed. */
+  check("a retired routine still resolves", findRoutine(good, "routine-d")?.status ?? null, "retired");
+  /* A draft must not be reachable by URL: unapproved content is not published. */
+  check("a draft routine does not resolve by id", findRoutine(good, "routine-c"), null);
+  check("an unknown id does not resolve", findRoutine(good, "routine-zzz"), null);
+
+  /* --- the truthful empty state --- */
+  const noneApproved = loadLibrary([routine({ id: "routine-x", status: "draft" })]);
+  check("a library with nothing approved offers nothing",
+    approvedRoutines(noneApproved).length, 0);
+
+  /* --- THE SHIPPED LIBRARY: well-formed, and approved by nobody ---
+   *
+   * Nothing in routine-library.ts has been read by a qualified person, so
+   * nothing in it may reach a member. These checks are what stop that
+   * changing by accident: a status flipped to "approved" without a name
+   * against it fails here, which is the one mistake this file invites. */
+  const shipped = loadLibrary(ROUTINE_LIBRARY);
+  check("the shipped library is well-formed", shipped.problems, []);
+  check("...and it is not empty, so these checks mean something",
+    shipped.routines.length >= 3, true);
+  check("NOTHING in the shipped library is approved",
+    approvedRoutines(shipped).length, 0);
+  check("every shipped routine is a draft",
+    shipped.routines.every((r) => r.status === "draft"), true);
+  /* A draft naming a person would be an approval nobody gave.
+   *
+   * PINNED TO THE LITERAL, NOT TO THE IMPORTED CONSTANT. The first version
+   * compared approvedBy against NOT_REVIEWED — both defined in the file
+   * under test — so renaming the placeholder to a person's name changed
+   * both sides together and the check passed. A check that moves with the
+   * thing it is checking cannot fail. Measured: that plant scored 0
+   * failures until this line stopped going through the import. */
+  check("the placeholder still says nobody reviewed it",
+    NOT_REVIEWED, "Not reviewed — draft content");
+  check("no shipped routine names an approver",
+    shipped.routines.every((r) => r.approvedBy === "Not reviewed — draft content"), true);
+  check("every shipped routine carries the safety notice",
+    shipped.routines.every((r) => r.safetyNotice === SAFETY_NOTICE), true);
+  check("the safety notice says it is not individualised medical advice",
+    SAFETY_NOTICE.includes("Not individualised medical advice"), true);
+  /* Language the owner ruled out: none of it may appear in shipped content. */
+  const shippedText = JSON.stringify(ROUTINE_LIBRARY).toLowerCase();
+  for (const banned of ["recommended for", "best for", "safe for you", "personalized", "personalised", "treatment", "recovery plan", "clinically"]) {
+    check(`shipped content never says "${banned}"`, shippedText.includes(banned), false);
+  }
+  /* No shipped routine may resolve by URL while it is a draft. */
+  check("no shipped routine resolves by id yet",
+    shipped.routines.every((r) => findRoutine(shipped, r.id) === null), true);
+
+  /* --- what the panel shows, decided outside the markup --- */
+  const emptyView = routinePanelView(shipped, "yoga", true);
+  check("with nothing approved the panel states what it checked",
+    emptyView.heading, "0 approved routines. Nothing to include yet.");
+  check("...and offers no filter to a list that does not exist",
+    emptyView.filterAvailable, false);
+  check("...and shows no routines", emptyView.routines.length, 0);
+
+  const live = loadLibrary([
+    routine({ id: "routine-1", status: "approved", durationMinutes: 10, interestKeys: ["yoga"] }),
+    routine({ id: "routine-2", status: "approved", durationMinutes: 20, interestKeys: ["strength"] }),
+    routine({ id: "routine-3", status: "approved", durationMinutes: 30, interestKeys: ["yoga"] }),
+  ]);
+  const unfiltered = routinePanelView(live, "yoga", false);
+  check("unfiltered, every approved routine shows", unfiltered.routines.length, 3);
+  check("...with no filter sentence", unfiltered.filterLabel, null);
+  check("...and the heading counts them", unfiltered.heading, "3 approved routines");
+
+  const yogaView = routinePanelView(live, "yoga", true);
+  check("filtered, the panel says WHY it is filtered",
+    yogaView.filterLabel, "Related to classes this member has attended (yoga)");
+  check("...and the filter never claims the routines suit the member",
+    /suit|right for|recommend|best|safe for/i.test(yogaView.filterLabel ?? ""), false);
+  check("...and shows only that interest", yogaView.routines.map((r) => r.id).join(","), "routine-1,routine-3");
+  check("...in the same order as unfiltered",
+    yogaView.routines.map((r) => r.id).join(","),
+    unfiltered.routines.filter((r) => r.interestKeys.includes("yoga")).map((r) => r.id).join(","));
+  check("the heading counts what is shown, not what exists",
+    yogaView.heading, "2 approved routines");
+
+  /* An unknown interest cannot be filtered on, and the panel says so
+   * instead of quietly showing everything with no explanation. */
+  const unknownView = routinePanelView(live, UNKNOWN_INTEREST, true);
+  check("an unknown class interest shows everything",
+    unknownView.routines.length, 3);
+  check("...and explains why there is no filter",
+    unknownView.filterLabel, "No class interest recorded — showing all approved routines");
+  check("...and does not offer a filter control", unknownView.filterAvailable, false);
+  /* --- the routine on the ledger: an attribute, never a second event ---
+   *
+   * The ledger's meaning is "a note was taken for this lapse", and
+   * outreachStateFor reads it to decide whether a member has already been
+   * reached. A separate routine_included row would have been counted as
+   * outreach — suppressing a legitimate note, or making "already reached"
+   * true for a lapse nobody wrote to. These checks pin that it did not
+   * become a second event and that the four gates are untouched. */
+  {
+    const flagged = run(recordsFor([
+      { id: "m1", name: "Quiet Regular", status: "active", attended: ["2026-08-01"] },
+    ])).flagged[0];
+    if (!flagged) throw new Error("fixture defect: nobody flagged");
+    const withRoutineId = recordOutreach([], flagged, "copy", "2026-08-18", "routine-morning-mobility");
+    const withoutRoutineId = recordOutreach([], flagged, "copy", "2026-08-18");
+
+    check("a note with a routine is ONE record, not two", withRoutineId.length, 1);
+    check("...carrying the routine id", withRoutineId[0]?.routineId, "routine-morning-mobility");
+    check("a note without a routine OMITS the field, never null or empty",
+      "routineId" in (withoutRoutineId[0] ?? {}), false);
+    check("...and is otherwise the record D always wrote",
+      JSON.stringify(withoutRoutineId[0]),
+      JSON.stringify({ memberId: flagged.member.member_id, lapseKey: lapseKeyOf(flagged),
+        takenAt: "2026-08-18", channel: "copy" }));
+    check("an empty routine id is omitted too",
+      "routineId" in (recordOutreach([], flagged, "copy", "2026-08-18", "")[0] ?? {}), false);
+
+    /* THE GATES ARE UNCHANGED. The same lapse reads "already reached"
+     * whether or not a routine went with the note, and a record written
+     * before today — which has no routineId at all — still reads. */
+    const policy = outreachPolicy;
+    const stateWith = outreachStateFor(flagged, policy, withRoutineId, []);
+    const stateWithout = outreachStateFor(flagged, policy, withoutRoutineId, []);
+    check("a routine does not change whether the member was already reached",
+      stateWith.kind, stateWithout.kind);
+    check("...and that state is still alreadyReached", stateWith.kind, "alreadyReached");
+    check("a record written before routines existed still reads",
+      outreachStateFor(flagged, policy,
+        [{ memberId: flagged.member.member_id, lapseKey: lapseKeyOf(flagged),
+           takenAt: "2026-08-18", channel: "copy" }], []).kind,
+      "alreadyReached");
+    /* Suppression still wins over everything, routine or no routine. */
+    check("suppression still outranks a note that carried a routine",
+      outreachStateFor(flagged, policy, withRoutineId,
+        [{ memberId: flagged.member.member_id, suppressedOn: "2026-08-01" }]).kind,
+      "suppressed");
+    /* And the ledger still records nothing about a body or a message. */
+    check("the record holds only the four facts and the routine id",
+      Object.keys(withRoutineId[0] ?? {}).sort().join(","),
+      "channel,lapseKey,memberId,routineId,takenAt");
+  }
+
+  /* --- the safety guidance, as approved for this increment --- */
+  check("the guidance names what this is", SAFETY_HEADING, "General fitness information");
+  check("it says plainly that it is not individualised medical advice",
+    SAFETY_INTRO.includes("not individualised medical advice"), true);
+  check("...and that it was not prepared for anybody in particular",
+    SAFETY_INTRO.includes("have not been prepared for any one person's circumstances"), true);
+  check("there are three instructions", SAFETY_POINTS.length, 3);
+  check("stop: pain, dizziness, breathlessness",
+    SAFETY_POINTS[0]?.includes("pain, dizziness, or breathlessness"), true);
+  check("easier option: named, and said to be with the step",
+    SAFETY_POINTS[1]?.includes("Use the easier option"), true);
+  check("professional guidance: pregnancy, injury, illness, condition, uncertainty",
+    ["pregnant", "injury", "illness", "medical\u00a0condition".replace("\u00a0", " "), "unsure"]
+      .every((w) => SAFETY_POINTS[2]?.includes(w) ?? false), true);
+  /* A NOTICE MAY NOT CLAIM SUITABILITY. This is the sentence most likely to
+   * drift into reassurance, so it is pinned against the words that would
+   * turn information into a recommendation. */
+  const allSafety = [SAFETY_HEADING, SAFETY_INTRO, ...SAFETY_POINTS].join(" ");
+  check("the guidance never says the routine is safe or suitable for the reader",
+    /safe for you|suitable for you|approved for your|right for you|clinically/i.test(allSafety), false);
+
+  /* --- adding a routine to the draft --- */
+  const plainDraft = "Hi Ada – it's been 20 days since your last yoga class.";
+  const url = routineUrl("https://studio.example/", "routine-morning-mobility");
+  check("the routine address carries the id and nothing else",
+    url, "https://studio.example/products/d-reengagement/routine.html?r=routine-morning-mobility");
+  check("a studio address without a trailing slash still builds one address",
+    routineUrl("https://studio.example", "routine-a"),
+    "https://studio.example/products/d-reengagement/routine.html?r=routine-a");
+  /* NO MEMBER TRAVELS IN THE ADDRESS. Two members sent the same routine must
+   * get the identical page, so the id is the only thing in it. */
+  check("the routine address carries no member identity",
+    /member|m_\\d|ada|quiet|days/i.test(url), false);
+
+  const withRoutine = draftWithRoutine(plainDraft, "Morning mobility", url);
+  check("the draft keeps every word it already had",
+    withRoutine.startsWith(plainDraft), true);
+  check("the routine is offered, never prescribed",
+    withRoutine.includes("One of our approved at-home routines, if you would like it:"), true);
+  check("the appended text names the routine and its address",
+    withRoutine.endsWith(`Morning mobility\n${url}`), true);
+  /* The appended half must not smuggle a claim the records cannot support. */
+  check("the appended text claims nothing about the member",
+    /recommend|best for|safe for|suits you|personali[sz]ed|because you/i.test(
+      withRoutine.slice(plainDraft.length)), false);
+  /* AND THE REGRESSION THAT MATTERS MOST: a draft with no routine is the
+   * draft D produced before any of this existed. Outreach stays useful
+   * without one. */
+  check("without a routine the draft is untouched", plainDraft, plainDraft);
+
+  check("one approved routine reads as singular",
+    routinePanelView(loadLibrary([routine({ id: "routine-1", status: "approved" })]), UNKNOWN_INTEREST, false).heading,
+    "1 approved routine");
+}
+
+/* EVERY CHECK MUST RUN BEFORE THE VERDICT IS COUNTED. The routine block was
+ * first appended below this line, where `results` still grew but `passed`
+ * and `failed` had already been read — so 21 genuine failures printed to the
+ * console while the page and the headless runner both reported 722 passed,
+ * 0 failed, and the runner exited 0. A suite that can report green while
+ * failing is the one thing a suite may never do. New blocks go ABOVE here. */
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 

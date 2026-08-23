@@ -13,7 +13,10 @@ import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";
 import { csvField, onSessionChange, readPulseSession } from "./deps.js";
 import { generateStudio } from "./generate.js";
-import { brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { NOT_RECORDED, brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
+import { ROUTINE_LIBRARY } from "./routine-library.js";
+import { loadLibrary, normalizeClassInterest, routinePanelView } from "./routines.js";
+import type { HomeRoutine } from "./routines.js";
 import {
   dataQualityLine,
   dayNumberFromIso,
@@ -57,6 +60,8 @@ import {
   type KeptRows,
   type OutreachRecord,
   type SuppressionRecord,
+  draftWithRoutine,
+  routineUrl,
 } from "./outreach.js";
 
 /** Find a required element up front, loudly — a missing mount point is a
@@ -213,6 +218,146 @@ function buildDraftText(f: FlaggedMember, data: FixtureSet, today: number): stri
  *  and so did this comment; the code three lines down always handled it
  *  correctly, which is exactly how a comment gets to be wrong for months. */
 
+/* The routine library is validated ONCE at load. A malformed entry is a
+ * defect in content somebody wrote, not a runtime condition to paper over,
+ * so it is reported where a person will see it rather than dropped. */
+const routineLibrary = loadLibrary(ROUTINE_LIBRARY);
+
+/** Which routine a staff member picked, per member. Defaults to NONE, and
+ *  the draft is complete without one. Never persisted here — the ledger
+ *  records it only when a note is actually taken. */
+const chosenRoutine = new Map<string, string>();
+/** Whether the class-interest filter is on, per member. Off by default:
+ *  showing everything is the honest starting point. */
+const routineFilterOn = new Map<string, boolean>();
+/* Whether the panel was left open, per member. A rebuilt card would
+ * otherwise collapse it under a person who had just opened it. */
+const routinePanelOpen = new Map<string, boolean>();
+/* Which routine control to put the keyboard back on after a rebuild.
+ *
+ * WITHOUT THIS, INCLUDING A ROUTINE THROWS A KEYBOARD USER OUT. Measured in
+ * a browser: activating "Include this routine" rebuilt the card, collapsed
+ * the panel, and left focus on the member article — so the person had to
+ * re-open the panel and tab back in to do anything else. A mouse user would
+ * never have noticed. */
+let focusRoutineAfterRender: string | null = null;
+
+/** The optional routine panel. Markup only — every decision it renders was
+ *  made by routinePanelView(), which the suite can load and this file
+ *  cannot hide. */
+function renderRoutinePanel(
+  memberId: string,
+  usualClassType: string | null,
+  onChange: () => void,
+): HTMLElement {
+  const interest = normalizeClassInterest(usualClassType);
+  const filterOn = routineFilterOn.get(memberId) ?? false;
+  const view = routinePanelView(routineLibrary, interest, filterOn);
+
+  const panel = document.createElement("details");
+  panel.className = "routines";
+  panel.open = routinePanelOpen.get(memberId) ?? false;
+  panel.addEventListener("toggle", () => routinePanelOpen.set(memberId, panel.open));
+  const summary = document.createElement("summary");
+  summary.textContent = "Approved home routines (optional)";
+  panel.append(summary);
+
+  const heading = document.createElement("p");
+  heading.className = "evidence";
+  heading.textContent = view.heading;
+  panel.append(heading);
+
+  if (view.filterLabel !== null) {
+    const why = document.createElement("p");
+    why.className = "evidence";
+    why.textContent = view.filterLabel;
+    panel.append(why);
+  }
+
+  if (view.filterAvailable) {
+    const toggle = document.createElement("button");
+    toggle.className = "btn quiet";
+    toggle.type = "button";
+    toggle.textContent = filterOn
+      ? "Show all approved routines"
+      : "Show only routines related to classes this member has attended";
+    toggle.dataset["routineControl"] = "filter";
+    toggle.addEventListener("click", () => {
+      routineFilterOn.set(memberId, !filterOn);
+      /* Recorded HERE, not left to the toggle event: `toggle` fires as a
+       * separate task, and the rebuild beats it. Using a control inside the
+       * panel is itself proof the panel is open. */
+      routinePanelOpen.set(memberId, true);
+      focusRoutineAfterRender = "filter";
+      onChange();
+    });
+    panel.append(toggle);
+  }
+
+  /* Any problem in the library is stated, never swallowed. */
+  for (const problem of routineLibrary.problems) {
+    const bad = document.createElement("p");
+    bad.className = "evidence";
+    bad.textContent = `Routine not offered — ${problem}`;
+    panel.append(bad);
+  }
+
+  const chosen = chosenRoutine.get(memberId) ?? null;
+  for (const r of view.routines) {
+    const item = document.createElement("div");
+    item.className = "routine";
+
+    const title = document.createElement("p");
+    title.className = "routine-title";
+    /* textContent throughout: routine text is authored by a person and this
+     * page may be read by anyone. Nothing here is ever set as HTML. */
+    title.textContent = `${r.title} · ${r.durationMinutes} min · ${r.difficulty}`;
+    item.append(title);
+
+    const summaryLine = document.createElement("p");
+    summaryLine.className = "evidence";
+    summaryLine.textContent = r.summary;
+    item.append(summaryLine);
+
+    const kit = document.createElement("p");
+    kit.className = "evidence";
+    kit.textContent = r.equipment.length === 0
+      ? "No equipment needed"
+      : `Equipment: ${r.equipment.join(", ")}`;
+    item.append(kit);
+
+    const notice = document.createElement("p");
+    notice.className = "evidence";
+    notice.textContent = r.safetyNotice;
+    item.append(notice);
+
+    const pick = document.createElement("button");
+    pick.className = "btn";
+    pick.type = "button";
+    const isChosen = chosen === r.id;
+    pick.textContent = isChosen ? "Included in draft — remove" : "Include this routine";
+    pick.setAttribute("aria-pressed", isChosen ? "true" : "false");
+    pick.dataset["routineControl"] = r.id;
+    pick.addEventListener("click", () => {
+      if (isChosen) chosenRoutine.delete(memberId);
+      else chosenRoutine.set(memberId, r.id);
+      routinePanelOpen.set(memberId, true);
+      focusRoutineAfterRender = r.id;
+      onChange();
+    });
+    item.append(pick);
+    panel.append(item);
+  }
+  return panel;
+}
+
+/** The routine a staff member picked for this member, or null. */
+function chosenRoutineFor(memberId: string): HomeRoutine | null {
+  const id = chosenRoutine.get(memberId);
+  if (id === undefined) return null;
+  return routineLibrary.routines.find((r) => r.id === id) ?? null;
+}
+
 function renderFlagged(
   f: FlaggedMember,
   rank: number,
@@ -303,7 +448,14 @@ function renderFlagged(
     return card;
   }
 
-  const draft = buildDraftText(f, data, today);
+  /* The draft a staff member copies, with the routine they chose appended
+   * underneath it. Nothing is appended when nothing was chosen, which is
+   * the default and stays the common case. */
+  const chosen = chosenRoutineFor(f.member.member_id);
+  const baseDraft = buildDraftText(f, data, today);
+  const draft = chosen === null
+    ? baseDraft
+    : draftWithRoutine(baseDraft, chosen.title, routineUrl(brand.studioUrl, chosen.id));
   const draftBlock = document.createElement("pre");
   draftBlock.className = "draft";
   draftBlock.textContent = draft;
@@ -328,7 +480,7 @@ function renderFlagged(
     navigator.clipboard.writeText(draft).then(
       () => {
         copyBtn.textContent = "Copied ✓";
-        ledger = recordOutreach(ledger, f, "copy", studioToday());
+        ledger = recordOutreach(ledger, f, "copy", studioToday(), chosen?.id);
         persist();
         setTimeout(() => {
           focusMemberAfterRender = f.member.member_id;
@@ -366,7 +518,7 @@ function renderFlagged(
     anchor.addEventListener("click", () => {
       // Opening the mail client IS taking the draft — the note is in the
       // staff member's hands from here.
-      ledger = recordOutreach(ledger, f, "email", studioToday());
+      ledger = recordOutreach(ledger, f, "email", studioToday(), chosen?.id);
       persist();
       setTimeout(() => {
         focusMemberAfterRender = f.member.member_id;
@@ -388,7 +540,20 @@ function renderFlagged(
   });
 
   actions.append(copyBtn, mailLink, suppressBtn);
-  card.append(draftBlock, actions);
+  /* The routine panel sits BETWEEN the draft and the actions: after the
+   * evidence and the words a person will send, before the button that
+   * takes them. It is optional, collapsed, and the draft is complete
+   * without it. */
+  const routinePanel = renderRoutinePanel(
+    f.member.member_id,
+    f.usualClassType === NOT_RECORDED ? null : f.usualClassType,
+    () => {
+      focusMemberAfterRender = f.member.member_id;
+      rerender();
+    },
+  );
+
+  card.append(draftBlock, routinePanel, actions);
   return card;
 }
 
@@ -457,6 +622,21 @@ function restoreFocusAfterRender(): void {
     `[data-member="${CSS.escape(focusMemberAfterRender)}"]`,
   );
   focusMemberAfterRender = null;
+  /* A routine control was used: put the keyboard back ON IT, inside the
+   * rebuilt card, rather than on the card. Falling back to the card is the
+   * right answer when the control is gone — clearing a filter can remove
+   * the very routine that was showing. */
+  if (focusRoutineAfterRender !== null && target !== null) {
+    const control = target.querySelector<HTMLElement>(
+      `[data-routine-control="${CSS.escape(focusRoutineAfterRender)}"]`,
+    );
+    focusRoutineAfterRender = null;
+    if (control !== null) {
+      control.focus();
+      return;
+    }
+  }
+  focusRoutineAfterRender = null;
   // The card may legitimately be gone — a suppressed member leaves the
   // list. Falling back to the list itself keeps the keyboard in the region
   // the person was working in rather than at the top of the document.
