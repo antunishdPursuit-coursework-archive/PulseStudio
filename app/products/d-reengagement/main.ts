@@ -13,6 +13,7 @@ import { sharedStudio, type FixtureSet } from "./deps.js";
 import { fixtureSetFrom, readRuntimeReservations } from "./live-studio.js";
 import { adaptAttendanceCsv, importProvenance } from "./csv.js";
 import { csvField, onSessionChange, readPulseSession } from "./deps.js";
+import { mountStaffDoor } from "../../shared/auth/staff-gate.js";
 import { generateStudio } from "./generate.js";
 import { NOT_RECORDED, brand, draftMessage, outreachPolicy, proposedRules } from "./config.js";
 import { ROUTINE_LIBRARY } from "./routine-library.js";
@@ -798,13 +799,18 @@ generateBtn.addEventListener("click", () => {
 
 csvReset.addEventListener("click", loadSharedRecords);
 
-loadSharedRecords();
+/* THE DOOR COMES FIRST. This page used to draw itself for anybody with the
+ * URL. It now asks the studio's server whether this browser holds a staff
+ * session and renders nothing until the answer is yes. */
+void mountStaffDoor(document.querySelector("main") ?? document.body).then((open) => {
+  if (open) loadSharedRecords();
+});
 
-/* ADAPT, NEVER GATE. A member who reaches this staff page by link or URL is
- * told what it is and where their own pages are; the page itself is
- * unchanged, because the session is convenience and not access control. It
- * re-reads on every session change so signing out clears the note in the
- * same tab it happened in. */
+/* THE NOTE STILL ADAPTS; THE DOOR NOW GATES. This note names what the
+ * surface is and where a member's own pages are. It used to be the ONLY
+ * thing that happened to a member who arrived here, because on a static
+ * site a gate would have been a picture of one. There is a server now, so
+ * the gate above is real and this note is what a person reads beside it. */
 function renderActorNote(): void {
   const session = readPulseSession();
   const note = actorNote(session === null ? null : session.actor_type, brand.studioUrl);
