@@ -18,7 +18,13 @@
 
      storytold.html was missing from this file until 2026-08-21. It is
      public, carries no noindex, and is linked from the front door's
-     footer — so it was indexable and simply unlisted. -->
+     footer — so it was indexable and simply unlisted.
+
+     The terms and the privacy policy are listed on purpose. They are the
+     two pages a person looks for BY NAME, often from a search rather than
+     from the footer, and a legal page nobody can find is a legal page
+     nobody has been given. settings.html is the opposite case and carries
+     noindex: it is a control, not something to read. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://antunishdpursuit.github.io/PulseStudio/</loc>
@@ -39,5 +45,15 @@
     <loc>https://antunishdpursuit.github.io/PulseStudio/shared/storytold.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://antunishdpursuit.github.io/PulseStudio/shared/terms.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://antunishdpursuit.github.io/PulseStudio/shared/privacy.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

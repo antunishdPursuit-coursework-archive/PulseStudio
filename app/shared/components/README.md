@@ -7,13 +7,17 @@
 | `brand-header.ts` | Renders the studio's name into every branded home link (`.home-brand .brand-word`), refreshes their aria-labels, and fills any `[data-studio-name]` with the plain name — all from `../brand.ts` | Automatic: `theme-boot.js` calls `renderStudioBrand()` on every page |
 | `logo.ts` | The pulse mark as a callable SVG (`pulseLogo(size)`), same path as `app/favicon.svg`, stroke = `currentColor` | Import and append where a mark is wanted |
 | `topbar.ts` | The sign-in control: Sign in button → member picker dialog; signed in → name chip + Sign out. Self-injected styles, accent-aware | Automatic: `theme-boot.js` mounts it into `.topnav`/`.page-head` (opt out: `<body data-no-session>`) |
-| `site-footer.ts` | The ONE footer for the whole studio: the mark, the studio word, three named link groups, the outreach promise, and the source link. Every href resolves from the site root so the same list works at three page depths | Automatic: `theme-boot.js` appends it (a page that writes its own `<footer>` keeps it; `<body data-no-footer>` refuses one) |
+| `site-footer.ts` | The ONE footer for the whole studio: the mark, the studio word, four named link groups (members · staff · the studio · legal), the outreach promise, the studio's address and its three contact lines, and the way to settings. Every href resolves from the site root, so the same list works at three page depths; every visible detail is real text, never CSS `content:`, so an address can actually be copied | Automatic: `theme-boot.js` appends it (a page that writes its own `<footer>` keeps it; `<body data-no-footer>` refuses one) |
 | `alert.ts` | Notice · Problem · Done. A message that says what is true, in a live region created empty at boot so a screen reader is already listening. Nothing here disappears on a timer | Automatic region; `showAlert()` / `dismissAlert()` from anywhere |
 
 ## The clone story (change everything from the least files)
 
-1. **`app/shared/brand.ts`** — the studio's NAME. Every header follows at
-   runtime.
+1. **`app/shared/brand.ts`** — the studio's NAME **and its contact details**
+   (`STUDIO_CONTACT`: street, town, state, postcode, email, and the numbers
+   it takes calls and texts on). Every header and every footer follows at
+   runtime. A clone that renames the studio and keeps somebody else's
+   address is the failure this seam exists to make impossible, so the two
+   live in the same file.
 2. **`app/shared/theme.css`** — the accent tokens (and the one shared
    `.home-brand` ruleset all headers use — style it here, never per-page).
 3. **`app/favicon.svg`** — the mark (`logo.ts` carries the same path for
@@ -21,8 +25,10 @@
 3b. **`app/shared/photos/`** — the studio's own pictures, and
    `app/shared/fonts/` if the new studio has its own faces. Both fold into
    one instruction: replace the files, keep the licence files honest.
-4. **`app/index.html`** — the front door's title, meta description, and
-   theme-color: values a `<meta>` tag cannot read at runtime.
+4. **`app/index.html`** — the front door's title, meta description,
+   theme-color, and the address / telephone / email inside its JSON-LD
+   block: values markup a crawler reads cannot get from a module at
+   runtime.
 
 That is the whole rebrand **for everything shared**. Two honest remainders,
 each in an owner's lane rather than here (an audit caught this page claiming
