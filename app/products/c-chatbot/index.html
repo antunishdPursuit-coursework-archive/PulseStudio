@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Member Support — Pulse Studio</title>
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <meta name="description" content="Ask about the Pulse Studio class schedule, class levels, and current studio policies.">
   <link rel="stylesheet" href="../../shared/theme.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -15,23 +16,23 @@
   </header>
   <main>
     <section class="support-intro">
-      <p class="eyebrow">Member support</p>
+      <p class="eyebrow">Schedule and policies</p>
       <h2>How can we help?</h2>
-      <p>Ask about the class schedule, class levels, or current studio policies.</p>
+      <p id="scope">Ask about the class schedule, class levels, or current studio policies.</p>
     </section>
 
     <section class="chat" aria-label="Conversation">
       <div class="messages" id="messages" aria-live="polite">
-        <p class="message assistant">Hi! Ask me about Pulse Studio classes or policies.</p>
+        <p class="message assistant" id="greeting">Ask about classes or studio policies.</p>
       </div>
       <form class="composer" id="chat-form">
         <label for="question">Your question</label>
         <div class="composer-row">
-          <input id="question" name="question" autocomplete="off" placeholder="What yoga classes are available?" required>
+          <input id="question" name="question" autocomplete="off" placeholder="What yoga classes are available?" maxlength="1000" required>
           <button class="btn" type="submit">Send</button>
         </div>
       </form>
-      <p class="status" id="status">Preparing the latest studio schedule and policies.</p>
+      <p class="status" id="status" aria-live="polite">Preparing the latest studio schedule and policies.</p>
     </section>
   </main>
   <script type="module" src="../../shared/theme-boot.js"></script>

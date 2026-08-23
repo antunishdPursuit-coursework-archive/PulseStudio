@@ -66,8 +66,15 @@ option { background: var(--bg); color: var(--fg); }
 .session .text-button { padding: 8px 14px; }
 .meter, .room-bar { height: 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-top: 8px; }
 .meter i, .room-bar i { display: block; height: 100%; background: var(--accent); }
-.meter i.warn, .meter i.full { background: var(--accent); }
-.status, .status.warn, .status.full { display: inline-block; background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; padding: 4px 9px; text-transform: uppercase; }
+/* Status chips draw their distinction with weight, not hue — the colour law
+   spends colour on people. A "warn" chip (Underbooked / Filling soon, the
+   ones a staff person can act on) is filled; Full and On track stay
+   outlined. Before this, three selectors set identical styles, so the CSS
+   implied a difference the page never showed. */
+.status { display: inline-block; background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; padding: 4px 9px; text-transform: uppercase; }
+.status.warn { background: var(--accent); color: var(--accent-ink); }
+.data-note, .room-empty { color: var(--muted); font-size: 0.85rem; margin: 10px 0 0; }
+.text-button { display: inline-block; text-decoration: none; }
 .room { margin: 16px 0; }
 .room-line { display: flex; justify-content: space-between; gap: 12px; }
 .room-line span { color: var(--muted); }
