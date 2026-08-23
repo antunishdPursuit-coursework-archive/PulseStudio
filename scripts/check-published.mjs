@@ -162,6 +162,29 @@ export function declaresIcon(html) {
   return /<link[^>]+rel=["'][^"']*\bicon\b[^"']*["'][^>]*>/i.test(html);
 }
 
+/** True when a page loads the shared bootstrap. `theme-boot.js` injects a
+ *  favicon link at runtime for any page that declares none — see
+ *  `ensureFavicon()` there — so a page reaching it has a favicon PATH even
+ *  when `declaresIcon` above reads false against its static markup. */
+export function loadsSharedBootstrap(html) {
+  /* NOT a \b regex: `\btheme-boot\.js\b` matches inside
+   * "not-theme-boot.js", because `-` is a non-word character and a boundary
+   * sits right there — the exact mistake check-brand.mjs made against
+   * "brand-word-legacy" before its own self-test caught it. This compares
+   * the FULL last path segment instead, so only the real file matches. */
+  const srcs = [...html.matchAll(/<script[^>]+src=["']([^"']*)["']/gi)].map((m) => m[1]);
+  return srcs.some((src) => src.split("/").pop() === "theme-boot.js");
+}
+
+/** Every published page needs SOME path to a favicon: its own markup, or the
+ *  bootstrap that injects one at runtime. A page with neither is the gap
+ *  `staff-dashboard.html` sat in — it declared no icon and loaded no
+ *  bootstrap, so it asked every browser for /favicon.ico and got a 404, with
+ *  nothing short of opening it in a browser to show that. */
+export function hasFaviconPath(html) {
+  return declaresIcon(html) || loadsSharedBootstrap(html);
+}
+
 /* ---------- the self-test ---------- */
 
 function selfTest() {
@@ -247,7 +270,27 @@ function selfTest() {
     }
   }
 
-  let failed = failedIndexing;
+  const faviconPathCases = [
+    ["an icon link alone is a path", '<link rel="icon" href="/favicon.svg">', true],
+    ["theme-boot alone is a path", '<script type="module" src="../../shared/theme-boot.js"></script>', true],
+    ["both is still a path", '<link rel="icon" href="/f.svg"><script src="../../shared/theme-boot.js"></script>', true],
+    /* THE GAP THIS CHECK EXISTS FOR: staff-dashboard.html, exactly. */
+    ["neither is the gap this check exists for", "<head><title>x</title></head>", false],
+    ["a DIFFERENT script is not the bootstrap",
+      '<script type="module" src="staff-dashboard.js"></script>', false],
+    ["theme-boot named as a SUBSTRING of another file is not a match",
+      '<script src="../../shared/not-theme-boot.js"></script>', false],
+  ];
+  let failedFaviconPath = failedIndexing;
+  for (const [label, html, want] of faviconPathCases) {
+    const got = hasFaviconPath(html);
+    if (got !== want) {
+      failedFaviconPath += 1;
+      console.error(`  self-test MISS — ${label}: wanted ${want}, got ${got}`);
+    }
+  }
+
+  let failed = failedFaviconPath;
   for (const c of planted) {
     const { web, sources, other } = classifyPublished([c.file]);
     const got = web.length ? "web" : sources.length ? "sources" : "other";
@@ -257,7 +300,7 @@ function selfTest() {
     }
   }
   console.log(
-    `self-test: ${planted.length + indexingCases.length + iconCases.length + rootCases.length} planted cases, ${planted.length + indexingCases.length + iconCases.length + rootCases.length - failed} behaved, ${failed} did not.`,
+    `self-test: ${planted.length + indexingCases.length + iconCases.length + rootCases.length + faviconPathCases.length} planted cases, ${planted.length + indexingCases.length + iconCases.length + rootCases.length + faviconPathCases.length - failed} behaved, ${failed} did not.`,
   );
   console.log(
     failed === 0
@@ -349,7 +392,40 @@ function run() {
     process.exit(1);
   }
 
-  /* Second pass: every page's indexing decision. */
+  /* Fourth pass: every published page has SOME path to a favicon — its own
+   * markup, or the shared bootstrap that injects one at runtime. This is
+   * the regression check for the gap `staff-dashboard.html` sat in: it
+   * declared no icon and loaded no bootstrap, so nothing short of opening
+   * it in a browser showed the 404 it asked for on every load. */
+  const knownNoPath = new Map((baseline.noFaviconPath ?? []).map((e) => [e.file, e]));
+  const noPath = [];
+  for (const file of tracked) {
+    if (!file.endsWith(".html")) continue;
+    if (!hasFaviconPath(readFileSync(join(ROOT, file), "utf8"))) noPath.push(file);
+  }
+  const freshNoPath = noPath.filter((f) => !knownNoPath.has(f));
+  console.log(
+    `check-published: ${pagesWithIcons(tracked)} published pages checked for a favicon path — ` +
+      `${noPath.length} with neither markup nor the shared bootstrap (${noPath.length - freshNoPath.length} known).`,
+  );
+  for (const file of noPath.filter((f) => knownNoPath.has(f))) {
+    const entry = knownNoPath.get(file);
+    console.log(`  known · ${file} · ${entry.why} (owner: ${entry.owner})`);
+  }
+  for (const file of freshNoPath) {
+    console.error(
+      `  ${file} · declares no <link rel="icon"> and loads no theme-boot.js, so nothing gives it a ` +
+        "favicon path at all — every browser that opens it asks for /favicon.ico and gets a 404. Add " +
+        'either <link rel="icon" href="<path>/favicon.svg" type="image/svg+xml"> or load ' +
+        "<path>/shared/theme-boot.js, whichever this page's header system already expects.",
+    );
+  }
+  if (freshNoPath.length > 0) {
+    console.error(`check-published: ${freshNoPath.length} page(s) with no favicon path at all. FAIL`);
+    process.exit(1);
+  }
+
+  /* Second pass: every page's indexing decision. */  /* Second pass: every page's indexing decision. */
   const sitemapPath = join(ROOT, "app/sitemap.xml");
   const sitemap = existsSync(sitemapPath) ? readFileSync(sitemapPath, "utf8") : "";
   const knownIndexing = new Map((baseline.indexing ?? []).map((e) => [e.file, e]));
