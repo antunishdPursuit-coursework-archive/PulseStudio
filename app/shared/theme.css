@@ -925,6 +925,39 @@ h1, h2, h3, .display, .page-head .role, .brand {
 /* The same trap the assistant panel hit twice: a class rule that sets
    display beats the UA's [hidden] unless we say so here. */
 .staff-door-problem[hidden] { display: none; }
+
+/* A THUMB IS NOT A MOUSE POINTER.
+ *
+ * Measured on a 375px-wide viewport, this site had SEVENTEEN controls under
+ * the 44px minimum a finger needs — eleven of them the footer's navigation
+ * links, at fifteen pixels tall. On a desktop with a cursor that is fine and
+ * invisible; on the phone most members actually carry, it is a column of
+ * links you cannot reliably hit, right where somebody goes looking for
+ * "Book a class".
+ *
+ * The query is `pointer: coarse`, not a width breakpoint, because the thing
+ * that changed is the INPUT, not the screen. A tablet with a pen and a
+ * narrow desktop window are different problems; a finger is a finger at any
+ * width. Nothing moves visually — the text stays where it was and the box
+ * around it grows to meet the hand. */
+@media (pointer: coarse) {
+  .site-footer li a,
+  .site-footer-base a,
+  .site-footer-brand a,
+  .topnav .brand,
+  .page-head .home-brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .appearance-mode {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* The list gets its rhythm back: the links are taller now, so the gap
+     between them no longer has to carry the separation on its own. */
+  .site-footer li + li { margin-top: 0; }
+}
 .assistant-panel {
   position: fixed;
   right: 20px;

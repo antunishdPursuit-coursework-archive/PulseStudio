@@ -28,10 +28,18 @@ states that conversational support is unavailable. The local server lives in
 ## The deliberate design
 
 - **The shared-data boundary is exact:** Product C accesses
-  `FixtureSet.timezone`, `class_sessions`, and `studio_policies`; timezone is
-  the fixture envelope, not another record collection. It does not access
-  members, memberships, instructors, reservations, attendance, synthetic
-  records, or another product's browser storage.
+  `PublicFixtures.timezone`, `class_sessions`, and `studio_policies`;
+  timezone is the fixture envelope, not another record collection. It cannot
+  access members, memberships, reservations or attendance — those are not in
+  the public half at all, and the type has no such fields, so a read of one
+  is a compile error rather than an undefined at runtime. It does not touch
+  synthetic records or another product's browser storage.
+
+  The assistant's outbound guard is in two halves now. The staff-vocabulary
+  half runs here on the finished text; the NAME half runs on the server,
+  which holds the roster. This page used to fetch every member's display
+  name to run that check itself — a member-facing page holding the whole
+  roster, which is a larger leak than the one it prevented.
 - **Policies are read-only.** Only records with `is_current: true` reach the
   model. The cancellation answer comes from `pol_001`; missing policy topics
   get a stated miss rather than an invented answer.

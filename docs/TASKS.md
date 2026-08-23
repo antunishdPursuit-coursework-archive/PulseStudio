@@ -20,141 +20,111 @@ change in `app/shared/`, it does not — say so and it gets built here instead.
 
 ---
 
-## Everyone — one line, and it is the same line
+## Everyone — nothing outstanding
 
-Four pages ask a browser for an icon that does not exist. The site ships
-`app/favicon.svg`; a browser only finds it when the page points at it.
-
-In each page's `<head>`:
-
-```html
-<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
-```
-
-| Page | Owner |
-| --- | --- |
-| `app/products/a-booking/index.html` | Kerrian |
-| `app/products/b-dashboard/index.html` | Manny |
-| `app/products/b-dashboard/staff-dashboard.html` | Manny |
-| `app/products/c-chatbot/index.html` | Dennis |
-
-Check it: open the page and look at the console. A 404 for `/favicon.ico`
-means the line is missing or the path is wrong.
+The four pages that asked a browser for an icon they never declared now
+declare it. The two staff pages that showed rosters and attendance with no
+`robots` tag now carry `noindex, nofollow`. Both were one line each and both
+are done on this branch.
 
 ---
 
 ## Kerrian — Product A
 
-**1. The icon line above.**
+**Nothing outstanding.** Your accent has a readable companion
+(`--kerrian-strong`), your lines are gone from `docs/contrast-baseline.json`
+— which is now empty — and `PRODUCT_A_MEMBER_BOOKING_APP.md` no longer says
+"Evidence level: Planned" or lists waitlists as a non-goal. Waitlists ship,
+with the guard chain in `rules.ts` and 47 checks behind them.
 
-**2. Your accent is unreadable as text on the light theme.** `#3b82f6` on
-white is 3.68:1, and text needs 4.5:1. It sits in
-`docs/contrast-baseline.json` so the gate reports it instead of failing you,
-but the list only shrinks.
-
-The shared theme already has the shape for the fix — a companion token that
-keeps your identity hue for fills and gives you a readable one for text.
-Product D did it and `app/shared/theme.css` shows how. Define
-`--kerrian-strong` for the light theme, use it wherever your blue is TEXT,
-and delete your lines from the baseline in the same commit.
-
-**3. Three lines in your brief describe code you no longer have.** See
-`docs/REQUESTFOR-A-B-C.md` — the colour law summary is out of date, your
-product brief still says "Evidence level: Planned", and waitlists are listed
-as out of scope in a product that ships them.
+One thing measured and deliberately NOT changed: your day chips are 43.59px
+tall on a phone, 0.41px under the 44px touch minimum. That is sub-pixel and a
+finger cannot tell. Left alone rather than churning your stylesheet for it.
 
 ---
 
 ## Manny — Product B
 
-**1. The icon line above, on both pages.**
+**Nothing outstanding.** In order:
 
-**2. Your staff pages carry no `robots` tag.** The re-engagement tool has
-one; the dashboard does not, and it shows rosters and attendance. In the
-`<head>` of both `index.html` and `staff-dashboard.html`:
-
-```html
-<meta name="robots" content="noindex, nofollow">
-```
-
-`app/robots.txt` is the weaker fallback and, on a project site, is served at
-a path crawlers do not read for this repository — the file says so itself.
-The tag is the part that works.
-
-**3. Your accent is the least readable of the four.** `#f59e0b` on white is
-2.15:1. Same fix as Kerrian's, same baseline, same one-commit rule.
-
-**4. Six lines in your brief describe behaviour your code does not have** —
-including "no persistence of any kind" when `staff-dashboard.js` writes
-`pulse-schedule-b`. `docs/REQUESTFOR-A-B-C.md` has the list and a prompt
-written for your assistant, because a brief that is wrong is worse than no
-brief: an assistant reads it first and believes it.
+- The icon line and the `robots` tag are on both pages.
+- `--manny-strong` clears AA; amber as text on white was 2.15:1.
+- Your header stopped restyling the shared `.topbar` and now uses the shared
+  `.page-head` the other three already used.
+- **`staff-dashboard.js` is TypeScript.** It shipped for months as
+  hand-written JavaScript no compiler opened, and `docs/sources-baseline.json`
+  said so. That file is now empty. Behaviour was held identical through the
+  conversion by snapshotting the rendered page first: 35 session cards, 4 week
+  buttons, 5 class-type options, 4,423 characters of text — then filter,
+  roster drill-in, week navigation and the publish dialog exercised after.
+  Zero differences.
+- `main.ts` is deleted. It rendered the whole dashboard, no page loaded it,
+  and the record split had quietly broken it while it still type-checked.
+  `docs/reachable-baseline.json` is empty as a result.
 
 ---
 
 ## Dennis — Product C
 
-**1. The icon line above.**
+**Nothing outstanding.** The icon line is in, the audience guard is wired,
+and your brief describes the boundary that exists.
 
-**2. The assistant has to know who it is talking to, and that is built.**
-`app/shared/assistant-audience.ts`. It holds no key, makes no network call,
-and never learns your endpoint exists — it decides who is asking and what may
-be said back, and hands you that as data.
-
-```ts
-import { audiencePolicy, answerProblems } from "../../shared/assistant-audience.js";
-import { readPulseSession } from "../../shared/auth/session.js";
-
-// Set this per page. A member-facing page stays member-facing even when a
-// staff person is signed in on it — the screen may be turned toward a member.
-const PLACEMENT = "member-facing";
-
-const session = readPulseSession();
-const policy = audiencePolicy(session?.actor_type ?? null, PLACEMENT, firstName);
-
-// policy.greeting  — the opening line, in that audience's voice
-// policy.scope     — what this assistant will answer, stated to the reader
-// policy.refusal   — what it says when a question falls outside that
-// policy.mayUseStaffRecords / policy.mayNameOtherMembers
-
-// LAST, on the text itself, before anything is shown:
-const problems = answerProblems(answer, policy, otherMemberNames);
-if (problems.length > 0) {
-  // Show policy.refusal instead of the answer, and say nothing about why.
-}
-```
-
-Run `answerProblems` on the way OUT, on the finished text, every time. The
-audience decision is the easy half; the failure this prevents is an answer
-composed with staff records reaching a member's screen after that decision
-was made. Seventeen checks in `app/shared/auth/tests.html` cover both halves,
-including a member on a staff page and a staff person on a member page.
-
-**3. Serving both audiences means two placements, not two products.** When
-the studio runs it at the front desk, that page passes `"staff-facing"` and
-staff answers become possible; the same assistant embedded anywhere a member
-reads passes `"member-facing"` and they never are. The API you are given
-sits behind both — the audience decides what may be asked of it and what may
-come back, and that decision is not the model's to make.
-
-**4. One line in your brief points at code that says something else** —
-`CLAUDE.md:32` cites `main.ts:69-71`, which is inside `studioDate()`.
+One change came from outside your folder and you should know why. The
+assistant's outbound guard is now in **two halves in two places**. The
+staff-vocabulary half still runs on your page, on the finished text. The NAME
+half moved to the server. Your page used to fetch every member's display name
+so it could check answers against them — a member-facing page holding the
+whole roster, which is a larger leak than the one it prevented and against
+the data law outright. The server holds the roster and returns a verdict:
+never the roster, never the name it matched.
 
 ---
 
 ## Rensley — Product D
 
-**1. Nothing on the list above.** D declares its icon, carries its `robots`
-tag, and was fixed rather than baselined on contrast.
-
-**2. Get a qualified person to approve routine content.** All three routines
+**1. Get a qualified person to approve routine content.** All three routines
 ship as `draft`, so the panel reads "0 approved routines. Nothing to include
-yet." That is correct and it is not finished.
+yet." That is correct and it is not finished. **This one cannot be closed by
+whoever is writing the code** — it needs somebody qualified to sign off on
+exercise content going to members. Naming that here rather than quietly
+flipping a flag.
 
-**3. Verify Enter and Space on the routine controls by hand.** Automation
-could not deliver the activation, so it is unverified rather than passing.
+**2. Enter and Space on the routine controls: still unverified, honestly.**
+Measured this round: they are native `<details>`/`<summary>`, they toggle on
+click, nothing intercepts keys, and the summary takes focus with `tabIndex 0`
+— which is every precondition for native keyboard activation. What could not
+be produced is a TRUSTED key event; automation delivers a synthetic one, and
+a synthetic keypress does not drive native `<details>` behaviour. So the
+preconditions are verified and the activation is not. It stays on this list
+until somebody presses the key with a finger.
 
 ---
+
+## What changed underneath all four, this branch
+
+Read this before you touch anything, because two of them change what your
+code is allowed to assume.
+
+- **Records that name a person left `app/`.** Everything under `app/` is
+  served at a URL, so members, memberships, reservations and attendance moved
+  to `data/staff-records.json`, outside it, behind `/api/staff/records`.
+  `loadFixtures()` returns `PublicFixtures` now — the timetable, who teaches,
+  the policies. It has no `members` field, so reading one is a compile error
+  rather than an `undefined` on a member's screen.
+- **Staff surfaces are gated, and the gate is real.** The dashboard and the
+  re-engagement tool draw nothing until the studio's server confirms a
+  session it signed itself. Where there is no server the door stays shut and
+  says so; it never fails open. The audience law in `CLAUDE.md` was amended
+  to say this, with the reasoning for why the old rule was right kept intact.
+- **`npm start` runs the studio's server**, not a static file server. Staff
+  sign-in needs `STAFF_PASSPHRASE` in the environment — see `.env.example`
+  and `docs/the-server.md`.
+- **Touch targets have a 44px minimum** behind `@media (pointer: coarse)`.
+  Seventeen controls were under it, eleven of them footer links at fifteen
+  pixels tall.
+- **`run-suites` finds its suites instead of listing them.** Three product
+  suites existed and ran nowhere; the count went from 1,425 to over 1,500 the
+  moment they were discovered. A suite with no label is now a hard error.
 
 ## Already done for you, in shared
 
