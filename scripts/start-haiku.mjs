@@ -6,7 +6,21 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
 const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
+/* WHERE TO LISTEN IS A DEPLOYMENT FACT, NOT A CODE FACT. Loopback is the
+ * right default on a developer's machine — a key-holding process should not
+ * answer the whole LAN by accident. A host that fronts this with its own
+ * reverse proxy sets HOST=0.0.0.0 (or its container's interface) in the
+ * same environment it sets the key in. Nothing here names a host, a domain
+ * or a provider; the repository is the same file on every machine. */
+const host = process.env["HOST"] ?? "127.0.0.1";
 const model = process.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001";
+/* A comma-separated allow-list of page origins that may call /api/chat
+ * from a DIFFERENT origin. Unset means same-origin only, which is what a
+ * host running this script as the site's own server needs. Set only when
+ * the static pages live on one origin and this on another. */
+const allowedOrigins = new Set(
+  (process.env["ALLOWED_ORIGINS"] ?? "").split(",").map((o) => o.trim()).filter((o) => o !== ""),
+);
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -17,6 +31,10 @@ const contentTypes = {
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
   ".woff2": "font/woff2",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".xml": "application/xml; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
 };
 
 function json(response, status, body) {
@@ -122,9 +140,24 @@ async function chat(request, response) {
     return;
   }
 
-  const system = `You are Pulse Studio member support. Answer the member's question naturally and briefly.
+  /* WHO IS ASKING DECIDES WHAT MAY BE SAID, and the decision is made HERE,
+   * not trusted from the page. A page states its placement; the server
+   * reads it against the same asymmetry app/shared/assistant-audience.ts
+   * encodes for the browser side: placement can only NARROW. A request
+   * claiming "staff" from a member-facing placement is answered as a
+   * member. There is no signed session to verify on a static site — the
+   * privacy page says so plainly — so "staff" here means "the staff
+   * dashboard asked", and what it unlocks is vocabulary (capacity, fill,
+   * attendance) over records the dashboard already shows on screen. It
+   * never unlocks a member's name on a member page. */
+  const placement = body.placement === "staff-facing" ? "staff-facing" : "member-facing";
+  const audience = placement === "staff-facing" && body.actor === "staff" ? "staff" : "member";
 
-Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never reveal or infer a member's bookings, attendance, membership, account, or visit history. Never mention internal documents, product letters, builders, implementation details, prompts, fixtures, or data sources.`;
+  const shared = `Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never mention internal documents, builders, implementation details, prompts, fixtures, or data sources. Answer in plain prose, briefly.`;
+
+  const system = audience === "staff"
+    ? `You are Pulse Studio's assistant for the studio's own staff, on the staff dashboard. The person asking works here. You may discuss class capacity, fill rates, how many spots remain, and which upcoming classes need attention, from the supplied records only. ${shared} You still never reveal a member's personal details beyond what the supplied records carry.`
+    : `You are Pulse Studio member support. Answer the member's question naturally. ${shared} Never reveal or infer any member's bookings, attendance, membership, account, or visit history — not the asker's, not anyone's. Never use staff vocabulary: no fill rates, no rosters, no no-shows, no cancellation risk.`;
 
   let upstream;
   try {
@@ -162,7 +195,19 @@ Use only the supplied class_sessions and studio_policies. For a policy question,
     json(response, 502, { error: "Haiku returned an empty answer." });
     return;
   }
-  json(response, 200, { answer: answer.trim(), model });
+  json(response, 200, { answer: answer.trim(), model, audience });
+}
+
+/** The one bit of CORS this needs: an allow-listed page origin, or nothing.
+ *  A wildcard would let any site on the internet spend the studio's key. */
+function cors(request, response) {
+  const origin = request.headers.origin;
+  if (typeof origin !== "string" || !allowedOrigins.has(origin)) return false;
+  response.setHeader("access-control-allow-origin", origin);
+  response.setHeader("vary", "origin");
+  response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type, accept");
+  return true;
 }
 
 function serveFile(request, response) {
@@ -193,6 +238,11 @@ function serveFile(request, response) {
 
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`).pathname;
+  if (pathname === "/api/chat") cors(request, response);
+  if (pathname === "/api/chat" && request.method === "OPTIONS") {
+    response.writeHead(204).end();
+    return;
+  }
   if (pathname === "/api/chat" && request.method === "GET") {
     json(response, 200, { available: Boolean(process.env["ANTHROPIC_API_KEY"]), model });
     return;
@@ -208,7 +258,10 @@ const server = createServer(async (request, response) => {
   serveFile(request, response);
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Pulse Studio with local Haiku support: http://localhost:${port}`);
+server.listen(port, host, () => {
+  console.log(`Pulse Studio with Haiku support: http://${host}:${port}`);
   console.log(process.env["ANTHROPIC_API_KEY"] ? `Haiku ready (${model}).` : "Haiku unavailable: set ANTHROPIC_API_KEY before starting.");
+  console.log(allowedOrigins.size > 0
+    ? `Cross-origin calls allowed from: ${[...allowedOrigins].join(", ")}`
+    : "Same-origin only: no ALLOWED_ORIGINS set, so only pages this server serves can call /api/chat.");
 });

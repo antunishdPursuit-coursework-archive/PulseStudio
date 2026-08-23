@@ -1,9 +1,17 @@
-# Member support with Haiku — local setup
+# The assistant service — local, and hosted
 
-Product C can use Claude Haiku when Pulse Studio runs through the local Node
-server. GitHub Pages remains static and has no safe place for the Anthropic API
-key, so the deployed chatbot reports that conversational support is unavailable
-until the team chooses a hosted backend.
+The studio's assistant answers from `scripts/start-haiku.mjs`: a small Node
+server that serves `app/` and answers `POST /api/chat` by calling Claude
+Haiku with the studio's key. **The key lives in that process's environment
+and nowhere else.** It is never in the repository, never in a build, never
+in the page. A browser gets an answer; it never gets the key.
+
+The static site on GitHub Pages has no process to hold a key in, so the
+deployed assistant there reports that it is unavailable. That is not a
+defect to route around — any key a static page can read, every visitor can
+read — it is the reason this service exists as a separate process.
+
+## Local
 
 From the repository root:
 
@@ -12,12 +20,52 @@ cp .env.example .env
 npm run start:haiku
 ```
 
-Put the Anthropic key after `ANTHROPIC_API_KEY=` in `.env`, then open
-`http://localhost:4173/products/c-chatbot/`. Git ignores `.env`; never commit
-its contents. `ANTHROPIC_MODEL` can override the pinned default model when the
-team intentionally upgrades Haiku.
+Put the key after `ANTHROPIC_API_KEY=` in `.env`, then open
+`http://localhost:4173/products/c-chatbot/`. Git ignores `.env`; never
+commit its contents. The server binds to loopback by default, so a
+key-holding process on a laptop never answers the whole LAN by accident.
 
-The browser refuses private-member questions before any network request. The
-server accepts only scheduled `class_session` records and current read-only
-`studio_policy` records, then passes those records and the member's question
-to Haiku.
+## Hosted
+
+Run the same script on whatever host the team has chosen, with the key in
+its environment. The repository names no host, on purpose: it is the same
+file on every machine, and a provider's name in a source file is a fact
+that goes stale the day the provider changes.
+
+Three environment variables are the whole configuration:
+
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | The key. Set it in the host's runtime configuration — never in a file this repository tracks. | unset → `/api/chat` answers 503 and the page says so |
+| `HOST` | The interface to listen on. A host that fronts this with its own reverse proxy sets its container's interface. | `127.0.0.1` |
+| `PORT` | The port. | `4173` |
+| `ALLOWED_ORIGINS` | Comma-separated page origins allowed to call `/api/chat` from a **different** origin. Only needed when the static pages are served from one origin and this from another. | unset → same-origin only |
+
+The simplest hosted shape is the one the script already is: let it serve
+`app/` itself, so the pages and `/api/chat` share an origin and
+`ALLOWED_ORIGINS` stays unset. A wildcard is never accepted; an origin not
+on the list gets no CORS header and the browser refuses the call.
+
+## What the server decides, and what it trusts
+
+- **Who is asking.** The page states a placement (`member-facing` or
+  `staff-facing`) and an actor. The server applies the same asymmetry the
+  browser-side guard in `app/shared/assistant-audience.ts` encodes:
+  placement can only narrow. A request claiming `staff` from a
+  member-facing page is answered as a member. There is no signed session to
+  verify on a static site — the privacy page says so to the reader — so
+  "staff" means "the staff dashboard asked", and what it unlocks is
+  vocabulary (capacity, fill, attention) over records that dashboard already
+  shows on screen. It never unlocks a member's name on a member page.
+- **What reaches the model.** Only the fields the allow-list in
+  `safeContext()` names: scheduled class sessions and current policies,
+  capped at twenty each. Anything else in the request body is dropped
+  before the prompt is built. The question is bounded at 1000 characters
+  and the body at 100 KB.
+- **What comes back.** The answer is returned with the `audience` the
+  server decided, so the page can run its own outbound guard
+  (`answerProblems()` in the shared module) against the right policy
+  before a word is shown.
+
+The browser also refuses private-member questions before any network
+request is made; that guard is Product C's and lives in its folder.
