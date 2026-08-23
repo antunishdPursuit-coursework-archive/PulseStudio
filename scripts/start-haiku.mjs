@@ -1,4 +1,5 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -238,10 +239,182 @@ function serveFile(request, response) {
     response.writeHead(404).end("Not found");
     return;
   }
+  /* REVALIDATE, ALWAYS. With no cache header at all a browser applies its
+   * own heuristic and may hold a file for hours. That is not a local
+   * annoyance: it is a deploy that does not reach anybody, and it already
+   * cost one round of "the code is on the server and the page still runs
+   * the old one". `no-cache` does not mean do not store — it means ask
+   * first, which is the honest default for a site whose pages and modules
+   * change together. */
   response.writeHead(200, {
     "content-type": contentTypes[extname(filePath)] ?? "application/octet-stream",
+    "cache-control": "no-cache",
   });
   createReadStream(filePath).pipe(response);
+}
+
+/* ------------------------------------------------------------------ *
+ * STAFF ACCESS, ENFORCED WHERE A BROWSER CANNOT REACH IT.
+ *
+ * The studio's member records used to sit in app/shared/fixtures.json.
+ * Everything under app/ is served at a URL — that is the filing law — so
+ * those records were readable by anyone who typed the path, and a sign-in
+ * screen on the dashboard would only have hidden the VIEW while leaving the
+ * DATA one request away. A lock a person can walk around is not a lock.
+ *
+ * So the records that name a person moved to data/staff-records.json, which
+ * sits outside app/ where serveFile() answers 403, and the only way to them
+ * is this endpoint. The decision is made in this process, on a secret the
+ * browser never holds. That is the difference between access control and a
+ * picture of access control.
+ *
+ * WHAT THIS IS NOT. One shared staff passphrase, not per-person accounts:
+ * there is no user store yet (app/shared/auth/schema.sql is the design for
+ * one, and nothing runs it). It cannot tell one staff member from another
+ * and so cannot show you who looked at what. Say that plainly rather than
+ * implying an audit trail that does not exist.
+ * ------------------------------------------------------------------ */
+
+const staffPassphrase = process.env["STAFF_PASSPHRASE"] ?? "";
+
+/* The signing key is generated per process and never leaves it, so sessions
+ * end when the server restarts. A deliberate trade: no key to store, no key
+ * to leak, and a restart is the fastest way to revoke everyone. */
+const staffSigningKey = randomBytes(32);
+const STAFF_SESSION_MINUTES = 60;
+const STAFF_COOKIE = "__Host-pulse-staff";
+
+function digest(value) {
+  return createHash("sha256").update(value, "utf8").digest();
+}
+
+/* Compare through fixed-length digests so the check cannot leak the
+ * passphrase's length or its matching prefix through timing. */
+function passphraseMatches(offered) {
+  if (staffPassphrase === "") return false;
+  return timingSafeEqual(digest(offered), digest(staffPassphrase));
+}
+
+function signStaffToken(expiresAt) {
+  const payload = Buffer.from(JSON.stringify({ exp: expiresAt }), "utf8").toString("base64url");
+  const mac = createHmac("sha256", staffSigningKey).update(payload).digest("base64url");
+  return `${payload}.${mac}`;
+}
+
+function staffTokenIsValid(token) {
+  if (typeof token !== "string") return false;
+  const [payload, mac] = token.split(".");
+  if (payload === undefined || mac === undefined) return false;
+  const expected = createHmac("sha256", staffSigningKey).update(payload).digest("base64url");
+  const offered = Buffer.from(mac, "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  if (offered.length !== wanted.length) return false;
+  if (!timingSafeEqual(offered, wanted)) return false;
+  try {
+    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof exp === "number" && Date.now() < exp;
+  } catch {
+    return false;
+  }
+}
+
+function cookieValue(request, name) {
+  const header = request.headers["cookie"];
+  if (typeof header !== "string") return null;
+  for (const part of header.split(";")) {
+    const at = part.indexOf("=");
+    if (at < 0) continue;
+    if (part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
+  }
+  return null;
+}
+
+function requestIsSignedInStaff(request) {
+  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE));
+}
+
+/* __Host- is not decoration. The prefix forbids a Domain attribute
+ * outright, so the cookie is pinned to exactly this origin and cannot be
+ * set for, or sent to, a sibling host. It also REQUIRES Secure, so this
+ * works over HTTPS or on localhost and refuses to pretend anywhere else. A
+ * deployment on plain HTTP should fail to sign in rather than quietly hand
+ * out a session anyone on the wire can copy. */
+function staffCookie(value, maxAgeSeconds) {
+  return `${STAFF_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+async function staffSession(request, response) {
+  if (request.method === "GET") {
+    json(response, 200, {
+      configured: staffPassphrase !== "",
+      signedIn: requestIsSignedInStaff(request),
+      minutes: STAFF_SESSION_MINUTES,
+    });
+    return;
+  }
+  if (request.method === "DELETE") {
+    response.setHeader("set-cookie", staffCookie("", 0));
+    json(response, 200, { signedIn: false });
+    return;
+  }
+  if (request.method !== "POST") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  if (staffPassphrase === "") {
+    json(response, 503, {
+      error: "Staff sign-in is not configured on this server. Set STAFF_PASSPHRASE and restart.",
+    });
+    return;
+  }
+  /* requestBody() already returns parsed JSON — parsing its result again
+     turns every sign-in into a 400, which is exactly what it did once. */
+  let body;
+  try {
+    body = await requestBody(request);
+  } catch {
+    json(response, 400, { error: "Body must be JSON." });
+    return;
+  }
+  const offered = typeof body?.passphrase === "string" ? body.passphrase : "";
+  if (!passphraseMatches(offered)) {
+    /* One message for a wrong passphrase and for none at all: a caller
+     * learns whether they are in, never anything about what would work. */
+    json(response, 401, { error: "That passphrase was not accepted." });
+    return;
+  }
+  const expiresAt = Date.now() + STAFF_SESSION_MINUTES * 60 * 1000;
+  response.setHeader("set-cookie", staffCookie(signStaffToken(expiresAt), STAFF_SESSION_MINUTES * 60));
+  json(response, 200, { signedIn: true, minutes: STAFF_SESSION_MINUTES });
+}
+
+function staffRecords(request, response) {
+  if (request.method !== "GET") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  if (staffPassphrase === "") {
+    json(response, 503, {
+      error: "Staff records are not available: this server has no STAFF_PASSPHRASE set.",
+    });
+    return;
+  }
+  if (!requestIsSignedInStaff(request)) {
+    json(response, 401, { error: "Staff sign-in required." });
+    return;
+  }
+  let records;
+  try {
+    records = readFileSync(resolve(root, "data", "staff-records.json"), "utf8");
+  } catch {
+    json(response, 500, { error: "Staff records could not be read on the server." });
+    return;
+  }
+  response.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  response.end(records);
 }
 
 const server = createServer(async (request, response) => {
@@ -259,6 +432,14 @@ const server = createServer(async (request, response) => {
     await chat(request, response);
     return;
   }
+  if (pathname === "/api/staff/session") {
+    await staffSession(request, response);
+    return;
+  }
+  if (pathname === "/api/staff/records") {
+    staffRecords(request, response);
+    return;
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405).end("Method not allowed");
     return;
@@ -269,6 +450,9 @@ const server = createServer(async (request, response) => {
 server.listen(port, host, () => {
   console.log(`Pulse Studio with Haiku support: http://${host}:${port}`);
   console.log(process.env["ANTHROPIC_API_KEY"] ? `Haiku ready (${model}).` : "Haiku unavailable: set ANTHROPIC_API_KEY before starting.");
+  console.log(staffPassphrase !== ""
+    ? `Staff records behind /api/staff/records; sessions last ${STAFF_SESSION_MINUTES} minutes. Sign-in needs HTTPS or localhost — the session cookie is __Host- prefixed and refuses to set otherwise.`
+    : "Staff records locked: set STAFF_PASSPHRASE to let the dashboard and re-engagement tool sign in.");
   console.log(allowedOrigins.size > 0
     ? `Cross-origin calls allowed from: ${[...allowedOrigins].join(", ")}`
     : "Same-origin only: no ALLOWED_ORIGINS set, so only pages this server serves can call /api/chat.");
