@@ -1254,6 +1254,7 @@ for (const file of ENGINE_SOURCES) {
     "../components/site-footer.ts",
     "../components/alert.ts",
     "../components/figures.ts",
+    "../components/assistant.ts",
   ]) {
     const source = await (await fetch(file)).text();
     check(`${file} was actually read`, source.length > 200, true);
@@ -1300,6 +1301,33 @@ for (const file of ENGINE_SOURCES) {
     boot.includes('from "./storage.js"'), true);
   check("...and opens none of its own",
     /localStorage\.(getItem|setItem|removeItem)/.test(boot), false);
+
+  check("theme-boot mounts the assistant launcher", boot.includes("mountAssistant()"), true);
+  const assistantSource = await (await fetch("../components/assistant.ts")).text();
+  check("the assistant was actually read", assistantSource.length > 200, true);
+  check("it names no hosting provider or domain in its own source",
+    /githat|vercel\.app|render\.com|railway\.app|herokuapp\.com/i.test(assistantSource), false);
+  check("it holds no key or credential-shaped literal",
+    /anthropic-version|x-api-key|sk-ant-/i.test(assistantSource), false);
+
+  /* A RECURRING CLASS OF BUG, PINNED BY THE TWO CASES THAT ALREADY
+   * HAPPENED. `hidden` is a UA-stylesheet `display: none` at the lowest
+   * possible specificity; a plain class rule setting `display:` on the
+   * same element wins by source order regardless, so the element is
+   * marked hidden and still drawn. It happened first to `.home-product`
+   * (the folded staff cards rendered at 941px anyway) and again, in the
+   * SAME session, to `.assistant-panel` (the chat panel rendered open on
+   * every page load) — proof that "I'll remember this time" does not
+   * survive contact with a second component. Every class here that
+   * toggles via `.hidden = ` in a shared module needs its override; this
+   * pins the two found so far rather than trusting the next one to be
+   * caught by eye. */
+  const homeCss = await (await fetch("../home.css")).text();
+  check("home.css was actually read", homeCss.length > 200, true);
+  check("the folded staff card override still exists",
+    homeCss.includes(".home .home-product[hidden] { display: none; }"), true);
+  check("the assistant panel's override still exists",
+    themeCss.includes(".assistant-panel[hidden] { display: none; }"), true);
 }
 
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.

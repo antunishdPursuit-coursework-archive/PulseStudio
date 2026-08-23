@@ -792,3 +792,123 @@ h1, h2, h3, .display, .page-head .role, .brand {
   .studio-floor [data-figure="lift"] { width: 92px; }
   .studio-floor [data-figure="cycle"] { width: 118px; }
 }
+
+/* ---- the assistant launcher --------------------------------------------
+   ONE CHATBOX, BOTTOM-RIGHT, ON EVERY PAGE THAT ASKED FOR ONE. The button
+   and panel are built by components/assistant.ts; this is their only look,
+   so a page cannot restyle the one thing every audience shares. It carries
+   NO product accent — the assistant speaks for the studio, not for one
+   product's colour, the same reason shared infrastructure carries none. */
+.assistant-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--fg) 22%, transparent);
+}
+.assistant-launcher:hover { filter: brightness(1.08); }
+.assistant-launcher:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+.assistant-launcher[aria-expanded="true"] { display: none; }
+
+/* `hidden` LOSES TO A CLASS RULE AT EQUAL SPECIFICITY, SOURCE ORDER
+   DECIDES. This is the same bug `.home-product[hidden]` was fixed for a
+   few sections up in this same file — found again, in the very panel that
+   fix should have made this session careful about. `.assistant-panel {
+   display: flex }` matches the element whether or not it carries `hidden`,
+   and being later in the sheet than the UA's `[hidden] { display: none }`,
+   it won: the panel rendered open on every page load until a person
+   clicked anything. Watched in a browser, not assumed from the code. */
+.assistant-panel[hidden] { display: none; }
+.assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 40px));
+  max-height: min(560px, calc(100vh - 40px));
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px color-mix(in srgb, var(--fg) 24%, transparent);
+  overflow: hidden;
+}
+.assistant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.assistant-title { margin: 0; font-size: 1rem; font-family: inherit; }
+.assistant-close {
+  background: none;
+  border: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.assistant-close:hover { color: var(--fg); }
+.assistant-close:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.assistant-log {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.assistant-line { margin: 0; padding: 9px 12px; border-radius: 12px; max-width: 88%; font-size: 0.92rem; line-height: 1.4; }
+.assistant-you { align-self: flex-end; background: var(--fg); color: var(--bg); }
+.assistant-studio { align-self: flex-start; background: color-mix(in srgb, var(--fg) 6%, var(--bg)); border: 1px solid var(--line); }
+
+.assistant-form { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.assistant-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.assistant-input:focus-visible { outline: 3px solid var(--fg); outline-offset: 1px; }
+.assistant-send {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.assistant-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.assistant-send:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.assistant-status { margin: 0; padding: 0 16px 12px; color: var(--muted); font-size: 0.78rem; }
+
+@media (max-width: 480px) {
+  .assistant-launcher, .assistant-panel { right: 12px; bottom: 12px; }
+  .assistant-panel { width: calc(100vw - 24px); }
+}
