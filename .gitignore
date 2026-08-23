@@ -38,3 +38,15 @@ Thumbs.db
 # rule was always about, so that is what it matches now.
 .claude/*.local.*
 .claude/settings.local.json
+
+# Isolated worktrees. `git worktree add .claude/worktrees/<name>` is how a
+# change gets built against a CLEAN main while unrelated work sits unfinished
+# somewhere else — which is the only safe way to touch shared ground while
+# another branch is mid-edit. Each one is a full second checkout of this
+# repository, so a single `git add -A` from the root would stage thousands of
+# files that already exist one directory up.
+#
+# Untracked is not the same as ignored: these were invisible only because
+# nobody had run `git add` at the root yet. A rule is what makes that a
+# property instead of a near miss.
+.claude/worktrees/
