@@ -669,6 +669,57 @@ check("today is computed in the studio timezone",
     nobodyFlaggedLine(r, proposedRules)?.includes("all 1 are paused, canceled or expired"), true);
   check("inactive members are counted, not silently skipped", r.notActiveCount, 1);
 }
+
+/* THE LINE A STAFF PERSON SEES ON A GOOD DAY, PINNED WHOLE.
+ *
+ * The language law asks a screen with nothing to show to say what it
+ * checked — "5 members checked, 0 flagged" — rather than leave a blank.
+ * This is that line, and every check on it tested a FRAGMENT with
+ * .includes(), so the sentence a person actually reads was never compared
+ * to anything as a whole.
+ *
+ * Its singular mattered and was unchecked. The head hand-rolled its own
+ * plural (`active === 1 ? "" : "s"`) until 2026-08-22, a second copy of the
+ * rule shared/text.ts exists to own, and every reason clause still
+ * hand-rolls its VERB — "1 has" against "2 have" — which counted() cannot
+ * do for it. The best outcome this tool produces already shipped reading
+ * "(1 days)" once. Nothing was watching this sentence for the same fault. */
+{
+  /* Three days before TODAY: quiet, but well inside the 14-day floor. */
+  const recent = ["2026-08-15"];
+  const one = findQuietMembers(
+    recordsFor([{ id: "m1", name: "Ada Quiet", status: "active", attended: recent }]),
+    TODAY, proposedRules);
+  check("nobody flagged, one member: the whole sentence, singular throughout",
+    nobodyFlaggedLine(one, proposedRules),
+    "1 active member checked, 0 flagged. Of those, 1 has been in within the last 14 days.");
+
+  const two = findQuietMembers(
+    recordsFor([
+      { id: "m1", name: "Ada Quiet", status: "active", attended: recent },
+      { id: "m2", name: "Bo Quiet", status: "active", attended: recent },
+    ]),
+    TODAY, proposedRules);
+  check("nobody flagged, two members: the whole sentence, plural throughout",
+    nobodyFlaggedLine(two, proposedRules),
+    "2 active members checked, 0 flagged. Of those, 2 have been in within the last 14 days.");
+
+  /* The other reason clauses hand-roll a verb too. One member apiece proves
+   * the singular of each, which is the half that reads wrong when it is. */
+  const never = findQuietMembers(
+    recordsFor([{ id: "m1", name: "Cy New", status: "active", attended: [] }]),
+    TODAY, proposedRules);
+  check("nobody flagged, one member who never attended: singular verb",
+    nobodyFlaggedLine(never, proposedRules),
+    "1 active member checked, 0 flagged. Of those, 1 has never attended a class — that is onboarding, not re-engagement.");
+
+  const longGone = findQuietMembers(
+    recordsFor([{ id: "m1", name: "Di Gone", status: "active", attended: ["2026-05-01"] }]),
+    TODAY, proposedRules);
+  check("nobody flagged, one member quiet past the window: singular verb",
+    nobodyFlaggedLine(longGone, proposedRules),
+    "1 active member checked, 0 flagged. Of those, 1 has been quiet longer than 60 days — past a note, and worth a pause-or-cancel conversation instead.");
+}
 {
   const newcomer = recordsFor([{ id: "m1", name: "Brand New", status: "active", attended: [] }]);
   const r = findQuietMembers(newcomer, TODAY, proposedRules);

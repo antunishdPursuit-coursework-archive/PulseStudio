@@ -511,7 +511,7 @@ export function nobodyFlaggedLine(
   if (inRecently > 0) {
     reasons.push(`${inRecently} ${inRecently === 1 ? "has" : "have"} been in within the last ${rules.minDaysQuiet} days`);
   }
-  const head = `${active} active member${active === 1 ? "" : "s"} checked, 0 flagged.`;
+  const head = `${counted(active, "active member")} checked, 0 flagged.`;
   return reasons.length === 0 ? head : `${head} Of those, ${reasons.join("; ")}.`;
 }
 
