@@ -25,9 +25,13 @@ a `.js` in a TypeScript repo (it has no `.ts` twin; do not delete it as
 "compiled output"). Meanwhile `main.ts` is DEAD: an earlier
 `loadFixtures()`-based dashboard whose required DOM ids exist in neither
 HTML file — nothing loads it, and editing it changes nothing on the page.
-`staff-dashboard.html` is a stale sibling page (no `product-b` class, no
-theme, hardcoded `#f4f1eb` rows that violate the color law) — treat
-`index.html` as canonical; the stale pair is Manny's to retire.
+`staff-dashboard.html` WAS a stale sibling page and is gone (retired
+2026-08-23 on the do-not-merge/b proposal branch): it loaded the same
+script as `index.html` but declared only 12 of the 33 ids that script
+reaches for, so it threw `Cannot set properties of null` on line 19 of the
+script on every load and rendered nothing. Nothing linked to it; the only
+ways in were a typed URL or an old bookmark. `index.html` is the one
+dashboard, and it now carries its own `noindex` and favicon lines.
 
 ## Lane law
 
