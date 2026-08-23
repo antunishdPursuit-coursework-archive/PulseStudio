@@ -1305,8 +1305,16 @@ for (const file of ENGINE_SOURCES) {
   check("theme-boot mounts the assistant launcher", boot.includes("mountAssistant()"), true);
   const assistantSource = await (await fetch("../components/assistant.ts")).text();
   check("the assistant was actually read", assistantSource.length > 200, true);
-  check("it names no hosting provider or domain in its own source",
-    /githat|vercel\.app|render\.com|railway\.app|herokuapp\.com/i.test(assistantSource), false);
+  /* NAMES NO HOST — and does not name one to check for it either. This
+   * used to be a list of candidate providers spelled out in a regex, in a
+   * file that ships to a public URL, which published the shortlist it was
+   * trying to keep out of the source. The generic form is both quieter and
+   * stricter: the assistant must carry NO absolute URL at all. It talks to
+   * its own origin through relative paths, so any scheme-and-host literal
+   * in there is a provider hardcoded into a file that should outlive the
+   * choice of provider. */
+  check("it names no host at all in its own source",
+    /https?:\/\/[a-z0-9]/i.test(assistantSource), false);
   check("it holds no key or credential-shaped literal",
     /anthropic-version|x-api-key|sk-ant-/i.test(assistantSource), false);
 
