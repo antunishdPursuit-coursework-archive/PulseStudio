@@ -34,6 +34,7 @@ import { answerProblems, audiencePolicy, type Actor, type Placement } from "../a
 import { sharedStudio } from "../auth/studio.js";
 import { readStored, writeStored } from "../storage.js";
 import { STUDIO_NAME } from "../brand.js";
+import { pulseLogo } from "./logo.js";
 import type { Reservation } from "../contract.js";
 import type { SyntheticClassSession, SyntheticDataset } from "../synthetic/contracts.js";
 
@@ -229,7 +230,13 @@ export function mountAssistant(): void {
   launcher.type = "button";
   launcher.setAttribute("aria-expanded", "false");
   launcher.setAttribute("aria-controls", PANEL_ID);
-  launcher.textContent = "Ask";
+  /* The launcher carries the studio's own mark, not a generic chat glyph —
+   * the same brand every header and footer already carries, so the one
+   * new fixed element on the page still reads as part of one system
+   * rather than a bolted-on widget. */
+  launcher.append(pulseLogo(18, true));
+  const launcherLabel = el("span", "assistant-launcher-label", "Ask");
+  launcher.append(launcherLabel);
 
   const panel = el("section", "assistant-panel");
   panel.id = PANEL_ID;
@@ -237,11 +244,14 @@ export function mountAssistant(): void {
   panel.setAttribute("aria-label", `${STUDIO_NAME} assistant`);
 
   const head = el("div", "assistant-head");
+  const heading = el("div", "assistant-heading");
+  heading.append(pulseLogo(16, true));
   const title = el("h2", "assistant-title", "Ask the studio");
+  heading.append(title);
   const close = el("button", "assistant-close", "×");
   close.type = "button";
   close.setAttribute("aria-label", "Close the assistant");
-  head.append(title, close);
+  head.append(heading, close);
 
   const log = el("div", "assistant-log");
   log.setAttribute("role", "log");
@@ -274,17 +284,32 @@ export function mountAssistant(): void {
     const session = readPulseSession();
     const actor: Actor = session === null ? null : session.actor_type;
     kind = assistantFor(actor, placement);
-    const first = session === null ? null : session.display_name.split(" ")[0] ?? null;
-    status.textContent = openingLine(kind, first);
   };
   refresh();
   subscribeToPulseSession(refresh);
 
+  /* THE GREETING IS A MESSAGE, NOT A FOOTNOTE. It used to live only in the
+   * small muted line under the input, which meant the panel opened to an
+   * empty log every time — a blank box until somebody typed into it. Said
+   * once, as the studio's own first line in the conversation, the moment
+   * the panel is first opened; the status line under the form goes back
+   * to reporting only what is happening right now ("Checking…"), never
+   * standing in for a message. */
+  let greeted = false;
   const open = (show: boolean): void => {
     panel.hidden = !show;
     launcher.setAttribute("aria-expanded", String(show));
-    if (show) input.focus();
-    else launcher.focus();
+    if (show) {
+      if (!greeted) {
+        const session = readPulseSession();
+        const first = session === null ? null : session.display_name.split(" ")[0] ?? null;
+        say(openingLine(kind, first), "studio");
+        greeted = true;
+      }
+      input.focus();
+    } else {
+      launcher.focus();
+    }
   };
   launcher.addEventListener("click", () => open(panel.hidden));
   close.addEventListener("click", () => open(false));
@@ -377,6 +402,14 @@ export function mountAssistant(): void {
       say(problems.length === 0 ? answer : policy.refusal, "studio");
     } finally {
       send.disabled = false;
+      /* CLEARED IN finally, NOT AFTER THE LAST say(). "Checking the
+       * studio's records." is a progress line, and every early `return`
+       * above — the 503 path, the unparseable-answer path — used to skip
+       * past the one place that cleared it, so the panel sat claiming to
+       * still be checking under an answer that had already arrived.
+       * finally runs on every exit, which is exactly the guarantee a
+       * progress line needs. */
+      status.textContent = "";
       refresh();
     }
   });
