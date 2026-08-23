@@ -341,6 +341,15 @@ function renderSchedule(member: SyntheticMember | undefined): void {
     button.addEventListener("click", () => {
       const session = sessions.find((item) => item.id === button.dataset.book);
       if (!session || !member) return;
+      /* THE CLOCK AT THE CLICK, NOT THE CLOCK AT THE LAST RENDER. ctx.nowLocal
+       * is only refreshed at the top of render() (line ~462); on a page left
+       * open with no interaction, a click on an already-rendered Book button
+       * for a class that has since started would otherwise compare
+       * session.startsAt against a STALE, earlier "now" — the started-class
+       * refusal never fires, and the reservation is stamped with a backdated
+       * time. Refreshed here, immediately before the rule reads it, so the
+       * check that exists to close this exact gap is checking the truth. */
+      ctx.nowLocal = studioNowTimestamp(dataset.meta.timezone);
       try {
         const reservation = bookSession(ctx, member, session, {
           reservationId: newReservationId(),
@@ -360,6 +369,9 @@ function renderSchedule(member: SyntheticMember | undefined): void {
     button.addEventListener("click", () => {
       const session = sessions.find((item) => item.id === button.dataset.wait);
       if (!session || !member) return;
+      /* Same staleness the Book handler above guards against — refreshed for
+       * the same reason. */
+      ctx.nowLocal = studioNowTimestamp(dataset.meta.timezone);
       try {
         const reservation = joinWaitlist(ctx, member, session, {
           reservationId: newReservationId(),
@@ -440,6 +452,10 @@ function renderMine(memberId: string): void {
   mineEl.querySelectorAll<HTMLButtonElement>("[data-cancel-confirm]").forEach((button) => {
     button.addEventListener("click", () => {
       const sessionId = button.dataset.cancelConfirm ?? "";
+      /* canceled_at should stamp the moment of the click, not whatever "now"
+       * was at the last render — the same reason Book and Join waitlist
+       * refresh it above. */
+      ctx.nowLocal = studioNowTimestamp(dataset.meta.timezone);
       try {
         appendRows(cancelReservation(ctx, memberId, sessionId, ctx.nowLocal, newReservationId));
         cancelArmed = null;
