@@ -4,6 +4,7 @@ import { generateStudio } from '../../shared/synthetic/generate.js';
 // pin it; this file keeps only the DOM wiring. See dashboard.ts for why.
 import { bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText, roomDemand, spotsLeftText, status } from './dashboard.js';
 import { counted } from '../../shared/text.js';
+import { mountStaffDoor } from '../../shared/auth/staff-gate.js';
 
 const RUNTIME_RESERVATIONS_KEY='pulse-reservations-a';
 const SCHEDULE_STORAGE_KEY='pulse-schedule-b';
@@ -65,4 +66,7 @@ let runtimeSignature=JSON.stringify(runtimeReservations);
 const refreshRuntimeReservations=()=>{const next=readRuntimeReservations();const signature=JSON.stringify(next);if(signature===runtimeSignature)return;runtimeReservations=next;runtimeSignature=signature;sharedSessionsByWeek=buildSharedSessionsByWeek();render();};
 window.addEventListener('storage',event=>{if(event.key===RUNTIME_RESERVATIONS_KEY)refreshRuntimeReservations();if(event.key===SCHEDULE_STORAGE_KEY){localSessionsByWeek=readPublishedSchedules();render();}});
 window.addEventListener('focus',refreshRuntimeReservations);
-render();
+// THE DOOR COMES FIRST. Nothing about this dashboard is drawn until the
+// studio's server confirms a staff session; see shared/auth/staff-gate.ts
+// for what that check is and what it is not.
+mountStaffDoor(document.querySelector('main') ?? document.body).then(open => { if (open) render(); });
