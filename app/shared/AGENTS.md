@@ -231,18 +231,20 @@ the legacy contract) is what all four products speak.
   touching the offset leaves every affected value an hour out on every
   screen that shows it. Checked through `Intl` rather than a table of
   transition dates, since the table is the thing that goes stale.
-- **`loadFixtures()` and `fixtures.json` are reached by no page**, found
-  2026-08-22. The data law names `loadFixtures()` as the one shared
-  loader and that is still the rule — but its only importer is
-  `b-dashboard/main.ts`, and `b-dashboard/index.html` loads
-  `staff-dashboard.js` instead, a hand-written module with no TypeScript
-  source. So nothing the site serves reads the legacy fixture set.
-  `check-fixtures.mjs` still validates it against the contract and still
-  prints its staleness countdown, which is worth keeping — but read that
-  countdown as being about RECORDS aging, not about a screen going stale:
-  no screen shows them. Worth knowing before anyone spends a day rolling
-  those dates forward. Whether the legacy loader has a future is a team
-  question; `check-reachable.mjs` holds the fact so it cannot quietly stop
+- **`loadFixtures()` IS reached, and this bullet said the opposite for a
+  while.** Found 2026-08-22 that its only importer was `b-dashboard/main.ts`,
+  a page nothing loaded — `b-dashboard/index.html` ran `staff-dashboard.js`
+  instead. That importer is deleted now, on this branch: it rendered the
+  whole dashboard, no page loaded it either, and the shared-records split
+  had broken it while it still type-checked.
+  What this bullet did not have yet is that `c-chatbot/main.ts` ALSO
+  imports `loadFixtures()`, and that page IS what `c-chatbot/index.html`
+  loads — a member asking the assistant a schedule question is reading the
+  legacy fixture set right now. `check-fixtures.mjs` validating it and
+  printing a staleness countdown was never merely worth keeping; a member-
+  facing screen depends on it. Whether the legacy loader has a future
+  beyond this one reader is still a team question; `check-reachable.mjs`
+  holds the fact so it cannot quietly stop
   being true.
 - **`components/logo.ts` is called by nothing.** `components/README.md`
   promises the pulse mark as a callable; every header draws its own
