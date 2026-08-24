@@ -20,6 +20,7 @@ __pycache__/
 # repo has never contained, and its name broke the language law.
 .env
 .env.*
+.env.example
 
 # Operating-system and editor files
 .DS_Store
