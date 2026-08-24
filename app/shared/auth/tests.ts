@@ -33,6 +33,7 @@ import {
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
+import { renderStudioBrand } from "../components/brand-header.js";
 import { assistantFor, bookForMember, bookingIntent, openingLine, resolveSessions } from "../components/assistant.js";
 import { generateStudio } from "../synthetic/generate.js";
 import { DEFAULT_CONFIG } from "../synthetic/config.js";
@@ -1085,6 +1086,58 @@ check("...and an already-international number is not given a second one", () =>
   eq(dialable("+44 20 7946 0018"), "+442079460018"));
 check("the address renders in the order an envelope wants it", () =>
   eq(addressLine(), "50 Upper Montclair Plaza, Montclair, NJ 07043"));
+
+/* THE CLONE SEAM ITSELF HAD NO CHECK ON IT. renderStudioBrand() is what
+ * check-brand.mjs's whole premise depends on — "every header follows
+ * shared/brand.ts" is a promise about this function's behavior, and
+ * nothing here had ever run it. It reads a DOM root as a parameter
+ * rather than the live document, which is exactly what makes it testable
+ * without the module-load side effects theme-boot.ts has. */
+check("the brand word fills as lead + accent, split on the first space", () => {
+  const root = document.createElement("div");
+  const word = document.createElement("span");
+  word.className = "brand-word";
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  home.append(word);
+  root.append(home);
+  renderStudioBrand(root);
+  return eq([word.textContent, word.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+});
+check("the home link gets a real aria-label naming the studio, not a leftover placeholder", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  root.append(home);
+  renderStudioBrand(root);
+  return eq(home.getAttribute("aria-label"), "Return to Pulse Studio home");
+});
+check("the home link gets exactly one mark, even mounted twice", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  root.append(home);
+  renderStudioBrand(root);
+  renderStudioBrand(root);
+  return eq(home.querySelectorAll("svg").length, 1);
+});
+check("a page that already drew its own mark inline is left alone, not doubled", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  home.innerHTML = "<svg><path/></svg>";
+  root.append(home);
+  renderStudioBrand(root);
+  return eq(home.querySelectorAll("svg").length, 1);
+});
+check("any element asking for the plain name gets it, unsplit", () => {
+  const root = document.createElement("div");
+  const label = document.createElement("span");
+  label.dataset["studioName"] = "";
+  root.append(label);
+  renderStudioBrand(root);
+  return eq(label.textContent, "Pulse Studio");
+});
 
 /* The legal pages are linked from every page's footer, and a footer link to
  * a page that does not exist is worse than no link at all. */

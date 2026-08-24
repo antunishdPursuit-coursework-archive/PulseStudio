@@ -88,7 +88,7 @@ const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
  * reaches it through deps.ts. Its checks — late evening, another zone,
  * both DST nights, the year roll — are in D's suite.
  *
- * The seven below are the same shape, found the same way this tool found
+ * The eight below are the same shape, found the same way this tool found
  * its own suite-key bug: asked about a module that a suite plainly
  * checks, and got back "no suite covers this." Each is imported straight
  * into app/shared/auth/tests.ts, but none lives under app/shared/auth/,
@@ -97,7 +97,9 @@ const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
  * storage.ts was the SAME MISS in the SAME PASS: the sweep that added the
  * other six read this import block and skipped the one two lines above
  * `../components/site-footer.js` — found only when the block was
- * re-checked against this list line by line, not trusted from memory. */
+ * re-checked against this list line by line, not trusted from memory.
+ * brand-header.ts is the same list finally getting checked a third time,
+ * against the SAME import block, after the checks for it were added. */
 const OVERRIDES = [
   ["app/shared/text.", "d-reengagement"],
   ["app/shared/today.", "d-reengagement"],
@@ -105,6 +107,7 @@ const OVERRIDES = [
   ["app/shared/storage.", "auth"],
   ["app/shared/brand.", "auth"],
   ["app/shared/components/assistant.", "auth"],
+  ["app/shared/components/brand-header.", "auth"],
   ["app/shared/components/site-footer.", "auth"],
   ["app/shared/components/figures.", "auth"],
   ["app/shared/components/alert.", "auth"],
