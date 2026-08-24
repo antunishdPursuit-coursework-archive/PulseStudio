@@ -19,7 +19,7 @@ import {
   type PulseSession,
 } from "./session.js";
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
-import { sharedStudioMembers } from "./studio.js";
+import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 import {
   PROBE_KEY,
@@ -32,7 +32,7 @@ import {
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
-import { assistantFor, bookForMember, bookingIntent, openingLine } from "../components/assistant.js";
+import { assistantFor, bookForMember, bookingIntent, openingLine, resolveSessions } from "../components/assistant.js";
 import { generateStudio } from "../synthetic/generate.js";
 import { DEFAULT_CONFIG } from "../synthetic/config.js";
 import {
@@ -447,6 +447,48 @@ check("signInAsFrontDesk writes exactly the staff record", () => {
   return eq(readPulseSession(), FRONT_DESK);
 });
 
+/* ---------- the shared studio, topped up for the dashboard ---------- */
+
+check("sharedStudioWithFill returns a real dataset on the FIRST call", () => {
+  /* THE ONE THING THIS FUNCTION MUST NEVER DO. Its cache check reads
+   * `existing !== undefined` before it has ever been called with this
+   * fill target — a distinct value proves the cache was empty rather
+   * than reusing whatever an earlier check in this file populated it
+   * with. Nothing here checked this until `npm run mutate` found it: the
+   * comparison flipped to `===` and no check noticed, which means the
+   * planted bug — returning `undefined` in place of a dataset on a cold
+   * cache — could have shipped silently. */
+  const dataset = sharedStudioWithFill(0.41);
+  return typeof dataset === "object" && dataset !== null && Array.isArray(dataset.classSessions)
+    ? true
+    : "expected a dataset, got " + JSON.stringify(dataset);
+});
+
+check("...and the same fill target is cached, not regenerated", () => {
+  const first = sharedStudioWithFill(0.41);
+  const second = sharedStudioWithFill(0.41);
+  return first === second ? true : "expected the identical cached object back";
+});
+
+check("...while a different fill target gets its own dataset", () => {
+  const a = sharedStudioWithFill(0.2);
+  const b = sharedStudioWithFill(0.6);
+  return a !== b ? true : "two different fill targets should not share one cache entry";
+});
+
+check("...and every upcoming class matches the schedule a plain sharedStudio() gives", () => {
+  /* THE KNOB SEATS MEMBERS; IT DOES NOT TOUCH THE SCHEDULE. Measured
+   * 2026-08-23: generating with and without upcomingFillTarget produced
+   * 1,900 of 1,900 sessions identical in id, start time, class type and
+   * status. This is that measurement, held as a check rather than left
+   * as a one-time note — the property Product B's hand-off with Product
+   * A now depends on. */
+  const plain = sharedStudio();
+  const filled = sharedStudioWithFill(0.85);
+  const key = (d: typeof plain) => d.classSessions.map((s) => `${s.id}|${s.startsAt}|${s.classTypeId}|${s.status}`);
+  return eq(key(filled), key(plain));
+});
+
 /* ---------- storage that is broken or missing ---------- */
 
 const throwingStorage = {
@@ -666,6 +708,20 @@ check("the greeting uses a first name only when there is one", () =>
   eq(audiencePolicy("member", "member-facing", "Ada").greeting.startsWith("Hi Ada"), true));
 check("...and assumes nothing about an unsigned reader", () =>
   eq(audiencePolicy(null, "member-facing").greeting.includes("Hi "), false));
+check("...and an empty name is treated the same as no name", () =>
+  eq(audiencePolicy("member", "member-facing", "").greeting.includes("Hi "), false));
+/* THE STAFF GREETING HAD NO CHECK ON IT AT ALL — every check above this
+ * line reads a member policy's greeting; the one staff-policy check
+ * above stops at mayUseStaffRecords/mayNameOtherMembers. `npm run mutate`
+ * found the gap once these modules became reachable: the whole
+ * `firstName === null || firstName === ""` condition in the staff branch
+ * could be broken and nothing here would notice. */
+check("a staff greeting with no name asks plainly, uncredited", () =>
+  eq(audiencePolicy("staff", "staff-facing").greeting, "Ask about the schedule, capacity, attendance, or policies."));
+check("...and a named staff person is greeted by it", () =>
+  eq(audiencePolicy("staff", "staff-facing", "Sam").greeting.startsWith("Sam — "), true));
+check("...with an empty name treated the same as no name, same as members", () =>
+  eq(audiencePolicy("staff", "staff-facing", "").greeting.startsWith("Sam"), false));
 /* A refusal states what it checked rather than shrugging. */
 check("a refusal says where the answer would have come from", () =>
   eq(audiencePolicy("member", "member-facing").refusal.includes("studio's records"), true));
@@ -1187,12 +1243,11 @@ const assistantStudio = generateStudio({
   upcomingFillTarget: 0.5,
 }).dataset;
 
-/* bookingIntent/bookForMember take a resolved Session — a module-private
- * shape assistant.ts builds from a dataset via resolveSessions(), which is
- * not exported (the launcher's DOM wiring is the only caller). What is
- * checked here is the two EXPORTED pure functions against hand-built
- * values in exactly the shape resolveSessions() produces, so the rule
- * itself — not the private plumbing around it — is what is pinned. */
+/* bookingIntent/bookForMember take a resolved Session — a shape
+ * assistant.ts builds from a dataset via resolveSessions(). What follows
+ * first checks those two functions against hand-built Session values, so
+ * their rule is pinned without needing a dataset at all — then checks
+ * resolveSessions() itself, against the real generated studio below. */
 function assistantSession(overrides: {
   id?: string; classType?: string; startsAt?: string; capacity?: number; bookedCount?: number;
   status?: "scheduled" | "completed" | "canceled";
@@ -1301,6 +1356,40 @@ check("a browser that refuses to save reports that, not a false success", () => 
   setSharedStorageForChecks(null);
   if (result.ok) return "reported success while storage refused the write";
   return eq(result.why.includes("not saving"), true);
+});
+
+/* RESOLVESESSIONS ITSELF, against the real generated studio rather than
+ * hand-built Session values — the one thing the checks above cannot
+ * reach, because they start from an already-resolved Session and never
+ * exercise the filter that BUILDS one from the dataset's own bookings.
+ *
+ * `npm run mutate` found the gap the day this module became reachable:
+ * `b.classSessionId === raw.id` in resolveSessions can flip to `!==` and
+ * every check above stays green, because none of them ever hand it a
+ * dataset with more than one session's worth of bookings to tell the two
+ * readings apart. Inverted, every session's count becomes "everyone NOT
+ * in this class" — the same shape of bug fixed in a-booking/rules.ts this
+ * branch, in a module of its own because shared code may not import a
+ * product's. */
+check("resolveSessions counts only bookings for that exact session", () => {
+  const resolved = resolveSessions(assistantStudio, new Map());
+  const bySession = new Map<string, number>();
+  for (const b of assistantStudio.bookings) {
+    if (b.status !== "booked") continue;
+    bySession.set(b.classSessionId, (bySession.get(b.classSessionId) ?? 0) + 1);
+  }
+  const mismatch = resolved.find((s) => (bySession.get(s.raw.id) ?? 0) !== s.bookedCount);
+  return mismatch === undefined
+    ? true
+    : `session ${mismatch.raw.id}: expected ${bySession.get(mismatch.raw.id) ?? 0} booked, resolveSessions said ${mismatch.bookedCount}`;
+});
+check("...and at least two sessions in this studio actually have DIFFERENT booked counts", () => {
+  /* A check that passes because every session happens to have the same
+   * count would not have caught the inversion either — this is the
+   * property that makes the check above meaningful rather than lucky. */
+  const resolved = resolveSessions(assistantStudio, new Map());
+  const counts = new Set(resolved.map((s) => s.bookedCount));
+  return counts.size > 1 ? true : "every session had the same booked count; this fixture proves nothing";
 });
 
 /* THE OUTBOUND GUARD, exercised the way the launcher exercises it — the
