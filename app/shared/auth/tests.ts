@@ -20,6 +20,7 @@ import {
 } from "./session.js";
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
+import { doorMessage } from "./staff-gate.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 import {
   PROBE_KEY,
@@ -592,6 +593,48 @@ check("clearing with a throwing storage still signs the page out", () => {
   const got = readPulseSession();
   setStorageForChecks(null);
   return eq(got, null);
+});
+
+/* ---------- the staff door's one pure function ---------- *
+ *
+ * doorMessage() had NO check on it at all until `npm run mutate` reached
+ * this module for the first time and scored it 0% — every mutation
+ * survived, because nothing here called it. The rest of staff-gate.ts asks
+ * a real server (readStaffGate, signInStaff, signOutStaff,
+ * loadStaffRecords), which this synchronous check() harness cannot stub;
+ * that is verified by hand against a throwaway server instead, the same
+ * way the rest of the staff door was proven this branch. doorMessage has
+ * no such excuse — it is a plain function from a StaffGate value to a
+ * sentence, and it is the ONE thing standing between "the server is down"
+ * and "no passphrase is set" and "sign in" ever reading the same to a
+ * visitor. */
+
+check("no server answered: the door says so, not 'no passphrase'", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  return said.includes("No server answered") ? true : `unexpected: ${said}`;
+});
+check("a server answered but no passphrase is set: says THAT, not 'no server'", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: true });
+  return said.includes("no staff passphrase set") && !said.includes("No server answered")
+    ? true : `unexpected: ${said}`;
+});
+check("configured and not signed in: asks for the passphrase", () => {
+  const said = doorMessage({ configured: true, signedIn: false, reachable: true });
+  return said.includes("Sign in with the studio's staff passphrase") ? true : `unexpected: ${said}`;
+});
+check("configured and ALREADY signed in reads the same as not signed in", () => {
+  /* mountStaffDoor never calls doorMessage once gate.signedIn is true — it
+   * returns before building the panel — so this is what the function
+   * itself does with that combination, not a claim about what the page
+   * shows. Pinned so `signedIn` staying out of the branching is a decision,
+   * not an oversight the next edit trips over. */
+  const asked = doorMessage({ configured: true, signedIn: false, reachable: true });
+  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true });
+  return eq(asked, alsoSignedIn);
+});
+check("unreachable outranks unconfigured — both true says the door is down", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
 /* ---------- run ---------- */
