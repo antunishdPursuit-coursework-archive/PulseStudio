@@ -2,7 +2,7 @@
 
 **Owner:** Manny
 **Phase:** Shipped
-**Evidence level:** Built and checked — `app/products/b-dashboard/tests.html`, 39 checks, run headlessly by `npm run check`. This line said "Problem framing" / "Planned" for a while after the code shipped — the same mistake Product A's brief made and was corrected for; nobody had come back to fix this one until now.
+**Evidence level:** Built and checked — `app/products/b-dashboard/tests.html`, 34 Product B checks, run headlessly by `npm run check`.
 
 ## First user and outcome
 
@@ -35,6 +35,11 @@ here promotes or cancels a class automatically.
 3. Staff see capacity, confirmed reservations, availability, and the agreed
    underbooked flag for each session.
 4. Staff open a session to review its roster and decide what action to take.
+5. Staff draft next week's classes in the schedule dialog and confirm them;
+   confirmed weeks persist to that browser only (localStorage key
+   `pulse-schedule-b`) and publish those sessions to the authenticated shared
+   schedule endpoint at `/api/schedule`; Product A does not read that endpoint
+   until its owner adds the approved consumer.
 
 ## Shared data use
 
@@ -46,7 +51,9 @@ the next line true rather than aspirational.
 
 Product B is read-only for reservations: staff build and publish next week's
 class schedule here, but promoting or canceling an individual reservation
-remains a human decision outside the dashboard.
+remains a human decision outside the dashboard. Published schedules are
+validated and stored by the server; Product A remains unchanged until its
+owner integrates the read path.
 
 ## Riskiest boundary
 

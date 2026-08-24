@@ -155,7 +155,7 @@ product creates, and unresolved questions during the team review.
 | Product | Owner | Reads | Creates or updates |
 | --- | --- | --- | --- |
 | Member Booking App | Kerrian | `member`, `membership`, `class_session`, `studio_policy` | `reservation` |
-| Staff Scheduling Dashboard | Manny | `member`, `class_session`, `instructor`, `reservation`, `attendance` | Product-local weekly schedule drafts only |
+| Staff Scheduling Dashboard | Manny | `member`, `class_session`, `instructor`, `reservation`, `attendance` | Authenticated published weekly schedule at `/api/schedule`; Product A consumer pending |
 | Member Support Chatbot | Dennis | `class_session`, `studio_policy` | No shared records in MVP |
 | Member Re-engagement Tool | Rensley | `member`, `membership`, `reservation`, `attendance`, `class_session`, `instructor` | Draft outreach only; no automatic sending |
 

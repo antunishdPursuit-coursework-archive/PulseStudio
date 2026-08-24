@@ -305,6 +305,10 @@ None of the above was touched by me — every file is in someone else's lane.
 
 ## Manny — the staff dashboard has no crawler protection at all (2026-08-21)
 
+**Status: closed.** The live Product B page now carries `noindex, nofollow`
+and mounts the shared staff sign-in door before rendering the dashboard. The
+historical investigation below is retained for context.
+
 This one is a privacy exposure, not a tidiness note, so it is first.
 
 `app/robots.txt` carried this claim: *"The staff dashboard has no such tag
@@ -321,8 +325,9 @@ Both halves turned out to be wrong, and the second one badly.
    site, in a different repository. Ours is served at
    `/PulseStudio/robots.txt` and is never requested.
 
-So the dashboard's roster and attendance content has had no protection of
-any kind. Verified just now — neither file carries a robots meta tag:
+At the time of this investigation, the dashboard's roster and attendance
+content had no crawler protection. The current page carries the tag and the
+shared server-backed staff door; the retired sibling page no longer exists.
 
 ```
 grep -c noindex app/products/b-dashboard/index.html          # 0
@@ -334,16 +339,14 @@ deliberately left crawlable: a crawler that is allowed to fetch the page
 reads the tag and honours it, and that is the only guaranteed way to stay
 out of an index. Blocking the crawl instead would stop the tag being read.
 
-**The ask — one line, in your lane:**
+**Historical ask — now completed:**
 
 ```html
 <meta name="robots" content="noindex, nofollow">
 ```
 
-in the `<head>` of both `app/products/b-dashboard/index.html` and
-`app/products/b-dashboard/staff-dashboard.html`. When it is in, the
-`Disallow` line in `app/robots.txt` should be deleted in the same commit so
-the tag can do the stronger job — the file explains why.
+in the `<head>` of `app/products/b-dashboard/index.html`; the retired
+`staff-dashboard.html` page is no longer part of the published product.
 
 Neither of these is a security control. A staff page holding real member
 data belongs behind a sign-in, not behind a politeness request; the meta tag

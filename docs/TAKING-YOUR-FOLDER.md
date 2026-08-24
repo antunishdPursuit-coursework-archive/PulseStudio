@@ -127,6 +127,10 @@ And note what a green gate does not do: **it never opens a browser.** Run
 
 ## One live defect, in Manny's folder, on `main` today
 
+**Status: closed.** Product B now mounts the shared server-backed staff door
+before rendering, and the obsolete sibling page has been retired. The
+historical finding below is retained as a record of what was fixed.
+
 Verified in a browser against `main` at `3457374`, not inferred from a gate:
 
 `GET /products/b-dashboard/` returns **200 to an anonymous visitor** and
