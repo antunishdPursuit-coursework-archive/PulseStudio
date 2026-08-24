@@ -190,6 +190,25 @@ function stampAt(at: string): { reservationId: string; at: string } {
   check("canceling a seeded booking frees the seat", remainingSpots(freed, tight), 1);
   const over = ctxOf([tight], seeded.concat(booking("member:000007", tight.id)));
   check("spots never go negative when seeded past capacity", remainingSpots(over, tight), 0);
+
+  /* EVERY BOOKING ABOVE BELONGS TO THIS SESSION, and that was the hole.
+   * `npm run mutate` swapped the `&&` in studioBooked for `||` and no
+   * check here noticed — because none of them ever handed the rules a
+   * booking for a DIFFERENT class. With `||`, any booking anywhere in the
+   * studio counts against this class's seats, and the member holding it
+   * reads as reserved for a class they never booked. The tool could not
+   * reach this suite at all until it learned to find its suites instead
+   * of listing three by hand. */
+  const elsewhere = session("class-session:000013", "2026-08-19T18:00:00", 2);
+  const crossed = ctxOf([tight, elsewhere], [booking("member:000008", elsewhere.id)]);
+  check("a booking in another class does not take a seat here",
+    remainingSpots(crossed, tight), 2);
+  check("...nor make that member reserved here",
+    memberStatus(crossed, "member:000008", tight.id), "none");
+  check("...while the class they did book still holds them",
+    memberStatus(crossed, "member:000008", elsewhere.id), "reserved");
+  check("...and this class's roster stays empty",
+    confirmedMemberIds(crossed, tight.id), []);
 }
 
 /* ------------------------------------------------------------------ */
