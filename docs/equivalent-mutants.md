@@ -418,18 +418,26 @@ LOOKED AT, not a scoreboard. Run the tool for a number.
 | shared `synthetic/generate` | **in full, 165 sites — 56% caught** | 73 survivors, dominated by paired guards; NOT individually audited |
 | the gates, other than the two below | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
 | gates `check-mirrors` and `check-brand` | not measured | both arrived after the sweep; the row above said ten gates until 2026-08-22, by which point twelve were running |
-| `today`, `theme-boot`, `components/*`, `brand` | not measured | nothing to swap, or no suite reaches them |
+| `today`, `theme-boot` | not measured | no suite reaches them — module-load side effects (`document`, the clock) |
 | a-booking `rules`, `reservations` | in full | none — 33 mutations, 33 caught, after two survivors were closed (a cross-session booking counting toward the wrong class's seats; the start-time guard only tested four hours late) |
 | b-dashboard `dashboard` | in full | none — 13 mutations, 13 caught, after one survivor was closed (busiest-room order indistinguishable from alphabetical in the one fixture that tried it) |
 | c-chatbot `support` | in full | none — 3 mutations, 3 caught. Small module; a clean score here is not a verdict on the product |
+| `assistant-audience` | in full | none — 12 mutations, 12 caught, after closing a gap where the STAFF greeting had no check on it at all |
+| `brand` | in full | none — 1 mutation, 1 caught |
+| `auth/studio` | in full | none — 1 mutation, 1 caught, after closing a real gap: `sharedStudioWithFill`'s cache check could invert and return `undefined` in place of a dataset on its first-ever call, and nothing noticed |
+| `components/assistant` (the two exported pure functions, plus `resolveSessions`) | sampled, 1 site in 2 of 61 | one real gap closed — `resolveSessions` could count a booking toward the WRONG session's capacity and nothing noticed, because every existing check started from an already-resolved `Session` and never exercised the filter that builds one. The rest of the 20 survivors sit inside `mountAssistant()`'s DOM-and-fetch body, below where the function is now cut — see "What is genuinely uncovered" |
+| `components/site-footer`, `components/alert` | in full | 5 survivors between them, all inside `mountSiteFooter()`/the alert-region mount — same shape, see below |
 
-The three product rows above were **not reachable by this tool at all**
-until 2026-08-23, when `mutate-suite.mjs` learned the suite keys from
+The five product-and-shared rows above were **not reachable by this tool at
+all** until 2026-08-23, when `mutate-suite.mjs` learned the suite keys from
 `scripts/suites.mjs` instead of a hand-written table that only knew three
-suites. Before that date this section had nothing to say about Product A,
-B or C because asking about them answered "no suite covers this module" —
-which reads as "nothing checks this," and for these three it was the tool,
-not the product.
+suites, and separately learned six modules imported into `auth/tests.ts`
+from OUTSIDE `app/shared/auth/` — `assistant-audience.ts`, `brand.ts`, and
+four `components/*.ts` files — which the by-folder default had never
+routed anywhere. Before both fixes this section had nothing to say about
+Product A, B, C, or any of those six modules, because asking about any of
+them answered "no suite covers this module" — which reads as "nothing
+checks this," and for all nine it was the tool, not the product.
 
 **A SAMPLE IS NOT A VERDICT, and this table proved it on itself.** The row
 above said "sampled, 1 site in 10 — 94%" until the full sweep ran: 165
@@ -495,3 +503,22 @@ it, so type and syntax errors are caught at the gate; its runtime behaviour
 is not. Same shape as Product D's `main.ts`, and the same remedy: anything in
 it that becomes a rule rather than markup should move to a module a check can
 load.
+
+**Two more entry points found the same shape, once the tool could see
+them at all (2026-08-23).** `mountAssistant()` in
+`app/shared/components/assistant.ts` and `mountSiteFooter()` plus the
+alert-region mount in `components/site-footer.ts` / `components/alert.ts`
+are called once each from `theme-boot.ts` at module load — `document`,
+`fetch`, and the session-change subscription live inside them, the same
+disqualifying shape `page.ts` has. 20 survivors in `assistant.ts` and 5
+between the other two are inside these bodies: DOM-existence guards
+("has this already mounted"), a fetch response's `.ok`/status branches, a
+first-name split for a greeting. None resembles the one bug this same
+survey found OUTSIDE these bodies — `resolveSessions`'s cross-session
+booking count, which was pure and got exported and checked directly. The
+remedy is the one already stated for `page.ts` and was already applied
+once to Product D's `main.ts`, finding two real bugs there: anything
+inside these mount functions that is a RULE rather than wiring should move
+to a function a check can call without a DOM. Not done here — it is real
+work, not a line, and nothing found so far inside either body has shown
+signs of being wrong.
