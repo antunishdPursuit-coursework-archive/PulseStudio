@@ -30,22 +30,34 @@ read every field. A product should read only the data its user needs.
 
 ## The envelope around the records
 
-`app/shared/fixtures.json` is not a bare list of entities. It is one object
-that carries the collections **and two fields of its own**, both live in
-`app/shared/contract.ts` as `FixtureSet` and both read at run time:
+The records split across TWO files on 2026-08-22, and this section described
+one file holding all seven collections until this correction — it needs to
+name both now, or a reader believes `fixtures.json` holds a member.
+
+**`app/shared/fixtures.json`** is public: any visitor's browser may fetch it.
+It carries `PublicFixtures` in `app/shared/contract.ts` — the timetable, who
+teaches, and the studio's policies:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `timezone` | string | The IANA zone this record set's dates are in. Every product that computes a day boundary — "how many days quiet", "is this class today" — resolves it here, so a staff member in another timezone still gets the STUDIO's answer. |
 | `note` | string | What this record set is, in one sentence, including that the people in it are fictional. It travels with the data so a set can never be mistaken for a real studio's records once it leaves this repo. |
 
-Then the collections: `members`, `memberships`, `instructors`,
-`class_sessions`, `reservations`, `attendance`, `studio_policies`.
+Then its collections: `instructors`, `class_sessions`, `studio_policies`.
 
-Documented 2026-08-21: these two fields existed in `contract.ts` and were
-described nowhere here, so the document that defines the vocabulary was
-silent about the field every day boundary in the studio is computed from.
-`scripts/check-fixtures.mjs` requires both.
+**`data/staff-records.json`** sits OUTSIDE `app/` on purpose — everything
+under `app/` is served at a URL, and every field in this file names a
+person: `members`, `memberships`, `reservations`, `attendance`. It carries
+`StaffRecords` in the same `contract.ts`, and the only route to it is
+`GET /api/staff/records`, behind the signed staff session
+`app/shared/auth/staff-gate.ts` requires.
+
+`FixtureSet` is both halves together — what the synthetic engine builds and
+`scripts/check-fixtures.mjs` validates as one record set, checked against
+both files, never fetched as one request. Documented 2026-08-21: `timezone`
+and `note` existed in `contract.ts` and were described nowhere here, so the
+document that defines the vocabulary was silent about the field every day
+boundary in the studio is computed from. The gate requires both fields.
 
 ## Core entities
 
@@ -167,24 +179,47 @@ Rensley's own correction — see `docs/REQUESTFOR-A-B-C.md`.
 
 ## Definitions the team must agree on
 
-Before implementation, define what counts as an active member, an underbooked
-class, a recent attendance drop, a full class, a no-show, a current policy, and
-a canceled reservation. Do not hard-code thresholds until the group agrees on
-them and records the reason.
+This section reads "before implementation, define" from the day the contract
+was drafted, and implementation has since answered most of these — in code,
+not in a team decision recorded here. What each product actually checks
+today: an active member is `membership_status === "active"`
+(`MembershipStatus` in `contract.ts`); a no-show is
+`attendance_status === "no_show"`; a current policy is `is_current === true`;
+a canceled reservation is `reservation_status === "canceled"`; a full class is
+zero seats left after `reserved` rows are counted, never `waitlisted` or
+`canceled` ones; underbooked is fill below 70% (`UNDERBOOKED_BELOW` in
+`app/products/b-dashboard/dashboard.ts`). A recent attendance drop is the one
+that is NOT settled: Product D flags a member quiet for 14 days, and that
+threshold is stated everywhere as Rensley's proposal, not a team decision —
+see `docs/SENIOR-DEV-BRIEF.md`. Read the code for what a value IS; read
+`docs/REQUESTFOR-A-B-C.md` for which of these the team has actually agreed to
+versus which one developer decided alone.
 
 ## Decisions required before building
 
-The team will use one shared fixture set for the MVPs. The remaining decision
-is whether that fixture is stored as JSON, CSV, or another simple format, plus
-who owns updates to the schedule and policy records. We also need a consistent
-timezone, ID format, enum values, and rule for handling missing or conflicting
-records.
+This section asked questions building has since answered. JSON, not CSV or
+another format — `app/shared/fixtures.json` and `data/staff-records.json`.
+Timezone is one IANA string carried in `PublicFixtures.timezone`, read by
+every product through `todayIsoInZone()` rather than each computing its own.
+ID format and enum values are typed in `app/shared/contract.ts`, the one
+place a rename has to happen for every reader to see it. A missing or
+conflicting record is a refusal, not a guess: `scripts/check-fixtures.mjs`
+fails the gate rather than letting an unresolved reference or an illegal
+status reach a screen.
 
-The group should define data permissions: members may see their own schedule
-and reservations, while staff-only attendance and cancellation-risk data must
-not be exposed through the member chatbot. Rensley's outreach tool should
-always produce a draft for staff review rather than send a message
-automatically.
+Who owns updates to the schedule and policy records remains genuinely open —
+both files are team-owned ground under `CLAUDE.md`, which means change with
+agreement stated in the PR, not "whoever gets there first."
+
+Data permissions are enforced, not merely defined: a member sees only their
+own schedule and reservations; attendance and cancellation-risk data never
+reaches the member chatbot, because `loadFixtures()` returns `PublicFixtures`
+— a type with no member, attendance or risk field to read in the first
+place, so importing one is a compile error rather than a runtime leak — and
+the chatbot's own privacy boundary separately refuses a private-member
+question before any network request is made. Rensley's outreach tool has
+never sent a message automatically — every draft goes to staff review, which
+is the language law now, not a proposal.
 
 Finally, agree on the repository workflow: one branch per product or approved
 shared increment, focused commits, pull-request review before merging, and no
