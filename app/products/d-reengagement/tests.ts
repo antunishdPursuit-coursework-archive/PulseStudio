@@ -2721,6 +2721,144 @@ check("clean records produce no data-quality line",
     heldByNonMember, 0);
 }
 
+// 30h. Chasing the no-show sibling of the join-day boundary above turned
+//      up a bigger bug instead, and closing THAT moved this one out of
+//      reach.
+//
+//      The block above proves an ATTENDED class on the join day survives
+//      its clamp (`day < joinedDay`). The no-show a member is booked into
+//      and skips has its own, separate clamp — `missedDay < joinedDay` —
+//      and the same tightening (`<=`) would drop a no-show dated exactly
+//      on the join day the same way. Measuring for it (a sweep to 500
+//      seeds, one real hit at seed 81) is what surfaced `lastVisitDaysAgo`
+//      itself reaching PAST `startedDaysAgo`: longGone (max 140) and left
+//      (max 120) could both draw a "last visit" older than the member's
+//      own membership, clamping away their v=0 attendance row entirely and
+//      leaving them with ZERO attendance — misread by findQuietMembers()
+//      as "never attended — onboarding, not ours" and silently dropped
+//      from the outreach the archetype exists to produce. 53 longGone and
+//      4 left members hit it across 200 seeds.
+//
+//      generateStudio() now clamps `lastVisitDaysAgo` to never exceed
+//      `startedDaysAgo` (see its comment). That fix also closes the
+//      no-show coincidence this section went looking for: a clamped
+//      member's missed-class day is `lastVisitDaysAgo` minus an offset of
+//      at least 2, which is now provably less than `startedDaysAgo` and so
+//      never lands exactly on the join day, and an unclamped member's own
+//      range sits far enough below `startedDaysAgo`'s floor of 90 that the
+//      exact coincidence needs its own rare alignment on top. Measured
+//      after the fix: 0 hits swept to 30,000 seeds, against 1 in the first
+//      500 before it. The guard itself stays — it is still what stops a
+//      no-show predating a join — there is just no seed on hand that
+//      proves its exact boundary, the same honest limit `day <= today`
+//      already carries above.
+
+// 30j. Each archetype draws its "days since last visit" from ITS OWN
+//      range, not a neighbour's.
+//
+//      generateStudio() decides how quiet a member looks with a chain of
+//      `archetype === "loyal" ? ... : archetype === "fading" ? ... : ...`.
+//      Flip any ONE of those comparisons to `!==` and that archetype falls
+//      through to the NEXT branch's range instead of its own — a newcomer
+//      who should look 1-9 days quiet reads as 30-120 days quiet, which is
+//      the exact shape of member this tool exists to flag, silently
+//      relabelled as somebody who just joined. Members carry no archetype
+//      field in the output; STUDIO_MIX's own order and counts (loyal 24,
+//      fading 8, longGone 6, newcomer 8, neverCame 4, paused 6, left 4) are
+//      how generation assigns `gen<seed>_m_<N>` ids, so the id range names
+//      the archetype without this file importing anything private.
+{
+  const ARCHETYPE_RANGES: ReadonlyArray<{ name: string; count: number; min: number; max: number }> = [
+    { name: "loyal", count: 24, min: 1, max: 12 },
+    { name: "fading", count: 8, min: 16, max: 55 },
+    { name: "longGone", count: 6, min: 75, max: 140 },
+    { name: "newcomer", count: 8, min: 1, max: 9 },
+    { name: "neverCame", count: 4, min: NaN, max: NaN }, // no attendance at all
+    { name: "paused", count: 6, min: 20, max: 90 },
+    { name: "left", count: 4, min: 30, max: 120 },
+  ];
+  const today = "2026-08-18";
+  const outOfRange: string[] = [];
+  const SEEDS = 10;
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    const { records } = generateStudio(seed, today);
+    const lastAttendedDayByMember = new Map<string, string>();
+    for (const a of records.attendance) {
+      if (a.attendance_status !== "attended") continue;
+      const session = records.class_sessions.find((s) => s.session_id === a.session_id);
+      const day = session?.starts_at.slice(0, 10);
+      if (day === undefined) continue;
+      const current = lastAttendedDayByMember.get(a.member_id);
+      if (current === undefined || day > current) lastAttendedDayByMember.set(a.member_id, day);
+    }
+    let memberNumber = 0;
+    for (const archetype of ARCHETYPE_RANGES) {
+      for (let n = 0; n < archetype.count; n += 1) {
+        memberNumber += 1;
+        if (archetype.name === "neverCame") continue; // never attends; nothing to check
+        const memberId = `gen${seed}_m_${memberNumber}`;
+        const lastDay = lastAttendedDayByMember.get(memberId);
+        if (lastDay === undefined) { outOfRange.push(`seed ${seed} ${memberId} (${archetype.name}): no attendance at all`); continue; }
+        const daysAgo = dayNumberFromIso(today) - dayNumberFromIso(lastDay);
+        if (daysAgo < archetype.min || daysAgo > archetype.max) {
+          outOfRange.push(`seed ${seed} ${memberId} (${archetype.name}): ${daysAgo} days, expected ${archetype.min}-${archetype.max}`);
+        }
+      }
+    }
+  }
+  check(`across ${SEEDS} studios, every archetype's most recent visit falls in ITS OWN declared range`,
+    outOfRange, []);
+}
+
+// 30k. A newcomer gets 2-5 visits, everyone else 4-14 — a SECOND,
+//      separate ternary from 30j's, and a separate loop-bound risk.
+//
+//      `visitCount` decides how many attendance rows a member gets, not
+//      how recent the newest one is, so 30j's recency check cannot see
+//      either of this one's own two ways to be wrong: the newcomer
+//      comparison flipping (giving a newcomer the 4-14 range and everyone
+//      else 2-5), or the walk that builds those rows running one iteration
+//      too many (`v < visitCount` loosened to `<=`), which can only ever
+//      ADD a row. Both push a member's attended-row count past their
+//      archetype's declared ceiling, so the ceiling alone — never a floor,
+//      which the join-date clamp can legitimately undercut — is what a
+//      check can hold without also catching honest truncation as a fault.
+{
+  const VISIT_ARCHETYPES: ReadonlyArray<{ name: string; count: number; max: number }> = [
+    { name: "loyal", count: 24, max: 14 },
+    { name: "fading", count: 8, max: 14 },
+    { name: "longGone", count: 6, max: 14 },
+    { name: "newcomer", count: 8, max: 5 },
+    { name: "neverCame", count: 4, max: NaN },
+    { name: "paused", count: 6, max: 14 },
+    { name: "left", count: 4, max: 14 },
+  ];
+  const overMax: string[] = [];
+  const SEEDS = 50;
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    const { records } = generateStudio(seed, "2026-08-18");
+    const countByMember = new Map<string, number>();
+    for (const a of records.attendance) {
+      if (a.attendance_status !== "attended") continue;
+      countByMember.set(a.member_id, (countByMember.get(a.member_id) ?? 0) + 1);
+    }
+    let memberNumber = 0;
+    for (const archetype of VISIT_ARCHETYPES) {
+      for (let n = 0; n < archetype.count; n += 1) {
+        memberNumber += 1;
+        if (archetype.name === "neverCame") continue;
+        const memberId = `gen${seed}_m_${memberNumber}`;
+        const attended = countByMember.get(memberId) ?? 0;
+        if (attended > archetype.max) {
+          overMax.push(`seed ${seed} ${memberId} (${archetype.name}): ${attended} visits, max ${archetype.max}`);
+        }
+      }
+    }
+  }
+  check(`across ${SEEDS} studios, nobody's visit count exceeds their OWN archetype's ceiling`,
+    overMax, []);
+}
+
 // 30d. What a staff member is told when the browser hands back rubbish.
 //
 //      This decision ran inside main.ts until 2026-08-22, which no check
