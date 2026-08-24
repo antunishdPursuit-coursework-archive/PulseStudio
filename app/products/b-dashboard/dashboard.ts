@@ -29,7 +29,6 @@ export interface RosterMember {
   reservation_status: string;
   attendance_status: string;
 }
-
 export interface DashboardSession {
   capacity: number;
   roster: RosterMember[];
@@ -121,4 +120,3 @@ export function roomDemand(sessions: (DashboardSession & { room: string })[]): R
   }
   return [...byRoom.values()].sort((a, b) => b.peakFill - a.peakFill || a.room.localeCompare(b.room));
 }
-
