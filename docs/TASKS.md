@@ -41,7 +41,33 @@ One thing measured and deliberately NOT changed: your day chips are 43.59px
 tall on a phone, 0.41px under the 44px touch minimum. That is sub-pixel and a
 finger cannot tell. Left alone rather than churning your stylesheet for it.
 
-**Your suite went from 47 checks to 54, and read why rather than just the
+**A saved booking no longer resolves against a schedule it was not made
+for, and this is the one item on this page you should read before you touch
+anything.** Your folder brief listed the sliding studio date under "traps
+that are DELIBERATE", ending "they linger harmlessly in the log". That was
+measured this round and both halves were wrong. The ids do not stop
+resolving — they are positions in a window that slides at midnight, so the
+same id names a different class the next day. With the shared seed on
+2026-08-23: of 1,900 sessions, 1,900 moved; of the 70 future classes, 70
+carried a different CLASS TYPE. `class-session:001831` was pilates at 08:00
+on Sunday and reads as strength at 08:00 on Monday — confirmed on the page
+itself, not only in the generator. A member who booked pilates would have
+opened the page holding a seat in strength, and your log is what Manny's
+roster reads, so he would have listed them in it.
+
+`reconcileSchedule()` in `reservations.ts` stamps the log with the studio
+date it was written against and lets a log from another date go, saying how
+many rather than quietly showing fewer. Eleven checks hold it, and they were
+proved able to fail by planting the old behaviour back — four went red,
+naming the exact rows. The brief is corrected with the numbers.
+
+**What is NOT fixed, and is not yours alone:** the id scheme itself.
+`SHARED_DATA_CONTRACT.md` says every record has a stable id and these do
+not. That is raised in `docs/REQUESTFOR-A-B-C.md` and it needs the team,
+because every fix for it renumbers 1,900 records and everything pinned to
+them.
+
+**Your suite went from 47 checks to 65, and read why rather than just the
 number.** `npm run mutate` can reach it now — it could not before, because
 the tool kept its own list of three suites — and it found two ways
 `rules.ts` could be wrong that nothing would have noticed:
@@ -149,6 +175,17 @@ code is allowed to assume.
 - **`run-suites` finds its suites instead of listing them.** Three product
   suites existed and ran nowhere; the count went from 1,425 to over 1,500 the
   moment they were discovered. A suite with no label is now a hard error.
+- **The shared sign-in dialog says something different**, and it is
+  team-owned ground so it is named here rather than changed quietly. It
+  claimed "This site is a static build that runs entirely in your browser"
+  — untrue since `npm start` began running the studio's server — and "The
+  hosted version of Pulse Studio checks a real password against its
+  Postgres database instead", which nobody has watched work; `schema.sql`
+  describes a shape a sold copy would use, and the present tense turned
+  that into a running database. Read together they told a member nothing
+  anywhere is checked, at the moment the staff door started being checked
+  by the server. The copy now names the one refusal this repo can
+  demonstrate.
 - **`npm run mutate` reaches all six suites**, and finding that out cost
   something worth knowing. The discovery fix above renamed the suite keys,
   and mutate kept its own copy of them, so every survey of Product D died on
