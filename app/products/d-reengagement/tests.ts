@@ -4106,6 +4106,23 @@ check("clean records produce no data-quality line",
       rowFor("Came Back Csv")?.includes("not in these records"), false);
     check("exactly one row per ledger entry — no member appears twice",
       csv2.trim().split("\n").length - 1, csvLedger.length);
+
+    /* THE "DAYS TO RETURN" COLUMN ITSELF, not just the label beside it.
+     * `npm run mutate` found this once the checks above existed: flipping
+     * `daysToReturn === null ? "" : String(daysToReturn)` to `!==` still
+     * leaves every check above green — the label still says "came back",
+     * the row count still matches — while the actual number a staff
+     * member reads goes blank for a returned member and prints the
+     * literal text "null" for one who is still quiet. */
+    const returnedOutcome = csvResults.outcomes.find((o) => o.record.memberId === "m_returned");
+    if (returnedOutcome?.daysToReturn == null) {
+      check("setup: the returned fixture actually has a days-to-return value", false, true);
+    } else {
+      check("the days-to-return column carries the real number, not blank",
+        rowFor("Came Back Csv")?.endsWith(`,${returnedOutcome.daysToReturn}`), true);
+    }
+    check("the still-quiet row's column is empty, never the text \"null\"",
+      rowFor("Stayed Quiet Csv")?.endsWith(",") && !rowFor("Stayed Quiet Csv")?.includes("null"), true);
   }
 }
 
