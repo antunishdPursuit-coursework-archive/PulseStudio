@@ -54,6 +54,7 @@ function el<T extends HTMLElement = HTMLElement>(selector: string): T {
 // pin it; this file keeps only the DOM wiring. See dashboard.ts for why.
 import { bookingDataLine, confirmedCount, emptyScheduleText, formatSessionTime, needsAttention, nextActionText, publishedSessionProblem, RESERVATION_STATUSES, reservationProblem, roomDemand, scheduleMatches, spotsLeftText, status } from './dashboard.js';
 import { counted } from '../../shared/text.js';
+import { escapeHtml } from '../../shared/html.js';
 import { mountStaffDoor } from '../../shared/auth/staff-gate.js';
 import { sharedStudioWithFill } from '../../shared/auth/studio.js';
 
@@ -85,8 +86,6 @@ const SCHEDULE_STORAGE_KEY='pulse-schedule-b';
    schedule alone. What moved the ids was the seed, the date and the
    history length, and none of those is this product's to choose. */
 const dataset=sharedStudioWithFill(0.85);
-const HTML_ESCAPES: Record<string, string> = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
-const escapeHtml=(value: string): string=>value.replace(/[&<>"']/g,(character: string)=>HTML_ESCAPES[character] ?? character);
 const memberById=new Map(dataset.members.map(member=>[member.id,member]));
 const instructorById=new Map(dataset.instructors.map(instructor=>[instructor.id,instructor]));
 const typeById=new Map(dataset.classTypes.map(type=>[type.id,type]));

@@ -16,6 +16,7 @@ import type { Reservation } from "../../shared/contract.js";
 import { currentSession, onSessionChange } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
 import { dismissAlert, showAlert } from "../../shared/components/alert.js";
+import { escapeHtml } from "../../shared/html.js";
 import { counted } from "../../shared/text.js";
 import type {
   SyntheticClassSession,
@@ -42,19 +43,6 @@ function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) throw new Error(`Member booking could not find ${selector}.`);
   return element;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => {
-    const replacements: Record<string, string> = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    };
-    return replacements[character] ?? character;
-  });
 }
 
 let reservationSeq = 0;
