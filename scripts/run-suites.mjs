@@ -26,10 +26,10 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { nodeTooOldNote } from "./node-floor.mjs";
+import { discoverSuites } from "./suites.mjs";
 
 // Repo-relative, like scripts/check-styles.mjs — never an absolute path from
 // somebody's home directory. A script a teammate cannot run is not tooling.
@@ -47,44 +47,11 @@ const RESULT_MARKER = "___RUN_SUITES_RESULT___";
  * check` reported a confident green over checks that never executed, which
  * is the exact failure the stub DOM below refuses to commit lower down.
  *
- * So the suites are FOUND, not remembered: any folder under app/ holding a
- * tests.html is a suite, and adding one is enough to make it run. The only
- * thing kept by hand is the label a person reads in the output — and a suite
- * with no label is a hard ERROR, never a skip. Naming it costs one line;
- * skipping it silently costs a green that means nothing. */
-const SUITE_LABELS = {
-  "app/shared/synthetic": "synthetic studio engine",
-  "app/shared/auth": "session contract",
-  "app/products/a-booking": "class booking",
-  "app/products/b-dashboard": "staff dashboard",
-  "app/products/c-chatbot": "member support",
-  "app/products/d-reengagement": "member re-engagement",
-};
-
-function discoverSuites() {
-  const found = [];
-  for (const area of ["app/products", "app/shared"]) {
-    const base = join(ROOT, area);
-    if (!existsSync(base)) continue;
-    for (const entry of readdirSync(base, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const dir = `${area}/${entry.name}`;
-      if (!existsSync(join(ROOT, dir, "tests.html"))) continue;
-      const label = SUITE_LABELS[dir];
-      if (label === undefined) {
-        throw new Error(
-          `run-suites found a suite at ${dir}/tests.html with no label. Add ` +
-            `"${dir}" to SUITE_LABELS in scripts/run-suites.mjs. A suite this ` +
-            "script cannot name is a suite nobody reads the result of.",
-        );
-      }
-      found.push({ key: entry.name, dir, label });
-    }
-  }
-  return found.sort((a, b) => a.dir.localeCompare(b.dir));
-}
-
-const SUITES = discoverSuites();
+ * So the suites are FOUND, not remembered, and the search lives in
+ * `scripts/suites.mjs` rather than here — because `mutate-suite.mjs` also
+ * needs to know which suites exist, and the second copy of that knowledge
+ * is what went stale last time. Read that file before changing this one. */
+const SUITES = discoverSuites(ROOT);
 
 /* The stub DOM.
  *
