@@ -79,26 +79,21 @@ alarms staff stop trusting.
 tool must agree: `ses_008` has 0 confirmed reservations, and the only member
 whose last attended class is more than 14 days old is Maria Santos.
 
-**One thing to fix when you next touch your page (found 2026-08-18):** your
-dashboard is live at a public URL and has no
-`<meta name="robots" content="noindex, nofollow">` in its `<head>`, so a
-search engine may index a page showing member names, rosters, and attendance.
-Mine has that tag; yours is one line away from it.
+**Done, since this was written (found 2026-08-18, closed 2026-08-23):** both
+your pages now carry `<meta name="robots" content="noindex, nofollow">`.
+`app/robots.txt`'s `Disallow` line for this folder protected nothing on its
+own — a GitHub Pages PROJECT site's crawler reads the USER site's robots.txt
+in a different repository, so ours was never requested — and the full
+account is in "the staff dashboard has no crawler protection at all" below.
 
-Until then, nothing covers it. `app/robots.txt` carries
-`Disallow: /PulseStudio/products/b-dashboard/`, and on this deploy that line
-protects nothing: a GitHub Pages PROJECT site's crawler reads the USER site's
-robots.txt in a different repository, so ours is never requested. This
-paragraph said the line stopped the crawl until 2026-08-22, and it never did —
-the section below, "the staff dashboard has no crawler protection at all", is
-the full account, and the reasoning is written into `app/robots.txt` itself.
-When you add the meta tag, **delete that Disallow line** anyway: a page that is
-blocked from crawling can never be read, so its noindex tag is never seen and
-never takes effect. Crawlable + noindex is the combination that actually keeps
-a page out of the index.
-
-Neither is a security control — a staff page holding real member data
-eventually belongs behind a sign-in.
+Neither a noindex tag nor a robots line was ever a security control, and that
+sentence used to end "eventually belongs behind a sign-in" as something still
+owed. It is not owed anymore: the dashboard draws nothing until the studio's
+own server confirms a session it signed itself (`app/shared/auth/staff-gate.ts`,
+`scripts/start-haiku.mjs`). Records that name a member moved out of `app/`
+entirely, to `data/staff-records.json`, reachable only through
+`/api/staff/records` with that session. A meta tag asks a crawler nicely; this
+refuses a request that cannot present a cookie the server signed.
 
 **THE ONE ASK:** confirm whether attendance recording will live in your
 dashboard's next increment or stays an ops flow outside both our products —
