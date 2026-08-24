@@ -43,12 +43,27 @@ number in prose is the kind of claim this repo has gotten wrong before.
 | `STAFF_PASSPHRASE` | The staff door. Unset → the dashboard and the re-engagement tool show a closed door saying nobody can sign in yet. They never fail open. | unset → staff surfaces stay shut |
 | `HOST` | The interface to listen on. A host that fronts this with its own reverse proxy sets its container's interface. | `127.0.0.1` |
 | `PORT` | The port. | `4173` |
+| `CHAT_RATE_PER_MINUTE` | Questions one caller may POST to `/api/chat` per minute. The guard that actually protects the key — see below. | `12` |
+| `CHAT_RATE_TOTAL_PER_MINUTE` | Questions the whole process will answer per minute, whoever asks. A ceiling on spend. | `120` |
+| `TRUST_PROXY` | Set to any value when something you control fronts this and writes `x-forwarded-for`. Off by default: a caller can forge that header and mint a fresh allowance per request. | unset → callers counted by socket address |
 | `ALLOWED_ORIGINS` | Comma-separated page origins allowed to call `/api/chat` from a **different** origin. Only needed when the static pages are served from one origin and this from another. | unset → same-origin only |
 
 The simplest hosted shape is the one the script already is: let it serve
 `app/` itself, so the pages and `/api/chat` share an origin and
 `ALLOWED_ORIGINS` stays unset. A wildcard is never accepted; an origin not
 on the list gets no CORS header and the browser refuses the call.
+
+**`ALLOWED_ORIGINS` is not a lock, and this page used to imply it was.**
+It is a browser rule: it decides whether another PAGE may read an answer.
+The header is sent by the browser, so anything that is not a browser simply
+omits it — `curl -X POST /api/chat` reached the model, unmetered, for as
+long as the origin list was the only thing in front of it. What stops a
+caller spending the studio's key is the rate guard above: a token bucket per
+caller plus a whole-process ceiling, both counted only on POST so the GET
+probe every page load makes stays free. Over either limit the answer is
+`429` with `Retry-After`. Behind a reverse proxy, set `TRUST_PROXY` or every
+request arrives wearing the proxy's address and the per-caller bucket
+becomes one shared bucket.
 
 ## What the server decides, and what it trusts
 

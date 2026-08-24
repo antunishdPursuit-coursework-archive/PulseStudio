@@ -23,6 +23,61 @@ const allowedOrigins = new Set(
   (process.env["ALLOWED_ORIGINS"] ?? "").split(",").map((o) => o.trim()).filter((o) => o !== ""),
 );
 
+/* WHAT ACTUALLY STOPS SOMEBODY SPENDING THE STUDIO'S KEY.
+ *
+ * Not the origin list above. That is a BROWSER rule: it decides whether
+ * another web page may read this answer. It is sent by the browser and can
+ * be typed by anything else, so `curl -X POST /api/chat` with no Origin
+ * header at all reaches the model. That was true and unguarded until this
+ * block existed, and the boot line below used to call it "same-origin
+ * only", which was a claim the code did not keep.
+ *
+ * A token bucket per caller is the guard, plus a whole-process ceiling so
+ * that a thousand callers cannot do together what one is stopped from
+ * doing alone. Both are counted only for POST — the GET probe costs
+ * nothing and the page asks it on every load. */
+const perCallerPerMinute = Number.parseInt(process.env["CHAT_RATE_PER_MINUTE"] ?? "12", 10);
+const totalPerMinute = Number.parseInt(process.env["CHAT_RATE_TOTAL_PER_MINUTE"] ?? "120", 10);
+/* Behind a reverse proxy every request arrives from the proxy, so the
+ * socket address is the same for everybody and the per-caller bucket
+ * becomes one global bucket. TRUST_PROXY says "x-forwarded-for is written
+ * by something I control". It is OFF by default because a caller can
+ * otherwise forge that header and mint a fresh bucket per request. */
+const trustProxy = (process.env["TRUST_PROXY"] ?? "") !== "";
+const RATE_WINDOW_MS = 60_000;
+const callerHits = new Map();
+let windowStartedAt = 0;
+let hitsThisWindow = 0;
+
+function callerKey(request) {
+  if (trustProxy) {
+    const forwarded = request.headers["x-forwarded-for"];
+    const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded ?? "").split(",")[0].trim();
+    if (first !== "") return first;
+  }
+  return request.socket.remoteAddress ?? "unknown";
+}
+
+/* Returns 0 when the call may proceed, or the seconds to wait. The window
+ * is fixed rather than sliding: one Map cleared each minute, so a long run
+ * cannot grow memory per distinct caller the way per-caller timestamps
+ * would. */
+function chatRateDelay(request, now) {
+  if (now - windowStartedAt >= RATE_WINDOW_MS) {
+    windowStartedAt = now;
+    hitsThisWindow = 0;
+    callerHits.clear();
+  }
+  const retryAfter = Math.max(1, Math.ceil((windowStartedAt + RATE_WINDOW_MS - now) / 1000));
+  if (hitsThisWindow >= totalPerMinute) return retryAfter;
+  const key = callerKey(request);
+  const used = callerHits.get(key) ?? 0;
+  if (used >= perCallerPerMinute) return retryAfter;
+  callerHits.set(key, used + 1);
+  hitsThisWindow += 1;
+  return 0;
+}
+
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -429,6 +484,12 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/chat" && request.method === "POST") {
+    const retryAfter = chatRateDelay(request, Date.now());
+    if (retryAfter > 0) {
+      response.setHeader("retry-after", String(retryAfter));
+      json(response, 429, { error: "Too many questions right now. Please wait a moment." });
+      return;
+    }
     await chat(request, response);
     return;
   }
@@ -454,6 +515,10 @@ server.listen(port, host, () => {
     ? `Staff records behind /api/staff/records; sessions last ${STAFF_SESSION_MINUTES} minutes. Sign-in needs HTTPS or localhost — the session cookie is __Host- prefixed and refuses to set otherwise.`
     : "Staff records locked: set STAFF_PASSPHRASE to let the dashboard and re-engagement tool sign in.");
   console.log(allowedOrigins.size > 0
-    ? `Cross-origin calls allowed from: ${[...allowedOrigins].join(", ")}`
-    : "Same-origin only: no ALLOWED_ORIGINS set, so only pages this server serves can call /api/chat.");
+    ? `Other pages allowed to read /api/chat answers: ${[...allowedOrigins].join(", ")}`
+    : "No ALLOWED_ORIGINS set, so no OTHER page may read an /api/chat answer in a browser.");
+  /* This line used to say "same-origin only", which read as a lock and was
+   * not one — a browser rule cannot bind a caller that is not a browser. */
+  console.log(`Spending guard on /api/chat: ${perCallerPerMinute} questions per caller per minute, ${totalPerMinute} in total`
+    + `${trustProxy ? ", callers identified by x-forwarded-for" : ", callers identified by socket address (set TRUST_PROXY behind a proxy)"}.`);
 });
