@@ -81,7 +81,7 @@ function endTime(startsAt: string, durationMinutes: number): string {
   return `${datePart}T${hh}:${mm}:00`;
 }
 
-function resolveSessions(dataset: SyntheticDataset, runtimeReservedBySession: Map<string, number>): Session[] {
+export function resolveSessions(dataset: SyntheticDataset, runtimeReservedBySession: Map<string, number>): Session[] {
   const typeById = new Map(dataset.classTypes.map((t) => [t.id, t] as const));
   return dataset.classSessions.map((raw) => {
     const type = typeById.get(raw.classTypeId);
