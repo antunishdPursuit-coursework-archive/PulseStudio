@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
+const publishedSchedulePath = resolve(root, "data", "published-schedule.json");
 const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
 /* WHERE TO LISTEN IS A DEPLOYMENT FACT, NOT A CODE FACT. Loopback is the
  * right default on a developer's machine — a key-holding process should not
@@ -472,6 +473,59 @@ function staffRecords(request, response) {
   response.end(records);
 }
 
+function validPublishedSession(value) {
+  return typeof value === "object" && value !== null &&
+    /^local-\d+$/.test(value.id) &&
+    typeof value.type === "string" && value.type.length > 0 &&
+    typeof value.level === "string" && value.level.length > 0 &&
+    typeof value.startsAt === "string" && !Number.isNaN(Date.parse(value.startsAt)) &&
+    typeof value.room === "string" && value.room.length > 0 &&
+    typeof value.instructor === "string" && value.instructor.length > 0 &&
+    Number.isInteger(value.capacity) && value.capacity > 0 &&
+    value.status === "scheduled";
+}
+
+async function publishedSchedule(request, response) {
+  if (request.method === "GET") {
+    try {
+      const stored = JSON.parse(readFileSync(publishedSchedulePath, "utf8"));
+      json(response, 200, { sessions: Array.isArray(stored.sessions) ? stored.sessions : [] });
+    } catch {
+      json(response, 200, { sessions: [] });
+    }
+    return;
+  }
+  if (request.method !== "POST") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  if (staffPassphrase === "" || !requestIsSignedInStaff(request)) {
+    json(response, 401, { error: "Staff sign-in required." });
+    return;
+  }
+  let body;
+  try {
+    body = await requestBody(request);
+  } catch {
+    json(response, 400, { error: "Body must be JSON." });
+    return;
+  }
+  if (!Array.isArray(body?.sessions) || body.sessions.length > 500 || !body.sessions.every(validPublishedSession)) {
+    json(response, 400, { error: "Schedule must contain at most 500 valid scheduled sessions." });
+    return;
+  }
+  let existing = [];
+  try {
+    const stored = JSON.parse(readFileSync(publishedSchedulePath, "utf8"));
+    existing = Array.isArray(stored.sessions) ? stored.sessions : [];
+  } catch { /* Start with an empty published schedule. */ }
+  const byId = new Map(existing.map((session) => [session.id, session]));
+  body.sessions.forEach((session) => byId.set(session.id, session));
+  const sessions = [...byId.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  writeFileSync(publishedSchedulePath, JSON.stringify({ sessions }, null, 2) + "\n");
+  json(response, 200, { published: body.sessions.length, sessions });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`).pathname;
   if (pathname === "/api/chat") cors(request, response);
@@ -499,6 +553,10 @@ const server = createServer(async (request, response) => {
   }
   if (pathname === "/api/staff/records") {
     staffRecords(request, response);
+    return;
+  }
+  if (pathname === "/api/schedule") {
+    await publishedSchedule(request, response);
     return;
   }
   if (request.method !== "GET" && request.method !== "HEAD") {

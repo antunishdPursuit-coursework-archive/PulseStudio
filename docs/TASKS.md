@@ -98,13 +98,10 @@ suite would have called correct.
 - `--manny-strong` clears AA; amber as text on white was 2.15:1.
 - Your header stopped restyling the shared `.topbar` and now uses the shared
   `.page-head` the other three already used.
-- **`staff-dashboard.js` is TypeScript.** It shipped for months as
-  hand-written JavaScript no compiler opened, and `docs/sources-baseline.json`
-  said so. That file is now empty. Behaviour was held identical through the
-  conversion by snapshotting the rendered page first: 35 session cards, 4 week
-  buttons, 5 class-type options, 4,423 characters of text — then filter,
-  roster drill-in, week navigation and the publish dialog exercised after.
-  Zero differences.
+- **The dashboard arithmetic is TypeScript.** The tracked
+  `staff-dashboard.js` remains the deliberate DOM-wiring source, while
+  `dashboard.ts` owns the fill, roster, time, status, and room calculations
+  covered by Product B's 34 checks. The obsolete `main.ts` dashboard is gone.
 - `main.ts` is deleted. It rendered the whole dashboard, no page loaded it,
   and the record split had quietly broken it while it still type-checked.
   `docs/reachable-baseline.json` is empty as a result.
