@@ -503,6 +503,44 @@ check("today is computed in the studio timezone",
       recordsFor([{ id: "m2", name: "No Shows Only", status: "active", attended: ["2026-06-15"], noShows: ["2026-08-10"] }]),
       TODAY).outcomes[0]?.result,
     "stillQuiet");
+
+  /* A FUTURE-DATED OR UNREADABLE ATTENDANCE ROW IS NOT A RETURN EITHER —
+   * the same guard `findQuietMembers` already has (6g/6h above), but this
+   * is a SEPARATE copy of it in outreachResults, and nothing here had
+   * tried it. `npm run mutate` found both gaps: the future-date half and
+   * the not-finite half. Without the guard, a corrupt or future-dated row
+   * from a CSV import would read as proof a member came back when nothing
+   * real happened yet — the evidence panel staff read to decide whether
+   * to stop reaching out. */
+  {
+    const futureFx = recordsFor([{ id: "m3", name: "Future Only", status: "active", attended: ["2026-07-01"] }]);
+    futureFx.class_sessions.push({
+      session_id: "s_future_return", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "2027-01-01T09:00:00-04:00", ends_at: "2027-01-01T10:00:00-04:00",
+      capacity: 12, session_status: "completed",
+    });
+    futureFx.attendance.push({
+      attendance_id: "a_future_return", member_id: "m3", session_id: "s_future_return",
+      attendance_status: "attended", recorded_at: "2027-01-01T10:00:00-04:00",
+    });
+    const futureLedger = [{ memberId: "m3", lapseKey: "m3|a", takenAt: "2026-08-12", channel: "copy" as const }];
+    check("a future-dated attendance row is not read as a return",
+      outreachResults(futureLedger, futureFx, TODAY).outcomes[0]?.result, "stillQuiet");
+
+    const blankFx = recordsFor([{ id: "m4", name: "Blank Only", status: "active", attended: ["2026-07-01"] }]);
+    blankFx.class_sessions.push({
+      session_id: "s_blank_return", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "not-a-real-date", ends_at: "not-a-real-date",
+      capacity: 12, session_status: "completed",
+    });
+    blankFx.attendance.push({
+      attendance_id: "a_blank_return", member_id: "m4", session_id: "s_blank_return",
+      attendance_status: "attended", recorded_at: "2026-08-13T10:00:00-04:00",
+    });
+    const blankLedger = [{ memberId: "m4", lapseKey: "m4|a", takenAt: "2026-08-12", channel: "copy" as const }];
+    check("an unreadable session date is not read as a return either",
+      outreachResults(blankLedger, blankFx, TODAY).outcomes[0]?.result, "stillQuiet");
+  }
 }
 
 /* THE SEAT COUNTS ARE MEMOISED, AND A MEMO CAN GO STALE.
@@ -4029,6 +4067,45 @@ check("clean records produce no data-quality line",
       lines.length - 1, ledger.length);
     check("every line has the same number of columns as the header",
       new Set(lines.map((l) => l.split(",").length)).size, 1);
+  }
+
+  /* WHICH LABEL GOES WITH WHICH RESULT, AND WHICH ROW IS WHOSE. The block
+   * above never exercises a "returned" outcome at all — both its ledger
+   * entries end up "stillQuiet" — so it cannot tell "came back" from
+   * "still quiet" apart, and it checks row COUNT and substring PRESENCE
+   * rather than which row belongs to which member. `npm run mutate` found
+   * both gaps: the label ternary can swap, and the not-yet-judged filter
+   * can misfire — and either one can pass count-and-substring checks by
+   * coincidence while attaching the wrong text to the wrong person. */
+  {
+    const csvFx = recordsFor([
+      { id: "m_returned", name: "Came Back Csv", status: "active", attended: ["2026-06-01", "2026-08-10"] },
+      { id: "m_quiet", name: "Stayed Quiet Csv", status: "active", attended: ["2026-06-01"] },
+    ]);
+    const csvLedger = [
+      { memberId: "m_returned", lapseKey: "m_returned|a", takenAt: "2026-07-01", channel: "copy" as const },
+      { memberId: "m_quiet", lapseKey: "m_quiet|a", takenAt: "2026-07-01", channel: "copy" as const },
+      { memberId: "m_ghost", lapseKey: "m_ghost|a", takenAt: "2026-07-01", channel: "email" as const },
+    ];
+    const csvResults = outreachResults(csvLedger, csvFx, TODAY);
+    const csvNames = new Map([
+      ["m_returned", "Came Back Csv"], ["m_quiet", "Stayed Quiet Csv"], ["m_ghost", "Ghost Csv"],
+    ]);
+    const csv2 = outreachLogCsv(csvResults, csvLedger, csvNames, csvField);
+    const rowFor = (name: string): string | undefined => csv2.split("\n").find((l) => l.includes(name));
+
+    check(`a member who returned reads "came back", by name`,
+      rowFor("Came Back Csv")?.includes("came back"), true);
+    check(`...never "still quiet"`, rowFor("Came Back Csv")?.includes("still quiet"), false);
+    check(`a member who did not return reads "still quiet", by name`,
+      rowFor("Stayed Quiet Csv")?.includes("still quiet"), true);
+    check(`...never "came back"`, rowFor("Stayed Quiet Csv")?.includes("came back"), false);
+    check("the unresolvable member's OWN row says so",
+      rowFor("Ghost Csv")?.includes("not in these records"), true);
+    check("...and a judged member's row never says that instead",
+      rowFor("Came Back Csv")?.includes("not in these records"), false);
+    check("exactly one row per ledger entry — no member appears twice",
+      csv2.trim().split("\n").length - 1, csvLedger.length);
   }
 }
 
