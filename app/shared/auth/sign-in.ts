@@ -9,7 +9,7 @@
  *
  * Test mode, as everywhere: no password, fictional people, stated in the
  * open. The hosted version replaces HOW these functions verify (Postgres,
- * schema.sql), not what they mean.
+ * docs/hosted-schema.sql), not what they mean.
  */
 
 import type { SyntheticMember } from "../synthetic/contracts.js";

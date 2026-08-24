@@ -180,7 +180,7 @@ code is allowed to assume.
   claimed "This site is a static build that runs entirely in your browser"
   — untrue since `npm start` began running the studio's server — and "The
   hosted version of Pulse Studio checks a real password against its
-  Postgres database instead", which nobody has watched work; `schema.sql`
+  Postgres database instead", which nobody has watched work; `docs/hosted-schema.sql`
   describes a shape a sold copy would use, and the present tense turned
   that into a running database. Read together they told a member nothing
   anywhere is checked, at the moment the staff door started being checked

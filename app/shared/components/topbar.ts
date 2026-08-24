@@ -32,7 +32,7 @@
    hosted version of Pulse Studio checks a real password against its
    Postgres database instead." The first stopped being true the day
    `npm start` began running the studio's server. The second was never
-   watched working by anybody — `app/shared/auth/schema.sql` describes the
+   watched working by anybody — `docs/hosted-schema.sql` describes the
    shape a sold copy would use, which is not the same as a hosted database
    that checks a password today, and the present tense said it was. A
    member reading both would conclude nothing anywhere is checked, at

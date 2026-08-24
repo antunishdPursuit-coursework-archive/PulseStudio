@@ -77,11 +77,6 @@
       "why": "developer documentation for the folder it sits in"
     },
     {
-      "file": "app/shared/auth/schema.sql",
-      "owner": "the team",
-      "why": "a design document for a database nothing runs yet; published only because it sits beside the auth code it describes"
-    },
-    {
       "file": "app/shared/components/README.md",
       "owner": "the team",
       "why": "developer documentation for the folder it sits in"
