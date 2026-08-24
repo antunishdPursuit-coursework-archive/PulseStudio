@@ -29,7 +29,7 @@ import {
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
 import { adaptAttendanceCsv, cleanName, identityKey, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
-import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
+import { currentScheduleReservations, fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { NOT_RECORDED, brand, classPhrase, draftMessage, outreachPolicy, proposedRules } from "./config.js";
@@ -3123,6 +3123,19 @@ check("clean records produce no data-quality line",
     rows(JSON.stringify([{ ...rt, canceled_at: 7 }])), 0);
   check("one good row survives ten thousand junk ones",
     rows("[" + Array.from({ length: 10_000 }, () => "null").join(",") + "," + JSON.stringify(rt) + "]"), 1);
+
+  /* THE STALE-SCHEDULE GUARD. Booking's session ids slide with the studio
+   * date — measured 2026-08-23, 70 of 70 future classes changed CLASS TYPE
+   * under the same id one day later — and Booking only notices on ITS OWN
+   * page load. A log read here from yesterday is not evidence about
+   * today's classes, so it is discarded rather than trusted. */
+  check("a log stamped for today's schedule is kept",
+    currentScheduleReservations([rt], "2026-08-18", "2026-08-18"), [rt]);
+  check("a log stamped for another day is not evidence about today",
+    currentScheduleReservations([rt], "2026-08-17", "2026-08-18"), []);
+  check("a log with no stamp at all is the same as the wrong stamp",
+    currentScheduleReservations([rt], null, "2026-08-18"), []);
+  check("no rows, no stamp needed", currentScheduleReservations([], null, "2026-08-18"), []);
 
   /* A row carrying __proto__ must not reach Object.prototype. JSON.parse
    * makes it an ordinary own property, which is why this passes — the check

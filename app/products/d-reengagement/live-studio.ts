@@ -64,9 +64,40 @@ export function parseRuntimeReservations(raw: string | null): Reservation[] {
   }
 }
 
-export function readRuntimeReservations(): Reservation[] {
+/* A's own schedule stamp — read, never written, the same "read the seam,
+ * never import the code" rule BOOKING_LOG_KEY already follows.
+ * a-booking/reservations.ts documents why it exists: session ids are
+ * positions in a window that slides at midnight, so the same id can name
+ * a different class the next day — measured 2026-08-23, of 1,900 sessions
+ * 1,900 moved, and 70 of 70 future classes changed CLASS TYPE. Booking
+ * clears its own log when it notices the date has moved, but only on ITS
+ * OWN page load; a staff member opening this tool without opening Booking
+ * first would otherwise read a log dated to yesterday's schedule as if it
+ * named today's classes. This product never writes to that log — "I will
+ * read, never write" is the standing promise in
+ * docs/REQUESTFOR-A-B-C.md — so instead of clearing it, a stale log is
+ * simply not trusted for this read. */
+export const BOOKING_SCHEDULE_KEY = "pulse-reservations-a-schedule";
+
+/** Rows stamped for a different studio date than `asOfDate` are not
+ *  evidence about TODAY's schedule — the session ids they name have since
+ *  been reassigned. `storedDate === null` (no stamp at all — every log
+ *  written before the stamp existed) is treated the same as a mismatch:
+ *  not knowing which schedule a row belongs to is the same as knowing it
+ *  is the wrong one. */
+export function currentScheduleReservations(
+  rows: readonly Reservation[],
+  storedDate: string | null,
+  asOfDate: string,
+): Reservation[] {
+  return storedDate === asOfDate ? [...rows] : [];
+}
+
+export function readRuntimeReservations(asOfDate: string): Reservation[] {
   try {
-    return parseRuntimeReservations(localStorage.getItem(BOOKING_LOG_KEY));
+    const rows = parseRuntimeReservations(localStorage.getItem(BOOKING_LOG_KEY));
+    const storedDate = localStorage.getItem(BOOKING_SCHEDULE_KEY);
+    return currentScheduleReservations(rows, storedDate, asOfDate);
   } catch {
     return []; // storage unavailable — the studio still renders
   }

@@ -205,6 +205,13 @@ code is allowed to assume.
 - **`run-suites` finds its suites instead of listing them.** Three product
   suites existed and ran nowhere; the count went from 1,425 to over 1,500 the
   moment they were discovered. A suite with no label is now a hard error.
+- **The same sliding-id defect that hit Product A's own log also hit
+  Product D's read of it**, and D never writes to that log so it could not
+  fix itself the way A did. `readRuntimeReservations()` now takes the
+  studio's `asOfDate` and drops any row whose stamp does not match — the
+  same "read the seam, never import the code" rule the log itself was
+  already read under. Four checks, proved able to fail by planting the old
+  behaviour back.
 - **The shared sign-in dialog says something different**, and it is
   team-owned ground so it is named here rather than changed quietly. It
   claimed "This site is a static build that runs entirely in your browser"
