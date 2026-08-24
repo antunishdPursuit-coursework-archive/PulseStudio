@@ -39,7 +39,7 @@ server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
 | --- | --- |
 | `rules.ts` | The booking rules, with no DOM and no clock: schedule cutoff, capacity math, the guard chains, waitlist promotion, the studio-local stamp. Everything comes in as arguments so the suite can hold it |
 | `main.ts` | The page: reads the log and the studio clock once per render, hands both to the rules, renders what comes back, restores keyboard focus after each re-render |
-| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save through the shared guarded doors (`app/shared/storage.ts`), `latestReservation()` (last row wins) |
+| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save through the shared guarded doors (`app/shared/storage.ts`), `latestReservation()` (last row wins), and `reconcileSchedule()` — which refuses to resolve a saved booking against a schedule it was not written for |
 | `tests.ts` + `tests.html` | The unit checks — the brief's acceptance list held for real, "now" pinned so verdicts never drift. Open tests.html, read the count in `#summary` |
 | `index.html` | The page shell; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
 | `styles.css` | Product-local styling; every color is a theme token |
@@ -64,9 +64,22 @@ The upgrade path, whenever Kerrian wants it: switch to
   promotion appends a fresh reserved row above the old waitlist row — so
   `reservation_id` is NOT unique in the log. Consumers must use
   `latestReservation()` semantics, never index by id.
-- **The studio is dated to TODAY** (`sharedStudio()`), so yesterday's
-  reservations can reference session ids that no longer render; they
-  linger harmlessly in the log.
+- **The studio is dated to TODAY** (`sharedStudio()`), and this line used
+  to end "yesterday's reservations can reference session ids that no
+  longer render; they linger harmlessly in the log." Both halves were
+  wrong, and they were measured rather than argued. The ids DO still
+  render: they are positions in a window that slides at midnight, so the
+  same id names a different class the next day. With the shared seed on
+  2026-08-23, of 1,900 sessions 1,900 moved, and of the 70 future classes
+  70 carried a different CLASS TYPE under the same id — pilates at 08:00
+  on Sunday reads as strength at 08:00 on Monday. A member would open the
+  page holding a seat they never booked, and Product B's roster would list
+  them in that class. So `reconcileSchedule()` in `reservations.ts` stamps
+  the log with the studio date it was written against and lets a log from
+  another date go, saying how many rather than showing fewer. The ID
+  SCHEME itself is still a team question — `SHARED_DATA_CONTRACT.md`
+  promises stable ids and these are not — and it is raised in
+  `docs/REQUESTFOR-A-B-C.md`, not improvised here.
 - **Times are studio-local wall clocks with no offset.** Formatters append
   `Z` and use `timeZone: "UTC"` so the written hour prints as written,
   including in winter. Day chips use `dataset.meta.asOfDate` for Today /
@@ -85,7 +98,13 @@ reads that log as the live trail.
   `Reservation[]` published for the dashboard to read. Key name, field
   names (`reservation_id`, `member_id`, `session_id`,
   `reservation_status`, `reserved_at`, `canceled_at`), and last-row-wins
-  are all contract.
+  are all contract. **Append-only within one schedule**: opening this page
+  on a new studio date empties the log, because every id in it now names a
+  different class. The rows are cleared rather than left for another
+  product to resolve — a row this one refuses to trust is not one the
+  dashboard should trust either. The sibling key
+  `pulse-reservations-a-schedule` holds the studio date the log belongs
+  to; nothing outside this folder needs to read it.
 - The `?session=<id>` deep link — other products may link into a class.
 
 ## Gate

@@ -18,7 +18,13 @@ import type {
   SyntheticMember,
 } from "../../shared/synthetic/contracts.js";
 import { setStorageForChecks } from "../../shared/storage.js";
-import { latestReservation, loadRuntimeReservations, saveRuntimeReservations } from "./reservations.js";
+import {
+  latestReservation,
+  loadRuntimeReservations,
+  reconcileSchedule,
+  saveRuntimeReservations,
+  storedScheduleDate,
+} from "./reservations.js";
 import {
   type BookingContext,
   bookSession,
@@ -366,6 +372,66 @@ function stampAt(at: string): { reservationId: string; at: string } {
   check("a blocked read reports an empty log",
     refusal(() => check("...the load call itself", loadRuntimeReservations(), [])),
     "no error");
+  setStorageForChecks(null);
+}
+
+/* ------------------------------------------------------------------ */
+/* A saved booking belongs to the schedule it was made against         */
+/* ------------------------------------------------------------------ */
+{
+  /* THE MEASUREMENT THIS EXISTS FOR. Session ids are positions in a window
+   * that slides at midnight, so the same id names a different class the
+   * next day. With the shared seed on 2026-08-23: of 70 future classes, 70
+   * carried a DIFFERENT class type under the same id one day later —
+   * pilates at 08:00 Sunday became strength at 08:00 Monday. A saved
+   * reservation resolved against the wrong schedule shows a member holding
+   * a seat they never booked, and puts them on Product B's roster for it.
+   * This folder's brief called that harmless; it is not, and the brief was
+   * corrected with these numbers. */
+  const store = new Map<string, string>();
+  setStorageForChecks({
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+    removeItem: (key: string) => { store.delete(key); },
+  });
+
+  const booked = [row(ada.id, "class-session:001831", "reserved", "2026-08-22T09:00:00")];
+  saveRuntimeReservations(booked);
+
+  /* A log with no stamp at all — every log written before this shipped.
+   * Not knowing which schedule it belongs to is the same as knowing it is
+   * the wrong one. */
+  check("an unstamped log is not carried into today's schedule",
+    reconcileSchedule("2026-08-22"), { dropped: 1 });
+  check("...and the rows are cleared, not merely ignored",
+    loadRuntimeReservations(), []);
+  check("...and today's schedule is stamped for the next booking",
+    storedScheduleDate(), "2026-08-22");
+
+  /* Same day, second visit: nothing is touched. A member who books in the
+   * morning still holds it in the afternoon. */
+  saveRuntimeReservations(booked);
+  check("a second visit on the same day drops nothing",
+    reconcileSchedule("2026-08-22"), { dropped: 0 });
+  check("...and the booking is still there",
+    loadRuntimeReservations().length, 1);
+
+  /* Midnight passes. */
+  check("the next day lets the row go and says how many",
+    reconcileSchedule("2026-08-23"), { dropped: 1 });
+  check("...leaving nothing to resolve against the wrong class",
+    loadRuntimeReservations(), []);
+  check("...stamped with the new day", storedScheduleDate(), "2026-08-23");
+
+  /* An empty log still gets stamped, or the first booking of the day would
+   * be dropped by the visit after it. */
+  check("a new day with nothing stored drops nothing",
+    reconcileSchedule("2026-08-24"), { dropped: 0 });
+  check("...and is stamped anyway", storedScheduleDate(), "2026-08-24");
+  saveRuntimeReservations(booked);
+  check("...so a booking made after that stamp survives the next visit",
+    reconcileSchedule("2026-08-24"), { dropped: 0 });
+
   setStorageForChecks(null);
 }
 

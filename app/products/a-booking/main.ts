@@ -16,11 +16,12 @@ import type { Reservation } from "../../shared/contract.js";
 import { currentSession, onSessionChange } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
 import { dismissAlert, showAlert } from "../../shared/components/alert.js";
+import { counted } from "../../shared/text.js";
 import type {
   SyntheticClassSession,
   SyntheticMember,
 } from "../../shared/synthetic/contracts.js";
-import { loadRuntimeReservations, saveRuntimeReservations } from "./reservations.js";
+import { loadRuntimeReservations, reconcileSchedule, saveRuntimeReservations } from "./reservations.js";
 import {
   type BookingContext,
   bookSession,
@@ -531,5 +532,27 @@ onSessionChange(() => {
   clearError();
   render();
 });
+
+/* BEFORE THE FIRST READ OF THE LOG, not after it. The studio is dated to
+ * today, and its session ids are positions in a window that slides every
+ * midnight — measured with the shared seed on 2026-08-23: of 70 future
+ * classes, 70 name a DIFFERENT class type under the same id the next day.
+ * A member who booked pilates at 08:00 on Sunday would open this page on
+ * Monday holding a seat in strength. The reservations module states the
+ * whole reasoning; this is the one call that puts it into effect, and it
+ * says so rather than letting a member notice fewer reservations. */
+const reconciled = reconcileSchedule(dataset.meta.asOfDate);
+if (reconciled.dropped > 0) {
+  showAlert({
+    id: "reservations-from-another-schedule",
+    level: "notice",
+    message: `${counted(reconciled.dropped, "earlier reservation")} could not be carried over to today's schedule.`,
+    /* NUMBER-AGNOSTIC ON PURPOSE. "They were made against..." reads wrong
+     * above "1 earlier reservation", which is the same singular/plural
+     * slip the shared `counted()` helper exists to end — it just moved
+     * into the sentence after the count instead of the count itself. */
+    detail: "Today's schedule was rebuilt overnight, so a class booked against the old one no longer points at the same class. Book again below.",
+  });
+}
 
 render();
