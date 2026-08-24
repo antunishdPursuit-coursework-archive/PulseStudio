@@ -86,10 +86,22 @@ const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
  * is the same case: three modules had written "what day is it where the
  * studio is" and one was UTC, so there is one copy now and Product D
  * reaches it through deps.ts. Its checks — late evening, another zone,
- * both DST nights, the year roll — are in D's suite. */
+ * both DST nights, the year roll — are in D's suite.
+ *
+ * The six below are the same shape, found the same way this tool found
+ * its own suite-key bug: asked about a module that a suite plainly
+ * checks, and got back "no suite covers this." Each is imported straight
+ * into app/shared/auth/tests.ts, but none lives under app/shared/auth/,
+ * so the by-folder default never assigned them anywhere. */
 const OVERRIDES = [
   ["app/shared/text.", "d-reengagement"],
   ["app/shared/today.", "d-reengagement"],
+  ["app/shared/assistant-audience.", "auth"],
+  ["app/shared/brand.", "auth"],
+  ["app/shared/components/assistant.", "auth"],
+  ["app/shared/components/site-footer.", "auth"],
+  ["app/shared/components/figures.", "auth"],
+  ["app/shared/components/alert.", "auth"],
 ];
 
 /* An override naming a suite that no longer exists is the bug this file
