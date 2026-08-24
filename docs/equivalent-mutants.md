@@ -419,6 +419,17 @@ LOOKED AT, not a scoreboard. Run the tool for a number.
 | the gates, other than the two below | in full, each judged by its own self-test | rule survivors closed; self-test and run() survivors are circular or noise |
 | gates `check-mirrors` and `check-brand` | not measured | both arrived after the sweep; the row above said ten gates until 2026-08-22, by which point twelve were running |
 | `today`, `theme-boot`, `components/*`, `brand` | not measured | nothing to swap, or no suite reaches them |
+| a-booking `rules`, `reservations` | in full | none — 33 mutations, 33 caught, after two survivors were closed (a cross-session booking counting toward the wrong class's seats; the start-time guard only tested four hours late) |
+| b-dashboard `dashboard` | in full | none — 13 mutations, 13 caught, after one survivor was closed (busiest-room order indistinguishable from alphabetical in the one fixture that tried it) |
+| c-chatbot `support` | in full | none — 3 mutations, 3 caught. Small module; a clean score here is not a verdict on the product |
+
+The three product rows above were **not reachable by this tool at all**
+until 2026-08-23, when `mutate-suite.mjs` learned the suite keys from
+`scripts/suites.mjs` instead of a hand-written table that only knew three
+suites. Before that date this section had nothing to say about Product A,
+B or C because asking about them answered "no suite covers this module" —
+which reads as "nothing checks this," and for these three it was the tool,
+not the product.
 
 **A SAMPLE IS NOT A VERDICT, and this table proved it on itself.** The row
 above said "sampled, 1 site in 10 — 94%" until the full sweep ran: 165
