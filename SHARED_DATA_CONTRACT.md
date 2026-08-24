@@ -142,8 +142,8 @@ product creates, and unresolved questions during the team review.
 
 | Product | Owner | Reads | Creates or updates |
 | --- | --- | --- | --- |
-| Member Booking App | Kerrian | `member`, `membership`, `class_session` | `reservation` |
-| Staff Scheduling Dashboard | Manny | `class_session`, `instructor`, `reservation` | Product-specific flags only |
+| Member Booking App | Kerrian | `member`, `membership`, `class_session`, `studio_policy` | `reservation` |
+| Staff Scheduling Dashboard | Manny | `member`, `class_session`, `instructor`, `reservation`, `attendance` | Product-local weekly schedule drafts only |
 | Member Support Chatbot | Dennis | `class_session`, `studio_policy` | No shared records in MVP |
 | Member Re-engagement Tool | Rensley | `member`, `membership`, `reservation`, `attendance`, `class_session`, `instructor` | Draft outreach only; no automatic sending |
 
@@ -157,8 +157,13 @@ instructor. Reading them was correct; the row was wrong.
 An audit the same day compared every product's real reads against this table.
 **The data law itself holds** — no member-facing surface touches staff-only
 information. Product C now matches its row exactly and refuses private-member
-questions without reading member records. Two other rows remain for their
-owners to correct — see `docs/REQUESTFOR-A-B-C.md`.
+questions without reading member records. Kerrian's and Manny's rows were
+corrected on this branch (2026-08-24): Kerrian's page shows the current
+cancellation policy beside its Cancel button (`studio_policy`, not declared
+before), and Manny's roster resolves each booking to a member's display name
+and attendance status (`member` and `attendance`, neither declared before).
+Both were correct reads against an incomplete row, the same shape as
+Rensley's own correction — see `docs/REQUESTFOR-A-B-C.md`.
 
 ## Definitions the team must agree on
 
