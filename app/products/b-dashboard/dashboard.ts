@@ -29,6 +29,7 @@ export interface RosterMember {
   reservation_status: string;
   attendance_status: string;
 }
+
 export interface DashboardSession {
   capacity: number;
   roster: RosterMember[];
