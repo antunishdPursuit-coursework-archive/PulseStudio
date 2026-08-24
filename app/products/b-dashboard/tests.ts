@@ -26,6 +26,7 @@ function check(name: string, actual: unknown, expected: unknown): void {
   const e = JSON.stringify(expected);
   results.push({ name, passed: a === e, detail: a === e ? `= ${e}` : `expected ${e}, got ${a}` });
 }
+
 const member = (i: number, reservation_status: string): RosterMember => ({
   member_id: `m-${i}`, display_name: `Member ${i}`, reservation_status, attendance_status: "unknown",
 });
