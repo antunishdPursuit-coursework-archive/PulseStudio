@@ -36,6 +36,8 @@ import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../co
 import { assistantFor, bookForMember, bookingIntent, openingLine, resolveSessions } from "../components/assistant.js";
 import { generateStudio } from "../synthetic/generate.js";
 import { DEFAULT_CONFIG } from "../synthetic/config.js";
+import type { Reservation } from "../contract.js";
+import type { SyntheticDataset } from "../synthetic/contracts.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
@@ -1374,17 +1376,59 @@ check("a full class is refused, and nothing is written", () => {
  * WITH today's stamp: a row from an unstamped or differently-stamped log
  * is exactly what this function must refuse to trust, so leaving the
  * stamp off here would test the wrong thing by accident. */
-check("a class the runtime log already fills is refused too", () => {
+/* bookedCount IS THE CURRENT COUNT, not a stale display value bookForMember
+ * has to double-check against the raw log. resolveSessions() and
+ * bookForMember() run back-to-back in mountAssistant() with no `await`
+ * between them, so nothing can change the log in between — the log
+ * bookForMember would re-read is the exact one bookedCount was already
+ * computed from. A fixture built here with a real accurate count is what
+ * that guarantee looks like from the caller's side. */
+check("a class already at capacity is refused", () => {
   const key = "pulse-reservations-a";
-  const target = assistantSession({ id: "class-session:900004", capacity: 1, bookedCount: 0 });
-  localStorage.setItem(key, JSON.stringify([
-    { reservation_id: "res_x", member_id: "member:someone-else", session_id: target.raw.id, reservation_status: "reserved", reserved_at: target.startsAt, canceled_at: null },
-  ]));
-  localStorage.setItem(BOOKING_SCHEDULE_KEY, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  const target = assistantSession({ id: "class-session:900004", capacity: 1, bookedCount: 1 });
   const result = bookForMember("member:checks-3", target, ASSISTANT_TODAY);
   localStorage.removeItem(key);
-  if (result.ok) return "a class already filled by the runtime log accepted a second booking";
+  if (result.ok) return "a class already at capacity accepted another booking";
   return eq(result.ok === false && result.why.includes("full"), true);
+});
+/* THE BUG THIS ARCHITECTURE REPLACED: bookForMember used to ALSO
+ * recompute a runtime count from the raw log and ADD it to
+ * session.bookedCount — which already included a runtime count of its
+ * own. Every real reservation was counted twice. Measured live: a member
+ * who canceled and rebooked one capacity-3 class read as bookedCount 1
+ * (correct — resolveSessions() dedupes by member now), but the OLD
+ * bookForMember added its own recount of 1 on top, made the total 2, and
+ * a second real booker was refused as "full" with two empty seats still
+ * open. Proven end to end here, through the real resolveSessions() path
+ * rather than a hand-built Session, because the bug lived exactly in how
+ * the two functions' counts combined. */
+check("resolveSessions + bookForMember together count a cancel-and-rebook as ONE seat", () => {
+  const sessionId = "class-session:900004c";
+  const miniStudio = {
+    classTypes: [{ id: "ct-mini", name: "Mini", level: "all levels", durationMinutes: 60, capacity: 3 }],
+    classSessions: [{
+      id: sessionId, classTypeId: "ct-mini", instructorId: "i-mini",
+      startsAt: `${ASSISTANT_TODAY}T09:00:00`, durationMinutes: 60, capacity: 3, status: "scheduled" as const,
+    }],
+    bookings: [],
+  } as unknown as SyntheticDataset;
+  const rows: Reservation[] = [
+    { reservation_id: "r1", member_id: "member:A", session_id: sessionId, reservation_status: "reserved", reserved_at: `${ASSISTANT_TODAY}T09:00:00`, canceled_at: null },
+    { reservation_id: "r2", member_id: "member:A", session_id: sessionId, reservation_status: "canceled", reserved_at: `${ASSISTANT_TODAY}T09:00:00`, canceled_at: `${ASSISTANT_TODAY}T09:05:00` },
+    { reservation_id: "r3", member_id: "member:A", session_id: sessionId, reservation_status: "reserved", reserved_at: `${ASSISTANT_TODAY}T09:10:00`, canceled_at: null },
+  ];
+  const resolved = resolveSessions(miniStudio, rows)[0];
+  if (resolved === undefined) return "the mini studio resolved no sessions";
+  const bookedCheck = eq(resolved.bookedCount, 1);
+  if (bookedCheck !== true) return `bookedCount: ${bookedCheck}`;
+  const key = "pulse-reservations-a";
+  localStorage.setItem(key, JSON.stringify(rows));
+  localStorage.setItem(BOOKING_SCHEDULE_KEY, ASSISTANT_TODAY);
+  const result = bookForMember("member:B", resolved, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  if (!result.ok) return `member B should have gotten one of the two open seats, got: ${result.why}`;
+  return true;
 });
 check("...while the SAME seeded row is invisible once the stamp is for another day", () => {
   /* THE OTHER HALF OF THE PROOF. Booking through the assistant on
@@ -1456,7 +1500,7 @@ check("a browser that refuses to save reports that, not a false success", () => 
  * branch, in a module of its own because shared code may not import a
  * product's. */
 check("resolveSessions counts only bookings for that exact session", () => {
-  const resolved = resolveSessions(assistantStudio, new Map());
+  const resolved = resolveSessions(assistantStudio, []);
   const bySession = new Map<string, number>();
   for (const b of assistantStudio.bookings) {
     if (b.status !== "booked") continue;
@@ -1471,7 +1515,7 @@ check("...and at least two sessions in this studio actually have DIFFERENT booke
   /* A check that passes because every session happens to have the same
    * count would not have caught the inversion either — this is the
    * property that makes the check above meaningful rather than lucky. */
-  const resolved = resolveSessions(assistantStudio, new Map());
+  const resolved = resolveSessions(assistantStudio, []);
   const counts = new Set(resolved.map((s) => s.bookedCount));
   return counts.size > 1 ? true : "every session had the same booked count; this fixture proves nothing";
 });

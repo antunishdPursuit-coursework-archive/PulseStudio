@@ -97,8 +97,33 @@ function endTime(startsAt: string, durationMinutes: number): string {
   return `${datePart}T${hh}:${mm}:00`;
 }
 
-export function resolveSessions(dataset: SyntheticDataset, runtimeReservedBySession: Map<string, number>): Session[] {
+/** LAST ROW PER MEMBER, PER SESSION, THEN COUNT — never a blanket count of
+ *  every row whose status happens to say "reserved". The log is
+ *  append-only: a cancel is a NEW row, not a rewrite, so a member's
+ *  original "reserved" row is still sitting there with that status after
+ *  they cancel. Counting rows directly double-counts every
+ *  cancel-and-rebook. Measured live: one member who canceled and rebooked
+ *  a session read as TWO seats taken instead of one, and on a
+ *  capacity-3 class with only that one real booking, a second member's
+ *  booking was refused as "full" — two seats away from actually full.
+ *  This is the same last-row-wins union Product A's own remainingSpots()/
+ *  confirmedMemberIds() compute in rules.ts. */
+function runtimeReservedPerSession(rows: readonly Reservation[]): Map<string, number> {
+  const latestPerSessionMember = new Map<string, Reservation>();
+  for (const row of rows) {
+    latestPerSessionMember.set(`${row.session_id} ${row.member_id}`, row); // append order; last write wins
+  }
+  const counts = new Map<string, number>();
+  for (const row of latestPerSessionMember.values()) {
+    if (row.reservation_status !== "reserved") continue;
+    counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function resolveSessions(dataset: SyntheticDataset, runtimeRows: readonly Reservation[]): Session[] {
   const typeById = new Map(dataset.classTypes.map((t) => [t.id, t] as const));
+  const runtimeReservedBySession = runtimeReservedPerSession(runtimeRows);
   return dataset.classSessions.map((raw) => {
     const type = typeById.get(raw.classTypeId);
     const generatorBooked = dataset.bookings.filter(
@@ -205,21 +230,17 @@ export function bookForMember(
   if (mine !== undefined && mine.reservation_status === "reserved") {
     return { ok: false, why: "You already have a spot in that class." };
   }
-  /* LAST ROW PER MEMBER, THEN COUNT — never a blanket count of every row
-   * whose status happens to say "reserved". The log is append-only: a
-   * cancel is a NEW row, not a rewrite, so the member's original "reserved"
-   * row is still sitting there with that status. Counting rows directly
-   * double-counts every cancel-and-rebook and — the case a check pins —
-   * makes a cancelled spot look permanently taken. This is the same
-   * last-row-wins union Product A's own remainingSpots()/
-   * confirmedMemberIds() compute in main.ts. */
-  const latestPerMember = new Map<string, Reservation>();
-  for (const r of rows) {
-    if (r.session_id !== session.raw.id) continue;
-    latestPerMember.set(r.member_id, r); // rows are append order; last write wins
-  }
-  const runtimeReserved = [...latestPerMember.values()].filter((r) => r.reservation_status === "reserved").length;
-  if (session.bookedCount + runtimeReserved >= session.capacity) {
+  /* NOT session.bookedCount + a second, freshly-recomputed runtime count.
+   * resolveSessions() already folds the (correctly deduplicated) runtime
+   * count into bookedCount, computed moments ago in this same synchronous
+   * handler — there is no await between that call and this one, so the
+   * log cannot have changed underneath it. Adding a second runtime tally
+   * here used to double-count every real reservation: measured live, one
+   * member canceling and rebooking a capacity-3 class left only ONE real
+   * seat taken, bookedCount correctly read 1, and this line's old
+   * `+ runtimeReserved` made the total read 2 — then the SECOND real
+   * booker was refused as "full" two seats before it actually was. */
+  if (session.bookedCount >= session.capacity) {
     return { ok: false, why: "That class is full. The booking page has the waitlist." };
   }
   const row: Reservation = {
@@ -354,12 +375,7 @@ export function mountAssistant(): void {
     const actor: Actor = session === null ? null : session.actor_type;
     const policy = audiencePolicy(actor, placement);
     const studio = sharedStudio();
-    const runtimeReservedBySession = new Map<string, number>();
-    for (const row of readRuntimeReservedRows(studio.meta.asOfDate)) {
-      if (row.reservation_status !== "reserved") continue;
-      runtimeReservedBySession.set(row.session_id, (runtimeReservedBySession.get(row.session_id) ?? 0) + 1);
-    }
-    const sessions = resolveSessions(studio, runtimeReservedBySession);
+    const sessions = resolveSessions(studio, readRuntimeReservedRows(studio.meta.asOfDate));
 
     /* BOOKING IS A ROW, NOT A REPLY. Decided here, written here, and only
      * then described. The model is never asked to do it. */
