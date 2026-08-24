@@ -711,7 +711,8 @@ function loadSharedRecords(): void {
    * Booking's own reservation log merged in (last row wins). The CSV door
    * and the generated studio remain the other two doors. */
   try {
-    const data = fixtureSetFrom(sharedStudio(), readRuntimeReservations());
+    const studio = sharedStudio();
+    const data = fixtureSetFrom(studio, readRuntimeReservations(studio.meta.asOfDate));
     renderRecords(
       data,
       /* THE PEOPLE ON THIS PAGE ARE FICTIONAL, AND IT HAS TO SAY SO.
