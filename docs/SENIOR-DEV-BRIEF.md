@@ -345,12 +345,21 @@ And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
   suites — it reads `document` at module load. Proven by breaking it
   syntactically and watching every synthetic check pass. `tsc` still
   catches type and syntax errors.
-- **The engine and this product disagree about "today", latently.**
-  `validate.ts` skips attendance dated on the as-of date; `findQuietMembers`
-  counts a class attended today. They have never disagreed because the
-  generator schedules no attended record on that date — measured 0 at 60
-  members and 0 at 300 — but if that changes, a member who came in this
-  morning reads as quiet to the answer key and recent to this product.
+- **The engine and this product read "today" differently, and neither can
+  drift into the other quietly.** `validate.ts` treats attendance for a
+  class starting on or after the as-of date as a DEFECT
+  (`future-attendance`); `findQuietMembers` counts a class attended today
+  as recent activity. They have never disagreed because the generator
+  schedules no attended record on that date — measured 0 at 60 members and
+  0 at 300 — and this item used to end there, as a landmine waiting for a
+  generator change. It is not one: the synthetic suite pins
+  `problems.length === 0` on clean datasets at four scales, so a generator
+  that produced such a record fails before the record reaches a page, and
+  D's own suite pins the boundary from the other side — "no generated
+  class is dated on the as-of date" and "no attendance was recorded
+  against a class that has not happened". A CSV import CAN carry
+  attendance dated today, and counting it as recent is the right answer
+  for a member who actually came in this morning.
 
 ## 9. How to run, gate, and commit
 
