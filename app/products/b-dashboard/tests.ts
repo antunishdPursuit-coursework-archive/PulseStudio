@@ -90,6 +90,20 @@ check("rooms are grouped and the busiest leads", roomDemand([studio, loft, { ...
   [{ room: "Loft", peakFill: 90, sessions: 1 }, { room: "Studio", peakFill: 50, sessions: 2 }]);
 check("no sessions means no rooms", roomDemand([]), []);
 
+/* THE CHECK ABOVE CANNOT TELL THE TWO RULES APART. Loft is both the
+ * busiest room and the first alphabetically, so it leads either way —
+ * which `npm run mutate` proved by turning the comparator's `||` into
+ * `&&`, making it sort by ROOM NAME and leaving every check green. These
+ * two put the rules in conflict: Annex is quiet and sorts first, Loft is
+ * busy and sorts last. A staff member reads this panel to find where the
+ * demand is, so name order leading would be the wrong answer quietly. */
+const annex = { ...session(10, 2), room: "Annex" };
+check("a quiet room does not lead on its name alone",
+  roomDemand([annex, loft]).map((row) => row.room), ["Loft", "Annex"]);
+check("rooms level on demand fall back to name order",
+  roomDemand([{ ...session(10, 5), room: "Zephyr" }, studio]).map((row) => row.room),
+  ["Studio", "Zephyr"]);
+
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
 const summaryEl = document.querySelector<HTMLParagraphElement>("#summary");
