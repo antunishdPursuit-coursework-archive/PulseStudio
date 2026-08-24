@@ -34,6 +34,7 @@ import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../comp
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
 import { renderStudioBrand } from "../components/brand-header.js";
+import { mountSessionControl } from "../components/topbar.js";
 import { assistantFor, bookForMember, bookingIntent, openingLine, resolveSessions } from "../components/assistant.js";
 import { generateStudio } from "../synthetic/generate.js";
 import { DEFAULT_CONFIG } from "../synthetic/config.js";
@@ -596,6 +597,44 @@ check("clearing with a throwing storage still signs the page out", () => {
   const got = readPulseSession();
   setStorageForChecks(null);
   return eq(got, null);
+});
+
+/* ---------- where the session chip lands in the header ---------- *
+ *
+ * mountSessionControl() had no check at all. Its own comment records why
+ * that matters: the selector it inserts before CHANGED on 2026-08-23 (the
+ * settings drawer that used to sit in the header became its own page),
+ * and the old selector would have matched nothing — nothing would have
+ * thrown, the control would just have appended after the appearance
+ * switch instead of before it, silently, on every page. That EXACT case —
+ * a host that already has the switch present — cannot be checked here:
+ * the branch calls `insertBefore`, which this stub does not implement,
+ * the same limit `cloneNode` put on brand-header.ts's checks. What is
+ * still reachable is the branch with no switch on the page (appendChild,
+ * which the stub does support), plus the sign-in/signed-in content
+ * `render()` settles synchronously — `readStaffGate()` for the staff tag
+ * is fired and never awaited, so it cannot be part of what a check()
+ * harness with no async support holds to a known answer here. */
+check("with no appearance switch on the page, the chip is simply appended", () => {
+  const host = document.createElement("div");
+  fresh();
+  mountSessionControl(host);
+  return eq([...host.children].map((c) => c.id), ["pulse-session-control"]);
+});
+check("signed out, the chip is a Sign in button", () => {
+  const host = document.createElement("div");
+  fresh();
+  mountSessionControl(host);
+  const btn = host.querySelector(".pulse-session-signin");
+  return eq([btn !== null, btn?.textContent], [true, "Sign in"]);
+});
+check("signed in, the chip names the member instead", () => {
+  const host = document.createElement("div");
+  fresh();
+  writePulseSession({ version: 1, actor_type: "member", member_id: members[0]?.id ?? "", display_name: "Ada" });
+  mountSessionControl(host);
+  const who = host.querySelector(".pulse-session-who");
+  return eq([host.querySelector(".pulse-session-signin"), who?.textContent], [null, "Ada"]);
 });
 
 /* ---------- the staff door's one pure function ---------- *
