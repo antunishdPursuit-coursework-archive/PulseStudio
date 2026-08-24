@@ -3,6 +3,7 @@ import { loadFixtures } from "../../shared/data.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
 import { readPulseSession } from "../../shared/auth/session.js";
 import { asksForPrivateMemberData, QUESTION_MAX_LENGTH, recordStatus, safeStudioContext } from "./support.js";
+import { todayIsoInZone } from "../../shared/today.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -35,18 +36,6 @@ input.maxLength = QUESTION_MAX_LENGTH;
 
 let fixtures: PublicFixtures | null = null;
 
-function studioDate(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
-}
-
 function isChatResponse(value: unknown): value is { answer: string } {
   return (
     typeof value === "object" &&
@@ -71,7 +60,7 @@ async function haikuAnswer(
       /* The asker's OWN name, so the server's roster check never refuses a
          person for hearing their own name back. Nothing else about them. */
       self,
-      context: safeStudioContext(records, studioDate(records.timezone), Date.now()),
+      context: safeStudioContext(records, todayIsoInZone(records.timezone), Date.now()),
     }),
   });
   const result: unknown = await response.json().catch(() => null);
