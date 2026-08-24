@@ -32,11 +32,14 @@ its environment. The repository names no host, on purpose: it is the same
 file on every machine, and a provider's name in a source file is a fact
 that goes stale the day the provider changes.
 
-Three environment variables are the whole configuration:
+What a host sets is read from the environment, not counted here — a
+number in prose is the kind of claim this repo has gotten wrong before.
+`scripts/start-haiku.mjs` is where to read it live:
 
 | Variable | What it does | Default |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | The key. Set it in the host's runtime configuration — never in a file this repository tracks. | unset → `/api/chat` answers 503 and the page says so |
+| `ANTHROPIC_MODEL` | Which model answers. | `claude-haiku-4-5-20251001` |
 | `STAFF_PASSPHRASE` | The staff door. Unset → the dashboard and the re-engagement tool show a closed door saying nobody can sign in yet. They never fail open. | unset → staff surfaces stay shut |
 | `HOST` | The interface to listen on. A host that fronts this with its own reverse proxy sets its container's interface. | `127.0.0.1` |
 | `PORT` | The port. | `4173` |
@@ -112,6 +115,6 @@ npm run build
 npm start
 ```
 
-Then set `ANTHROPIC_API_KEY`, `STAFF_PASSPHRASE`, `HOST` and `PORT` in that
-host's own environment, and terminate TLS in front of it. Any host that can
-run a Node process and hold environment variables can run this.
+Then set the variables in the table above in that host's own environment,
+and terminate TLS in front of it. Any host that can run a Node process and
+hold environment variables can run this.
