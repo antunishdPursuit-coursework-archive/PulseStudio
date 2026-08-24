@@ -605,9 +605,11 @@ if (!IS_COMMAND) {
   }
 
   let data;
+  const partOf = new Map();
   for (const file of [FIXTURES, STAFF_RECORDS]) {
     try {
       const part = JSON.parse(readFileSync(join(ROOT, file), "utf8"));
+      partOf.set(file, part);
       data = data === undefined ? part : { ...data, ...part };
     } catch (error) {
       console.error(`check-fixtures: ${file} is not readable JSON — ${error.message}`);
@@ -617,11 +619,24 @@ if (!IS_COMMAND) {
 
   const problems = validateFixtures(data, unions);
   const freshness = attendanceFreshness(data);
-  const counts = Object.keys(SHAPE)
-    .map((n) => `${Array.isArray(data[n]) ? data[n].length : 0} ${n}`)
-    .join(", ");
+
+  /* COUNTED PER FILE, NOT OVER THE MERGE. This line used to name
+   * app/shared/fixtures.json and then print the merged counts after it, so
+   * it read as "fixtures.json holds 5 members" — about the one file in
+   * this repo that must never hold a member again. Everything under app/
+   * is served at a URL; that is why the records naming a person moved out.
+   * A gate that describes the arrangement it exists to protect as the
+   * opposite of what it is would send the next person to fix the wrong
+   * file, or reassure them the move never happened. */
+  const countsIn = (file) =>
+    Object.keys(SHAPE)
+      .filter((n) => Array.isArray(partOf.get(file)?.[n]))
+      .map((n) => `${partOf.get(file)[n].length} ${n}`)
+      .join(", ") || "nothing this gate shapes";
   console.log(
-    `check-fixtures: ${FIXTURES} read against ${REQUIRED_UNIONS.length} unions from ${CONTRACT} — ${counts}.`,
+    `check-fixtures: ${FIXTURES} — ${countsIn(FIXTURES)}; ` +
+      `${STAFF_RECORDS} — ${countsIn(STAFF_RECORDS)}; ` +
+      `checked together against ${REQUIRED_UNIONS.length} unions from ${CONTRACT}.`,
   );
 
   /* SAID EVERY RUN, not only when it breaks — the point is that the team
