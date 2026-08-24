@@ -269,7 +269,7 @@ function serveFile(request, response) {
  * picture of access control.
  *
  * WHAT THIS IS NOT. One shared staff passphrase, not per-person accounts:
- * there is no user store yet (app/shared/auth/schema.sql is the design for
+ * there is no user store yet (docs/hosted-schema.sql is the design for
  * one, and nothing runs it). It cannot tell one staff member from another
  * and so cannot show you who looked at what. Say that plainly rather than
  * implying an audit trail that does not exist.
