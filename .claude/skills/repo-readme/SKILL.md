@@ -32,7 +32,8 @@ This repo has shipped: "four gates" the day a fifth landed · "the ten gates"
 when twelve were running · "the codebase is 2,150 lines" when one product alone
 was four times that · "592 KB total" for files weighing 352,762 bytes · "147
 tracked files" at 160 · a mutation score of 52% measured before the checks that
-moved it to 56%.
+moved it to 56% · "the three suites" on ten lines across five documents while
+six suites ran.
 
 ```markdown
 <!-- rots on the next commit -->

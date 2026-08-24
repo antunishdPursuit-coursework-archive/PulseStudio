@@ -137,11 +137,14 @@ list: on the day it landed no product folder violated any of them.
 
 - Gate before every commit: `npm run check` must pass. It is `tsc` — which
   EMITS, so the suites run the code you just changed rather than the last
-  build — then every gate `package.json` lists and the three suites. (The
-  gates are named there and not counted here: this sentence said "four"
-  from the day a fifth was added — and the TABLE below then listed four of
-  them for as long again, which is the same drift one level down. If you
-  add a gate, add its row.) Each prints the count it
+  build — then every gate `package.json` lists and every suite
+  `run-suites` finds. (Neither is counted here, and the reason is this
+  sentence's own history: it said "four" gates from the day a fifth was
+  added, the TABLE below then listed four of them for as long again, and
+  it went on saying "the three suites" while six were running — that
+  third one was wrong on ten lines, in five documents and their
+  mirrors, at the same time. One cause every time: a count in prose
+  that nothing checks. If you add a gate, add its row.) Each prints the count it
   actually reached, never a silent pass; read the count there, not from
   prose. Several of the laws above are no longer only stated:
 
@@ -161,7 +164,7 @@ list: on the day it landed no product folder violated any of them.
   | `scripts/check-mirrors.mjs` | every `AGENTS.md` is still a byte-equivalent mirror of its `CLAUDE.md` |
   | `scripts/check-brand.mjs` | the clone seam — a page that shows the studio's name is wired to receive it |
   | `scripts/check-settings.mjs` | the settings law — settings lives in exactly one place, the header carries light/dark only, and light is the built-in default |
-  | `scripts/run-suites.mjs` | the three browser suites, run headlessly |
+  | `scripts/run-suites.mjs` | every browser suite it finds under `app/`, run headlessly |
 
   Every gate carries `--self-test`, which plants known-bad input and proves
   it still catches it. Run one if you ever doubt a green. And note what none

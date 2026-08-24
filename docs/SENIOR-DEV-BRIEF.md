@@ -252,6 +252,17 @@ These cost real time. They are the most valuable part of this brief.
 14. **A metric mistaken for a behaviour.** `scrollWidth` exceeding
     `clientWidth` is not a page that scrolls, and a timing taken at load
     average 92 is not a regression. Both nearly sent a fix at working code.
+15. **A list of suites, written down twice.** `run-suites.mjs` held a
+    hand-written array of three while six suites existed, so three of them
+    ran nowhere and the gate went green over checks that never executed.
+    Teaching it to FIND suites then broke `mutate-suite.mjs`, which kept its
+    own copy of the keys: "reengagement" became "d-reengagement", every
+    mutation survey of Product D died on an unknown suite, and the error it
+    printed blamed a stale build. Both halves now read `scripts/suites.mjs`,
+    which is the only file that knows. The cost of the second copy was not
+    the outage — it was what the tool said while broken, which was
+    confident and wrong in both directions: "no suite covers this module"
+    about modules a suite checks.
 
 ## 8. Known open items — honest state
 
@@ -278,15 +289,19 @@ These cost real time. They are the most valuable part of this brief.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
-- **Manny's staff dashboard has no `noindex`** and is live and public showing
-  member names and rosters. This brief used to add "`app/robots.txt` blocks
-  its crawl as a stopgap" — it does not, and never did on this deploy. That
-  file is served at `/PulseStudio/robots.txt` on a project page, while
+- **Manny's staff dashboard now carries `noindex, nofollow`**, and so does
+  the re-engagement tool. This item read "has no `noindex`" for as long as
+  it was true and for a while after it stopped being: both tags landed on
+  this branch. What has NOT changed is the reason the tag was the only
+  answer available — this brief used to add "`app/robots.txt` blocks its
+  crawl as a stopgap", which it does not, and never did on this deploy.
+  That file is served at `/PulseStudio/robots.txt` on a project page, while
   crawlers read the USER site's root, which is a different repository; its
   Disallow line was also missing the path prefix. Both corrected, and the
-  honest position is now written in three places: the robots file, the
-  sitemap, and `REQUESTFOR-A-B-C.md`. The dashboard has NO crawler
-  protection at all, and only its owner can add the tag.
+  honest position is written in three places: the robots file, the sitemap,
+  and `REQUESTFOR-A-B-C.md`. A meta tag is also not a fence: it asks a
+  well-behaved crawler not to index. What actually keeps the records off
+  the open web is that they no longer live under `app/` at all.
 - **The session ids in the shared studio are not stable.** Measured: 1900 of
   1900 move to a different date each day, because they are minted
   positionally over a window anchored on today. Product A persists
@@ -295,11 +310,13 @@ These cost real time. They are the most valuable part of this brief.
   have a stable id; these do not. The fix is content-derived ids, which
   changes every id in the dataset and everything pinned to them — a team
   decision, raised rather than improvised, per `app/shared/CLAUDE.md`.
-- **Three developer accents are below WCAG AA** as text on the light theme —
-  blue 3.68:1, amber 2.15:1, green 2.54:1. Violet was too and is fixed
-  without changing its identity hex. `scripts/check-contrast.mjs` measures
-  all of them every run; the other three are baselined against their owners,
-  who are the only people who may change them.
+- **All four accents now have a readable companion.** Three were below WCAG
+  AA as text on the light theme — blue 3.68:1, amber 2.15:1, green 2.54:1 —
+  and each owner's hue is untouched: the fix was a `--<name>-strong` token
+  used where an accent is TEXT, the same move violet made first.
+  `docs/contrast-baseline.json` is empty, and its note says the list only
+  shrinks, so a new entry is a regression rather than a plan.
+  `scripts/check-contrast.mjs` measures every pairing on every run.
 
 Raised since, each in `docs/REQUESTFOR-A-B-C.md` and each belonging to
 somebody else — none is mine to close:
@@ -341,14 +358,17 @@ And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
 npm ci             # what CI runs; npm install is fine locally
 npm run check      # the gate — must pass before any commit
 npm run build      # tsc — emits the .js the browser runs
-npm run start      # serves app/ at http://localhost:4173
+npm run start      # builds, then runs the studio's server on :4173
 ```
 
 Then `http://localhost:4173/products/d-reengagement/` and its `tests.html`.
+The tool is behind the staff door now, so signing in needs `STAFF_PASSPHRASE`
+in the environment — copy `.env.example` and read `docs/the-server.md`. The
+`tests.html` pages are not gated; they check logic and hold no records.
 
 **`npm run check` is not `tsc --noEmit`,** which this page used to say. It is
-`tsc` — which EMITS — followed by every gate `package.json` lists and the
-three suites:
+`tsc` — which EMITS — followed by every gate `package.json` lists and every
+suite `run-suites` finds:
 
 | | what it fails on |
 | --- | --- |
@@ -364,12 +384,16 @@ three suites:
 | `check-sources.mjs` | a NEW tracked `.js` under `app/` — committed build output, or hand-written JavaScript no compiler reads |
 | `check-reachable.mjs` | a NEW module under `app/` that no page reaches (needs a build; types-only modules are not dead code) |
 | `check-mirrors.mjs` | an `AGENTS.md` that has stopped being a byte-equivalent mirror of its `CLAUDE.md` — the file every non-Claude assistant reads and edits |
-| `run-suites.mjs` | any of the three browser suites, run headlessly |
+| `check-brand.mjs` | a page that shows the studio's name without being wired to receive it |
+| `check-settings.mjs` | a second settings surface, a header carrying more than light/dark, or a built-in default that is not light |
+| `run-suites.mjs` | every browser suite it finds under `app/`, run headlessly |
 
 Each gate carries `--self-test`, which plants known-bad input and proves it
 still catches it — run one if you ever doubt a green. Do not read the list
 above as complete either: `package.json` is where the `check` script names
-them, and it is the only place that cannot drift.
+them, and it is the only place that cannot drift. This table has already
+proved that — it was two gates short, and the sentence above it said "the
+three suites" while six were running.
 
 `npm run mutate` is the other half and is deliberately NOT in the gate. It
 changes one token in a compiled module, reruns a suite, and puts the file

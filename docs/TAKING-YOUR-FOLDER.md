@@ -84,8 +84,8 @@ npm run check
 ```
 
 That is the gate. It runs `tsc` — which emits, so the suites execute the code
-you just took rather than the last build — then every gate script and the
-three suites. Each prints the count it reached. Read the counts.
+you just took rather than the last build — then every gate script and every
+suite `run-suites` finds. Each prints the count it reached. Read the counts.
 
 ## What is NOT yours to take
 
