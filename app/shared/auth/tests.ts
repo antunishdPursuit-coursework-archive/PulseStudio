@@ -45,6 +45,7 @@ import {
   ALERT_REGION_ID,
   alertElement,
   dismissAlert,
+  ensureAlertRegion,
   openAlerts,
   showAlert,
 } from "../components/alert.js";
@@ -1040,6 +1041,17 @@ check("the footer's studio word comes from brand.ts, not from a string here", ()
    * that renamed the studio, which is the whole point of the seam. */
   return eq(word === word.toUpperCase() && word.length > 0, true);
 });
+check("...and the word carries BOTH the lead and the accent, not just the lead", () => {
+  /* The check above reads the whole textContent, which stays uppercase and
+   * non-empty even if the accent span is never appended — a studio name's
+   * second word could go missing from the footer with nothing here to
+   * notice. Read the nested span on its own, the same way the header's
+   * equivalent check does, so the two halves cannot silently collapse into
+   * one. */
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const word = f.querySelector(".brand-word");
+  return eq([word?.textContent, word?.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+});
 
 check("the footer carries the mark, and only one of it", () => {
   const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
@@ -1685,6 +1697,22 @@ check("the open alerts are listed in the order they were raised", () => {
   dismissAlert("check-a");
   dismissAlert("check-b");
   return eq(listed, ["check-a", "check-b"]);
+});
+
+/* This suite's own page has no ".topnav, .page-head, .topbar" anywhere, so
+ * every check above exercised only the fallback — prepended at the top of
+ * the body. Force the OTHER branch: remove the memoized region so the next
+ * call rebuilds it, give the page a header, and check the region lands
+ * right after it rather than before. */
+check("with a page header present, the alert region is placed right after it", () => {
+  document.getElementById(ALERT_REGION_ID)?.remove();
+  const header = document.createElement("div");
+  header.className = "topnav";
+  document.body.append(header);
+  const region = ensureAlertRegion();
+  const siblings = [...document.body.children];
+  header.remove();
+  return eq(siblings.indexOf(region), siblings.indexOf(header) + 1);
 });
 
 check("the region is made once and reused, not once per alert", () => {
