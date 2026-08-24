@@ -1274,6 +1274,19 @@ check("every opening line names what that assistant may actually do", () => {
   if (!(lines[1] ?? "").includes("book")) return "the member line never mentions booking";
   return true;
 });
+/* THE MEMBER LINE AND THE VISITOR LINE BOTH SAY "book", and the check
+ * above never noticed that "member" could fall through to the VISITOR
+ * line and still pass it — `npm run mutate` found `kind === "member"` can
+ * flip to `!==` with nothing objecting. The visitor line's own "Sign in
+ * to book" carries the substring the old check went looking for. What
+ * actually tells the two apart is that a signed-in member is never asked
+ * to sign in, and is greeted by name when one is given. */
+check("a member is never told to sign in — they already are", () =>
+  eq(openingLine("member", "Ada").toLowerCase().includes("sign in"), false));
+check("...and is greeted by their own first name", () =>
+  eq(openingLine("member", "Ada").startsWith("Ada,"), true));
+check("a visitor with no name IS told to sign in", () =>
+  eq(openingLine("visitor", null).toLowerCase().includes("sign in"), true));
 
 /* BOOKING, AGAINST A REAL GENERATED STUDIO — not a hand-built fixture, so
  * a fill-count off by one shows up here the way it would on the live page.
