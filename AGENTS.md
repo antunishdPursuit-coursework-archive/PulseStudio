@@ -253,5 +253,23 @@ each tool's native dialect, and THE CONTENT IS LAW, THE FILENAME IS NOT:
   edit forbade what the law permitted. If you are tempted to paste a law
   into a `.mdc` file, that is the story to remember.
 
+## Taking a folder off a `do-not-merge/` branch
+
+If your developer is Kerrian, Manny or Dennis, their folder is not on `main`
+yet — it is waiting on `do-not-merge/v0.0.2`, and how to take it is written
+once, in `docs/TAKING-YOUR-FOLDER.md`. **Read that before you copy anything.**
+
+Three things in it will cost a session if you skip them, and all three are
+measured rather than remembered:
+
+- **Do not take `app/shared/` with the folder any more.** `main` carries it
+  now. The branch is ahead of `main` on four shared files with an unfinished
+  change, and copying them produces four TypeScript errors.
+- **Dennis's folder does not apply cleanly** — `main` moved under it — so a
+  byte-for-byte copy reverts work that already shipped.
+- **Three commits are still on that branch** because each needs a product
+  folder that stayed behind. They land with their other half, in one pull
+  request, never alone.
+
 Whichever assistant you run: identify your developer, read the root brief
 plus the brief of the folder you are editing, and obey both.
