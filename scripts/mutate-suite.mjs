@@ -103,13 +103,17 @@ const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
  * components/topbar.ts is a FOURTH pass over the same list: checks for
  * mountSessionControl() were added to auth/tests.ts and this table was
  * never told, so a survey of it reported "no suite covers this" about a
- * module the suite had just gained real coverage for. */
+ * module the suite had just gained real coverage for. html.ts is new
+ * ground rather than another repeat of that same miss — added the same
+ * commit its checks were, so this table would not go stale before it was
+ * ever right. */
 const OVERRIDES = [
   ["app/shared/text.", "d-reengagement"],
   ["app/shared/today.", "d-reengagement"],
   ["app/shared/assistant-audience.", "auth"],
   ["app/shared/storage.", "auth"],
   ["app/shared/brand.", "auth"],
+  ["app/shared/html.", "auth"],
   ["app/shared/components/assistant.", "auth"],
   ["app/shared/components/brand-header.", "auth"],
   ["app/shared/components/topbar.", "auth"],

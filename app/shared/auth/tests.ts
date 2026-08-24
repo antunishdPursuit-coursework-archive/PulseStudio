@@ -21,6 +21,7 @@ import {
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
 import { doorMessage } from "./staff-gate.js";
+import { escapeHtml } from "../html.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 import {
   PROBE_KEY,
@@ -637,6 +638,25 @@ check("signed in, the chip names the member instead", () => {
   const who = host.querySelector(".pulse-session-who");
   return eq([host.querySelector(".pulse-session-signin"), who?.textContent], [null, "Ada"]);
 });
+
+/* ---------- escaping text before it goes into innerHTML ---------- *
+ *
+ * escapeHtml() lived twice, byte-identical, in Product A's and Product B's
+ * entry modules — each an untestable page-load file, so neither copy had
+ * ever run against a hostile string. Moved here the same way storage.ts
+ * and today.ts were: one implementation, checked once. */
+
+check("the five HTML-significant characters all escape", () =>
+  eq(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#039;"));
+check("ordinary text passes through untouched", () =>
+  eq(escapeHtml("Yoga · Room 2 (all levels)"), "Yoga · Room 2 (all levels)"));
+check("an ampersand is escaped FIRST, so its own entity is not re-escaped", () =>
+  eq(escapeHtml("Tom & Jerry"), "Tom &amp; Jerry"));
+check("a script tag typed into a name field cannot close and reopen a real tag", () =>
+  eq(escapeHtml('<script>alert(1)</script>'), "&lt;script&gt;alert(1)&lt;/script&gt;"));
+check("a quote cannot break out of a double-quoted HTML attribute", () =>
+  eq(escapeHtml('room" onmouseover="steal()'), "room&quot; onmouseover=&quot;steal()"));
+check("an empty string escapes to itself", () => eq(escapeHtml(""), ""));
 
 /* ---------- the staff door's one pure function ---------- *
  *
