@@ -99,7 +99,11 @@ const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
  * `../components/site-footer.js` — found only when the block was
  * re-checked against this list line by line, not trusted from memory.
  * brand-header.ts is the same list finally getting checked a third time,
- * against the SAME import block, after the checks for it were added. */
+ * against the SAME import block, after the checks for it were added.
+ * components/topbar.ts is a FOURTH pass over the same list: checks for
+ * mountSessionControl() were added to auth/tests.ts and this table was
+ * never told, so a survey of it reported "no suite covers this" about a
+ * module the suite had just gained real coverage for. */
 const OVERRIDES = [
   ["app/shared/text.", "d-reengagement"],
   ["app/shared/today.", "d-reengagement"],
@@ -108,6 +112,7 @@ const OVERRIDES = [
   ["app/shared/brand.", "auth"],
   ["app/shared/components/assistant.", "auth"],
   ["app/shared/components/brand-header.", "auth"],
+  ["app/shared/components/topbar.", "auth"],
   ["app/shared/components/site-footer.", "auth"],
   ["app/shared/components/figures.", "auth"],
   ["app/shared/components/alert.", "auth"],
