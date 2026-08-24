@@ -51,6 +51,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { discoverSuites } from "./suites.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -62,25 +63,50 @@ const TARGETS = targets.length > 0 ? targets : DEFAULT_TARGETS;
  * because running the re-engagement checks against a mutation in
  * app/shared/auth would report everything as "caught" for the wrong
  * reason — that suite never loads the module, so nothing it says is
- * evidence either way. Override with --suite=<key>. */
+ * evidence either way. Override with --suite=<key>.
+ *
+ * THE FOLDERS ARE READ, NOT REMEMBERED. This was a hand-written table, and
+ * both halves of it went wrong at once when `run-suites.mjs` started
+ * finding its suites instead of listing them. The keys it wrote down
+ * ("reengagement") stopped existing — the search names a suite after its
+ * folder, so the key is "d-reengagement" — and every survey of Product D
+ * died on `unknown suite`, reported as "the judge does not pass BEFORE
+ * anything is mutated", which sends you to look at the build. Meanwhile
+ * the three product suites the search had just found were covered by no
+ * prefix at all, so this tool answered "no suite covers this module —
+ * which is itself the finding" about modules that a suite checks. Both
+ * sentences were confident and false. */
+const DISCOVERED = discoverSuites(ROOT);
+const SUITE_KEYS = DISCOVERED.map((suite) => suite.key);
+
+/* Shared modules judged by a suite that does not live in their folder.
+ * app/shared/text.js is used by Product D and by the synthetic reporting
+ * page; its checks are in D's suite, so asking the synthetic one reports
+ * 0% for the wrong reason — that suite never loads it. app/shared/today.ts
+ * is the same case: three modules had written "what day is it where the
+ * studio is" and one was UTC, so there is one copy now and Product D
+ * reaches it through deps.ts. Its checks — late evening, another zone,
+ * both DST nights, the year roll — are in D's suite. */
+const OVERRIDES = [
+  ["app/shared/text.", "d-reengagement"],
+  ["app/shared/today.", "d-reengagement"],
+];
+
+/* An override naming a suite that no longer exists is the bug this file
+ * just had, so it is now a crash on startup rather than a wrong answer
+ * hours later. */
+for (const [prefix, key] of OVERRIDES) {
+  if (!SUITE_KEYS.includes(key)) {
+    throw new Error(
+      `mutate-suite: ${prefix} is routed to a suite "${key}" that does not ` +
+        `exist. The suites found are: ${SUITE_KEYS.join(", ")}.`,
+    );
+  }
+}
+
 const SUITE_BY_PREFIX = [
-  ["app/shared/synthetic/", "synthetic"],
-  ["app/shared/auth/", "auth"],
-  ["app/products/d-reengagement/", "reengagement"],
-  /* Shared modules used by more than one product are judged by whichever
-   * suite actually checks them, which is not always the folder they live
-   * in. app/shared/text.js is used by Product D and by the synthetic
-   * reporting page; its checks are in D's suite, so asking the synthetic
-   * one reports 0% for the wrong reason — the suite never loads it. */
-  ["app/shared/text.", "reengagement"],
-  /* app/shared/today.ts is the same case: three modules had written "what
-   * day is it where the studio is" and one was UTC, so there is one copy
-   * now and Product D reaches it through deps.ts. Its checks — late
-   * evening, another zone, both DST nights, the year roll — are in D's
-   * suite, so that is the suite that can judge it. Added late, because the
-   * module was created without this line and the tool answered "no suite
-   * covers it", which reads like "nothing checks this" and was not true. */
-  ["app/shared/today.", "reengagement"],
+  ...OVERRIDES,
+  ...DISCOVERED.map((suite) => [`${suite.dir}/`, suite.key]),
 ];
 /* A sample, for a module too large to sweep whole. --stride=4 tries every
  * fourth site (1 in 4). It is deterministic — every Nth, never random — so the same
@@ -93,7 +119,7 @@ const STRIDE = strideArg === undefined ? 1 : Math.max(1, Number(strideArg.slice(
 
 /* JUDGED BY SOMETHING OTHER THAN A SUITE.
  *
- * Three browser suites are not the only checks in this repo, and the
+ * The browser suites are not the only checks in this repo, and the
  * modules they cannot reach are exactly the ones worth asking about.
  * `app/shared/color.ts` decides whether a person's chosen background and
  * text are readable enough to accept — and its only checks live in
@@ -124,8 +150,22 @@ const judgeArg = process.argv.find((a) => a.startsWith("--judge="));
 const JUDGE = judgeArg === undefined ? null : judgeArg.slice("--judge=".length).trim().split(/\s+/);
 
 const explicit = process.argv.find((a) => a.startsWith("--suite="));
+const EXPLICIT_KEY = explicit === undefined ? null : explicit.slice("--suite=".length);
+
+/* Checked HERE, before a single mutation is written to disk. Passed on to
+ * run-suites unchecked, a key that does not exist comes back as a non-zero
+ * exit, which this tool reads as "the suite noticed" — the one reading that
+ * makes a broken run look like a perfect score. */
+if (EXPLICIT_KEY !== null && JUDGE === null && !SUITE_KEYS.includes(EXPLICIT_KEY)) {
+  console.error(
+    `mutate-suite: no suite is called "${EXPLICIT_KEY}". The suites found ` +
+      `under app/ are: ${SUITE_KEYS.join(", ")}.`,
+  );
+  process.exit(2);
+}
+
 const suiteFor = (rel) => {
-  if (explicit) return explicit.slice("--suite=".length);
+  if (EXPLICIT_KEY !== null) return EXPLICIT_KEY;
   const hit = SUITE_BY_PREFIX.find(([prefix]) => rel.startsWith(prefix));
   return hit === undefined ? null : hit[1];
 };
@@ -228,7 +268,7 @@ for (const rel of TARGETS) {
   const suite = JUDGE === null ? suiteFor(rel) : JUDGE.join(" ");
   if (suite === null) {
     console.error(
-      `mutate-suite: no suite covers ${rel}. Pass --suite=<synthetic|auth|reengagement>, ` +
+      `mutate-suite: no suite covers ${rel}. Pass --suite=<${SUITE_KEYS.join("|")}>, ` +
         "or accept that nothing checks this module — which is itself the finding.",
     );
     anyMissing = true;
