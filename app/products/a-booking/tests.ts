@@ -127,6 +127,23 @@ function stampAt(at: string): { reservationId: string; at: string } {
   check("the waitlist of a started class is closed too",
     refusal(() => joinWaitlist(ctxOf([morning], [], [], NOW), ada, morning, stampAt(NOW))),
     "This class has already started.");
+
+  /* ON THE SECOND, not four hours after it. Both refusals above hand the
+   * rules a class that started at 08:00 with the clock at noon, which is
+   * true of `<` and `<=` alike — `npm run mutate` weakened both guards to
+   * `<` and no check here objected. The schedule already drops a class at
+   * its start time, so reaching this guard means a link, not the
+   * calendar: a member opening yesterday's message at exactly 08:00:00
+   * would have been let in. */
+  check("booking is refused on the exact second the class starts",
+    refusal(() => bookSession(atStart, ada, morning, stampAt("2026-08-18T08:00:00"))),
+    "This class has already started.");
+  check("...and so is the waitlist",
+    refusal(() => joinWaitlist(atStart, ada, morning, stampAt("2026-08-18T08:00:00"))),
+    "This class has already started.");
+  check("...while one second earlier both still open",
+    refusal(() => bookSession(justBefore, ada, morning, stampAt("2026-08-18T07:59:59"))),
+    "no error");
 }
 
 /* ------------------------------------------------------------------ */
