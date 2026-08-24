@@ -16,7 +16,7 @@ import { attendanceCsv, csvField } from "./csv-export.js";
 import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn, periodProblems } from "./lifecycle.js";
-import { demandFactor } from "./scenarios.js";
+import { demandFactor, planCohorts } from "./scenarios.js";
 import { buildSchedule, roomsPerSlot } from "./schedule.js";
 import { dateOfDayNumber, dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
@@ -653,6 +653,34 @@ for (const n of [1, 2, 5, 12]) {
   for (const d of days) counts.set(d, (counts.get(d) ?? 0) + 1);
   const top2 = [...counts.values()].sort((a, b) => b - a).slice(0, 2).reduce((x, y) => x + y, 0);
   check("a regular's visits concentrate on habit weekdays", top2 * 2 >= days.length, true);
+}
+
+// The check above is a loose statistical heuristic on one member from one
+// seed — it cannot tell a correct habit-weekday count from a shifted one,
+// which is exactly why `npm run mutate` found `w < habitCount` widened to
+// `w <= habitCount` surviving: every member silently gained a 5th habit
+// day. planCohorts() itself had never been called directly by a check.
+{
+  const plans = planCohorts(BASE);
+  const outOfRange = plans.filter((p) => p.preferredWeekdays.length < 2 || p.preferredWeekdays.length > 4);
+  const duplicated = plans.filter((p) => new Set(p.preferredWeekdays).size !== p.preferredWeekdays.length);
+  check("every member's habit weekdays number 2 to 4, never more", outOfRange.length, 0);
+  check("...and never repeat a weekday", duplicated.length, 0);
+}
+
+// A member's join date must fall within the studio's own configured
+// history — a member who "joined" further back than a five-year-old studio
+// has existed is a contradiction the answer key has no way to explain.
+// `npm run mutate` found the sign on the join-date spread's `- 100` could
+// flip to `+ 100` with nothing noticing: the only existing check on
+// joinedOn (the flagship, five years out) uses a threshold loose enough
+// that both the real and the flipped formula satisfy it.
+{
+  const flagshipConfig: SyntheticStudioConfig = { ...BASE, memberCount: 1000, historyDays: 1825, mode: "scale" };
+  const plans = planCohorts(flagshipConfig).filter((p) => p.membershipKind !== "newcomer");
+  const tooOld = plans.filter((p) => p.joinDaysAgo > flagshipConfig.historyDays - 30);
+  check("across 1000 members over 5 years, nobody joined further back than the studio's own history",
+    tooOld.length, 0);
 }
 
 // The gradual decliner's recent gaps are wider than their old ones.
