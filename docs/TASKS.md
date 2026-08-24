@@ -41,6 +41,27 @@ One thing measured and deliberately NOT changed: your day chips are 43.59px
 tall on a phone, 0.41px under the 44px touch minimum. That is sub-pixel and a
 finger cannot tell. Left alone rather than churning your stylesheet for it.
 
+**Your suite went from 47 checks to 54, and read why rather than just the
+number.** `npm run mutate` can reach it now — it could not before, because
+the tool kept its own list of three suites — and it found two ways
+`rules.ts` could be wrong that nothing would have noticed:
+
+- Every booking in your capacity checks belonged to the session being
+  checked, so `studioBooked`'s `&&` could be an `||` and stay green. With
+  `||`, a booking in ANY class takes a seat in EVERY class, and the member
+  holding it reads as reserved for a class they never booked. Four checks
+  now hand the rules a booking that belongs somewhere else.
+- Both "class has already started" guards were only ever tried four hours
+  after the start, where `<` and `<=` agree. On the exact second they do
+  not: `<` lets the booking through. The schedule already drops a class at
+  its start time, so what reaches that guard is a link — a member opening
+  yesterday's message at 08:00:00 sharp. Three checks pin the second, and
+  one of them proves the second BEFORE still opens, so the boundary is not
+  merely closed.
+
+Neither was a live defect. Both were a way to break your product that the
+suite would have called correct.
+
 ---
 
 ## Manny — Product B
@@ -61,13 +82,25 @@ finger cannot tell. Left alone rather than churning your stylesheet for it.
 - `main.ts` is deleted. It rendered the whole dashboard, no page loaded it,
   and the record split had quietly broken it while it still type-checked.
   `docs/reachable-baseline.json` is empty as a result.
+- **Your room panel could have sorted by name and passed.** Your check
+  "rooms are grouped and the busiest leads" uses Loft and Studio — and Loft
+  is both the busiest room and the first alphabetically, so it leads under
+  either rule. `npm run mutate` turned the comparator's `||` into `&&`,
+  which sorts by room NAME, and every check stayed green. Two checks now
+  put the rules in conflict: a quiet Annex against a busy Loft, and two
+  rooms level on demand. A staff member reads that panel to find where the
+  demand is; name order would have been the wrong answer, quietly. 34
+  checks became 36.
 
 ---
 
 ## Dennis — Product C
 
 **Nothing outstanding.** The icon line is in, the audience guard is wired,
-and your brief describes the boundary that exists.
+and your brief describes the boundary that exists. `support.ts` was surveyed
+with `npm run mutate` once the tool could reach your suite: 3 single-token
+mutations, 3 caught, nothing survived. That is a real result and a small one
+— three sites is what the module has, not a verdict on the product.
 
 One change came from outside your folder and you should know why. The
 assistant's outbound guard is now in **two halves in two places**. The
@@ -116,6 +149,14 @@ code is allowed to assume.
 - **`run-suites` finds its suites instead of listing them.** Three product
   suites existed and ran nowhere; the count went from 1,425 to over 1,500 the
   moment they were discovered. A suite with no label is now a hard error.
+- **`npm run mutate` reaches all six suites**, and finding that out cost
+  something worth knowing. The discovery fix above renamed the suite keys,
+  and mutate kept its own copy of them, so every survey of Product D died on
+  `unknown suite "reengagement"` while the error blamed a stale build — and
+  the three product suites it had never known about were still reported as
+  "no suite covers this module", about modules a suite checks. Both tools
+  read `scripts/suites.mjs` now. One list, or the copies drift; that is the
+  same lesson as the shared data contract, one level down in the tooling.
 
 ## Already done for you, in shared
 
