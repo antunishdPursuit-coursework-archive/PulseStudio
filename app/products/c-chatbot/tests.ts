@@ -1,5 +1,6 @@
 import type { ClassSession, FixtureSet, StudioPolicy } from "../../shared/contract.js";
-import { asksForPrivateMemberData, isUpcoming, safeStudioContext } from "./support.js";
+import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
+import { asksForPrivateMemberData, isUpcoming, normalizeQuestion, recordStatus, safeStudioContext } from "./support.js";
 
 const results: Array<{ name: string; passed: boolean }> = [];
 function check(name: string, actual: unknown, expected: unknown): void {
@@ -20,6 +21,8 @@ for (const question of [
   "What is the cancellation policy?",
 ]) check(`allows: ${question}`, asksForPrivateMemberData(question), false);
 
+check("normalizes a phone apostrophe", normalizeQuestion("Maria’s"), "maria's");
+
 function session(id: string, starts: string, ends: string, status: ClassSession["session_status"] = "scheduled"): ClassSession {
   return { session_id: id, class_type: "yoga", level: "all", instructor_id: "unused", starts_at: starts, ends_at: ends, capacity: 10, session_status: status };
 }
@@ -39,6 +42,11 @@ const context = safeStudioContext(records, "2026-08-23", now);
 check("context includes only the upcoming class", context.class_sessions.map((item) => item.session_id), ["future"]);
 check("context includes only pol_001", context.studio_policies.map((item) => item.policy_id), ["pol_001"]);
 check("context exposes no instructor or capacity", Object.keys(context.class_sessions[0] ?? {}).sort(), ["class_type", "ends_at", "level", "session_id", "session_status", "starts_at"]);
+check("status uses singular class", recordStatus({ ...records, class_sessions: [future] }, now, false), "1 upcoming class and 1 current policy ready, but conversational support is unavailable on this site.");
+
+const memberPolicy = audiencePolicy("staff", "member-facing");
+check("a staff sign-in does not widen this member page", memberPolicy.audience, "member");
+check("outbound staff language is refused", answerProblems("The roster has three no-shows.", memberPolicy).length > 0, true);
 
 const passed = results.filter((result) => result.passed).length;
 const summary = document.querySelector<HTMLElement>("#summary");

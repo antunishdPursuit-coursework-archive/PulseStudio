@@ -1,6 +1,8 @@
 import type { FixtureSet } from "../../shared/contract.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
+import { readPulseSession } from "../../shared/auth/session.js";
 import { loadFixtures } from "../../shared/data.js";
+import { todayIsoInZone } from "../../shared/today.js";
 import {
   asksForPrivateMemberData,
   QUESTION_MAX_LENGTH,
@@ -17,25 +19,22 @@ function requiredElement<T extends Element>(selector: string): T {
 const form = requiredElement<HTMLFormElement>("#chat-form");
 const input = requiredElement<HTMLInputElement>("#question");
 const messages = requiredElement<HTMLElement>("#messages");
+const greeting = requiredElement<HTMLParagraphElement>("#greeting");
+const scope = requiredElement<HTMLParagraphElement>("#scope");
 const status = requiredElement<HTMLParagraphElement>("#status");
 const sendButton = requiredElement<HTMLButtonElement>("button[type='submit']");
 const CHAT_ENDPOINT = new URL("../../api/chat", import.meta.url);
-const memberPolicy = audiencePolicy(null, "member-facing");
+const session = readPulseSession();
+const memberPolicy = audiencePolicy(
+  session?.actor_type ?? null,
+  "member-facing",
+  session?.display_name.split(" ")[0] ?? null,
+);
+greeting.textContent = memberPolicy.greeting;
+scope.textContent = memberPolicy.scope;
 input.maxLength = QUESTION_MAX_LENGTH;
 
 let fixtures: FixtureSet | null = null;
-
-function studioDate(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
-}
 
 function isChatResponse(value: unknown): value is { answer: string } {
   return (
@@ -51,7 +50,7 @@ async function haikuAnswer(question: string, records: FixtureSet): Promise<strin
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       question,
-      context: safeStudioContext(records, studioDate(records.timezone), Date.now()),
+      context: safeStudioContext(records, todayIsoInZone(records.timezone), Date.now()),
     }),
   });
   const result: unknown = await response.json().catch(() => null);
@@ -118,8 +117,12 @@ async function start(): Promise<void> {
     const result: unknown = await response.json();
     const available = response.ok && typeof result === "object" && result !== null && (result as Record<string, unknown>)["available"] === true;
     status.textContent = recordStatus(fixtures, Date.now(), available);
+    if (!available) {
+      greeting.textContent = "The studio schedule and policies are loaded, but conversational support is unavailable on this site. The front desk can help with urgent questions.";
+    }
   } catch {
     status.textContent = recordStatus(fixtures, Date.now(), false);
+    greeting.textContent = "The studio schedule and policies are loaded, but conversational support is unavailable on this site. The front desk can help with urgent questions.";
   }
 }
 

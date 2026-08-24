@@ -16,7 +16,7 @@ refusal in the browser. Its pure support rules live in `support.ts` and are
 checked by `tests.ts`. The deployed GitHub Pages site has no backend and
 states that conversational support is unavailable. The local server lives in
 `scripts/start-haiku.mjs`; setup is documented in
-`docs/member-support-haiku.md` by team agreement.
+`docs/the-server.md` by team agreement.
 
 ## Lane law
 
@@ -40,7 +40,9 @@ states that conversational support is unavailable. The local server lives in
   refuse attendance, history, account, membership, booking, reservation, and
   questions shaped like "did Maria come last week?" before any network call.
   The shared outbound guard also rejects staff-only language in a reply, but
-  Product C does not load the member roster for name matching.
+  Product C does not load the member roster for name matching. Moving that
+  name check to the server remains part of the coordinated public/staff data
+  split with Product B.
 - **No instructor or availability claims.** Those require collections outside
   this product's agreed boundary.
 
@@ -50,7 +52,8 @@ states that conversational support is unavailable. The local server lives in
   Product C creates or updates no shared record.
 - Theme: `product-c` body class + `shared/theme.css` +
   `shared/theme-boot.js`, which also mounts the shared sign-in chip.
-- Storage: Product C reads and writes no browser storage.
+- Storage: Product C writes no browser storage. It reads the shared session
+  only to choose member-facing wording; the session never widens access.
 - Network: `npm run start:haiku` serves the site and proxies `/api/chat` to
   Anthropic with `ANTHROPIC_API_KEY` from the local environment. The key never
   enters browser code or the repository. The server accepts only the agreed
