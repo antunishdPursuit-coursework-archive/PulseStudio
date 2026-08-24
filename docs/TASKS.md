@@ -158,6 +158,13 @@ with `npm run mutate` once the tool could reach your suite: 3 single-token
 mutations, 3 caught, nothing survived. That is a real result and a small one
 — three sites is what the module has, not a verdict on the product.
 
+`main.ts` had its own hand-assembled copy of "what day is it where the
+studio is" — the same rule `app/shared/today.ts` already centralizes, and
+the same shape `auth/studio.ts` was fixed to stop doing. It happened to
+compute the right answer, but nothing checked that it would keep doing
+so, because `main.ts` runs at module load and no suite reaches it — same
+as Product D's old `main.ts`. Now calls `todayIsoInZone` directly.
+
 One change came from outside your folder and you should know why. The
 assistant's outbound guard is now in **two halves in two places**. The
 staff-vocabulary half still runs on your page, on the finished text. The NAME

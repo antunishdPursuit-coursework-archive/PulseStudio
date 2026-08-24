@@ -204,6 +204,17 @@ the legacy contract) is what all four products speak.
   roll) now cover the implementation `auth/` and the synthetic page use,
   which had none of their own.
 
+  **A fourth copy turned up 2026-08-23**, in `c-chatbot/main.ts` —
+  hand-assembled from `formatToParts` exactly like the `auth/studio.ts`
+  copy this paragraph already describes, feeding the date the assistant
+  treats as "now" when deciding which classes are upcoming. It happened
+  to compute the same answer, but nothing checked that it would keep
+  doing so: `main.ts` runs at module load and no suite imports it, the
+  same shape as Product D's old `main.ts` and `synthetic/page.ts`. Now
+  calls `todayIsoInZone` directly. "Three modules" in the sentence above
+  was the count when this bullet was written, not a ceiling — read it as
+  history, not as a guarantee nothing else duplicated the rule since.
+
   A grep in `synthetic/tests.ts` keeps the antipattern from coming back in
   any module allowed to read the clock. It strips comments first, unlike
   the engine audit beside it, and the difference is deliberate: the engine
