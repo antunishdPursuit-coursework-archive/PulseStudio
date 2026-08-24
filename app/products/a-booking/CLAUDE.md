@@ -14,8 +14,10 @@ a reserved spot. Day chips say Today / Tomorrow. Book / waitlist / cancel
 with a full guard chain, automatic waitlist promotion, and `?session=<id>`
 deep links.
 Occupancy is the generator's own bookings plus rows the signed-in member
-(or waitlist promotion) writes — never a random fill on first open. No
-server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
+(or waitlist promotion) writes — never a random fill on first open — and
+only rows stamped for today's studio date. No server, no framework:
+`main.ts` compiles to a sibling `main.js` ES module. `tests.html` is the
+suite `npm run check` already labels "class booking".
 
 ## Lane law
 
@@ -29,23 +31,23 @@ server, no framework: `main.ts` compiles to a sibling `main.js` ES module.
 
 | File | What it is |
 | --- | --- |
-| `main.ts` | All product logic: schedule, booking rules, capacity math, waitlist promotion, session-gated UI |
-| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, load/save, `latestReservation()` (last row wins) |
-| `index.html` | The page shell; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
+| `main.ts` | Page logic: schedule, waitlist promotion, session-gated UI. Booking refusals and occupancy come from `rules.ts`. |
+| `rules.ts` | Pure booking rules the suite imports: last-row-wins occupancy, spots left, book / waitlist refusals, the let-go line |
+| `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, `SCHEDULE_KEY = "pulse-reservations-a-schedule"`, load/save via `readStored` / `writeStored`, `latestReservation()` (last row wins), `reservationsForSchedule()`. A refused write returns false so Book can say the browser is not saving. |
+| `index.html` | The page shell; favicon link; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
+| `tests.html` / `tests.ts` | Checks that can fail: capacity, duplicate book, waitlist only when full, last-row-wins, date stamp, storage refusal |
 | `styles.css` | Product-local styling; every color is a theme token |
 
 ## Identity and sign-in
 
 This page keeps NO auth state of its own. It reads the shared
-`pulse-session` through `shared/auth/session.js` — today via the
-compatibility view `currentSession()` / `onSessionChange()` (it reads
-exactly `.role` and `.member_id`). Booking requires a member session;
-staff get an explicit "Member sign-in required" line; signed-out visitors
-see the schedule with disabled actions — the route itself is never gated.
-The upgrade path, whenever Kerrian wants it: switch to
-`readPulseSession()` and branch on `actor_type` (see
-`app/shared/auth/README.md`). Booking identity = the member ids of
-`sharedStudio()` — the same generator call the sign-in dialog lists.
+`pulse-session` through `readPulseSession()` / `subscribeToPulseSession()`
+and branches on `actor_type`. Booking requires a member session; staff
+get an explicit "Member sign-in required" line; signed-out visitors see
+the schedule with disabled actions — the route itself is never gated.
+Booking identity = the member ids of `sharedStudio()` — the same
+generator call the sign-in dialog lists. The compatibility view in
+team-owned `session.ts` is unused here and is not ours to retire.
 
 ## The traps that are DELIBERATE (do not "fix" without team intent)
 
@@ -54,9 +56,16 @@ The upgrade path, whenever Kerrian wants it: switch to
   promotion appends a fresh reserved row above the old waitlist row — so
   `reservation_id` is NOT unique in the log. Consumers must use
   `latestReservation()` semantics, never index by id.
-- **The studio is dated to TODAY** (`sharedStudio()`), so yesterday's
-  reservations can reference session ids that no longer render; they
-  linger harmlessly in the log.
+- **The studio is dated to TODAY** (`sharedStudio()`). Session ids are
+  positions in a sliding window: after midnight the same id can name a
+  different class (measured: 70 of 70 future classes changed type under
+  the same id one day later). The log stays a `Reservation[]` under
+  `pulse-reservations-a` — wrapping it as `{ asOfDate, rows }` would
+  break B, D, and the shared assistant. The companion stamp
+  `pulse-reservations-a-schedule` is today's `asOfDate`. A missing or
+  other-date stamp means the rows are not today's schedule: this page
+  lets them go, stamps today, and says how many. Do not treat yesterday's
+  ids as lingering harmlessly.
 - **Times are studio-local wall clocks with no offset.** Formatters append
   `Z` and use `timeZone: "UTC"` so the written hour prints as written,
   including in winter. Day chips use `dataset.meta.asOfDate` for Today /
@@ -69,18 +78,21 @@ reads that log as the live trail.
 ## Seams other lanes rely on — never break silently
 
 - `localStorage["pulse-reservations-a"]`: an append-only contract-shaped
-  `Reservation[]` published for the dashboard to read. Key name, field
-  names (`reservation_id`, `member_id`, `session_id`,
-  `reservation_status`, `reserved_at`, `canceled_at`), and last-row-wins
-  are all contract.
+  `Reservation[]` published for the dashboard, re-engagement, and the
+  shared assistant to read. Key name, field names (`reservation_id`,
+  `member_id`, `session_id`, `reservation_status`, `reserved_at`,
+  `canceled_at`), and last-row-wins are all contract. Never change the
+  array shape.
+- `localStorage["pulse-reservations-a-schedule"]`: an ISO date string.
+  Written on every successful save and on load when the date has moved.
+  D and the assistant copy this key name; they do not import this folder.
 - The `?session=<id>` deep link — other products may link into a class.
 
 ## Gate
 
 `npm run check` green before every commit (and `npm run build` if you
 touched TypeScript). Compiled `.js` is gitignored — edit `.ts` only. The
-repo-wide laws (no "demo"/"example"/"mock", no AI attribution, black or
-white backgrounds only, stated negatives, never commit red) all apply.
+repo-wide laws in the root brief all apply.
 
 > AGENTS.md beside this file is a generated mirror for non-Claude
 > assistants — edit THIS file, then run `bash scripts/sync-agent-briefs.sh`.

@@ -1,14 +1,16 @@
 /* Product A — Member Booking App. Kerrian's lane.
    Shared studio records come from sharedStudio() — the same generator and
-   member ids the top-bar sign-in lists. Runtime reservations are stored in
+   member ids the top-bar sign-in lists.    Runtime reservations are stored in
    localStorage under pulse-reservations-a and never written back into
    shared fixtures. The log is append-only: member book / waitlist / cancel
-   only — this page never seeds occupancy on load. Members see only their
-   own reservation records. Sign-in is the shared pulse-session; this page
-   never keeps a second key. */
+   only — this page never seeds occupancy on load. A companion stamp
+   pulse-reservations-a-schedule dates the log to today's studio schedule;
+   a missing or other-date stamp is not resolved against today's ids.
+   Members see only their own reservation records. Sign-in is the shared
+   pulse-session; this page never keeps a second key. */
 
 import type { Reservation } from "../../shared/contract.js";
-import { currentSession, onSessionChange } from "../../shared/auth/session.js";
+import { readPulseSession, subscribeToPulseSession } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
 import type {
   SyntheticBooking,
@@ -17,9 +19,19 @@ import type {
 } from "../../shared/synthetic/contracts.js";
 import {
   latestReservation,
-  loadRuntimeReservations,
+  loadScheduleReservations,
+  reconcileSchedule,
   saveRuntimeReservations,
 } from "./reservations.js";
+import {
+  bookRefusal,
+  heldStatus,
+  letGoLine,
+  reservedMemberIds,
+  spotsLeft,
+  waitlistRefusal,
+  waitlistedInOrder,
+} from "./rules.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -64,6 +76,7 @@ const TOMORROW_ISO = (() => {
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 })();
+const scheduleSync = reconcileSchedule(TODAY_ISO);
 
 const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]));
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
@@ -86,11 +99,16 @@ function studioBooked(sessionId: string): SyntheticBooking[] {
   );
 }
 
+function studioBookedIds(sessionId: string): string[] {
+  return studioBooked(sessionId).map((booking) => booking.memberId);
+}
+
+function runtimeRows(): Reservation[] {
+  return loadScheduleReservations(TODAY_ISO);
+}
+
 function memberStatus(memberId: string, sessionId: string): Reservation["reservation_status"] | "none" {
-  const latest = latestReservation(loadRuntimeReservations(), sessionId, memberId);
-  if (latest) return latest.reservation_status;
-  if (studioBooked(sessionId).some((booking) => booking.memberId === memberId)) return "reserved";
-  return "none";
+  return heldStatus(runtimeRows(), sessionId, memberId, studioBookedIds(sessionId));
 }
 
 function memberHoldsSpot(memberId: string, sessionId: string): boolean {
@@ -101,29 +119,15 @@ function memberWaitlisted(memberId: string, sessionId: string): boolean {
   return memberStatus(memberId, sessionId) === "waitlisted";
 }
 
-function confirmedMemberIds(sessionId: string): string[] {
-  const ids = new Set<string>();
-  for (const booking of studioBooked(sessionId)) ids.add(booking.memberId);
-  for (const row of loadRuntimeReservations()) {
-    if (row.session_id === sessionId) ids.add(row.member_id);
-  }
-  return [...ids].filter((memberId) => memberHoldsSpot(memberId, sessionId));
-}
-
 function remainingSpots(session: SyntheticClassSession): number {
-  return Math.max(0, session.capacity - confirmedMemberIds(session.id).length);
+  return spotsLeft(
+    session.capacity,
+    reservedMemberIds(runtimeRows(), session.id, studioBookedIds(session.id)).length,
+  );
 }
 
 function waitlist(sessionId: string): Reservation[] {
-  const ids = new Set<string>();
-  for (const booking of studioBooked(sessionId)) ids.add(booking.memberId);
-  for (const row of loadRuntimeReservations()) {
-    if (row.session_id === sessionId) ids.add(row.member_id);
-  }
-  return [...ids]
-    .map((memberId) => latestReservation(loadRuntimeReservations(), sessionId, memberId))
-    .filter((row): row is Reservation => row?.reservation_status === "waitlisted")
-    .sort((left, right) => left.reserved_at.localeCompare(right.reserved_at));
+  return waitlistedInOrder(runtimeRows(), sessionId, studioBookedIds(sessionId));
 }
 
 function upcomingSessions(): SyntheticClassSession[] {
@@ -188,8 +192,8 @@ function sessionLabel(session: SyntheticClassSession): { name: string; instructo
 }
 
 function bookingMember(): SyntheticMember | undefined {
-  const session = currentSession();
-  if (session === null || session.role !== "member" || session.member_id === null) {
+  const session = readPulseSession();
+  if (session === null || session.actor_type !== "member") {
     return undefined;
   }
   return memberById.get(session.member_id);
@@ -223,17 +227,16 @@ function fullOnDay(day: string): number {
 }
 
 function appendReservation(reservation: Reservation): void {
-  const rows = loadRuntimeReservations();
+  const rows = runtimeRows();
   rows.push(reservation);
-  saveRuntimeReservations(rows);
+  if (!saveRuntimeReservations(rows, TODAY_ISO)) {
+    throw new Error("This browser is not saving site data.");
+  }
 }
 
 function bookSession(memberId: string, session: SyntheticClassSession): Reservation {
-  if (session.status === "canceled") throw new Error("This class was canceled.");
-  if (session.status !== "scheduled") throw new Error("This class is not open for reservations.");
-  if (memberHoldsSpot(memberId, session.id)) throw new Error("You already have a spot in this class.");
-  if (memberWaitlisted(memberId, session.id)) throw new Error("You are already on the waitlist.");
-  if (remainingSpots(session) <= 0) throw new Error("This class is full. Join the waitlist instead.");
+  const refusal = bookRefusal(session.status, memberStatus(memberId, session.id), remainingSpots(session));
+  if (refusal) throw new Error(refusal);
 
   const reservation: Reservation = {
     reservation_id: newReservationId(),
@@ -248,10 +251,8 @@ function bookSession(memberId: string, session: SyntheticClassSession): Reservat
 }
 
 function joinWaitlist(memberId: string, session: SyntheticClassSession): Reservation {
-  if (session.status !== "scheduled") throw new Error("This class is not open for reservations.");
-  if (memberHoldsSpot(memberId, session.id)) throw new Error("You already have a spot in this class.");
-  if (memberWaitlisted(memberId, session.id)) throw new Error("You are already on the waitlist.");
-  if (remainingSpots(session) > 0) throw new Error("This class still has open spots. Book it instead.");
+  const refusal = waitlistRefusal(session.status, memberStatus(memberId, session.id), remainingSpots(session));
+  if (refusal) throw new Error(refusal);
 
   const reservation: Reservation = {
     reservation_id: newReservationId(),
@@ -282,7 +283,7 @@ function cancelReservation(memberId: string, sessionId: string): void {
   if (status !== "reserved" && status !== "waitlisted") {
     throw new Error("No reservation found to cancel.");
   }
-  const previous = latestReservation(loadRuntimeReservations(), sessionId, memberId);
+  const previous = latestReservation(runtimeRows(), sessionId, memberId);
   appendReservation({
     reservation_id: previous?.reservation_id ?? newReservationId(),
     member_id: memberId,
@@ -500,14 +501,14 @@ function render(): void {
   renderConfirmation(member);
   renderDays();
   if (!selectedDay) {
-    statusEl.textContent = `${sessions.length} scheduled classes checked, ${fullStudio} currently full. ${openSpots} spots remaining across the shared studio.`;
+    statusEl.textContent = `${letGoLine(scheduleSync.dropped)}${sessions.length} scheduled classes checked, ${fullStudio} currently full. ${openSpots} spots remaining across the shared studio.`;
   } else {
     const shown = sessionsOnDay(selectedDay).length;
     const dayLabel = formatDayChip(selectedDay);
-    statusEl.textContent = `${dayLabel}: ${shown} classes checked, ${fullOnDay(selectedDay)} full, ${remainingOnDay(selectedDay)} spots left. Studio-wide: ${sessions.length} scheduled classes, ${fullStudio} full, ${openSpots} spots left.`;
+    statusEl.textContent = `${letGoLine(scheduleSync.dropped)}${dayLabel}: ${shown} classes checked, ${fullOnDay(selectedDay)} full, ${remainingOnDay(selectedDay)} spots left. Studio-wide: ${sessions.length} scheduled classes, ${fullStudio} full, ${openSpots} spots left.`;
   }
-  const session = currentSession();
-  if (session?.role === "staff") {
+  const session = readPulseSession();
+  if (session?.actor_type === "staff") {
     statusEl.textContent = `Staff session signed in. Member sign-in required. ${statusEl.textContent}`;
   }
   renderSchedule(memberId);
@@ -517,7 +518,7 @@ function render(): void {
   }
 }
 
-onSessionChange(() => {
+subscribeToPulseSession(() => {
   lastConfirmation = null;
   clearError();
   render();
