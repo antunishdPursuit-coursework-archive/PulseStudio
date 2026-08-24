@@ -1327,21 +1327,27 @@ check("with no day named, a matching session is still offered", () =>
 check("a past session is never offered, even matching by name", () =>
   eq(bookingIntent("book yoga", [assistantSession({ startsAt: "2020-01-01T09:00:00" })], assistantStudio.meta.asOfDate), null));
 
+const BOOKING_SCHEDULE_KEY = "pulse-reservations-a-schedule";
+const ASSISTANT_TODAY = assistantStudio.meta.asOfDate;
+
 check("booking a class with room succeeds and returns the row", () => {
   const key = "pulse-reservations-a";
   localStorage.removeItem(key);
-  const result = bookForMember("member:checks-1", assistantSession({ id: "class-session:900002", capacity: 10, bookedCount: 2 }));
+  const result = bookForMember("member:checks-1", assistantSession({ id: "class-session:900002", capacity: 10, bookedCount: 2 }), ASSISTANT_TODAY);
   const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
   localStorage.removeItem(key);
   if (!result.ok) return `expected success, got: ${result.why}`;
   return eq([stored.length, stored[0]?.member_id, stored[0]?.reservation_status], [1, "member:checks-1", "reserved"]);
+});
+check("...and stamps the log with the schedule it was booked against", () => {
+  return eq(localStorage.getItem(BOOKING_SCHEDULE_KEY), ASSISTANT_TODAY);
 });
 
 check("a full class is refused, and nothing is written", () => {
   const key = "pulse-reservations-a";
   localStorage.removeItem(key);
   const full = assistantSession({ id: "class-session:900003", capacity: 5, bookedCount: 5 });
-  const result = bookForMember("member:checks-2", full);
+  const result = bookForMember("member:checks-2", full, ASSISTANT_TODAY);
   const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
   localStorage.removeItem(key);
   if (result.ok) return "a full class accepted a booking";
@@ -1351,25 +1357,47 @@ check("a full class is refused, and nothing is written", () => {
 /* THE COUNT THAT MATTERS IS THE UNION, NOT JUST THE GENERATOR'S OWN. A
  * class the generator reports empty (bookedCount 0) can still be full
  * because Booking's own runtime log already filled it — a check that only
- * read bookedCount would wrongly accept a second booking here. */
+ * read bookedCount would wrongly accept a second booking here. Seeded
+ * WITH today's stamp: a row from an unstamped or differently-stamped log
+ * is exactly what this function must refuse to trust, so leaving the
+ * stamp off here would test the wrong thing by accident. */
 check("a class the runtime log already fills is refused too", () => {
   const key = "pulse-reservations-a";
   const target = assistantSession({ id: "class-session:900004", capacity: 1, bookedCount: 0 });
   localStorage.setItem(key, JSON.stringify([
     { reservation_id: "res_x", member_id: "member:someone-else", session_id: target.raw.id, reservation_status: "reserved", reserved_at: target.startsAt, canceled_at: null },
   ]));
-  const result = bookForMember("member:checks-3", target);
+  localStorage.setItem(BOOKING_SCHEDULE_KEY, ASSISTANT_TODAY);
+  const result = bookForMember("member:checks-3", target, ASSISTANT_TODAY);
   localStorage.removeItem(key);
   if (result.ok) return "a class already filled by the runtime log accepted a second booking";
   return eq(result.ok === false && result.why.includes("full"), true);
+});
+check("...while the SAME seeded row is invisible once the stamp is for another day", () => {
+  /* THE OTHER HALF OF THE PROOF. Booking through the assistant on
+   * 2026-08-24, then opening a-booking/ the same day before anything had
+   * stamped the log, silently deleted the reservation the assistant had
+   * just confirmed to the member as "It is on your classes page." This is
+   * that scenario from the writer's side: a log honestly filled for
+   * someone else must not block a booking once its stamp no longer
+   * matches today. */
+  const key = "pulse-reservations-a";
+  const target = assistantSession({ id: "class-session:900004b", capacity: 1, bookedCount: 0 });
+  localStorage.setItem(key, JSON.stringify([
+    { reservation_id: "res_y", member_id: "member:someone-else", session_id: target.raw.id, reservation_status: "reserved", reserved_at: target.startsAt, canceled_at: null },
+  ]));
+  localStorage.setItem(BOOKING_SCHEDULE_KEY, "2020-01-01");
+  const result = bookForMember("member:checks-3b", target, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  return eq(result.ok, true);
 });
 
 check("booking the same class twice is refused the second time as already-held", () => {
   const key = "pulse-reservations-a";
   localStorage.removeItem(key);
   const target = assistantSession({ id: "class-session:900005", capacity: 10, bookedCount: 0 });
-  const first = bookForMember("member:checks-4", target);
-  const second = bookForMember("member:checks-4", target);
+  const first = bookForMember("member:checks-4", target, ASSISTANT_TODAY);
+  const second = bookForMember("member:checks-4", target, ASSISTANT_TODAY);
   localStorage.removeItem(key);
   if (!first.ok) return "the first booking should have succeeded";
   return eq([second.ok, second.ok === false && second.why.includes("already")], [false, true]);
@@ -1378,12 +1406,12 @@ check("booking the same class twice is refused the second time as already-held",
 check("a cancel makes the spot bookable again — last row wins", () => {
   const key = "pulse-reservations-a";
   const target = assistantSession({ id: "class-session:900006", capacity: 1, bookedCount: 0 });
-  const first = bookForMember("member:checks-5", target);
+  const first = bookForMember("member:checks-5", target, ASSISTANT_TODAY);
   if (!first.ok) return "setup failed: first booking did not succeed";
   const rows = JSON.parse(localStorage.getItem(key) ?? "[]");
   rows.push({ ...rows[0], reservation_status: "canceled", canceled_at: target.startsAt });
   localStorage.setItem(key, JSON.stringify(rows));
-  const second = bookForMember("member:checks-5", target);
+  const second = bookForMember("member:checks-5", target, ASSISTANT_TODAY);
   localStorage.removeItem(key);
   return eq(second.ok, true);
 });
@@ -1395,7 +1423,7 @@ check("a browser that refuses to save reports that, not a false success", () => 
     removeItem(): void { /* nothing was written */ },
   };
   setSharedStorageForChecks(throwing);
-  const result = bookForMember("member:checks-6", assistantSession({ id: "class-session:900007" }));
+  const result = bookForMember("member:checks-6", assistantSession({ id: "class-session:900007" }), ASSISTANT_TODAY);
   setSharedStorageForChecks(null);
   if (result.ok) return "reported success while storage refused the write";
   return eq(result.why.includes("not saving"), true);

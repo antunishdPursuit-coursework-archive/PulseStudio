@@ -42,9 +42,25 @@ const ENDPOINT = new URL("../../api/chat", import.meta.url);
 const BOOKING_LOG = "pulse-reservations-a";
 const PANEL_ID = "pulse-assistant";
 
+/* THE SAME SCHEDULE STAMP a-booking/reservations.ts reads and writes —
+ * read and written here too, never imported (shared code may not depend
+ * on a product's, the same rule the capacity-counting duplication below
+ * already follows). Session ids are positions in a window that slides at
+ * midnight, so a row this widget wrote yesterday can point at a DIFFERENT
+ * class today. Booking's own page reconciles this on its own load; this
+ * widget can be opened on any page, at any time, without that load ever
+ * happening — proven live: booking through the assistant on the front
+ * door, then opening a-booking/ on the same day with no stamp yet set,
+ * silently deleted the reservation the assistant had just confirmed to
+ * the member as "It is on your classes page." Now it stamps too. */
+const BOOKING_SCHEDULE_KEY = "pulse-reservations-a-schedule";
+
 /** Booking's published log, read the guarded way — a malformed value is
- *  simply no rows, never a throw into the panel. */
-function readRuntimeReservedRows(): Reservation[] {
+ *  simply no rows, never a throw into the panel — and scoped to TODAY's
+ *  schedule: a log stamped for another date, or never stamped at all, is
+ *  not evidence about which class an id names right now. */
+function readRuntimeReservedRows(scheduleDate: string): Reservation[] {
+  if (readStored(BOOKING_SCHEDULE_KEY) !== scheduleDate) return [];
   try {
     const parsed: unknown = JSON.parse(readStored(BOOKING_LOG) ?? "[]");
     return Array.isArray(parsed) ? (parsed as Reservation[]) : [];
@@ -164,16 +180,24 @@ function shiftIso(iso: string, days: number): string {
 
 /** Write the booking the way the Book button does: the same row shape, the
  *  same key, appended, last-row-wins. Returns what was written or the
- *  reason nothing was — never a throw into the chat. */
-export function bookForMember(memberId: string, session: Session): { ok: true; row: Reservation } | { ok: false; why: string } {
-  const raw = readStored(BOOKING_LOG);
-  let rows: Reservation[] = [];
-  try {
-    const parsed: unknown = raw === null ? [] : JSON.parse(raw);
-    rows = Array.isArray(parsed) ? (parsed as Reservation[]) : [];
-  } catch {
-    rows = [];
-  }
+ *  reason nothing was — never a throw into the chat.
+ *
+ *  `scheduleDate` is the studio date this booking is being made against —
+ *  callers pass `studio.meta.asOfDate`, the same value the session was
+ *  resolved with, so the row that gets appended and the stamp that gets
+ *  written always agree with each other. */
+export function bookForMember(
+  memberId: string,
+  session: Session,
+  scheduleDate: string,
+): { ok: true; row: Reservation } | { ok: false; why: string } {
+  /* SCHEDULE-SCOPED, not a raw read of whatever is stored. A log stamped
+   * for another date — or never stamped — names classes that no longer
+   * exist at those ids, so it is not evidence for or against a booking
+   * being made against TODAY's session. Dropping it here rather than
+   * merely refusing to count it also means a stale row does not survive
+   * into the array this function writes back below. */
+  const rows = readRuntimeReservedRows(scheduleDate);
   /* LAST ROW WINS, the same reading Booking's own memberStatus() uses: the
    * most recent row for this member and session is the truth, whatever an
    * earlier cancel or rebook says. */
@@ -208,6 +232,10 @@ export function bookForMember(memberId: string, session: Session): { ok: true; r
   };
   const written = writeStored(BOOKING_LOG, JSON.stringify([...rows, row]));
   if (!written) return { ok: false, why: "This browser is not saving site data, so the booking could not be kept." };
+  /* Stamped AFTER the log write succeeds, never before: a browser that
+   * refuses to save site data must not end up with a schedule stamp that
+   * claims a booking exists which was never actually written. */
+  writeStored(BOOKING_SCHEDULE_KEY, scheduleDate);
   return { ok: true, row };
 }
 
@@ -327,7 +355,7 @@ export function mountAssistant(): void {
     const policy = audiencePolicy(actor, placement);
     const studio = sharedStudio();
     const runtimeReservedBySession = new Map<string, number>();
-    for (const row of readRuntimeReservedRows()) {
+    for (const row of readRuntimeReservedRows(studio.meta.asOfDate)) {
       if (row.reservation_status !== "reserved") continue;
       runtimeReservedBySession.set(row.session_id, (runtimeReservedBySession.get(row.session_id) ?? 0) + 1);
     }
@@ -338,7 +366,7 @@ export function mountAssistant(): void {
     if (kind === "member" && session !== null && session.actor_type === "member") {
       const target = bookingIntent(question, sessions, studio.meta.asOfDate);
       if (target !== null) {
-        const result = bookForMember(session.member_id, target);
+        const result = bookForMember(session.member_id, target, studio.meta.asOfDate);
         say(
           result.ok
             ? `Booked: ${target.classType} on ${target.startsAt.slice(0, 10)} at ${target.startsAt.slice(11, 16)}. It is on your classes page.`
