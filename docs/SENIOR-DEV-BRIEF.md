@@ -334,10 +334,15 @@ somebody else — none is mine to close:
   gate no longer objects — a path is a name, not the word — but whether the
   repo should hold that filename is his call, and `.env.fixture` would
   satisfy the law and still read naturally.
-- **The contract's product map understates every product**, mine included
-  until I corrected my own row. Three rows still name fewer records than
-  their product reads. No data-law breach in any of them; the risk is that
-  a new teammate reads the table to learn what they may touch.
+- **The contract's product map is filled in now** (2026-08-23). It
+  understated every product, and Manny's row read "TBD | TBD | TBD" from
+  the first draft onward — in the table a new teammate reads to learn what
+  they may touch. Every row now names what its product actually reads and
+  writes, read off the code rather than the plan, and two of the "open
+  questions" columns were answered rather than left standing: C's hosted
+  key question (the studio's server holds it) and D's records path (through
+  `/api/staff/records`, not a file under `app/`). No data-law breach was
+  found in any row while checking.
 
 And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
 
