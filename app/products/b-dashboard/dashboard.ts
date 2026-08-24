@@ -153,3 +153,58 @@ export function roomDemand(sessions: (DashboardSession & { room: string })[]): R
 export function scheduleMatches(storedDate: string | null, asOfDate: string): boolean {
   return storedDate === asOfDate;
 }
+
+export const RESERVATION_STATUSES = new Set(["reserved", "waitlisted", "canceled"]);
+
+/** Minimal shape both `memberById` (a Map) and `sessionIds` (a Set) already
+ *  satisfy, so the caller passes what it already has instead of building a
+ *  fresh Set per validated row. */
+export interface KnownIds {
+  has(id: string): boolean;
+}
+
+/** Validates one row of Booking's runtime reservation log before this page
+ *  trusts it — pulled out of staff-dashboard.ts, which no suite can import
+ *  (it reads `document` and localStorage at module load). Same shape as
+ *  every other guarded-storage read in this repo: an untrusted row is
+ *  DROPPED and counted, never trusted partially. Returns "" when the row is
+ *  sound, or a message naming what is wrong. */
+export function reservationProblem(candidate: unknown, knownMemberIds: KnownIds, knownSessionIds: KnownIds): string {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return "record must be an object";
+  const row = candidate as Record<string, unknown>;
+  for (const field of ["reservation_id", "member_id", "session_id", "reserved_at"]) {
+    if (typeof row[field] !== "string") return `${field} must be a string`;
+  }
+  if (!knownMemberIds.has(row["member_id"] as string)) return "member_id must reference the shared studio";
+  if (!knownSessionIds.has(row["session_id"] as string)) return "session_id must reference the shared studio";
+  if (!RESERVATION_STATUSES.has(row["reservation_status"] as string)) {
+    return "reservation_status must be reserved, waitlisted, or canceled";
+  }
+  if (Number.isNaN(Date.parse(row["reserved_at"] as string))) return "reserved_at must be a datetime";
+  if (row["canceled_at"] !== null && typeof row["canceled_at"] !== "string") return "canceled_at must be a string or null";
+  if (typeof row["canceled_at"] === "string" && Number.isNaN(Date.parse(row["canceled_at"] as string))) {
+    return "canceled_at must be a datetime or null";
+  }
+  return "";
+}
+
+/** Validates one row of this page's own published-schedule storage —
+ *  self-contained, unlike `reservationProblem`, since a local class session
+ *  answers to nothing but its own shape. Same reasons for existing apart
+ *  from staff-dashboard.ts as above. */
+export function publishedSessionProblem(candidate: unknown): string {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return "record must be an object";
+  const session = candidate as Record<string, unknown>;
+  for (const field of ["id", "type", "level", "startsAt", "time", "room", "instructor"]) {
+    if (typeof session[field] !== "string") return `${field} must be a string`;
+  }
+  if (!/^local-\d+$/.test(session["id"] as string)) return "id must be a local session id";
+  if (Number.isNaN(Date.parse(session["startsAt"] as string))) return "startsAt must be a datetime";
+  if (!Number.isInteger(session["capacity"]) || (session["capacity"] as number) < 1) {
+    return "capacity must be a positive integer";
+  }
+  if (!Array.isArray(session["roster"]) || (session["roster"] as unknown[]).length !== 0) {
+    return "roster must be an empty array";
+  }
+  return "";
+}

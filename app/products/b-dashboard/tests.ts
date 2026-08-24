@@ -14,7 +14,8 @@
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
   bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
-  emptyScheduleText, occupancy, roomDemand, scheduleMatches, spotsLeftText, status,
+  emptyScheduleText, occupancy, publishedSessionProblem, reservationProblem, roomDemand,
+  scheduleMatches, spotsLeftText, status,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
 
@@ -126,6 +127,63 @@ check("rooms level on demand fall back to name order",
 check("a log stamped for today's schedule is trusted", scheduleMatches("2026-08-18", "2026-08-18"), true);
 check("a log stamped for another day is not evidence about today", scheduleMatches("2026-08-17", "2026-08-18"), false);
 check("a log with no stamp at all is the same as the wrong stamp", scheduleMatches(null, "2026-08-18"), false);
+
+/* THE TRUST BOUNDARY ON BOOKING'S LOG. reservationProblem() had never run
+ * outside a real page load — staff-dashboard.ts reads document and
+ * localStorage at module scope, so no suite could import it, the same
+ * reason scheduleMatches() was pulled out above it on 2026-08-23. This is
+ * the OTHER half of that same read: every field a hostile or merely stale
+ * row could get wrong, one at a time. */
+const knownMembers = new Set(["m-1", "m-2"]);
+const knownSessions = new Set(["s-1", "s-2"]);
+const soundReservation = {
+  reservation_id: "r-1", member_id: "m-1", session_id: "s-1",
+  reserved_at: "2026-08-18T09:00:00Z", reservation_status: "reserved", canceled_at: null,
+};
+check("a sound reservation row passes", reservationProblem(soundReservation, knownMembers, knownSessions), "");
+check("a row that is not an object is refused", reservationProblem("m-1", knownMembers, knownSessions), "record must be an object");
+check("an array is refused too, despite being typeof object", reservationProblem([], knownMembers, knownSessions), "record must be an object");
+check("a missing required field is named", reservationProblem({ ...soundReservation, reservation_id: 7 }, knownMembers, knownSessions),
+  "reservation_id must be a string");
+check("a member outside the shared studio is refused",
+  reservationProblem({ ...soundReservation, member_id: "ghost" }, knownMembers, knownSessions),
+  "member_id must reference the shared studio");
+check("a session outside the shared studio is refused",
+  reservationProblem({ ...soundReservation, session_id: "ghost" }, knownMembers, knownSessions),
+  "session_id must reference the shared studio");
+check("an unrecognized reservation_status is refused",
+  reservationProblem({ ...soundReservation, reservation_status: "pending" }, knownMembers, knownSessions),
+  "reservation_status must be reserved, waitlisted, or canceled");
+check("an unparsable reserved_at is refused",
+  reservationProblem({ ...soundReservation, reserved_at: "not a date" }, knownMembers, knownSessions),
+  "reserved_at must be a datetime");
+check("canceled_at may be null", reservationProblem({ ...soundReservation, canceled_at: null }, knownMembers, knownSessions), "");
+check("canceled_at may be a real datetime",
+  reservationProblem({ ...soundReservation, canceled_at: "2026-08-19T09:00:00Z" }, knownMembers, knownSessions), "");
+check("canceled_at cannot be a number", reservationProblem({ ...soundReservation, canceled_at: 1 }, knownMembers, knownSessions),
+  "canceled_at must be a string or null");
+check("canceled_at cannot be an unparsable string",
+  reservationProblem({ ...soundReservation, canceled_at: "whenever" }, knownMembers, knownSessions),
+  "canceled_at must be a datetime or null");
+
+const soundLocalSession = {
+  id: "local-3", type: "Yoga", level: "All levels", startsAt: "2026-08-25T18:30:00",
+  time: "6:30 PM", room: "Loft", instructor: "Staff assigned", capacity: 12, roster: [],
+};
+check("a sound published session passes", publishedSessionProblem(soundLocalSession), "");
+check("a published session that is not an object is refused, same as a runtime reservation row",
+  publishedSessionProblem("local-3"), "record must be an object");
+check("a session id must look locally minted, never a shared studio id",
+  publishedSessionProblem({ ...soundLocalSession, id: "s-1" }), "id must be a local session id");
+check("an unparsable startsAt is refused", publishedSessionProblem({ ...soundLocalSession, startsAt: "whenever" }),
+  "startsAt must be a datetime");
+check("capacity zero is refused — a class of zero seats is not a class", publishedSessionProblem({ ...soundLocalSession, capacity: 0 }),
+  "capacity must be a positive integer");
+check("capacity one is a real class, not a boundary violation", publishedSessionProblem({ ...soundLocalSession, capacity: 1 }), "");
+check("a fractional capacity is refused", publishedSessionProblem({ ...soundLocalSession, capacity: 12.5 }),
+  "capacity must be a positive integer");
+check("a published session may never arrive pre-booked — the roster is built fresh from bookings, not trusted from storage",
+  publishedSessionProblem({ ...soundLocalSession, roster: [{ member_id: "m-1" }] }), "roster must be an empty array");
 
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
