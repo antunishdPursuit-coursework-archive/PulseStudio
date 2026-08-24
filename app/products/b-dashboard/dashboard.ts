@@ -135,3 +135,21 @@ export function roomDemand(sessions: (DashboardSession & { room: string })[]): R
   }
   return [...byRoom.values()].sort((a, b) => b.peakFill - a.peakFill || a.room.localeCompare(b.room));
 }
+
+/** Whether Booking's reservation log is stamped for THIS studio date —
+ *  pulled out as its own pure check so it can be pinned by a test, unlike
+ *  the localStorage read around it in staff-dashboard.ts, which cannot be
+ *  imported into a suite without running that page's whole boot sequence.
+ *
+ *  Session ids are positions in a window that slides at midnight, so a
+ *  row this log holds from yesterday can point at a DIFFERENT class today
+ *  — measured elsewhere in this repo: every future class changed type
+ *  under its own id one day later. A staff member who opens this
+ *  dashboard before Booking's own page has run today would otherwise see
+ *  a member's reservation attached to whichever class now happens to sit
+ *  at that id, not the one they actually booked. `storedDate === null`
+ *  (no stamp at all — every log written before the stamp existed) is
+ *  treated the same as a mismatch. */
+export function scheduleMatches(storedDate: string | null, asOfDate: string): boolean {
+  return storedDate === asOfDate;
+}

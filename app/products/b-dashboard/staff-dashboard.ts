@@ -52,12 +52,24 @@ function el<T extends HTMLElement = HTMLElement>(selector: string): T {
 
 // The arithmetic lives in dashboard.ts so a gate type-checks it and tests.ts can
 // pin it; this file keeps only the DOM wiring. See dashboard.ts for why.
-import { bookingDataLine, confirmedCount, emptyScheduleText, formatSessionTime, needsAttention, nextActionText, roomDemand, spotsLeftText, status } from './dashboard.js';
+import { bookingDataLine, confirmedCount, emptyScheduleText, formatSessionTime, needsAttention, nextActionText, roomDemand, scheduleMatches, spotsLeftText, status } from './dashboard.js';
 import { counted } from '../../shared/text.js';
 import { mountStaffDoor } from '../../shared/auth/staff-gate.js';
 import { sharedStudioWithFill } from '../../shared/auth/studio.js';
 
 const RUNTIME_RESERVATIONS_KEY='pulse-reservations-a';
+/* THE SAME SCHEDULE STAMP a-booking/reservations.ts reads and writes —
+   read here too, never imported (shared code and other products' code may
+   not depend on a product's, the same rule that already made this file
+   duplicate its own capacity math instead of importing Booking's).
+   Session ids are positions in a window that slides at midnight, so a
+   row this log holds from yesterday can point at a DIFFERENT class today
+   — measured elsewhere in this repo: every future class changed type
+   under its own id one day later. A member who books today, when this
+   dashboard has not been opened yet today, would otherwise show up on
+   whichever class now happens to sit at that id — not the one they
+   booked. */
+const RUNTIME_RESERVATIONS_SCHEDULE_KEY='pulse-reservations-a-schedule';
 const SCHEDULE_STORAGE_KEY='pulse-schedule-b';
 const RESERVATION_STATUSES=new Set(['reserved','waitlisted','canceled']);
 /* THE SAME STUDIO EVERY OTHER PRODUCT READS, topped up so the week looks
@@ -82,7 +94,7 @@ const typeById=new Map(dataset.classTypes.map(type=>[type.id,type]));
 const sessionIds=new Set(dataset.classSessions.map(session=>session.id));
 const attendanceByBooking=new Map(dataset.attendance.filter(record=>record.bookingId).map(record=>[record.bookingId,record.status]));
 const reservationProblem=(candidate: unknown): string=>{if(!candidate||typeof candidate!=='object'||Array.isArray(candidate))return 'record must be an object';const row=candidate as Record<string, unknown>;for(const field of ['reservation_id','member_id','session_id','reserved_at'])if(typeof row[field]!=='string')return `${field} must be a string`;if(!memberById.has(row['member_id'] as string))return 'member_id must reference the shared studio';if(!sessionIds.has(row['session_id'] as string))return 'session_id must reference the shared studio';if(!RESERVATION_STATUSES.has(row['reservation_status'] as string))return 'reservation_status must be reserved, waitlisted, or canceled';if(Number.isNaN(Date.parse(row['reserved_at'] as string)))return 'reserved_at must be a datetime';if(row['canceled_at']!==null&&typeof row['canceled_at']!=='string')return 'canceled_at must be a string or null';if(typeof row['canceled_at']==='string'&&Number.isNaN(Date.parse(row['canceled_at'])))return 'canceled_at must be a datetime or null';return '';};
-const readRuntimeReservations=()=>{try{const raw=localStorage.getItem(RUNTIME_RESERVATIONS_KEY);if(!raw)return{rows:[],rejected:[]};const parsed=JSON.parse(raw);if(!Array.isArray(parsed))return{rows:[],rejected:['stored value must be an array']};const rows: RuntimeReservation[]=[],rejected: string[]=[];parsed.forEach((row: unknown,index: number)=>{const problem=reservationProblem(row);if(problem)rejected.push(`row ${index+1}: ${problem}`);else rows.push(row as RuntimeReservation);});return{rows,rejected};}catch{return{rows:[],rejected:['stored value must be valid JSON']};}};
+const readRuntimeReservations=()=>{if(!scheduleMatches(localStorage.getItem(RUNTIME_RESERVATIONS_SCHEDULE_KEY),dataset.meta.asOfDate))return{rows:[],rejected:[]};try{const raw=localStorage.getItem(RUNTIME_RESERVATIONS_KEY);if(!raw)return{rows:[],rejected:[]};const parsed=JSON.parse(raw);if(!Array.isArray(parsed))return{rows:[],rejected:['stored value must be an array']};const rows: RuntimeReservation[]=[],rejected: string[]=[];parsed.forEach((row: unknown,index: number)=>{const problem=reservationProblem(row);if(problem)rejected.push(`row ${index+1}: ${problem}`);else rows.push(row as RuntimeReservation);});return{rows,rejected};}catch{return{rows:[],rejected:['stored value must be valid JSON']};}};
 const latestRuntimeReservations=(rows: RuntimeReservation[]): RuntimeReservation[]=>{const latest=new Map<string, RuntimeReservation>();rows.forEach((row: RuntimeReservation)=>latest.set(`${row.session_id}\u0000${row.member_id}`,row));return[...latest.values()];};
 let runtimeReservations=readRuntimeReservations();
 const classTypeSelect=el<HTMLSelectElement>('#classType');classTypeSelect.innerHTML=[...dataset.classTypes].sort((a,b)=>a.name.localeCompare(b.name)||a.level.localeCompare(b.level)).map(classType=>`<option value="${classType.id}">${escapeHtml(classType.name)} · ${escapeHtml(classType.level)}</option>`).join('');

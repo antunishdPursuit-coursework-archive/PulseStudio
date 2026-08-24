@@ -14,7 +14,7 @@
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
   bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
-  emptyScheduleText, occupancy, roomDemand, spotsLeftText, status,
+  emptyScheduleText, occupancy, roomDemand, scheduleMatches, spotsLeftText, status,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
 
@@ -114,6 +114,18 @@ check("a quiet room does not lead on its name alone",
 check("rooms level on demand fall back to name order",
   roomDemand([{ ...session(10, 5), room: "Zephyr" }, studio]).map((row) => row.room),
   ["Studio", "Zephyr"]);
+
+/* THE SAME SCHEDULE-STALENESS GUARD Booking's own page has, on the read
+ * side: this dashboard reads Booking's log defensively, but had no way to
+ * tell a log stamped for TODAY from one left over from yesterday — proven
+ * live: booking through the shared assistant, then opening this page
+ * before Booking's own page had run today, showed the reservation
+ * attached to whichever class currently sits at that session id, not the
+ * one actually booked. scheduleMatches() is the one line staff-dashboard
+ * checks before trusting the log at all. */
+check("a log stamped for today's schedule is trusted", scheduleMatches("2026-08-18", "2026-08-18"), true);
+check("a log stamped for another day is not evidence about today", scheduleMatches("2026-08-17", "2026-08-18"), false);
+check("a log with no stamp at all is the same as the wrong stamp", scheduleMatches(null, "2026-08-18"), false);
 
 const passed = results.filter((r) => r.passed).length;
 const failed = results.length - passed;
