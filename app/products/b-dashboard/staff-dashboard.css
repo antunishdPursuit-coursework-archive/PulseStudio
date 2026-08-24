@@ -39,6 +39,24 @@ h2 { margin: 0; }
 
 .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr); gap: 24px; }
 .wide { min-width: 0; }
+.instructors-panel { margin-top: 24px; }
+.instructor-list { margin-top: 8px; }
+.instructor-row { border-bottom: 1px solid var(--line); padding: 14px 0; }
+.instructor-row:last-child { border-bottom: 0; }
+.instructor-row summary { color: var(--fg); cursor: pointer; list-style-position: outside; padding-left: 4px; }
+.instructor-row summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.instructor-summary { display: inline-flex; flex-wrap: wrap; gap: 8px 18px; vertical-align: top; }
+.instructor-summary strong { color: var(--accent); }
+.instructor-summary small { color: var(--muted); font-size: .85rem; }
+.instructor-detail { display: grid; gap: 7px; margin: 14px 0 4px 22px; }
+.instructor-detail p { color: var(--muted); font-size: .85rem; margin: 0; }
+.instructor-detail strong { color: var(--fg); }
+.attendance-graph { overflow-x: auto; margin: 16px 0 8px; }
+.attendance-graph svg { display: block; min-width: 560px; width: 100%; height: auto; }
+.attendance-line { fill: none; stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.attendance-points circle { fill: var(--accent); stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.attendance-points circle:focus-visible, .attendance-points circle:hover { fill: var(--fg); outline: 2px solid var(--accent); }
+.attendance-graph text { fill: var(--muted); font-size: 11px; }
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .weekly-enrollment { color: var(--accent); font-weight: 700; margin: 8px 0 0; }
 .weekly-reservations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 3rem; margin-top: 12px; }

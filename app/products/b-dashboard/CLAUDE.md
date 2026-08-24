@@ -7,18 +7,23 @@ folder.
 
 ## What this product is (proven in code, not aspiration)
 
-A staff view of upcoming class sessions: fill rates with attention flags
+(A staff view of upcoming class sessions is protected by the shared
+server-backed staff door before any dashboard content renders.) Fill rates
+with attention flags
 (Underbooked / Filling soon / Full — computed from generator `booked`
 bookings, then overridden per member by the latest matching row in the
 booking app's `pulse-reservations-a`), a status filter, a per-session
 roster view, an "add a class session" dialog whose confirmed weeks persist
 to this browser, a by-room demand panel, and a hand-off link to Product D.
-Driven by the shared synthetic generator plus this browser's localStorage —
-no server.
+Driven by the shared synthetic studio adapter plus this browser's localStorage;
+published schedule writes also cross the authenticated server boundary.
 
 ## THE structural facts to know before touching anything
 
 **The live page is `index.html` + `staff-dashboard.js` + `dashboard.ts`.**
+`staff-dashboard.js` mounts `../../shared/auth/staff-gate.js` first; an
+anonymous visitor sees only the shared staff sign-in door, and the dashboard
+DOM is not initialized until the server confirms a signed staff session.
 `staff-dashboard.js` is hand-written, git-tracked SOURCE, despite being a
 `.js` in a TypeScript repo (it has no `.ts` twin; do not delete it as
 "compiled output"). It keeps the DOM wiring; the arithmetic — fill bands,
@@ -50,10 +55,10 @@ dashboard, and it carries its own `noindex` and favicon lines.
 
 ## The deliberate design (do not "fix" without Manny's intent)
 
-- **Week 0 is anchored on purpose**: seed `capacity-watch-2026`,
-  `asOfDate: "2026-08-19"`, and week 0 is always the 7 days from that
-  date, never from today — the same starting week renders forever,
-  deterministically. The week picker shows four weeks at a time and
+- **Week 0 follows the studio-local date** from `sharedStudioWithFill(0.85)`;
+  the shared generator remains deterministic for that date, while the
+  dashboard stays aligned with Product A's current schedule. The week picker
+  shows four weeks at a time and
   `#previousWeeks`/`#nextWeeks` page the window; forward paging has no
   upper bound, so a staff person can walk into empty weeks (each states
   "0 sessions").
@@ -61,11 +66,11 @@ dashboard, and it carries its own `noindex` and favicon lines.
   string `"Studio"`; a session added in the dialog carries whatever room
   was typed. The demand panel groups by that field, busiest room first,
   and `#fastestRoom` ("Busiest room") is the top row's label.
-- **Publish persists to this browser**: confirming a draft writes the
-  week's `local-N` sessions to localStorage under `pulse-schedule-b`, and
-  they are restored (and re-validated) on the next load. A storage
-  listener picks up changes from another tab. No shared record is ever
-  created.
+- **Publish writes the shared schedule**: confirming a draft sends the
+  week's `local-N` sessions to `/api/schedule` through the staff session and
+  also caches the accepted result in this browser under `pulse-schedule-b`.
+  Product A does not read the endpoint yet; its consumer is a separate,
+  approved change for Kerrian's lane.
 - The roster locally re-maps generator camelCase into contract-style
   snake_case names — it LOOKS like contract data but is a private
   adapter inside this folder.
@@ -76,14 +81,14 @@ dashboard, and it carries its own `noindex` and favicon lines.
 
 ## Integration facts
 
-- Data: `shared/synthetic/config.js` + `generate.js` ONLY — the live page
-  bypasses `loadFixtures()`/`fixtures.json` entirely (a cross-lane fact
-  the team knows about).
+- Data: `shared/auth/studio.js` → `shared/synthetic/` — the live page uses
+  the shared generator adapter with the same studio-local date as Product A,
+  while bypassing `loadFixtures()`/`fixtures.json` entirely.
 - Theme: `index.html` carries `product-b`, links `shared/theme.css`, and
   loads `shared/theme-boot.js` — which also gives the page the shared
   sign-in chip and theme toggle for free.
-- Storage: this product OWNS one key, `pulse-schedule-b` (its published
-  weeks), and READS the booking app's `pulse-reservations-a` — on load, on
+- Storage: this product caches one key, `pulse-schedule-b` (the server's
+  accepted published weeks), and READS the booking app's `pulse-reservations-a` — on load, on
   window focus, and on storage events — validating every row and stating
   the rejected count on the page. It never writes A's key. A canceled
   runtime row decrements a session's confirmed count and a reserved one
