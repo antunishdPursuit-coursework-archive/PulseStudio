@@ -2,7 +2,7 @@
 
 **Owner:** Kerrian
 **Phase:** Shipped
-**Evidence level:** Built and checked — `app/products/a-booking/tests.html`, 47 checks, run headlessly by `npm run check`
+**Evidence level:** Built and checked — `app/products/a-booking/tests.html`, 65 checks, run headlessly by `npm run check`
 
 ## First user and outcome
 
@@ -46,6 +46,14 @@ after a class and belongs to the staff/operations workflow.
 
 Capacity must remain correct when a class is full, and the public calendar must
 not reveal member-specific data.
+
+A boundary found late, and closed rather than left implicit: the studio's
+session ids are positions in a window that slides every midnight, so a
+reservation saved yesterday can silently resolve to a DIFFERENT class today
+— measured 2026-08-23, every future class changed type under its own id one
+day later. `reservations.ts` now stamps the log with the schedule it was
+written against and lets a log from another date go rather than resolve it
+against the wrong class.
 
 ## Acceptance checks
 
