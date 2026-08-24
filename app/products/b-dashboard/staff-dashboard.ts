@@ -15,7 +15,6 @@
    "Cannot read properties of null", which is the same failure said sooner
    and in a sentence somebody can act on. */
 import type { DashboardSession, RosterMember } from './dashboard.js';
-import type { SyntheticStudioConfig } from '../../shared/synthetic/config.js';
 
 /** A session as this page assembles it: the arithmetic half that
     dashboard.ts checks, plus the fields the page needs to draw a card. */
@@ -51,19 +50,30 @@ function el<T extends HTMLElement = HTMLElement>(selector: string): T {
   return found;
 }
 
-import { DEFAULT_CONFIG, GENERATOR_VERSION } from '../../shared/synthetic/config.js';
-import { generateStudio } from '../../shared/synthetic/generate.js';
 // The arithmetic lives in dashboard.ts so a gate type-checks it and tests.ts can
 // pin it; this file keeps only the DOM wiring. See dashboard.ts for why.
 import { bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText, roomDemand, spotsLeftText, status } from './dashboard.js';
 import { counted } from '../../shared/text.js';
 import { mountStaffDoor } from '../../shared/auth/staff-gate.js';
+import { sharedStudioWithFill } from '../../shared/auth/studio.js';
 
 const RUNTIME_RESERVATIONS_KEY='pulse-reservations-a';
 const SCHEDULE_STORAGE_KEY='pulse-schedule-b';
 const RESERVATION_STATUSES=new Set(['reserved','waitlisted','canceled']);
-const syntheticConfig: SyntheticStudioConfig={...DEFAULT_CONFIG,generatorVersion:GENERATOR_VERSION,seed:'capacity-watch-2026',asOfDate:'2026-08-19',memberCount:60,historyDays:180,mode:'clean',upcomingFillTarget:0.85};
-const dataset=generateStudio(syntheticConfig).dataset;
+/* THE SAME STUDIO EVERY OTHER PRODUCT READS, topped up so the week looks
+   like a studio's week. This used to generate its own — seed
+   'capacity-watch-2026', frozen at 2026-08-19, 180 days of history — and
+   the cost of that was the one red hand-off on the story map: a member's
+   real booking names a class id from the SHARED studio, none of which
+   existed here, so every reservation arrived as "outside the current
+   schedule". Measured 2026-08-20: 0 shared class ids out of 75.
+
+   The fill target is kept because it was never the problem. Generating
+   with and without it produces the same 1,900 sessions, identical in id,
+   start time, class type and status; it seats members and leaves the
+   schedule alone. What moved the ids was the seed, the date and the
+   history length, and none of those is this product's to choose. */
+const dataset=sharedStudioWithFill(0.85);
 const HTML_ESCAPES: Record<string, string> = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
 const escapeHtml=(value: string): string=>value.replace(/[&<>"']/g,(character: string)=>HTML_ESCAPES[character] ?? character);
 const memberById=new Map(dataset.members.map(member=>[member.id,member]));
