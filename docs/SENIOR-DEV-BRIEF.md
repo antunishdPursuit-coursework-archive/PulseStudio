@@ -420,11 +420,29 @@ had been deliberately reverted to see the checks go red; they stayed green
 and said nothing. **A check proved against stale build output proves
 nothing.**
 
-Verified from a clean clone on 2026-08-21, not from a working tree with
-artefacts lying around: clone, `npm ci`, `npm run check` green, `npm run
-build`, `npm run start`, and every page — front door, the tool, all three
-proof suites, storytold and ready — served and rendered. The reviewer bundle
-builds there too.
+Verified from a clean clone again on 2026-08-23, because almost everything
+about how this runs changed after the first pass: clone the proposal branch,
+`npm ci`, `npm run check` — EXIT 0, 12 gates PASS and `check-lanes` SKIPPED
+with its reason stated ("no origin/main to compare against", which is what a
+shallow clone has), 1,583 checks across 6 suites, 0 failed.
+
+Then the part that did not exist on 2026-08-21. A clean clone has no `.env`,
+so it has NO staff passphrase, and that is the state the audience law's
+"never fails open" is about. Started on its own port and asked:
+
+| Asked of a fresh clone with no passphrase | Answer |
+| --- | --- |
+| the front door | 200 |
+| `/api/staff/records` | **503** — refused, no records |
+| `data/staff-records.json` at a URL | **404** — not served at all |
+| sign in with any passphrase | refused, and it says `Set STAFF_PASSPHRASE and restart` |
+| the dashboard and the tool in a browser | `<main>` holds ONE element, the door, reading "This is a staff surface. The server is running but has no staff passphrase set, so nobody can sign in yet." No member name anywhere on either page. |
+
+One correction worth keeping, because it nearly sent a fix at working code:
+scraping `document.body.textContent` showed a whole schedule-builder form on
+the gated dashboard, which looked like a leak. It is inside a CLOSED
+`<dialog>` — present in the DOM, zero-sized, invisible. `<main>` had only
+the door. The instrument answered the question it was asked.
 
 - **Compiled `.js` is gitignored on purpose.** Source is source; CI builds.
   `.github/workflows/pages.yml` runs the gate and only publishes if it passes,
