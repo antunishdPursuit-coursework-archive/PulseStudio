@@ -14,7 +14,7 @@
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
   bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
-  occupancy, roomDemand, spotsLeftText, status,
+  emptyScheduleText, occupancy, roomDemand, spotsLeftText, status,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
 
@@ -89,6 +89,17 @@ const loft = { ...session(10, 9), room: "Loft" };
 check("rooms are grouped and the busiest leads", roomDemand([studio, loft, { ...session(10, 2), room: "Studio" }]),
   [{ room: "Loft", peakFill: 90, sessions: 1 }, { room: "Studio", peakFill: 50, sessions: 2 }]);
 check("no sessions means no rooms", roomDemand([]), []);
+
+/* An empty list has two causes and the panel used to name only one of
+ * them — "No sessions match this filter" for a week the studio has not
+ * scheduled yet, which sends a staff member looking for a filter to
+ * clear. */
+check("a week with nothing scheduled says so, and does not blame a filter",
+  emptyScheduleText(0, "September 13\u201319"), "0 classes scheduled for September 13\u201319.");
+check("a filter that excluded everything says what it checked",
+  emptyScheduleText(12, "August 23\u201329"), "12 sessions checked. None match this filter for August 23\u201329.");
+check("one session checked reads as one, not 1 sessions",
+  emptyScheduleText(1, "August 23\u201329"), "1 session checked. None match this filter for August 23\u201329.");
 
 /* THE CHECK ABOVE CANNOT TELL THE TWO RULES APART. Loft is both the
  * busiest room and the first alphabetically, so it leads either way —

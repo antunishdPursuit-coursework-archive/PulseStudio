@@ -129,6 +129,15 @@ suite would have called correct.
   strength for Mon 24 Aug 08:00 on Product A; your page then read "Member
   bookings from the booking app: 1 in this schedule, 0 outside it", and his
   name was on that class's roster, reserved.
+- **An empty week no longer blames a filter.** Past the studio's 14-day
+  horizon the schedule panel read "0 sessions checked. No sessions match
+  this filter for September 13–19" — which sends a staff member hunting for
+  a filter to clear when the truth is that nothing is scheduled there yet.
+  Your room panel beside it always said it correctly. `emptyScheduleText()`
+  is in `dashboard.ts` now, so a check can hold it: three of them, including
+  "1 session checked" rather than "1 sessions". Both sentences watched in a
+  browser — "0 classes scheduled for September 13–19", and "5 sessions
+  checked. None match this filter for September 6–12".
 - **Your room panel could have sorted by name and passed.** Your check
   "rooms are grouped and the busiest leads" uses Loft and Studio — and Loft
   is both the busiest room and the first alphabetically, so it leads under

@@ -99,6 +99,20 @@ export function nextActionText(sessions: DashboardSession[]): string {
   return `${counted(underbooked, "class", "classes")} under ${UNDERBOOKED_BELOW}% full this week — review before publishing.`;
 }
 
+/** What the schedule panel says when it has nothing to show.
+ *
+ *  TWO REASONS, AND THEY ARE NOT THE SAME FACT: a week the studio has not
+ *  scheduled yet, and a filter that excluded everything. The panel said
+ *  "No sessions match this filter" for both, so a staff member looking at
+ *  a week past the end of the schedule read it as "you filtered these
+ *  out" and went hunting for a filter to clear. The room panel beside it
+ *  has always said "no sessions scheduled for <week>"; this is the same
+ *  sentence for the list. */
+export function emptyScheduleText(checked: number, weekLabel: string): string {
+  if (checked === 0) return `0 classes scheduled for ${weekLabel}.`;
+  return `${counted(checked, "session")} checked. None match this filter for ${weekLabel}.`;
+}
+
 /** The line that used to sit in the callout, now worded for a staff reader:
  *  no product letter, and the rejected count reads as English. */
 export function bookingDataLine(shown: number, outside: number, rejected: string[]): string {
