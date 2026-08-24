@@ -411,6 +411,7 @@ LOOKED AT, not a scoreboard. Run the tool for a number.
 | Module | Measured | Anything left |
 | --- | --- | --- |
 | d-reengagement `logic`, `csv`, `outreach`, `config`, `live-studio` | in full | explained below or closed |
+| d-reengagement `routines` | in full, 74 sites — 72% caught | two real gaps closed 2026-08-24: `compareRoutines`'s duration-then-title-then-id sort had never been tested with duration and title in DISAGREEMENT, so a mutation that skipped the duration comparison entirely produced the same order by coincidence; and "an approval date in the future is refused" was only ever tried against a wildly future date, never the exact boundary — TODAY itself, which must be accepted. 21 survivors remain, almost all `<`/`>`/`\|\|` on length-boundary guards inside unexported `textProblem`/`intProblem` helpers (id 8-40 chars, equipment ≤8 items, interestKeys 1-7, steps 1-30) — read, not chased: an off-by-one at a validation edge is a smaller finding than a sort order or a rejected valid date, and closing all of them would be pinning arithmetic rather than a rule. Two (`compareRoutines`'s own `<` comparisons, guarded by an inequality check one line above) are equivalent |
 | d-reengagement `generate` | in full | archetype heuristics and one unreachable boundary |
 | shared `session`, `normalize`, `serialize`, `text`, `lifecycle` | in full | one documented comment-only block |
 | shared `color` | in full, judged by check-contrast's self-test | four equivalents, each explained |
