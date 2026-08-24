@@ -458,6 +458,18 @@ body.home { overflow-x: hidden; }
 .home .staff-head { margin-top: 84px; }
 .home .staff-head .staff-note { color: var(--muted); max-width: 60ch; margin: 0; }
 body[data-view="staff"] .staff-note { color: var(--fg); font-weight: 600; }
+/* The one door. Shown only while the staff cards are folded — when they are
+   open, each card is its own door and a third would be the clutter this
+   exists to remove. */
+/* `hidden` LOSES TO A DISPLAY RULE. The attribute is a UA stylesheet
+   `display: none`, and `.home .home-product { display: grid }` is more
+   specific, so a card with hidden="" was marked hidden and drawn anyway —
+   941px of staff dashboard, on a page that had just folded it. Measured in
+   a browser, not reasoned about. This rule outranks the card's own. */
+.home .home-product[hidden] { display: none; }
+.home .staff-door { display: none; margin: 14px 0 0; }
+.home .staff-head[data-folded="true"] .staff-door { display: block; }
+.home .staff-door a { color: var(--fg); font-weight: 600; }
 
 /* ---------- photography on the front door ---------- */
 

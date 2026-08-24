@@ -20,141 +20,224 @@ change in `app/shared/`, it does not — say so and it gets built here instead.
 
 ---
 
-## Everyone — one line, and it is the same line
+## Everyone — nothing outstanding
 
-Four pages ask a browser for an icon that does not exist. The site ships
-`app/favicon.svg`; a browser only finds it when the page points at it.
-
-In each page's `<head>`:
-
-```html
-<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
-```
-
-| Page | Owner |
-| --- | --- |
-| `app/products/a-booking/index.html` | Kerrian |
-| `app/products/b-dashboard/index.html` | Manny |
-| `app/products/b-dashboard/staff-dashboard.html` | Manny |
-| `app/products/c-chatbot/index.html` | Dennis |
-
-Check it: open the page and look at the console. A 404 for `/favicon.ico`
-means the line is missing or the path is wrong.
+The four pages that asked a browser for an icon they never declared now
+declare it. The two staff pages that showed rosters and attendance with no
+`robots` tag now carry `noindex, nofollow`. Both were one line each and both
+are done on this branch.
 
 ---
 
 ## Kerrian — Product A
 
-**1. The icon line above.**
+**Nothing outstanding.** Your accent has a readable companion
+(`--kerrian-strong`), your lines are gone from `docs/contrast-baseline.json`
+— which is now empty — and `PRODUCT_A_MEMBER_BOOKING_APP.md` no longer says
+"Evidence level: Planned" or lists waitlists as a non-goal. Waitlists ship,
+with the guard chain in `rules.ts` and 47 checks behind them.
 
-**2. Your accent is unreadable as text on the light theme.** `#3b82f6` on
-white is 3.68:1, and text needs 4.5:1. It sits in
-`docs/contrast-baseline.json` so the gate reports it instead of failing you,
-but the list only shrinks.
+One thing measured and deliberately NOT changed: your day chips are 43.59px
+tall on a phone, 0.41px under the 44px touch minimum. That is sub-pixel and a
+finger cannot tell. Left alone rather than churning your stylesheet for it.
 
-The shared theme already has the shape for the fix — a companion token that
-keeps your identity hue for fills and gives you a readable one for text.
-Product D did it and `app/shared/theme.css` shows how. Define
-`--kerrian-strong` for the light theme, use it wherever your blue is TEXT,
-and delete your lines from the baseline in the same commit.
+**A saved booking no longer resolves against a schedule it was not made
+for, and this is the one item on this page you should read before you touch
+anything.** Your folder brief listed the sliding studio date under "traps
+that are DELIBERATE", ending "they linger harmlessly in the log". That was
+measured this round and both halves were wrong. The ids do not stop
+resolving — they are positions in a window that slides at midnight, so the
+same id names a different class the next day. With the shared seed on
+2026-08-23: of 1,900 sessions, 1,900 moved; of the 70 future classes, 70
+carried a different CLASS TYPE. `class-session:001831` was pilates at 08:00
+on Sunday and reads as strength at 08:00 on Monday — confirmed on the page
+itself, not only in the generator. A member who booked pilates would have
+opened the page holding a seat in strength, and your log is what Manny's
+roster reads, so he would have listed them in it.
 
-**3. Three lines in your brief describe code you no longer have.** See
-`docs/REQUESTFOR-A-B-C.md` — the colour law summary is out of date, your
-product brief still says "Evidence level: Planned", and waitlists are listed
-as out of scope in a product that ships them.
+`reconcileSchedule()` in `reservations.ts` stamps the log with the studio
+date it was written against and lets a log from another date go, saying how
+many rather than quietly showing fewer. Eleven checks hold it, and they were
+proved able to fail by planting the old behaviour back — four went red,
+naming the exact rows. The brief is corrected with the numbers.
+
+**What is NOT fixed, and is not yours alone:** the id scheme itself.
+`SHARED_DATA_CONTRACT.md` says every record has a stable id and these do
+not. That is raised in `docs/REQUESTFOR-A-B-C.md` and it needs the team,
+because every fix for it renumbers 1,900 records and everything pinned to
+them.
+
+**Your suite went from 47 checks to 65, and read why rather than just the
+number.** `npm run mutate` can reach it now — it could not before, because
+the tool kept its own list of three suites — and it found two ways
+`rules.ts` could be wrong that nothing would have noticed:
+
+- Every booking in your capacity checks belonged to the session being
+  checked, so `studioBooked`'s `&&` could be an `||` and stay green. With
+  `||`, a booking in ANY class takes a seat in EVERY class, and the member
+  holding it reads as reserved for a class they never booked. Four checks
+  now hand the rules a booking that belongs somewhere else.
+- Both "class has already started" guards were only ever tried four hours
+  after the start, where `<` and `<=` agree. On the exact second they do
+  not: `<` lets the booking through. The schedule already drops a class at
+  its start time, so what reaches that guard is a link — a member opening
+  yesterday's message at 08:00:00 sharp. Three checks pin the second, and
+  one of them proves the second BEFORE still opens, so the boundary is not
+  merely closed.
+
+Neither was a live defect. Both were a way to break your product that the
+suite would have called correct.
 
 ---
 
 ## Manny — Product B
 
-**1. The icon line above, on both pages.**
+**Nothing outstanding.** In order:
 
-**2. Your staff pages carry no `robots` tag.** The re-engagement tool has
-one; the dashboard does not, and it shows rosters and attendance. In the
-`<head>` of both `index.html` and `staff-dashboard.html`:
+- The icon line and the `robots` tag are on both pages.
+- `--manny-strong` clears AA; amber as text on white was 2.15:1.
+- Your header stopped restyling the shared `.topbar` and now uses the shared
+  `.page-head` the other three already used.
+- **`staff-dashboard.js` is TypeScript.** It shipped for months as
+  hand-written JavaScript no compiler opened, and `docs/sources-baseline.json`
+  said so. That file is now empty. Behaviour was held identical through the
+  conversion by snapshotting the rendered page first: 35 session cards, 4 week
+  buttons, 5 class-type options, 4,423 characters of text — then filter,
+  roster drill-in, week navigation and the publish dialog exercised after.
+  Zero differences.
+- `main.ts` is deleted. It rendered the whole dashboard, no page loaded it,
+  and the record split had quietly broken it while it still type-checked.
+  `docs/reachable-baseline.json` is empty as a result.
+- **The red hand-off is green: a booking now reaches your meters.** Your
+  dashboard generated its own studio — seed `capacity-watch-2026`, frozen at
+  2026-08-19, 180 days of history — while Product A books against the shared
+  one dated today. No class id could ever match: measured 0 shared ids out of
+  75. Every real reservation arrived as "outside the current schedule", and
+  the readiness board called it the one red hand-off on the story map.
 
-```html
-<meta name="robots" content="noindex, nofollow">
-```
+  It now calls `sharedStudioWithFill(0.85)`, new in
+  `app/shared/auth/studio.ts` — so this is a SHARED change as well as one in
+  your folder, named here rather than made quietly. **You keep the full
+  week.** The fill knob was never the problem: generating with and without it
+  produced 1,900 of 1,900 sessions identical in id, start time, class type
+  and status, and mean upcoming occupancy is 82% with it against 6% without.
+  What moved the ids was the seed, the date and the history length. The new
+  function takes ONE argument for exactly that reason — none of those four is
+  on offer.
 
-`app/robots.txt` is the weaker fallback and, on a project site, is served at
-a path crawlers do not read for this repository — the file says so itself.
-The tag is the part that works.
-
-**3. Your accent is the least readable of the four.** `#f59e0b` on white is
-2.15:1. Same fix as Kerrian's, same baseline, same one-commit rule.
-
-**4. Six lines in your brief describe behaviour your code does not have** —
-including "no persistence of any kind" when `staff-dashboard.js` writes
-`pulse-schedule-b`. `docs/REQUESTFOR-A-B-C.md` has the list and a prompt
-written for your assistant, because a brief that is wrong is worse than no
-brief: an assistant reads it first and believes it.
+  Watched end to end in a browser on 2026-08-23: Idris Boateng booked
+  strength for Mon 24 Aug 08:00 on Product A; your page then read "Member
+  bookings from the booking app: 1 in this schedule, 0 outside it", and his
+  name was on that class's roster, reserved.
+- **An empty week no longer blames a filter.** Past the studio's 14-day
+  horizon the schedule panel read "0 sessions checked. No sessions match
+  this filter for September 13–19" — which sends a staff member hunting for
+  a filter to clear when the truth is that nothing is scheduled there yet.
+  Your room panel beside it always said it correctly. `emptyScheduleText()`
+  is in `dashboard.ts` now, so a check can hold it: three of them, including
+  "1 session checked" rather than "1 sessions". Both sentences watched in a
+  browser — "0 classes scheduled for September 13–19", and "5 sessions
+  checked. None match this filter for September 6–12".
+- **Your room panel could have sorted by name and passed.** Your check
+  "rooms are grouped and the busiest leads" uses Loft and Studio — and Loft
+  is both the busiest room and the first alphabetically, so it leads under
+  either rule. `npm run mutate` turned the comparator's `||` into `&&`,
+  which sorts by room NAME, and every check stayed green. Two checks now
+  put the rules in conflict: a quiet Annex against a busy Loft, and two
+  rooms level on demand. A staff member reads that panel to find where the
+  demand is; name order would have been the wrong answer, quietly. 34
+  checks became 36.
 
 ---
 
 ## Dennis — Product C
 
-**1. The icon line above.**
+**Nothing outstanding.** The icon line is in, the audience guard is wired,
+and your brief describes the boundary that exists. `support.ts` was surveyed
+with `npm run mutate` once the tool could reach your suite: 3 single-token
+mutations, 3 caught, nothing survived. That is a real result and a small one
+— three sites is what the module has, not a verdict on the product.
 
-**2. The assistant has to know who it is talking to, and that is built.**
-`app/shared/assistant-audience.ts`. It holds no key, makes no network call,
-and never learns your endpoint exists — it decides who is asking and what may
-be said back, and hands you that as data.
+`main.ts` had its own hand-assembled copy of "what day is it where the
+studio is" — the same rule `app/shared/today.ts` already centralizes, and
+the same shape `auth/studio.ts` was fixed to stop doing. It happened to
+compute the right answer, but nothing checked that it would keep doing
+so, because `main.ts` runs at module load and no suite reaches it — same
+as Product D's old `main.ts`. Now calls `todayIsoInZone` directly.
 
-```ts
-import { audiencePolicy, answerProblems } from "../../shared/assistant-audience.js";
-import { readPulseSession } from "../../shared/auth/session.js";
-
-// Set this per page. A member-facing page stays member-facing even when a
-// staff person is signed in on it — the screen may be turned toward a member.
-const PLACEMENT = "member-facing";
-
-const session = readPulseSession();
-const policy = audiencePolicy(session?.actor_type ?? null, PLACEMENT, firstName);
-
-// policy.greeting  — the opening line, in that audience's voice
-// policy.scope     — what this assistant will answer, stated to the reader
-// policy.refusal   — what it says when a question falls outside that
-// policy.mayUseStaffRecords / policy.mayNameOtherMembers
-
-// LAST, on the text itself, before anything is shown:
-const problems = answerProblems(answer, policy, otherMemberNames);
-if (problems.length > 0) {
-  // Show policy.refusal instead of the answer, and say nothing about why.
-}
-```
-
-Run `answerProblems` on the way OUT, on the finished text, every time. The
-audience decision is the easy half; the failure this prevents is an answer
-composed with staff records reaching a member's screen after that decision
-was made. Seventeen checks in `app/shared/auth/tests.html` cover both halves,
-including a member on a staff page and a staff person on a member page.
-
-**3. Serving both audiences means two placements, not two products.** When
-the studio runs it at the front desk, that page passes `"staff-facing"` and
-staff answers become possible; the same assistant embedded anywhere a member
-reads passes `"member-facing"` and they never are. The API you are given
-sits behind both — the audience decides what may be asked of it and what may
-come back, and that decision is not the model's to make.
-
-**4. One line in your brief points at code that says something else** —
-`CLAUDE.md:32` cites `main.ts:69-71`, which is inside `studioDate()`.
+One change came from outside your folder and you should know why. The
+assistant's outbound guard is now in **two halves in two places**. The
+staff-vocabulary half still runs on your page, on the finished text. The NAME
+half moved to the server. Your page used to fetch every member's display name
+so it could check answers against them — a member-facing page holding the
+whole roster, which is a larger leak than the one it prevented and against
+the data law outright. The server holds the roster and returns a verdict:
+never the roster, never the name it matched.
 
 ---
 
 ## Rensley — Product D
 
-**1. Nothing on the list above.** D declares its icon, carries its `robots`
-tag, and was fixed rather than baselined on contrast.
-
-**2. Get a qualified person to approve routine content.** All three routines
+**Get a qualified person to approve routine content.** All three routines
 ship as `draft`, so the panel reads "0 approved routines. Nothing to include
-yet." That is correct and it is not finished.
-
-**3. Verify Enter and Space on the routine controls by hand.** Automation
-could not deliver the activation, so it is unverified rather than passing.
+yet." That is correct and it is not finished. **This one cannot be closed by
+whoever is writing the code** — it needs somebody qualified to sign off on
+exercise content going to members. Naming that here rather than quietly
+flipping a flag.
 
 ---
+
+## What changed underneath all four, this branch
+
+Read this before you touch anything, because two of them change what your
+code is allowed to assume.
+
+- **Records that name a person left `app/`.** Everything under `app/` is
+  served at a URL, so members, memberships, reservations and attendance moved
+  to `data/staff-records.json`, outside it, behind `/api/staff/records`.
+  `loadFixtures()` returns `PublicFixtures` now — the timetable, who teaches,
+  the policies. It has no `members` field, so reading one is a compile error
+  rather than an `undefined` on a member's screen.
+- **Staff surfaces are gated, and the gate is real.** The dashboard and the
+  re-engagement tool draw nothing until the studio's server confirms a
+  session it signed itself. Where there is no server the door stays shut and
+  says so; it never fails open. The audience law in `CLAUDE.md` was amended
+  to say this, with the reasoning for why the old rule was right kept intact.
+- **`npm start` runs the studio's server**, not a static file server. Staff
+  sign-in needs `STAFF_PASSPHRASE` in the environment — see `.env.example`
+  and `docs/the-server.md`.
+- **Touch targets have a 44px minimum** behind `@media (pointer: coarse)`.
+  Seventeen controls were under it, eleven of them footer links at fifteen
+  pixels tall.
+- **`run-suites` finds its suites instead of listing them.** Three product
+  suites existed and ran nowhere; the count went from 1,425 to over 1,500 the
+  moment they were discovered. A suite with no label is now a hard error.
+- **The same sliding-id defect that hit Product A's own log also hit
+  Product D's read of it**, and D never writes to that log so it could not
+  fix itself the way A did. `readRuntimeReservations()` now takes the
+  studio's `asOfDate` and drops any row whose stamp does not match — the
+  same "read the seam, never import the code" rule the log itself was
+  already read under. Four checks, proved able to fail by planting the old
+  behaviour back.
+- **The shared sign-in dialog says something different**, and it is
+  team-owned ground so it is named here rather than changed quietly. It
+  claimed "This site is a static build that runs entirely in your browser"
+  — untrue since `npm start` began running the studio's server — and "The
+  hosted version of Pulse Studio checks a real password against its
+  Postgres database instead", which nobody has watched work; `docs/hosted-schema.sql`
+  describes a shape a sold copy would use, and the present tense turned
+  that into a running database. Read together they told a member nothing
+  anywhere is checked, at the moment the staff door started being checked
+  by the server. The copy now names the one refusal this repo can
+  demonstrate.
+- **`npm run mutate` reaches all six suites**, and finding that out cost
+  something worth knowing. The discovery fix above renamed the suite keys,
+  and mutate kept its own copy of them, so every survey of Product D died on
+  `unknown suite "reengagement"` while the error blamed a stale build — and
+  the three product suites it had never known about were still reported as
+  "no suite covers this module", about modules a suite checks. Both tools
+  read `scripts/suites.mjs` now. One list, or the copies drift; that is the
+  same lesson as the shared data contract, one level down in the tooling.
 
 ## Already done for you, in shared
 

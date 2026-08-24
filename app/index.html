@@ -50,7 +50,7 @@
   }
   </script>
 </head>
-<body class="home">
+<body class="home" data-assistant="member-facing">
   <header class="topnav">
     <a class="brand" href="./">
       <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
@@ -109,7 +109,7 @@
     </section>
 
     <section class="truths" aria-label="How this studio treats you">
-      <div><strong>Your data stays yours</strong><span>Booking and sign-in run in your browser; your records never leave it.</span></div>
+      <div><strong>Your data stays yours</strong><span>As a member, booking and sign-in run in your own browser — your records never leave it. Staff records are different: they sit behind a real sign-in, not a public page. See the <a href="./shared/privacy.html">privacy policy</a> for exactly what that means.</span></div>
       <div><strong>A person decides</strong><span>Notes are drafted by the studio&rsquo;s own tool, then read, edited and sent by real staff. Nothing is ever sent automatically.</span></div>
       <div><strong>Straight answers</strong><span>Questions are answered from the current schedule and written policies — and we say so when we can't.</span></div>
       <div><strong>Fair cancellation</strong><span>Cancel up to 12 hours before class at no charge.</span></div>
@@ -119,10 +119,12 @@
          it repeats none of the copy above it and says nothing a screen
          reader has to sit through. What it does is show the studio
          WORKING, which is the one thing a schedule and a list of features
-         cannot. shared/components/figures.ts draws the three; theme.css
-         moves them, all of it behind prefers-reduced-motion. -->
+         cannot. shared/components/figures.ts draws the four, one per
+         builder's colour; theme.css moves them, all of it behind
+         prefers-reduced-motion. -->
     <section class="studio-floor" aria-hidden="true" data-figure-lane>
       <div data-figure="lift"></div>
+      <div data-figure="row"></div>
       <div data-figure="cycle"></div>
     </section>
 
@@ -185,6 +187,11 @@
     <div class="products-head staff-head" id="staff">
       <h2>For the studio team</h2>
       <p class="staff-note" id="staff-note">Staff only — sign in as Front Desk from the top bar.</p>
+      <!-- The one door that is always there. When a member is signed in the
+           two staff cards below fold away (shared/home.ts) and this is what
+           remains: a single, named link, because every route stays reachable
+           and a hidden room is not the same as a room with one door. -->
+      <p class="staff-door"><a href="./products/b-dashboard/">Open the staff tools</a></p>
     </div>
 
     <section class="home-product product-b" id="schedule" aria-label="Staff: the Dashboard">

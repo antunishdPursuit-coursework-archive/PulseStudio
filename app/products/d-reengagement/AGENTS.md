@@ -43,6 +43,18 @@ own log. `upcomingReservedMemberIds()` (logic.ts) then keeps a quiet member
 who already booked back in OUT of the outreach list, stated by name. The
 CSV door and the generated studio remain the other two doors, unchanged.
 
+**The log is discarded if it is not stamped for TODAY (2026-08-23).**
+Booking's session ids slide with the studio date — measured 2026-08-23, 70
+of 70 future classes changed CLASS TYPE under the same id one day later —
+and Booking only reconciles its own log on ITS OWN page load. A staff
+member opening this tool first, on a new day, would otherwise read
+yesterday's reservations as if they named today's classes.
+`readRuntimeReservations(asOfDate)` reads the sibling key
+`pulse-reservations-a-schedule` and drops every row unless it matches —
+still never writing to either key, and still never importing A's code:
+`BOOKING_SCHEDULE_KEY` is a second seam read, the same way
+`BOOKING_LOG_KEY` already was.
+
 ## Which door shows which draft (2026-08-21)
 
 A draft either NAMES an upcoming class ("Kim teaches yoga on Saturday at
@@ -250,7 +262,7 @@ npm run build     # emits the .js the browser runs (gitignored by design)
 `npm run check` is NOT `tsc --noEmit`, whatever a doc tells you. It runs
 `tsc`, which emits, then every gate the `check` script in `package.json`
 names — read them there rather than from a list here, which is how this
-sentence came to omit one — then all three suites headlessly. Verifying a change with
+sentence came to omit one — then every suite `run-suites` finds, headlessly. Verifying a change with
 `--noEmit` compiles nothing, so the suites re-run the PREVIOUS build and
 report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They

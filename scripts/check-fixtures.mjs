@@ -49,6 +49,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTRACT = "app/shared/contract.ts";
 const FIXTURES = "app/shared/fixtures.json";
 
+/* THE RECORDS LIVE IN TWO FILES, AND THIS GATE STILL SEES ONE SET.
+ *
+ * Everything under app/ is served at a public URL — that is the filing law.
+ * So the records that NAME A PERSON moved to data/staff-records.json, which
+ * sits outside app/ where the static handler answers 403 and only an
+ * authenticated staff session can reach them.
+ *
+ * The split is a serving boundary, never a validation boundary. A
+ * reservation still points at a member and a session that now live in
+ * different files, and a gate that checked each file alone would stop
+ * seeing exactly the references most worth checking. Both are read and
+ * merged here before a single check runs. */
+const STAFF_RECORDS = "data/staff-records.json";
+
 /* The union names this gate needs out of contract.ts. Each one must be
  * found; a missing name means the contract was renamed and this gate is
  * checking against a vocabulary that no longer exists. */
@@ -591,20 +605,38 @@ if (!IS_COMMAND) {
   }
 
   let data;
-  try {
-    data = JSON.parse(readFileSync(join(ROOT, FIXTURES), "utf8"));
-  } catch (error) {
-    console.error(`check-fixtures: ${FIXTURES} is not readable JSON — ${error.message}`);
-    process.exit(1);
+  const partOf = new Map();
+  for (const file of [FIXTURES, STAFF_RECORDS]) {
+    try {
+      const part = JSON.parse(readFileSync(join(ROOT, file), "utf8"));
+      partOf.set(file, part);
+      data = data === undefined ? part : { ...data, ...part };
+    } catch (error) {
+      console.error(`check-fixtures: ${file} is not readable JSON — ${error.message}`);
+      process.exit(1);
+    }
   }
 
   const problems = validateFixtures(data, unions);
   const freshness = attendanceFreshness(data);
-  const counts = Object.keys(SHAPE)
-    .map((n) => `${Array.isArray(data[n]) ? data[n].length : 0} ${n}`)
-    .join(", ");
+
+  /* COUNTED PER FILE, NOT OVER THE MERGE. This line used to name
+   * app/shared/fixtures.json and then print the merged counts after it, so
+   * it read as "fixtures.json holds 5 members" — about the one file in
+   * this repo that must never hold a member again. Everything under app/
+   * is served at a URL; that is why the records naming a person moved out.
+   * A gate that describes the arrangement it exists to protect as the
+   * opposite of what it is would send the next person to fix the wrong
+   * file, or reassure them the move never happened. */
+  const countsIn = (file) =>
+    Object.keys(SHAPE)
+      .filter((n) => Array.isArray(partOf.get(file)?.[n]))
+      .map((n) => `${partOf.get(file)[n].length} ${n}`)
+      .join(", ") || "nothing this gate shapes";
   console.log(
-    `check-fixtures: ${FIXTURES} read against ${REQUIRED_UNIONS.length} unions from ${CONTRACT} — ${counts}.`,
+    `check-fixtures: ${FIXTURES} — ${countsIn(FIXTURES)}; ` +
+      `${STAFF_RECORDS} — ${countsIn(STAFF_RECORDS)}; ` +
+      `checked together against ${REQUIRED_UNIONS.length} unions from ${CONTRACT}.`,
   );
 
   /* SAID EVERY RUN, not only when it breaks — the point is that the team

@@ -1,15 +1,25 @@
 -- Pulse Studio — the sign-in schema for the HOSTED version. Postgres (pg).
 --
--- The static build you are reading this from has no server, so its sign-in
--- is a browser-local test session (see ./session.ts) — for testing purposes.
--- When Pulse Studio is sold and hosted, this file is the database the same
--- sign-in talks to. Nothing conceptual changes: the session shape in
--- session.ts and the rows here use THE SAME identifier names, taken from
--- app/shared/contract.ts — member_id, display_name, membership_status,
--- email. Swapping test mode for pg changes where a session comes from, not
--- what a session is.
+-- NOTHING RUNS THIS. It is a design document: no database in this repo has
+-- ever had these tables, and no code opens this file. It moved out of
+-- app/shared/auth/ on 2026-08-23 because everything under app/ is served
+-- at a public URL, and a schema is not something a browser asks for.
 --
--- Run with: psql "$DATABASE_URL" -f app/shared/auth/schema.sql
+-- What IS true today: member sign-in is a browser-local test session
+-- (app/shared/auth/session.ts) with no password, and the STAFF door is
+-- checked by the studio's own server, which holds the passphrase and signs
+-- the cookie (scripts/start-haiku.mjs, docs/the-server.md). This header
+-- used to open "The static build you are reading this from has no server",
+-- which stopped being true the day that server landed.
+--
+-- When Pulse Studio is sold and hosted, this is the database that sign-in
+-- talks to. Nothing conceptual changes: the session shape in session.ts and
+-- the rows here use THE SAME identifier names, taken from
+-- app/shared/contract.ts — member_id, display_name, membership_status,
+-- email. Swapping a test session for pg changes where a session comes
+-- from, not what a session is.
+--
+-- Would run with: psql "$DATABASE_URL" -f docs/hosted-schema.sql
 
 begin;
 

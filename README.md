@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/shared/og-image.svg" alt="Pulse Studio" width="620">
+  <img src="app/shared/readme-banner.svg" alt="Pulse Studio" width="620">
 </p>
 
 # Pulse Studio
@@ -27,9 +27,14 @@ npm run build
 npm run start
 ```
 
-Then open <http://localhost:4173>. That is the whole setup — no database, no
-API keys, no services. `build` is `tsc` and nothing else; `start` is a static
-file server pointed at `app/`.
+Then open <http://localhost:4173>. `build` is `tsc` and nothing else; `start`
+runs the studio's own server, `scripts/start-haiku.mjs` — no database, but it
+is not a static file server either. Without any environment variables set it
+still serves every page and the member-facing site works in full; two things
+stay honestly closed rather than failing open: the member support assistant
+answers that it is unavailable (needs `ANTHROPIC_API_KEY`), and both staff
+surfaces show a closed door (needs `STAFF_PASSPHRASE`). See
+[docs/the-server.md](docs/the-server.md) for both.
 
 Needs Node 20.19 or newer. Below that the compiled modules fail to load with an
 error that blames the wrong thing — `scripts/node-floor.mjs` explains why and
@@ -76,9 +81,11 @@ is [CLAUDE.md](CLAUDE.md).
 npm run check
 ```
 
-`tsc`, then every `check-*.mjs` script in `package.json`, then three browser
-suites run headlessly. Each prints the count it actually reached — read the
-number there, never from prose, including this README.
+`tsc`, then every `check-*.mjs` script in `package.json`, then every browser
+suite `scripts/run-suites.mjs` finds under `app/` — six today, found rather
+than counted so a new one cannot ship unrun. Each prints the count it
+actually reached — read the number there, never from prose, including this
+README, which said "three" for a while after a fourth suite started running.
 
 Each gate holds one law that used to be only written down: where styles live,
 that a new colour pairing meets WCAG AA, that no page shows a builder's name
@@ -116,20 +123,33 @@ policy take staff time one at a time.
 The booking app and the support assistant are member-facing and public. The
 staff dashboard and the re-engagement tool are **staff-only**: they show
 rosters, attendance, and cancellation risk, and `app/sitemap.xml` lists the
-public pages only.
+public pages only. Both staff pages carry
+`<meta name="robots" content="noindex, nofollow">` in their `<head>`, and
+`app/sitemap.xml`/`app/robots.txt` agree with that — but a meta tag only
+asks a well-behaved crawler not to index a page it can still fetch, and was
+never the thing keeping a person out.
 
-Every staff page should carry `<meta name="robots" content="noindex, nofollow">`
-in its own `<head>` — the guaranteed way to stay out of a search index, and it
-only works if the page stays crawlable so the tag can be read. `app/robots.txt`
-blocks the crawl only for a staff page that does not have the tag yet, because
-blocking is the weaker fallback: it stops the content being fetched, but the URL
-can still be listed. Read the comments in that file before changing it.
+**That part is real now, not a request.** Records that name a person —
+members, memberships, reservations, attendance — do not live under `app/`
+at all; they sit in `data/staff-records.json`, outside the folder the site
+publishes. The only route to them is `GET /api/staff/records`, and the
+studio's own server refuses it without a session it signed itself after a
+passphrase. Neither staff page draws anything until the server says yes;
+where there is no server — a static host — the door reports exactly that
+and stays shut. See [docs/the-server.md](docs/the-server.md) for how.
 
-**The site talks to nobody.** Measured 2026-08-23 across every shipped module:
-three network calls exist and all three are same-origin. No analytics, no tag
-manager, no cookies, no Shared Storage, no third-party host — not even a font.
-Both typefaces are self-hosted from this origin. Anything a browser console
-reports beyond that came from an extension, not from here.
+**The site talks to nobody outside itself.** Every `fetch()` in the app is a
+relative, same-origin path — `grep -rn "fetch(" app/` is where to read the
+current list rather than a count in this paragraph, which has already been
+wrong once. No analytics, no tag manager, no Shared Storage, no third-party
+host — not even a font: both typefaces are self-hosted from this origin.
+
+**One cookie exists, and it is not tracking.** Staff sign-in sets
+`__Host-pulse-staff` — first-party, `HttpOnly`, `Secure`, no `Domain`
+attribute possible under that prefix — which is how the studio's server
+knows a request already proved it holds the staff passphrase. Nothing else
+sets a cookie. Anything a browser console reports beyond what is listed here
+came from an extension, not from this site.
 
 ## Where the data comes from
 
@@ -170,14 +190,19 @@ rather than left to be found on the day, and the open asks between developers
 live in [docs/REQUESTFOR-A-B-C.md](docs/REQUESTFOR-A-B-C.md) with an owner and
 one closing action each.
 
-Two things worth knowing before you read further:
+One thing worth knowing before you read further:
 
-- **A member's booking does not reach the dashboard's meters yet.** The
-  dashboard reads the booking log but builds its own studio, so the class ids
-  never match. One config line, in one lane, and it is the honest thing to show.
 - **The support assistant answers nothing on the deployed site.** It posts every
   question to an address a static build does not publish. It works locally with
   a key; the hosted endpoint is its remaining blocker.
+
+This section used to list a second item — a member's booking never reaching
+the dashboard's meters, because the dashboard generated its own studio
+instead of reading the shared one. That is fixed: the dashboard now calls
+the same shared studio function every other product does, watched end to
+end in a browser — a member books, the dashboard's own line reads the
+booking, and that member is on the class roster. It stayed listed here
+until the fix actually landed, not until it was merely diagnosed.
 
 This section claimed the team was still framing the problem and had not started
 building, until 2026-08-22.

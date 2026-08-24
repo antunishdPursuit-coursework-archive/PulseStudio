@@ -16,7 +16,7 @@ import { attendanceCsv, csvField } from "./csv-export.js";
 import { makeStream } from "./random.js";
 import { serializeBundle, parseBundle } from "./serialize.js";
 import { deriveStatusOn, periodProblems } from "./lifecycle.js";
-import { demandFactor } from "./scenarios.js";
+import { demandFactor, planCohorts } from "./scenarios.js";
 import { buildSchedule, roomsPerSlot } from "./schedule.js";
 import { dateOfDayNumber, dateOfTimestamp, dayNumberOf, isStrictDate, isStrictTimestamp, weekdayOf } from "./normalize.js";
 import type { NamePool } from "./identity.js";
@@ -655,6 +655,34 @@ for (const n of [1, 2, 5, 12]) {
   check("a regular's visits concentrate on habit weekdays", top2 * 2 >= days.length, true);
 }
 
+// The check above is a loose statistical heuristic on one member from one
+// seed — it cannot tell a correct habit-weekday count from a shifted one,
+// which is exactly why `npm run mutate` found `w < habitCount` widened to
+// `w <= habitCount` surviving: every member silently gained a 5th habit
+// day. planCohorts() itself had never been called directly by a check.
+{
+  const plans = planCohorts(BASE);
+  const outOfRange = plans.filter((p) => p.preferredWeekdays.length < 2 || p.preferredWeekdays.length > 4);
+  const duplicated = plans.filter((p) => new Set(p.preferredWeekdays).size !== p.preferredWeekdays.length);
+  check("every member's habit weekdays number 2 to 4, never more", outOfRange.length, 0);
+  check("...and never repeat a weekday", duplicated.length, 0);
+}
+
+// A member's join date must fall within the studio's own configured
+// history — a member who "joined" further back than a five-year-old studio
+// has existed is a contradiction the answer key has no way to explain.
+// `npm run mutate` found the sign on the join-date spread's `- 100` could
+// flip to `+ 100` with nothing noticing: the only existing check on
+// joinedOn (the flagship, five years out) uses a threshold loose enough
+// that both the real and the flipped formula satisfy it.
+{
+  const flagshipConfig: SyntheticStudioConfig = { ...BASE, memberCount: 1000, historyDays: 1825, mode: "scale" };
+  const plans = planCohorts(flagshipConfig).filter((p) => p.membershipKind !== "newcomer");
+  const tooOld = plans.filter((p) => p.joinDaysAgo > flagshipConfig.historyDays - 30);
+  check("across 1000 members over 5 years, nobody joined further back than the studio's own history",
+    tooOld.length, 0);
+}
+
 // The gradual decliner's recent gaps are wider than their old ones.
 {
   const fadingId = cohortMemberId(first, "fading");
@@ -1254,6 +1282,7 @@ for (const file of ENGINE_SOURCES) {
     "../components/site-footer.ts",
     "../components/alert.ts",
     "../components/figures.ts",
+    "../components/assistant.ts",
   ]) {
     const source = await (await fetch(file)).text();
     check(`${file} was actually read`, source.length > 200, true);
@@ -1300,6 +1329,103 @@ for (const file of ENGINE_SOURCES) {
     boot.includes('from "./storage.js"'), true);
   check("...and opens none of its own",
     /localStorage\.(getItem|setItem|removeItem)/.test(boot), false);
+
+  check("theme-boot mounts the assistant launcher", boot.includes("mountAssistant()"), true);
+  const assistantSource = await (await fetch("../components/assistant.ts")).text();
+  check("the assistant was actually read", assistantSource.length > 200, true);
+  /* NAMES NO HOST — and does not name one to check for it either. This
+   * used to be a list of candidate providers spelled out in a regex, in a
+   * file that ships to a public URL, which published the shortlist it was
+   * trying to keep out of the source. The generic form is both quieter and
+   * stricter: the assistant must carry NO absolute URL at all. It talks to
+   * its own origin through relative paths, so any scheme-and-host literal
+   * in there is a provider hardcoded into a file that should outlive the
+   * choice of provider. */
+  check("it names no host at all in its own source",
+    /https?:\/\/[a-z0-9]/i.test(assistantSource), false);
+  check("it holds no key or credential-shaped literal",
+    /anthropic-version|x-api-key|sk-ant-/i.test(assistantSource), false);
+
+  /* A NAME IS NOT A PERMISSION, AND THE HEADER MUST NOT CONFUSE THE TWO.
+   *
+   * The top bar used to print "staff · front desk" straight from the
+   * browser's remembered session — a localStorage value anybody can write.
+   * Once the staff surfaces grew a real door, the two disagreed on one
+   * screen: the header claimed staff while the page below it asked the
+   * person to sign in. The tag is now drawn only after the SERVER confirms
+   * a session it signed itself.
+   *
+   * These read the shipped source rather than the behaviour because the
+   * failure they guard is a shape: somebody simplifying the async answer
+   * back into a synchronous one from the local session. That reads like a
+   * tidy-up and is a privilege claim. */
+  const topbarSource = await (await fetch("../components/topbar.ts")).text();
+  check("the top bar was actually read", topbarSource.length > 200, true);
+  /* The IMPORT, not the name. An earlier version of this check looked for
+     the string "readStaffGate" and was satisfied by the comment above it
+     explaining what it does — a check a comment can pass is not a check.
+     An import is a structural dependency prose cannot fake. */
+  check("it imports the door from shared rather than deciding for itself",
+    topbarSource.includes('from "../auth/staff-gate.js"'), true);
+  check("...and the staff tag is only appended inside that answer",
+    /readStaffGate\(\)[\s\S]{0,400}pulse-session-role/.test(topbarSource), true);
+  check("signing out ends the server session, not just the remembered name",
+    topbarSource.includes("signOutStaff") && topbarSource.includes("clearPulseSession"), true);
+
+  /* A THUMB IS NOT A POINTER. Seventeen controls measured under 44px on a
+     375px viewport, eleven of them the footer's navigation links at fifteen
+     pixels tall — invisible on a desktop, unusable on the phone a member
+     actually carries. The rule is keyed on `pointer: coarse` rather than a
+     width, because what changed is the input, not the screen. */
+  const themeSource = await (await fetch("../theme.css")).text();
+  check("the theme was actually read", themeSource.length > 200, true);
+  check("touch pointers get a 44px minimum",
+    /@media\s*\(pointer:\s*coarse\)/.test(themeSource), true);
+  check("...and it covers the footer links that were fifteen pixels tall",
+    /@media\s*\(pointer:\s*coarse\)[\s\S]{0,400}\.site-footer li a/.test(themeSource), true);
+  check("...with a real minimum, not just a comment about one",
+    /@media\s*\(pointer:\s*coarse\)[\s\S]{0,600}min-height:\s*44px/.test(themeSource), true);
+
+  /* A RECURRING CLASS OF BUG, PINNED BY THE TWO CASES THAT ALREADY
+   * HAPPENED. `hidden` is a UA-stylesheet `display: none` at the lowest
+   * possible specificity; a plain class rule setting `display:` on the
+   * same element wins by source order regardless, so the element is
+   * marked hidden and still drawn. It happened first to `.home-product`
+   * (the folded staff cards rendered at 941px anyway) and again, in the
+   * SAME session, to `.assistant-panel` (the chat panel rendered open on
+   * every page load) — proof that "I'll remember this time" does not
+   * survive contact with a second component. Every class here that
+   * toggles via `.hidden = ` in a shared module needs its override; this
+   * pins the two found so far rather than trusting the next one to be
+   * caught by eye. */
+  const homeCss = await (await fetch("../home.css")).text();
+  check("home.css was actually read", homeCss.length > 200, true);
+  check("the folded staff card override still exists",
+    homeCss.includes(".home .home-product[hidden] { display: none; }"), true);
+  check("the assistant panel's override still exists",
+    themeCss.includes(".assistant-panel[hidden] { display: none; }"), true);
+
+  /* THE ASSISTANT'S DIRECTIONS HAVE TO POINT AT REAL PAGES. The system
+   * prompt tells the model that booking happens on this site rather than
+   * at the front desk — a wayfinding claim, and the kind of sentence that
+   * rots silently when a route moves. It said the opposite until somebody
+   * asked "where do I book?" on a page with a Book a class button on it.
+   * These read the shipped server prompt and hold it to routes this
+   * repository actually publishes. */
+  const serverSource = await (await fetch("../../../scripts/start-haiku.mjs")).text();
+  /* Fetched, not assumed: the booking page the prompt points a member at
+   * has to be a page this site actually serves. A 404 here means the
+   * assistant is giving directions to a room that is not there. */
+  const bookingPageExists = (await fetch("../../products/a-booking/index.html")).ok;
+  check("the assistant service was actually read", serverSource.length > 500, true);
+  check("it tells the model booking happens on this site",
+    /booking page/i.test(serverSource) && /do NOT send somebody to the front desk/i.test(serverSource), true);
+  check("...and the booking page it names is one this site publishes",
+    bookingPageExists, true);
+  /* The other half, so the fix cannot swing too far: money is NOT on this
+   * site, and the front desk must stay the answer for it. */
+  check("...while payment still goes to the front desk",
+    /Payment, prices and membership signup are NOT on this site/i.test(serverSource), true);
 }
 
 /* NOTHING IS ATTENDED ON THE AS-OF DATE, AND TWO PRODUCTS DEPEND ON IT.

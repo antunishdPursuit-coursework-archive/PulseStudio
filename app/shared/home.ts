@@ -68,7 +68,30 @@ function applyView(session: PulseSession | null): void {
     staffNote.textContent =
       session !== null && session.actor_type === "staff"
         ? `Signed in as ${session.display_name} — these are your tools.`
-        : "Staff only — sign in as Front Desk from the top bar.";
+        : session !== null
+          ? "The studio team's tools. Staff sign in as Front Desk from the top bar."
+          : "Staff only — sign in as Front Desk from the top bar.";
+  }
+
+  /* ONE DOOR INTO THE STAFF ROOM, NOT THREE. A signed-in member could reach
+   * the staff dashboard from the front door's product card, from the
+   * footer, AND from the sign-in landing — three doors into a room that is
+   * not theirs, on a page that had just greeted them by name. Every route
+   * stays reachable by URL, because the audience law says a session is
+   * convenience and never access control, and the privacy page says so to
+   * the person's face. What changes is what a member is SHOWN: the two
+   * staff cards fold into the one named heading, which still links. A
+   * staff person sees them open, as before. Nobody signed in sees them
+   * open too — the front door leads with members, but a visitor has not
+   * told the page who they are, and hiding the studio's own tools from an
+   * unknown reader would be the wrong guess. */
+  const staffSection = document.getElementById("staff");
+  if (staffSection !== null) {
+    const foldForMember = session !== null && session.actor_type === "member";
+    for (const card of document.querySelectorAll<HTMLElement>("#schedule, #reengagement")) {
+      card.hidden = foldForMember;
+    }
+    staffSection.dataset["folded"] = foldForMember ? "true" : "false";
   }
 }
 

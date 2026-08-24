@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /* Pulse Studio — run every browser unit suite headlessly, in Node.
  *
- * WHY THIS EXISTS. The three suites (synthetic, auth, re-engagement) are
- * written to run in a browser tab: each has a tests.html that loads its
+ * WHY THIS EXISTS. Every suite in this repo is written to run in a browser
+ * tab: each has a tests.html that loads its
  * tests.js and paints the results into the page. That is a good way for a
  * human to read them and a useless way for CI to check them — a suite that
  * only runs when somebody remembers to open a tab is a suite that can go red
@@ -29,6 +29,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { nodeTooOldNote } from "./node-floor.mjs";
+import { discoverSuites } from "./suites.mjs";
 
 // Repo-relative, like scripts/check-styles.mjs — never an absolute path from
 // somebody's home directory. A script a teammate cannot run is not tooling.
@@ -38,11 +39,19 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // from a suite can never be mistaken for the result payload.
 const RESULT_MARKER = "___RUN_SUITES_RESULT___";
 
-const SUITES = [
-  { key: "synthetic", dir: "app/shared/synthetic", label: "synthetic studio engine" },
-  { key: "auth", dir: "app/shared/auth", label: "session contract" },
-  { key: "reengagement", dir: "app/products/d-reengagement", label: "member re-engagement" },
-];
+/* WHICH SUITES RUN, and why this is a search rather than a list.
+ *
+ * This was a hand-written array of three. Three more suites were then
+ * written and committed — booking, the dashboard, the chatbot — and run by
+ * nothing at all, because the array did not know they existed. `npm run
+ * check` reported a confident green over checks that never executed, which
+ * is the exact failure the stub DOM below refuses to commit lower down.
+ *
+ * So the suites are FOUND, not remembered, and the search lives in
+ * `scripts/suites.mjs` rather than here — because `mutate-suite.mjs` also
+ * needs to know which suites exist, and the second copy of that knowledge
+ * is what went stale last time. Read that file before changing this one. */
+const SUITES = discoverSuites(ROOT);
 
 /* The stub DOM.
  *

@@ -19,7 +19,9 @@ import {
   type PulseSession,
 } from "./session.js";
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
-import { sharedStudioMembers } from "./studio.js";
+import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
+import { doorMessage } from "./staff-gate.js";
+import { escapeHtml } from "../html.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 import {
   PROBE_KEY,
@@ -32,11 +34,19 @@ import {
 import { FOOTER_GROUPS, SETTINGS_HREF, isCurrentPage, siteFooter } from "../components/site-footer.js";
 import { STUDIO_CONTACT, addressLine, dialable } from "../brand.js";
 import { cyclingFigure, liftingFigure, mountFigures, runningFigure } from "../components/figures.js";
+import { renderStudioBrand } from "../components/brand-header.js";
+import { mountSessionControl } from "../components/topbar.js";
+import { assistantFor, bookForMember, bookingIntent, openingLine, resolveSessions } from "../components/assistant.js";
+import { generateStudio } from "../synthetic/generate.js";
+import { DEFAULT_CONFIG } from "../synthetic/config.js";
+import type { Reservation } from "../contract.js";
+import type { SyntheticDataset } from "../synthetic/contracts.js";
 import {
   ALERT_LEVELS,
   ALERT_REGION_ID,
   alertElement,
   dismissAlert,
+  ensureAlertRegion,
   openAlerts,
   showAlert,
 } from "../components/alert.js";
@@ -444,6 +454,48 @@ check("signInAsFrontDesk writes exactly the staff record", () => {
   return eq(readPulseSession(), FRONT_DESK);
 });
 
+/* ---------- the shared studio, topped up for the dashboard ---------- */
+
+check("sharedStudioWithFill returns a real dataset on the FIRST call", () => {
+  /* THE ONE THING THIS FUNCTION MUST NEVER DO. Its cache check reads
+   * `existing !== undefined` before it has ever been called with this
+   * fill target — a distinct value proves the cache was empty rather
+   * than reusing whatever an earlier check in this file populated it
+   * with. Nothing here checked this until `npm run mutate` found it: the
+   * comparison flipped to `===` and no check noticed, which means the
+   * planted bug — returning `undefined` in place of a dataset on a cold
+   * cache — could have shipped silently. */
+  const dataset = sharedStudioWithFill(0.41);
+  return typeof dataset === "object" && dataset !== null && Array.isArray(dataset.classSessions)
+    ? true
+    : "expected a dataset, got " + JSON.stringify(dataset);
+});
+
+check("...and the same fill target is cached, not regenerated", () => {
+  const first = sharedStudioWithFill(0.41);
+  const second = sharedStudioWithFill(0.41);
+  return first === second ? true : "expected the identical cached object back";
+});
+
+check("...while a different fill target gets its own dataset", () => {
+  const a = sharedStudioWithFill(0.2);
+  const b = sharedStudioWithFill(0.6);
+  return a !== b ? true : "two different fill targets should not share one cache entry";
+});
+
+check("...and every upcoming class matches the schedule a plain sharedStudio() gives", () => {
+  /* THE KNOB SEATS MEMBERS; IT DOES NOT TOUCH THE SCHEDULE. Measured
+   * 2026-08-23: generating with and without upcomingFillTarget produced
+   * 1,900 of 1,900 sessions identical in id, start time, class type and
+   * status. This is that measurement, held as a check rather than left
+   * as a one-time note — the property Product B's hand-off with Product
+   * A now depends on. */
+  const plain = sharedStudio();
+  const filled = sharedStudioWithFill(0.85);
+  const key = (d: typeof plain) => d.classSessions.map((s) => `${s.id}|${s.startsAt}|${s.classTypeId}|${s.status}`);
+  return eq(key(filled), key(plain));
+});
+
 /* ---------- storage that is broken or missing ---------- */
 
 const throwingStorage = {
@@ -547,6 +599,105 @@ check("clearing with a throwing storage still signs the page out", () => {
   const got = readPulseSession();
   setStorageForChecks(null);
   return eq(got, null);
+});
+
+/* ---------- where the session chip lands in the header ---------- *
+ *
+ * mountSessionControl() had no check at all. Its own comment records why
+ * that matters: the selector it inserts before CHANGED on 2026-08-23 (the
+ * settings drawer that used to sit in the header became its own page),
+ * and the old selector would have matched nothing — nothing would have
+ * thrown, the control would just have appended after the appearance
+ * switch instead of before it, silently, on every page. That EXACT case —
+ * a host that already has the switch present — cannot be checked here:
+ * the branch calls `insertBefore`, which this stub does not implement,
+ * the same limit `cloneNode` put on brand-header.ts's checks. What is
+ * still reachable is the branch with no switch on the page (appendChild,
+ * which the stub does support), plus the sign-in/signed-in content
+ * `render()` settles synchronously — `readStaffGate()` for the staff tag
+ * is fired and never awaited, so it cannot be part of what a check()
+ * harness with no async support holds to a known answer here. */
+check("with no appearance switch on the page, the chip is simply appended", () => {
+  const host = document.createElement("div");
+  fresh();
+  mountSessionControl(host);
+  return eq([...host.children].map((c) => c.id), ["pulse-session-control"]);
+});
+check("signed out, the chip is a Sign in button", () => {
+  const host = document.createElement("div");
+  fresh();
+  mountSessionControl(host);
+  const btn = host.querySelector(".pulse-session-signin");
+  return eq([btn !== null, btn?.textContent], [true, "Sign in"]);
+});
+check("signed in, the chip names the member instead", () => {
+  const host = document.createElement("div");
+  fresh();
+  writePulseSession({ version: 1, actor_type: "member", member_id: members[0]?.id ?? "", display_name: "Ada" });
+  mountSessionControl(host);
+  const who = host.querySelector(".pulse-session-who");
+  return eq([host.querySelector(".pulse-session-signin"), who?.textContent], [null, "Ada"]);
+});
+
+/* ---------- escaping text before it goes into innerHTML ---------- *
+ *
+ * escapeHtml() lived twice, byte-identical, in Product A's and Product B's
+ * entry modules — each an untestable page-load file, so neither copy had
+ * ever run against a hostile string. Moved here the same way storage.ts
+ * and today.ts were: one implementation, checked once. */
+
+check("the five HTML-significant characters all escape", () =>
+  eq(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#039;"));
+check("ordinary text passes through untouched", () =>
+  eq(escapeHtml("Yoga · Room 2 (all levels)"), "Yoga · Room 2 (all levels)"));
+check("an ampersand is escaped FIRST, so its own entity is not re-escaped", () =>
+  eq(escapeHtml("Tom & Jerry"), "Tom &amp; Jerry"));
+check("a script tag typed into a name field cannot close and reopen a real tag", () =>
+  eq(escapeHtml('<script>alert(1)</script>'), "&lt;script&gt;alert(1)&lt;/script&gt;"));
+check("a quote cannot break out of a double-quoted HTML attribute", () =>
+  eq(escapeHtml('room" onmouseover="steal()'), "room&quot; onmouseover=&quot;steal()"));
+check("an empty string escapes to itself", () => eq(escapeHtml(""), ""));
+
+/* ---------- the staff door's one pure function ---------- *
+ *
+ * doorMessage() had NO check on it at all until `npm run mutate` reached
+ * this module for the first time and scored it 0% — every mutation
+ * survived, because nothing here called it. The rest of staff-gate.ts asks
+ * a real server (readStaffGate, signInStaff, signOutStaff,
+ * loadStaffRecords), which this synchronous check() harness cannot stub;
+ * that is verified by hand against a throwaway server instead, the same
+ * way the rest of the staff door was proven this branch. doorMessage has
+ * no such excuse — it is a plain function from a StaffGate value to a
+ * sentence, and it is the ONE thing standing between "the server is down"
+ * and "no passphrase is set" and "sign in" ever reading the same to a
+ * visitor. */
+
+check("no server answered: the door says so, not 'no passphrase'", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  return said.includes("No server answered") ? true : `unexpected: ${said}`;
+});
+check("a server answered but no passphrase is set: says THAT, not 'no server'", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: true });
+  return said.includes("no staff passphrase set") && !said.includes("No server answered")
+    ? true : `unexpected: ${said}`;
+});
+check("configured and not signed in: asks for the passphrase", () => {
+  const said = doorMessage({ configured: true, signedIn: false, reachable: true });
+  return said.includes("Sign in with the studio's staff passphrase") ? true : `unexpected: ${said}`;
+});
+check("configured and ALREADY signed in reads the same as not signed in", () => {
+  /* mountStaffDoor never calls doorMessage once gate.signedIn is true — it
+   * returns before building the panel — so this is what the function
+   * itself does with that combination, not a claim about what the page
+   * shows. Pinned so `signedIn` staying out of the branching is a decision,
+   * not an oversight the next edit trips over. */
+  const asked = doorMessage({ configured: true, signedIn: false, reachable: true });
+  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true });
+  return eq(asked, alsoSignedIn);
+});
+check("unreachable outranks unconfigured — both true says the door is down", () => {
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
 /* ---------- run ---------- */
@@ -663,6 +814,20 @@ check("the greeting uses a first name only when there is one", () =>
   eq(audiencePolicy("member", "member-facing", "Ada").greeting.startsWith("Hi Ada"), true));
 check("...and assumes nothing about an unsigned reader", () =>
   eq(audiencePolicy(null, "member-facing").greeting.includes("Hi "), false));
+check("...and an empty name is treated the same as no name", () =>
+  eq(audiencePolicy("member", "member-facing", "").greeting.includes("Hi "), false));
+/* THE STAFF GREETING HAD NO CHECK ON IT AT ALL — every check above this
+ * line reads a member policy's greeting; the one staff-policy check
+ * above stops at mayUseStaffRecords/mayNameOtherMembers. `npm run mutate`
+ * found the gap once these modules became reachable: the whole
+ * `firstName === null || firstName === ""` condition in the staff branch
+ * could be broken and nothing here would notice. */
+check("a staff greeting with no name asks plainly, uncredited", () =>
+  eq(audiencePolicy("staff", "staff-facing").greeting, "Ask about the schedule, capacity, attendance, or policies."));
+check("...and a named staff person is greeted by it", () =>
+  eq(audiencePolicy("staff", "staff-facing", "Sam").greeting.startsWith("Sam — "), true));
+check("...with an empty name treated the same as no name, same as members", () =>
+  eq(audiencePolicy("staff", "staff-facing", "").greeting.startsWith("Sam"), false));
 /* A refusal states what it checked rather than shrugging. */
 check("a refusal says where the answer would have come from", () =>
   eq(audiencePolicy("member", "member-facing").refusal.includes("studio's records"), true));
@@ -896,6 +1061,17 @@ check("the footer's studio word comes from brand.ts, not from a string here", ()
    * that renamed the studio, which is the whole point of the seam. */
   return eq(word === word.toUpperCase() && word.length > 0, true);
 });
+check("...and the word carries BOTH the lead and the accent, not just the lead", () => {
+  /* The check above reads the whole textContent, which stays uppercase and
+   * non-empty even if the accent span is never appended — a studio name's
+   * second word could go missing from the footer with nothing here to
+   * notice. Read the nested span on its own, the same way the header's
+   * equivalent check does, so the two halves cannot silently collapse into
+   * one. */
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
+  const word = f.querySelector(".brand-word");
+  return eq([word?.textContent, word?.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+});
 
 check("the footer carries the mark, and only one of it", () => {
   const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
@@ -982,6 +1158,58 @@ check("...and an already-international number is not given a second one", () =>
 check("the address renders in the order an envelope wants it", () =>
   eq(addressLine(), "50 Upper Montclair Plaza, Montclair, NJ 07043"));
 
+/* THE CLONE SEAM ITSELF HAD NO CHECK ON IT. renderStudioBrand() is what
+ * check-brand.mjs's whole premise depends on — "every header follows
+ * shared/brand.ts" is a promise about this function's behavior, and
+ * nothing here had ever run it. It reads a DOM root as a parameter
+ * rather than the live document, which is exactly what makes it testable
+ * without the module-load side effects theme-boot.ts has. */
+check("the brand word fills as lead + accent, split on the first space", () => {
+  const root = document.createElement("div");
+  const word = document.createElement("span");
+  word.className = "brand-word";
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  home.append(word);
+  root.append(home);
+  renderStudioBrand(root);
+  return eq([word.textContent, word.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+});
+check("the home link gets a real aria-label naming the studio, not a leftover placeholder", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  root.append(home);
+  renderStudioBrand(root);
+  return eq(home.getAttribute("aria-label"), "Return to Pulse Studio home");
+});
+check("the home link gets exactly one mark, even mounted twice", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  root.append(home);
+  renderStudioBrand(root);
+  renderStudioBrand(root);
+  return eq(home.querySelectorAll("svg").length, 1);
+});
+check("a page that already drew its own mark inline is left alone, not doubled", () => {
+  const root = document.createElement("div");
+  const home = document.createElement("a");
+  home.className = "home-brand";
+  home.innerHTML = "<svg><path/></svg>";
+  root.append(home);
+  renderStudioBrand(root);
+  return eq(home.querySelectorAll("svg").length, 1);
+});
+check("any element asking for the plain name gets it, unsplit", () => {
+  const root = document.createElement("div");
+  const label = document.createElement("span");
+  label.dataset["studioName"] = "";
+  root.append(label);
+  renderStudioBrand(root);
+  return eq(label.textContent, "Pulse Studio");
+});
+
 /* The legal pages are linked from every page's footer, and a footer link to
  * a page that does not exist is worse than no link at all. */
 check("the footer links terms and privacy, resolved from the site root", () => {
@@ -993,6 +1221,56 @@ check("the footer links terms and privacy, resolved from the site root", () => {
     "https://studio.example/base/shared/terms.html",
     "https://studio.example/base/shared/privacy.html",
   ]);
+});
+
+/* ONE DOOR INTO THE STAFF ROOM. A signed-in member used to be shown the
+ * dashboard three ways — front-door card, footer list, sign-in landing —
+ * on a page that had just greeted them by name. The law keeps every route
+ * reachable, so nothing may DISAPPEAR: for a member the staff group folds
+ * to one link that is the heading itself. Staff and the signed-out see the
+ * group whole. These pin the fold, the reachability, and the asymmetry. */
+check("a signed-out reader sees the staff group whole", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", null);
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  return eq(staff?.querySelectorAll("ul a").length, 2);
+});
+
+check("a staff reader sees it whole too", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "staff");
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  return eq([staff?.querySelectorAll("ul a").length, staff?.dataset["folded"] ?? "false"].join("|"), "2|false");
+});
+
+check("a member sees the staff group folded to one door", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
+    (g) => g.getAttribute("aria-label") === "For staff",
+  );
+  const door = staff?.querySelector(".site-footer-heading a") as HTMLAnchorElement | null;
+  return eq(
+    [staff?.dataset["folded"], staff?.querySelectorAll("ul").length, door?.textContent, door?.href].join("|"),
+    "true|0|For staff|https://studio.example/base/products/b-dashboard/",
+  );
+});
+
+/* THE ROUTE IS STILL THERE. Folding is not hiding: the dashboard href a
+ * member is shown is the same one staff are shown, and it resolves. */
+check("...and the door still reaches the dashboard, not a dead end", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const hrefs = [...f.querySelectorAll("a")].map((a) => (a as HTMLAnchorElement).href);
+  return eq(hrefs.includes("https://studio.example/base/products/b-dashboard/"), true);
+});
+
+check("only the staff group folds; the member's own links never do", () => {
+  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
+  const folded = [...f.querySelectorAll<HTMLElement>(".site-footer-group")]
+    .filter((g) => g.dataset["folded"] === "true")
+    .map((g) => g.getAttribute("aria-label"));
+  return eq(folded, ["For staff"]);
 });
 
 /* ------------------------------------------------------------------ */
@@ -1098,6 +1376,288 @@ check("the runner gets a lane to cross, and only one", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* The assistant launcher                                               */
+/* ------------------------------------------------------------------ */
+
+/* THE AUDIENCE ASYMMETRY, checked the same way assistant-audience.ts is
+ * checked above: placement can only NARROW what an actor is shown, never
+ * widen it. A staff person on a member-facing page is still shown the
+ * visitor/member assistant — the screen may be turned toward a member. */
+check("nobody signed in is a visitor on a member-facing page", () =>
+  eq(assistantFor(null, "member-facing"), "visitor"));
+check("a signed-in member is the booking assistant", () =>
+  eq(assistantFor("member", "member-facing"), "member"));
+check("staff AND a staff-facing page is the staff assistant", () =>
+  eq(assistantFor("staff", "staff-facing"), "staff"));
+check("a staff person on a member-facing page never becomes the staff assistant", () =>
+  eq(assistantFor("staff", "member-facing"), "visitor"));
+check("a member on a staff-facing page never becomes the staff assistant either", () =>
+  eq(assistantFor("member", "staff-facing"), "visitor"));
+check("every opening line names what that assistant may actually do", () => {
+  const lines = [openingLine("visitor", null), openingLine("member", "Ada"), openingLine("staff", null)];
+  if (lines.some((l) => l.trim() === "")) return "an assistant opened with nothing to say";
+  if (!(lines[2] ?? "").toLowerCase().includes("capacity")) return "the staff line does not mention capacity";
+  if (!(lines[1] ?? "").includes("book")) return "the member line never mentions booking";
+  return true;
+});
+/* THE MEMBER LINE AND THE VISITOR LINE BOTH SAY "book", and the check
+ * above never noticed that "member" could fall through to the VISITOR
+ * line and still pass it — `npm run mutate` found `kind === "member"` can
+ * flip to `!==` with nothing objecting. The visitor line's own "Sign in
+ * to book" carries the substring the old check went looking for. What
+ * actually tells the two apart is that a signed-in member is never asked
+ * to sign in, and is greeted by name when one is given. */
+check("a member is never told to sign in — they already are", () =>
+  eq(openingLine("member", "Ada").toLowerCase().includes("sign in"), false));
+check("...and is greeted by their own first name", () =>
+  eq(openingLine("member", "Ada").startsWith("Ada,"), true));
+check("a visitor with no name IS told to sign in", () =>
+  eq(openingLine("visitor", null).toLowerCase().includes("sign in"), true));
+
+/* BOOKING, AGAINST A REAL GENERATED STUDIO — not a hand-built fixture, so
+ * a fill-count off by one shows up here the way it would on the live page.
+ * upcomingFillTarget guarantees a mix of open and full classes. */
+const assistantStudio = generateStudio({
+  ...DEFAULT_CONFIG,
+  seed: "assistant-launcher-checks",
+  asOfDate: "2026-08-19",
+  memberCount: 60,
+  upcomingFillTarget: 0.5,
+}).dataset;
+
+/* bookingIntent/bookForMember take a resolved Session — a shape
+ * assistant.ts builds from a dataset via resolveSessions(). What follows
+ * first checks those two functions against hand-built Session values, so
+ * their rule is pinned without needing a dataset at all — then checks
+ * resolveSessions() itself, against the real generated studio below. */
+function assistantSession(overrides: {
+  id?: string; classType?: string; startsAt?: string; capacity?: number; bookedCount?: number;
+  status?: "scheduled" | "completed" | "canceled";
+} = {}) {
+  const id = overrides.id ?? "class-session:900001";
+  const classType = overrides.classType ?? "Yoga";
+  const startsAt = overrides.startsAt ?? `${assistantStudio.meta.asOfDate}T09:00:00`;
+  const capacity = overrides.capacity ?? 10;
+  const status = overrides.status ?? "scheduled";
+  return {
+    raw: { id, classTypeId: "x", instructorId: "x", startsAt, durationMinutes: 60, capacity, status },
+    classType,
+    level: "All levels",
+    startsAt,
+    endsAt: startsAt,
+    capacity,
+    bookedCount: overrides.bookedCount ?? 0,
+  };
+}
+
+check('"book yoga tomorrow" finds tomorrow\'s yoga session', () => {
+  const day = Number(assistantStudio.meta.asOfDate.slice(8, 10)) + 1;
+  const tomorrow = `${assistantStudio.meta.asOfDate.slice(0, 8)}${String(day).padStart(2, "0")}`;
+  const s = assistantSession({ startsAt: `${tomorrow}T09:00:00` });
+  const found = bookingIntent("can you book yoga tomorrow", [s], assistantStudio.meta.asOfDate);
+  return eq(found?.raw.id, s.raw.id);
+});
+check("merely mentioning a class is not a booking request", () =>
+  eq(bookingIntent("what levels does yoga have", [assistantSession()], assistantStudio.meta.asOfDate), null));
+check("a class type the studio does not run finds nothing", () =>
+  eq(bookingIntent("book underwater basket weaving today", [assistantSession()], assistantStudio.meta.asOfDate), null));
+check("with no day named, a matching session is still offered", () =>
+  eq(bookingIntent("book me into yoga", [assistantSession()], assistantStudio.meta.asOfDate) !== null, true));
+check("a past session is never offered, even matching by name", () =>
+  eq(bookingIntent("book yoga", [assistantSession({ startsAt: "2020-01-01T09:00:00" })], assistantStudio.meta.asOfDate), null));
+
+const BOOKING_SCHEDULE_KEY = "pulse-reservations-a-schedule";
+const ASSISTANT_TODAY = assistantStudio.meta.asOfDate;
+
+check("booking a class with room succeeds and returns the row", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const result = bookForMember("member:checks-1", assistantSession({ id: "class-session:900002", capacity: 10, bookedCount: 2 }), ASSISTANT_TODAY);
+  const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+  localStorage.removeItem(key);
+  if (!result.ok) return `expected success, got: ${result.why}`;
+  return eq([stored.length, stored[0]?.member_id, stored[0]?.reservation_status], [1, "member:checks-1", "reserved"]);
+});
+check("...and stamps the log with the schedule it was booked against", () => {
+  return eq(localStorage.getItem(BOOKING_SCHEDULE_KEY), ASSISTANT_TODAY);
+});
+
+check("a full class is refused, and nothing is written", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const full = assistantSession({ id: "class-session:900003", capacity: 5, bookedCount: 5 });
+  const result = bookForMember("member:checks-2", full, ASSISTANT_TODAY);
+  const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+  localStorage.removeItem(key);
+  if (result.ok) return "a full class accepted a booking";
+  return eq(stored.length, 0);
+});
+
+/* THE COUNT THAT MATTERS IS THE UNION, NOT JUST THE GENERATOR'S OWN. A
+ * class the generator reports empty (bookedCount 0) can still be full
+ * because Booking's own runtime log already filled it — a check that only
+ * read bookedCount would wrongly accept a second booking here. Seeded
+ * WITH today's stamp: a row from an unstamped or differently-stamped log
+ * is exactly what this function must refuse to trust, so leaving the
+ * stamp off here would test the wrong thing by accident. */
+/* bookedCount IS THE CURRENT COUNT, not a stale display value bookForMember
+ * has to double-check against the raw log. resolveSessions() and
+ * bookForMember() run back-to-back in mountAssistant() with no `await`
+ * between them, so nothing can change the log in between — the log
+ * bookForMember would re-read is the exact one bookedCount was already
+ * computed from. A fixture built here with a real accurate count is what
+ * that guarantee looks like from the caller's side. */
+check("a class already at capacity is refused", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const target = assistantSession({ id: "class-session:900004", capacity: 1, bookedCount: 1 });
+  const result = bookForMember("member:checks-3", target, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  if (result.ok) return "a class already at capacity accepted another booking";
+  return eq(result.ok === false && result.why.includes("full"), true);
+});
+/* THE BUG THIS ARCHITECTURE REPLACED: bookForMember used to ALSO
+ * recompute a runtime count from the raw log and ADD it to
+ * session.bookedCount — which already included a runtime count of its
+ * own. Every real reservation was counted twice. Measured live: a member
+ * who canceled and rebooked one capacity-3 class read as bookedCount 1
+ * (correct — resolveSessions() dedupes by member now), but the OLD
+ * bookForMember added its own recount of 1 on top, made the total 2, and
+ * a second real booker was refused as "full" with two empty seats still
+ * open. Proven end to end here, through the real resolveSessions() path
+ * rather than a hand-built Session, because the bug lived exactly in how
+ * the two functions' counts combined. */
+check("resolveSessions + bookForMember together count a cancel-and-rebook as ONE seat", () => {
+  const sessionId = "class-session:900004c";
+  const miniStudio = {
+    classTypes: [{ id: "ct-mini", name: "Mini", level: "all levels", durationMinutes: 60, capacity: 3 }],
+    classSessions: [{
+      id: sessionId, classTypeId: "ct-mini", instructorId: "i-mini",
+      startsAt: `${ASSISTANT_TODAY}T09:00:00`, durationMinutes: 60, capacity: 3, status: "scheduled" as const,
+    }],
+    bookings: [],
+  } as unknown as SyntheticDataset;
+  const rows: Reservation[] = [
+    { reservation_id: "r1", member_id: "member:A", session_id: sessionId, reservation_status: "reserved", reserved_at: `${ASSISTANT_TODAY}T09:00:00`, canceled_at: null },
+    { reservation_id: "r2", member_id: "member:A", session_id: sessionId, reservation_status: "canceled", reserved_at: `${ASSISTANT_TODAY}T09:00:00`, canceled_at: `${ASSISTANT_TODAY}T09:05:00` },
+    { reservation_id: "r3", member_id: "member:A", session_id: sessionId, reservation_status: "reserved", reserved_at: `${ASSISTANT_TODAY}T09:10:00`, canceled_at: null },
+  ];
+  const resolved = resolveSessions(miniStudio, rows)[0];
+  if (resolved === undefined) return "the mini studio resolved no sessions";
+  const bookedCheck = eq(resolved.bookedCount, 1);
+  if (bookedCheck !== true) return `bookedCount: ${bookedCheck}`;
+  const key = "pulse-reservations-a";
+  localStorage.setItem(key, JSON.stringify(rows));
+  localStorage.setItem(BOOKING_SCHEDULE_KEY, ASSISTANT_TODAY);
+  const result = bookForMember("member:B", resolved, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  if (!result.ok) return `member B should have gotten one of the two open seats, got: ${result.why}`;
+  return true;
+});
+check("...while the SAME seeded row is invisible once the stamp is for another day", () => {
+  /* THE OTHER HALF OF THE PROOF. Booking through the assistant on
+   * 2026-08-24, then opening a-booking/ the same day before anything had
+   * stamped the log, silently deleted the reservation the assistant had
+   * just confirmed to the member as "It is on your classes page." This is
+   * that scenario from the writer's side: a log honestly filled for
+   * someone else must not block a booking once its stamp no longer
+   * matches today. */
+  const key = "pulse-reservations-a";
+  const target = assistantSession({ id: "class-session:900004b", capacity: 1, bookedCount: 0 });
+  localStorage.setItem(key, JSON.stringify([
+    { reservation_id: "res_y", member_id: "member:someone-else", session_id: target.raw.id, reservation_status: "reserved", reserved_at: target.startsAt, canceled_at: null },
+  ]));
+  localStorage.setItem(BOOKING_SCHEDULE_KEY, "2020-01-01");
+  const result = bookForMember("member:checks-3b", target, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  return eq(result.ok, true);
+});
+
+check("booking the same class twice is refused the second time as already-held", () => {
+  const key = "pulse-reservations-a";
+  localStorage.removeItem(key);
+  const target = assistantSession({ id: "class-session:900005", capacity: 10, bookedCount: 0 });
+  const first = bookForMember("member:checks-4", target, ASSISTANT_TODAY);
+  const second = bookForMember("member:checks-4", target, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  if (!first.ok) return "the first booking should have succeeded";
+  return eq([second.ok, second.ok === false && second.why.includes("already")], [false, true]);
+});
+
+check("a cancel makes the spot bookable again — last row wins", () => {
+  const key = "pulse-reservations-a";
+  const target = assistantSession({ id: "class-session:900006", capacity: 1, bookedCount: 0 });
+  const first = bookForMember("member:checks-5", target, ASSISTANT_TODAY);
+  if (!first.ok) return "setup failed: first booking did not succeed";
+  const rows = JSON.parse(localStorage.getItem(key) ?? "[]");
+  rows.push({ ...rows[0], reservation_status: "canceled", canceled_at: target.startsAt });
+  localStorage.setItem(key, JSON.stringify(rows));
+  const second = bookForMember("member:checks-5", target, ASSISTANT_TODAY);
+  localStorage.removeItem(key);
+  return eq(second.ok, true);
+});
+
+check("a browser that refuses to save reports that, not a false success", () => {
+  const throwing = {
+    getItem(): string | null { return null; },
+    setItem(): void { throw new Error("storage refused"); },
+    removeItem(): void { /* nothing was written */ },
+  };
+  setSharedStorageForChecks(throwing);
+  const result = bookForMember("member:checks-6", assistantSession({ id: "class-session:900007" }), ASSISTANT_TODAY);
+  setSharedStorageForChecks(null);
+  if (result.ok) return "reported success while storage refused the write";
+  return eq(result.why.includes("not saving"), true);
+});
+
+/* RESOLVESESSIONS ITSELF, against the real generated studio rather than
+ * hand-built Session values — the one thing the checks above cannot
+ * reach, because they start from an already-resolved Session and never
+ * exercise the filter that BUILDS one from the dataset's own bookings.
+ *
+ * `npm run mutate` found the gap the day this module became reachable:
+ * `b.classSessionId === raw.id` in resolveSessions can flip to `!==` and
+ * every check above stays green, because none of them ever hand it a
+ * dataset with more than one session's worth of bookings to tell the two
+ * readings apart. Inverted, every session's count becomes "everyone NOT
+ * in this class" — the same shape of bug fixed in a-booking/rules.ts this
+ * branch, in a module of its own because shared code may not import a
+ * product's. */
+check("resolveSessions counts only bookings for that exact session", () => {
+  const resolved = resolveSessions(assistantStudio, []);
+  const bySession = new Map<string, number>();
+  for (const b of assistantStudio.bookings) {
+    if (b.status !== "booked") continue;
+    bySession.set(b.classSessionId, (bySession.get(b.classSessionId) ?? 0) + 1);
+  }
+  const mismatch = resolved.find((s) => (bySession.get(s.raw.id) ?? 0) !== s.bookedCount);
+  return mismatch === undefined
+    ? true
+    : `session ${mismatch.raw.id}: expected ${bySession.get(mismatch.raw.id) ?? 0} booked, resolveSessions said ${mismatch.bookedCount}`;
+});
+check("...and at least two sessions in this studio actually have DIFFERENT booked counts", () => {
+  /* A check that passes because every session happens to have the same
+   * count would not have caught the inversion either — this is the
+   * property that makes the check above meaningful rather than lucky. */
+  const resolved = resolveSessions(assistantStudio, []);
+  const counts = new Set(resolved.map((s) => s.bookedCount));
+  return counts.size > 1 ? true : "every session had the same booked count; this fixture proves nothing";
+});
+
+/* THE OUTBOUND GUARD, exercised the way the launcher exercises it — the
+ * same policy object, the same function, so a member policy that stopped
+ * catching a leak would fail here exactly as it would in the panel. */
+check("a member policy still catches a roster leak in an assistant reply", () =>
+  eq(answerProblems("Twelve booked, three no-shows this week.", audiencePolicy("member", "member-facing")).length > 0, true));
+check("...and still catches another member's name", () =>
+  eq(answerProblems("Ask Priya Patel about it.", audiencePolicy("member", "member-facing"), ["Priya Patel"]).length > 0, true));
+check("an ordinary member answer still passes", () =>
+  eq(answerProblems("Yoga is Thursday at 9, and there is a spot.", audiencePolicy("member", "member-facing")), []));
+check("staff on a staff-facing page may hear capacity language", () =>
+  eq(answerProblems("Fill rate is 80% with two at-risk members.", audiencePolicy("staff", "staff-facing")), []));
+
+/* ------------------------------------------------------------------ */
+/* Alerts                                                               *//* ------------------------------------------------------------------ */
 /* Alerts                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -1157,6 +1717,22 @@ check("the open alerts are listed in the order they were raised", () => {
   dismissAlert("check-a");
   dismissAlert("check-b");
   return eq(listed, ["check-a", "check-b"]);
+});
+
+/* This suite's own page has no ".topnav, .page-head, .topbar" anywhere, so
+ * every check above exercised only the fallback — prepended at the top of
+ * the body. Force the OTHER branch: remove the memoized region so the next
+ * call rebuilds it, give the page a header, and check the region lands
+ * right after it rather than before. */
+check("with a page header present, the alert region is placed right after it", () => {
+  document.getElementById(ALERT_REGION_ID)?.remove();
+  const header = document.createElement("div");
+  header.className = "topnav";
+  document.body.append(header);
+  const region = ensureAlertRegion();
+  const siblings = [...document.body.children];
+  header.remove();
+  return eq(siblings.indexOf(region), siblings.indexOf(header) + 1);
 });
 
 check("the region is made once and reused, not once per alert", () => {

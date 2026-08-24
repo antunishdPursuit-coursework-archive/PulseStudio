@@ -1,0 +1,218 @@
+{
+  "note": "Staff-only records. This file sits OUTSIDE app/ on purpose: everything under app/ is served at a public URL, and these records name individual people. The server reads this file and hands it out only to an authenticated staff session \u2014 see /api/staff/records in scripts/start-haiku.mjs. Every person here is fictional, which is why the file can be committed to a public repository at all; real records would never be.",
+  "members": [
+    {
+      "member_id": "mem_001",
+      "display_name": "Maria Santos",
+      "membership_status": "active"
+    },
+    {
+      "member_id": "mem_002",
+      "display_name": "James Okafor",
+      "membership_status": "active"
+    },
+    {
+      "member_id": "mem_003",
+      "display_name": "Priya Patel",
+      "membership_status": "paused"
+    },
+    {
+      "member_id": "mem_004",
+      "display_name": "Leo Kim",
+      "membership_status": "active"
+    },
+    {
+      "member_id": "mem_005",
+      "display_name": "Sofia Reyes",
+      "membership_status": "canceled"
+    }
+  ],
+  "memberships": [
+    {
+      "membership_id": "mship_001",
+      "member_id": "mem_001",
+      "plan_name": "Unlimited Monthly",
+      "status": "active",
+      "started_on": "2026-03-05",
+      "renews_on": "2026-09-05",
+      "canceled_on": null
+    },
+    {
+      "membership_id": "mship_002",
+      "member_id": "mem_002",
+      "plan_name": "8 Classes Monthly",
+      "status": "active",
+      "started_on": "2026-01-19",
+      "renews_on": "2026-09-19",
+      "canceled_on": null
+    },
+    {
+      "membership_id": "mship_003",
+      "member_id": "mem_003",
+      "plan_name": "Unlimited Monthly",
+      "status": "paused",
+      "started_on": "2026-02-05",
+      "renews_on": null,
+      "canceled_on": null
+    },
+    {
+      "membership_id": "mship_004",
+      "member_id": "mem_004",
+      "plan_name": "4 Classes Monthly",
+      "status": "active",
+      "started_on": "2026-08-14",
+      "renews_on": "2026-09-14",
+      "canceled_on": null
+    },
+    {
+      "membership_id": "mship_005",
+      "member_id": "mem_005",
+      "plan_name": "8 Classes Monthly",
+      "status": "canceled",
+      "started_on": "2025-11-05",
+      "renews_on": null,
+      "canceled_on": "2026-07-24"
+    }
+  ],
+  "reservations": [
+    {
+      "reservation_id": "res_001",
+      "member_id": "mem_001",
+      "session_id": "ses_001",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-07-30T12:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_002",
+      "member_id": "mem_005",
+      "session_id": "ses_001",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-07-30T14:30:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_003",
+      "member_id": "mem_001",
+      "session_id": "ses_002",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-01T09:10:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_004",
+      "member_id": "mem_001",
+      "session_id": "ses_003",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-03T20:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_005",
+      "member_id": "mem_002",
+      "session_id": "ses_003",
+      "reservation_status": "canceled",
+      "reserved_at": "2026-08-02T08:00:00-04:00",
+      "canceled_at": "2026-08-04T18:00:00-04:00"
+    },
+    {
+      "reservation_id": "res_006",
+      "member_id": "mem_001",
+      "session_id": "ses_004",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-09T10:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_007",
+      "member_id": "mem_002",
+      "session_id": "ses_004",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-10T09:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_008",
+      "member_id": "mem_002",
+      "session_id": "ses_005",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-17T07:30:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_009",
+      "member_id": "mem_002",
+      "session_id": "ses_006",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-20T19:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_010",
+      "member_id": "mem_004",
+      "session_id": "ses_006",
+      "reservation_status": "reserved",
+      "reserved_at": "2026-08-21T11:00:00-04:00",
+      "canceled_at": null
+    },
+    {
+      "reservation_id": "res_011",
+      "member_id": "mem_004",
+      "session_id": "ses_007",
+      "reservation_status": "waitlisted",
+      "reserved_at": "2026-08-21T11:05:00-04:00",
+      "canceled_at": null
+    }
+  ],
+  "attendance": [
+    {
+      "attendance_id": "att_001",
+      "member_id": "mem_001",
+      "session_id": "ses_001",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-01T10:05:00-04:00"
+    },
+    {
+      "attendance_id": "att_002",
+      "member_id": "mem_005",
+      "session_id": "ses_001",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-01T10:05:00-04:00"
+    },
+    {
+      "attendance_id": "att_003",
+      "member_id": "mem_001",
+      "session_id": "ses_002",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-03T18:50:00-04:00"
+    },
+    {
+      "attendance_id": "att_004",
+      "member_id": "mem_001",
+      "session_id": "ses_003",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-05T10:05:00-04:00"
+    },
+    {
+      "attendance_id": "att_005",
+      "member_id": "mem_001",
+      "session_id": "ses_004",
+      "attendance_status": "no_show",
+      "recorded_at": "2026-08-12T19:00:00-04:00"
+    },
+    {
+      "attendance_id": "att_006",
+      "member_id": "mem_002",
+      "session_id": "ses_004",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-12T19:00:00-04:00"
+    },
+    {
+      "attendance_id": "att_007",
+      "member_id": "mem_002",
+      "session_id": "ses_005",
+      "attendance_status": "attended",
+      "recorded_at": "2026-08-19T10:05:00-04:00"
+    }
+  ]
+}

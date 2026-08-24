@@ -77,8 +77,8 @@
 
   /* one color per developer */
   --kerrian: #3b82f6;  --kerrian-ink: #ffffff;
-  --manny:   #f59e0b;  --manny-ink:   #0a0a0a;
-  --dennis:  #10b981;  --dennis-ink:  #0a0a0a;
+  --manny:   #f59e0b;  --manny-ink:   #ffffff;
+  --dennis:  #10b981;  --dennis-ink:  #ffffff;
   --rensley: #8b5cf6;  --rensley-ink: #ffffff;
 
   /* THE READABLE COMPANION, and why a second token instead of a new hex.
@@ -103,10 +103,13 @@
    * black, and every step that helps one hurts the other. So the dark
    * blocks below move it back up and flip the ink.
    *
-   * Only Product D defines one today. The other three are recorded in
-   * docs/contrast-baseline.json with the owner who can clear them, because
-   * a developer's colour is theirs to change. */
+   * All four define one now, and docs/contrast-baseline.json is empty as a
+   * result — it was never meant to hold anything permanently. Each hue was
+   * darkened for light and left alone for dark, where it already reads. */
   --rensley-strong: #743df5;   /* 5.63:1 on white, white ink 5.63:1 */
+  --kerrian-strong: #0b63f3;   /* 5.13:1 on white, white ink 5.13:1 */
+  --manny-strong:   #996206;   /* 5.12:1 on white, white ink 5.12:1 */
+  --dennis-strong:  #0b7c56;   /* 5.21:1 on white, white ink 5.21:1 */
 
   /* STATUS IS NOT A FIFTH DEVELOPER. The colour law spends colour on
    * PEOPLE — four accents, one per builder, and never a fifth. These two
@@ -145,6 +148,15 @@
     --muted: #a3a3a3;
     --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
     --rensley-ink: #0a0a0a;
+    /* The other three identity hues already read on black (blue 5.71:1,
+       amber 9.78:1, green 8.28:1), so the companion IS the identity here.
+       Only Kerrian's ink has to flip: white on that blue is 3.68:1. */
+    --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+    --kerrian-ink: #0a0a0a;
+    --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+    --manny-ink: #0a0a0a;
+    --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
     --status-bad:  #ff7b72;     /* 8.33:1 on black */
     --status-good: #3fb950;     /* 8.27:1 on black */
   }
@@ -157,6 +169,12 @@
   --muted: #a3a3a3;
   --rensley-strong: #9e77f8;  /* 6.45:1 on black, black ink 6.45:1 */
   --rensley-ink: #0a0a0a;
+  --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+  --kerrian-ink: #0a0a0a;
+  --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+  --manny-ink: #0a0a0a;
+  --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
   --status-bad:  #ff7b72;     /* 8.33:1 on black */
   --status-good: #3fb950;     /* 8.27:1 on black */
 }
@@ -180,6 +198,12 @@
 :root[data-theme="custom"][data-custom-tone="dark"] {
   --rensley-strong: #9e77f8;
   --rensley-ink: #0a0a0a;
+  --kerrian-strong: #3b82f6;  /* 5.71:1 on black, black ink 5.38:1 */
+  --kerrian-ink: #0a0a0a;
+  --manny-strong:  #f59e0b;  /* 9.78:1 on black, black ink 9.22:1 */
+  --manny-ink: #0a0a0a;
+  --dennis-strong: #10b981;  /* 8.28:1 on black, black ink 7.80:1 */
+    --dennis-ink: #0a0a0a;
   --status-bad:  #ff7b72;
   --status-good: #3fb950;
 }
@@ -263,9 +287,9 @@ h1, h2, h3, .display, .page-head .role, .brand {
 }
 
 /* developer scoping — the color law in one class */
-.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); }
-.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink); }
-.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink); }
+.product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); --accent-strong: var(--kerrian-strong); }
+.product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink);   --accent-strong: var(--manny-strong); }
+.product-c { --accent: var(--dennis);  --accent-ink: var(--dennis-ink);  --accent-strong: var(--dennis-strong); }
 .product-d { --accent: var(--rensley); --accent-ink: var(--rensley-ink); --accent-strong: var(--rensley-strong); }
 
 /* shared building blocks — every control a developer ships uses their accent */
@@ -549,6 +573,14 @@ h1, h2, h3, .display, .page-head .role, .brand {
   text-transform: uppercase;
 }
 .site-footer-group ul { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
+/* A folded group: the heading IS the link, styled as the heading it
+   replaces rather than as a list item, so the column keeps its shape. */
+.site-footer-group[data-folded="true"] .site-footer-heading a {
+  color: var(--fg);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
 .site-footer a { color: var(--muted); text-decoration: none; }
 .site-footer a:hover { color: var(--fg); text-decoration: underline; }
 .site-footer a:focus-visible { outline: 3px solid var(--accent, var(--fg)); outline-offset: 3px; }
@@ -605,20 +637,21 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .prose-date { color: var(--muted); font-size: 0.84rem; }
 
 /* ---- the studio floor -------------------------------------------------
-   Three figures in the mark's own line: one lifts, one rides, one runs the
-   length of the band. components/figures.ts draws them; this decides how
-   they move.
+   Four figures in the mark's own line, one per builder's colour: one
+   lifts, one rows, one rides, one runs the length of the band.
+   components/figures.ts draws them; this decides how they move.
 
    THE RESTING POSE IS A WHOLE DRAWING. Everything below the guard is
    motion; everything above it is the picture. With reduced motion the
-   band still shows a person mid-press, a rider on a bike, and a runner in
-   stride — a still, not a broken animation. That is the same promise the
-   pulse mark makes a few rules up.
+   band still shows a person mid-press, mid-pull, a rider on a bike, and a
+   runner in stride — a still, not a broken animation. That is the same
+   promise the pulse mark makes a few rules up.
 
    ONE BEAT FOR THE WHOLE STUDIO. The mark's spark runs every 3.6s; the
-   press and the pedal are multiples of it, so nothing on the page ever
-   quite syncs but nothing fights either. The crossing is deliberately far
-   slower — a runner who crosses in four seconds reads as a bug. */
+   press, the pull and the pedal are multiples of it, so nothing on the
+   page ever quite syncs but nothing fights either. The crossing is
+   deliberately far slower — a runner who crosses in four seconds reads as
+   a bug. */
 .figure { display: block; width: 100%; height: 100%; overflow: visible; }
 .figure line, .figure circle {
   fill: none;
@@ -660,26 +693,34 @@ h1, h2, h3, .display, .page-head .role, .brand {
 .cycle-leg-near .cycle-shin { transform: rotate(-10deg); }
 .cycle-leg-far .cycle-shin { transform: rotate(-66deg); }
 .cycle-foot { transform: rotate(-30deg); }
+/* The rower's resting pose is the catch: knees drawn up, torso forward,
+   arm reaching for the handle — the geometry itself IS that reach, so only
+   the leg and the lean need a rotation here. */
+.row-torso { transform: rotate(8deg); }
+.row-thigh { transform: rotate(58deg); }
+.row-shin { transform: rotate(-58deg); }
+.row-foot { transform: rotate(-14deg); }
 
 /* The band itself. A row on the studio's own ground line, with the runner
-   crossing behind the two who are working in place. */
+   crossing behind the three who are working in place. */
 .studio-floor {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 0 40px;
-  max-width: 760px;
+  max-width: 900px;
   margin: 26px auto 0;
   padding: 0 20px 34px;
   color: var(--muted);
 }
-/* One floor for all three, and every figure's box ends on it: the grid
+/* One floor for all four, and every figure's box ends on it: the grid
    bottom-aligns them, the run lane sits at the same offset, and the rule
    below is drawn at that offset too. Before this the runner stood ten
    pixels under the line and the lifter drew a second floor of its own. */
 .studio-floor [data-figure] { height: 132px; }
 .studio-floor [data-figure="lift"] { color: var(--kerrian); justify-self: end; width: 118px; }
+.studio-floor [data-figure="row"] { color: var(--manny); justify-self: center; width: 132px; }
 .studio-floor [data-figure="cycle"] { color: var(--dennis); justify-self: start; width: 152px; }
 .run-lane {
   position: absolute;
@@ -739,6 +780,35 @@ h1, h2, h3, .display, .page-head .role, .brand {
     100% { transform: rotate(-30deg); }
   }
 
+  /* The rower: catch, drive, finish, recovery — held at the catch a beat
+     longer than the drive takes, the way an actual stroke does, rather
+     than a symmetric back-and-forth. All four parts share one timeline so
+     the pull always finishes exactly as the legs straighten. */
+  .row-torso { animation: row-torso-swing 1.6s ease-in-out infinite; }
+  .row-arms  { animation: row-arms-pull 1.6s ease-in-out infinite; }
+  .row-thigh { animation: row-thigh-drive 1.6s ease-in-out infinite; }
+  .row-shin  { animation: row-shin-drive 1.6s ease-in-out infinite; }
+  @keyframes row-torso-swing {
+    0%, 40% { transform: rotate(8deg); }
+    75%     { transform: rotate(-16deg); }
+    100%    { transform: rotate(8deg); }
+  }
+  @keyframes row-arms-pull {
+    0%, 40% { transform: rotate(0deg); }
+    75%     { transform: rotate(-95deg); }
+    100%    { transform: rotate(0deg); }
+  }
+  @keyframes row-thigh-drive {
+    0%, 40% { transform: rotate(58deg); }
+    75%     { transform: rotate(4deg); }
+    100%    { transform: rotate(-18deg); }
+  }
+  @keyframes row-shin-drive {
+    0%, 40% { transform: rotate(-58deg); }
+    75%     { transform: rotate(-4deg); }
+    100%    { transform: rotate(52deg); }
+  }
+
   /* Opposition is the whole thing: the near arm swings with the FAR leg.
      Same duration, offset by half, on both pairs. */
   .run-leg-near { animation: stride 0.62s ease-in-out infinite; }
@@ -782,5 +852,218 @@ h1, h2, h3, .display, .page-head .role, .brand {
 @media (max-width: 560px) {
   .studio-floor { gap: 0 16px; }
   .studio-floor [data-figure="lift"] { width: 92px; }
+  .studio-floor [data-figure="row"] { width: 100px; }
   .studio-floor [data-figure="cycle"] { width: 118px; }
+}
+
+/* ---- the assistant launcher --------------------------------------------
+   ONE CHATBOX, BOTTOM-RIGHT, ON EVERY PAGE THAT ASKED FOR ONE. The button
+   and panel are built by components/assistant.ts; this is their only look,
+   so a page cannot restyle the one thing every audience shares. It carries
+   NO product accent — the assistant speaks for the studio, not for one
+   product's colour, the same reason shared infrastructure carries none. */
+.assistant-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px 13px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--fg) 22%, transparent);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+/* The mark carries the studio's own beat (guarded, reduced-motion-safe —
+   see the pulse-mark rules above) instead of a generic chat glyph, so the
+   one new fixed element on every page still reads as part of the same
+   system as the header and footer mark rather than a bolted-on widget. */
+.assistant-launcher svg.pulse-mark { width: 18px; height: 18px; flex: none; }
+.assistant-launcher:hover { box-shadow: 0 14px 32px color-mix(in srgb, var(--fg) 28%, transparent); transform: translateY(-1px); }
+.assistant-launcher:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+.assistant-launcher[aria-expanded="true"] { display: none; }
+
+/* `hidden` LOSES TO A CLASS RULE AT EQUAL SPECIFICITY, SOURCE ORDER
+   DECIDES. This is the same bug `.home-product[hidden]` was fixed for a
+   few sections up in this same file — found again, in the very panel that
+   fix should have made this session careful about. `.assistant-panel {
+   display: flex }` matches the element whether or not it carries `hidden`,
+   and being later in the sheet than the UA's `[hidden] { display: none }`,
+   it won: the panel rendered open on every page load until a person
+   clicked anything. Watched in a browser, not assumed from the code. */
+.assistant-panel[hidden] { display: none; }
+
+/* THE STAFF DOOR. Styled once here because both staff surfaces mount the
+   same panel — see app/shared/auth/staff-gate.ts. The accent arrives from
+   the page's product class, so a person still sees whose screen they are
+   standing in front of while they sign in. */
+.staff-door { max-width: 34rem; margin: 8vh auto; padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.staff-door h2 { margin: 0 0 10px; color: var(--accent-strong, var(--accent, var(--fg))); }
+.staff-door-said { margin: 0 0 18px; color: var(--muted); line-height: 1.55; }
+.staff-door-form { display: flex; flex-direction: column; gap: 8px; }
+.staff-door-form label { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.staff-door-form input { padding: 10px 12px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.staff-door-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.staff-door-form button { margin-top: 6px; padding: 10px 16px; font: inherit; font-weight: 600; color: var(--accent-ink); background: var(--accent-strong, var(--accent)); border: 0; border-radius: 6px; cursor: pointer; }
+.staff-door-form button:disabled { cursor: default; opacity: .7; }
+.staff-door-problem { margin: 4px 0 0; color: var(--status-bad, var(--fg)); }
+/* The same trap the assistant panel hit twice: a class rule that sets
+   display beats the UA's [hidden] unless we say so here. */
+.staff-door-problem[hidden] { display: none; }
+
+/* A THUMB IS NOT A MOUSE POINTER.
+ *
+ * Measured on a 375px-wide viewport, this site had SEVENTEEN controls under
+ * the 44px minimum a finger needs — eleven of them the footer's navigation
+ * links, at fifteen pixels tall. On a desktop with a cursor that is fine and
+ * invisible; on the phone most members actually carry, it is a column of
+ * links you cannot reliably hit, right where somebody goes looking for
+ * "Book a class".
+ *
+ * The query is `pointer: coarse`, not a width breakpoint, because the thing
+ * that changed is the INPUT, not the screen. A tablet with a pen and a
+ * narrow desktop window are different problems; a finger is a finger at any
+ * width. Nothing moves visually — the text stays where it was and the box
+ * around it grows to meet the hand. */
+@media (pointer: coarse) {
+  .site-footer li a,
+  .site-footer-base a,
+  .site-footer-brand a,
+  .topnav .brand,
+  .page-head .home-brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .appearance-mode {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* The list gets its rhythm back: the links are taller now, so the gap
+     between them no longer has to carry the separation on its own. */
+  .site-footer li + li { margin-top: 0; }
+}
+.assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(368px, calc(100vw - 40px));
+  max-height: min(560px, calc(100vh - 40px));
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 56px color-mix(in srgb, var(--fg) 22%, transparent);
+  overflow: hidden;
+}
+/* A ONE-SHOT ENTRANCE, not a persistent effect. `display: none` removes an
+   element from the animation timeline entirely, so an animation named on
+   the visible state restarts from 0% every time `hidden` toggles off —
+   the same mechanism `hidden` fighting `display` almost broke a few rules
+   up, used on purpose here instead. Guarded like every other motion on
+   this site: reduced motion gets the panel exactly as it ends, with
+   nothing to sit through. */
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-panel:not([hidden]) {
+    transform-origin: bottom right;
+    animation: assistant-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes assistant-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
+.assistant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.assistant-heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.assistant-heading svg.pulse-mark { width: 16px; height: 16px; flex: none; }
+.assistant-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.assistant-close {
+  background: none;
+  border: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  flex: none;
+}
+.assistant-close:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.assistant-close:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.assistant-log {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.assistant-line { margin: 0; padding: 10px 13px; border-radius: 14px; max-width: 86%; font-size: 0.93rem; line-height: 1.45; }
+.assistant-you { align-self: flex-end; background: var(--fg); color: var(--bg); border-bottom-right-radius: 4px; }
+.assistant-studio {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+
+.assistant-form { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.assistant-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.assistant-input:focus-visible { outline: 3px solid var(--fg); outline-offset: 1px; }
+.assistant-send {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.assistant-send:hover:not(:disabled) { filter: brightness(1.1); }
+.assistant-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.assistant-send:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+.assistant-status { margin: 0; padding: 0 18px 12px; min-height: 1.1em; color: var(--muted); font-size: 0.78rem; }
+
+@media (max-width: 480px) {
+  .assistant-launcher, .assistant-panel { right: 12px; bottom: 12px; }
+  .assistant-panel { width: calc(100vw - 24px); }
 }

@@ -142,6 +142,17 @@ export function parseCsvRowsDetailed(text: string): CsvParse {
       row.push(field);
       field = "";
     } else if (ch === "\n" || ch === "\r") {
+      /* THIS `i += 1` HAS NO TEST THAT CAN CATCH ITS OWN TYPO. Confirmed by
+       * planting the one-character regression a reviewer's eye could
+       * plausibly wave through: `+= 1` to `-= 1`. The for-loop's own
+       * increment then lands back on the SAME `\r`, forever — a genuine
+       * hang, not a wrong answer, reproduced in isolation on
+       * `parseCsv("Member,Date\r\nAda,2026-07-01\r\n")` with nothing else
+       * involved. A hung page cannot report a failing check; it cannot
+       * report anything. `\r\n` is the ordinary line ending for a
+       * Windows-authored or Excel-exported CSV — the common case, not an
+       * edge one — so this line is not a place for a confident refactor
+       * without re-reading this comment first. */
       if (ch === "\r" && text[i + 1] === "\n") i += 1;
       endRow();
       line += 1;

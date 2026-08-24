@@ -194,6 +194,8 @@ function selfTest() {
     { label: "robots.txt is the website", file: "app/robots.txt", want: "web" },
     { label: "a TypeScript source is counted separately", file: "app/shared/data.ts", want: "sources" },
     { label: "a brief filed beside the code is NOT the website", file: "app/products/d-reengagement/CLAUDE.md", want: "other" },
+    /* Filed in docs/ since 2026-08-23; kept here because the CLASSIFICATION
+     * is the thing under test, and this is the shape it has to get right. */
     { label: "a database design document is NOT the website", file: "app/shared/auth/schema.sql", want: "other" },
     { label: "the incident that started this — an internal note under app/", file: "app/products/d-reengagement/SENIOR-DEV-BRIEF.md", want: "other" },
     { label: "a shell script under app/ is NOT the website", file: "app/products/d-reengagement/bundle.sh", want: "other" },

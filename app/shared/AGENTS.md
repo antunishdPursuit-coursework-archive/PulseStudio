@@ -17,9 +17,10 @@ the legacy contract) is what all four products speak.
 | `text.ts` | `counted(n, singular, plural?)` — the one place a number becomes a phrase. Product D writes "1 class in the prior 60 days"; the synthetic page writes "1 finding". A copy in either folder would be two rules to keep true, which is what `color.ts` exists to undo for contrast. Product D reaches it through its own `deps.ts` |
 | `color.ts` | The WCAG arithmetic — luminance, contrast ratio, hex/HSL, and `nearestReadable`. It has no DOM in it ON PURPOSE: `theme-boot.ts` reads `document` at module load, so nothing could import it, and `scripts/check-contrast.mjs` was carrying a second copy of the same formula. Both now import this one, so the gate measures the arithmetic the browser actually runs |
 | `contract.ts` + `data.ts` + `fixtures.json` | The legacy shared vocabulary (typed mirror of root `SHARED_DATA_CONTRACT.md` — if they disagree, STOP and raise it) and `loadFixtures()`, the one legacy loader |
-| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and the future-hosted Postgres schema (`schema.sql` — a design document; nothing runs it) |
+| `auth/` | The v1 `pulse-session` contract (versioned, discriminated member/staff, hostile-input reader, and a browser suite in `auth/tests.html` that states its own count), the shared studio directory (`studio.ts`), and, until 2026-08-23, the future-hosted Postgres schema — now `docs/hosted-schema.sql`, because a design document nothing runs is not something a browser asks for |
 | `brand.ts` | THE clone seam: the studio's name AND its contact details (`STUDIO_CONTACT` — address, email, the call and text numbers), rendered into every header and every footer at runtime. `dialable()` derives the `tel:`/`sms:` form from the readable one so a number is typed once. See `components/README.md` for the rebrand checklist and its two static remainders |
 | `components/` | Pieces every page shows, no page owns: `brand-header.ts` (fills `.home-brand .brand-word` + `[data-studio-name]` from `brand.ts`), `logo.ts` (the pulse mark, callable), `topbar.ts` (the sign-in control), `site-footer.ts` (the ONE footer, on every page), `alert.ts` (Notice · Problem · Done, in a live region made empty at boot), `figures.ts` (the studio floor — a lifter, a rider, and a runner who crosses the page, every joint a nested rotation) — each documented in `components/README.md` |
+| `components/assistant.ts` | The one chat launcher, three audiences (visitor, signed-in member, staff), decided from `<body data-assistant="member-facing\|staff-facing">` plus the session — the same asymmetry `assistant-audience.ts` encodes. A member can book by asking; it writes the exact `Reservation` row the Book button writes, into the same log, after its own capacity check — never trusting the model to book. Every reply goes through the outbound guard before it is shown |
 | `storage.ts` | The four guarded doors onto `localStorage`: `readStored`, `writeStored`, `clearStored`, `storageWorks`. ONE implementation, arrived at the same way `color.ts` and `today.ts` did — `theme-boot.ts` and Product D's `main.ts` each had their own and the two had already drifted (see the storage bullet below). Carries `setStorageForChecks`, so the suite can hand it a store that throws |
 | `synthetic/` | The deterministic studio engine: seeded generation to 2000 members × 5yr, cohort intent with guaranteed D-boundary members (14/15/60/61 quiet days), independent truth answer key, a validator with exact declared/found reconciliation, CSV export in D's import vocabulary, and a browser suite in `synthetic/tests.html` that states its own count |
 | `home.css` | Front-door-only styles, scoped under `body.home` so they cannot leak into a product |
@@ -206,6 +207,17 @@ the legacy contract) is what all four products speak.
   roll) now cover the implementation `auth/` and the synthetic page use,
   which had none of their own.
 
+  **A fourth copy turned up 2026-08-23**, in `c-chatbot/main.ts` —
+  hand-assembled from `formatToParts` exactly like the `auth/studio.ts`
+  copy this paragraph already describes, feeding the date the assistant
+  treats as "now" when deciding which classes are upcoming. It happened
+  to compute the same answer, but nothing checked that it would keep
+  doing so: `main.ts` runs at module load and no suite imports it, the
+  same shape as Product D's old `main.ts` and `synthetic/page.ts`. Now
+  calls `todayIsoInZone` directly. "Three modules" in the sentence above
+  was the count when this bullet was written, not a ceiling — read it as
+  history, not as a guarantee nothing else duplicated the rule since.
+
   A grep in `synthetic/tests.ts` keeps the antipattern from coming back in
   any module allowed to read the clock. It strips comments first, unlike
   the engine audit beside it, and the difference is deliberate: the engine
@@ -219,18 +231,20 @@ the legacy contract) is what all four products speak.
   touching the offset leaves every affected value an hour out on every
   screen that shows it. Checked through `Intl` rather than a table of
   transition dates, since the table is the thing that goes stale.
-- **`loadFixtures()` and `fixtures.json` are reached by no page**, found
-  2026-08-22. The data law names `loadFixtures()` as the one shared
-  loader and that is still the rule — but its only importer is
-  `b-dashboard/main.ts`, and `b-dashboard/index.html` loads
-  `staff-dashboard.js` instead, a hand-written module with no TypeScript
-  source. So nothing the site serves reads the legacy fixture set.
-  `check-fixtures.mjs` still validates it against the contract and still
-  prints its staleness countdown, which is worth keeping — but read that
-  countdown as being about RECORDS aging, not about a screen going stale:
-  no screen shows them. Worth knowing before anyone spends a day rolling
-  those dates forward. Whether the legacy loader has a future is a team
-  question; `check-reachable.mjs` holds the fact so it cannot quietly stop
+- **`loadFixtures()` IS reached, and this bullet said the opposite for a
+  while.** Found 2026-08-22 that its only importer was `b-dashboard/main.ts`,
+  a page nothing loaded — `b-dashboard/index.html` ran `staff-dashboard.js`
+  instead. That importer is deleted now, on this branch: it rendered the
+  whole dashboard, no page loaded it either, and the shared-records split
+  had broken it while it still type-checked.
+  What this bullet did not have yet is that `c-chatbot/main.ts` ALSO
+  imports `loadFixtures()`, and that page IS what `c-chatbot/index.html`
+  loads — a member asking the assistant a schedule question is reading the
+  legacy fixture set right now. `check-fixtures.mjs` validating it and
+  printing a staleness countdown was never merely worth keeping; a member-
+  facing screen depends on it. Whether the legacy loader has a future
+  beyond this one reader is still a team question; `check-reachable.mjs`
+  holds the fact so it cannot quietly stop
   being true.
 - **`components/logo.ts` is called by nothing.** `components/README.md`
   promises the pulse mark as a callable; every header draws its own

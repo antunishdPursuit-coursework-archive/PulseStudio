@@ -23,10 +23,21 @@
    partial opacity so it stays legible with the selected appearance.
 
    TEST MODE, STATED IN THE OPEN: the dialog says it is a test sign-in,
-   for testing purposes, with no password — and where the real password
-   check lives when the site is sold (Postgres, app/shared/auth/schema.sql).
-   Claiming a login is "secure" on a static page would break the truth law;
-   we say what it is instead. */
+   for testing purposes, with no password. Claiming a login is "secure"
+   when nothing checks one would break the truth law; we say what it is
+   instead.
+
+   WHAT THAT SENTENCE USED TO CLAIM, and why it changed. It said "This
+   site is a static build that runs entirely in your browser" and "The
+   hosted version of Pulse Studio checks a real password against its
+   Postgres database instead." The first stopped being true the day
+   `npm start` began running the studio's server. The second was never
+   watched working by anybody — `docs/hosted-schema.sql` describes the
+   shape a sold copy would use, which is not the same as a hosted database
+   that checks a password today, and the present tense said it was. A
+   member reading both would conclude nothing anywhere is checked, at
+   exactly the moment the staff door started being checked by the server.
+   So the copy now names the one refusal this repo can demonstrate. */
 
 import { counted } from "../text.js";
 import type { SyntheticMember } from "../synthetic/contracts.js";
@@ -35,6 +46,7 @@ import {
   readPulseSession,
   subscribeToPulseSession,
 } from "../auth/session.js";
+import { readStaffGate, signOutStaff } from "../auth/staff-gate.js";
 import {
   signInAsFrontDesk,
   signInAsMember,
@@ -75,8 +87,28 @@ export function mountSessionControl(host: Element): void {
 
 /* The control has exactly two states, and both state who you are — a
    stated result, never a mystery: signed out shows "Sign in"; signed in
-   shows the member's display_name (with a
-   staff tag when the login is staff) and a Sign out. */
+   shows the member's display_name and a Sign out.
+
+   WHO IS ALLOWED TO CALL SOMEBODY STAFF, AND WHY IT IS NOT THIS FILE.
+
+   This control used to print "staff · front desk" whenever the BROWSER's
+   remembered session said `actor_type: "staff"`. That session lives in
+   localStorage. Anybody can write it. So the header was asserting an
+   authority it had no way to hold, and once the staff surfaces grew a real
+   door the two disagreed out loud: the header said "staff · front desk ·
+   Sign out" on a page whose own body said "sign in to see this". Two
+   answers to one question on one screen, which is how a person learns to
+   believe neither.
+
+   There is exactly one thing that can answer "is this staff?" now — the
+   server, which holds the passphrase and signs the cookie. So the tag is
+   NOT drawn from the local session at all. It is drawn only after
+   readStaffGate() comes back confirming a session this browser could not
+   have forged, and until then nothing is claimed. Rendering the unproven
+   state first and correcting it later would flash a lie, however briefly.
+
+   The local session keeps its real job: remembering a NAME so member
+   surfaces can greet a person. A name is not a permission. */
 function render(root: HTMLElement): void {
   /* readPulseSession() also handles recovery: a malformed, legacy, or
      stale value reads as null (and is cleaned up), so this render can
@@ -101,19 +133,30 @@ function render(root: HTMLElement): void {
   dot.setAttribute("aria-hidden", "true");
   who.appendChild(dot);
   who.appendChild(document.createTextNode(session.display_name));
+  /* No tag yet, on purpose. If the server confirms a staff session it is
+     appended below, after the answer arrives. */
   if (session.actor_type === "staff") {
-    /* actor type AND role, readable at a glance */
-    const tag = document.createElement("em");
-    tag.className = "pulse-session-role";
-    tag.textContent = "staff · front desk";
-    who.appendChild(tag);
+    void readStaffGate().then((gate) => {
+      if (!gate.signedIn) return;
+      if (!who.isConnected) return; // a re-render happened first
+      const tag = document.createElement("em");
+      tag.className = "pulse-session-role";
+      tag.textContent = "staff · front desk";
+      who.appendChild(tag);
+    });
   }
 
   const out = document.createElement("button");
   out.type = "button";
   out.className = "pulse-session-signout";
   out.textContent = "Sign out";
-  out.addEventListener("click", () => clearPulseSession());
+  /* Sign out means BOTH: the name this browser remembers, and the session
+     the server signed. Clearing one and leaving the other is how a person
+     ends up still holding staff access after they thought they left. */
+  out.addEventListener("click", () => {
+    clearPulseSession();
+    void signOutStaff().then(() => { window.location.reload(); });
+  });
 
   root.appendChild(who);
   root.appendChild(out);
@@ -165,10 +208,10 @@ function buildDialogShell(): HTMLDialogElement {
   const intro = document.createElement("p");
   intro.className = "pulse-session-intro";
   intro.textContent =
-    "Test sign-in, for testing purposes — no password. This site is a " +
-    "static build that runs entirely in your browser, and every member " +
-    "below is fictional. The hosted version of Pulse Studio checks a real " +
-    "password against its Postgres database instead.";
+    "Test sign-in, for testing purposes — no password. Every member below " +
+    "is fictional, and choosing one only decides what this browser shows " +
+    "you. Staff sign-in is not on this list: the studio's server checks it, " +
+    "and it is the only thing here that can refuse.";
 
   const state = document.createElement("p");
   state.className = "pulse-session-state";

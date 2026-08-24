@@ -252,6 +252,17 @@ These cost real time. They are the most valuable part of this brief.
 14. **A metric mistaken for a behaviour.** `scrollWidth` exceeding
     `clientWidth` is not a page that scrolls, and a timing taken at load
     average 92 is not a regression. Both nearly sent a fix at working code.
+15. **A list of suites, written down twice.** `run-suites.mjs` held a
+    hand-written array of three while six suites existed, so three of them
+    ran nowhere and the gate went green over checks that never executed.
+    Teaching it to FIND suites then broke `mutate-suite.mjs`, which kept its
+    own copy of the keys: "reengagement" became "d-reengagement", every
+    mutation survey of Product D died on an unknown suite, and the error it
+    printed blamed a stale build. Both halves now read `scripts/suites.mjs`,
+    which is the only file that knows. The cost of the second copy was not
+    the outage — it was what the tool said while broken, which was
+    confident and wrong in both directions: "no suite covers this module"
+    about modules a suite checks.
 
 ## 8. Known open items — honest state
 
@@ -260,33 +271,50 @@ These cost real time. They are the most valuable part of this brief.
 - **No real studio has used this.** No real member has received a note. The
   product has never been in front of a real user — that is the biggest gap and
   it is human work, not code.
-- **The shared fixtures age, and no page reads them.** `fixtures.json` has
-  fixed 2026 dates, and two active members could be flagged from it — Maria
-  Santos and James Okafor; Priya Patel is paused and Sofia Reyes is canceled,
-  so neither ever flags. What that costs has changed. This product's default
-  door is the running studio, not `loadFixtures()`, and as of 2026-08-22 no
-  page in the repo reaches the legacy fixture at all, so nothing a staff
-  member opens goes empty when it ages. What ages out is the GATE:
-  `scripts/check-fixtures.mjs` fails once the newest attended class is more
-  than 60 days old, and that blocks every deploy until somebody rolls the
-  file forward. Read the countdown there. This paragraph carried the dates in
-  prose instead and was wrong twice — it named the first member to age out
-  rather than the last until 2026-08-21, and then every date in it went stale
-  on 2026-08-22, when the fixture was rolled forward four days. The unit
-  checks are pinned and will not rot. Refreshing the team-owned fixture is
+- **The shared fixtures age, and this bullet has named the wrong file for
+  it since 2026-08-22.** The two active members that can be flagged from a
+  fixed 2026 date — Maria Santos and James Okafor; Priya Patel is paused
+  and Sofia Reyes is canceled, so neither ever flags — live in
+  `data/staff-records.json` now, not `fixtures.json`. Records naming a
+  person moved there that same day, because everything under `app/` is
+  served at a URL. `fixtures.json` kept only what any visitor may read —
+  the timetable, who teaches, the studio's policies — and has no `members`
+  field to carry a date at all.
+
+  This product's default door is the running studio, not `loadFixtures()`.
+  `loadFixtures()` itself is NOT unreached, either, which is the second
+  half of the correction: `c-chatbot/main.ts` calls it for the timetable
+  and policies a member asks the assistant about, so that half of the
+  split file is a live member-facing read. The half that ages —
+  `staff-records.json` — is reached only through `/api/staff/records`,
+  behind the staff gate, which is where the data law puts it.
+
+  What ages out is the GATE: `scripts/check-fixtures.mjs` fails once the
+  newest attended class is more than 60 days old, checking both files
+  together, and that blocks every deploy until somebody rolls the dates
+  forward. Read the countdown there — this paragraph has carried dates in
+  prose three times now and been wrong twice: it named the first member to
+  age out rather than the last until 2026-08-21, then every date in it went
+  stale on 2026-08-22 when the fixture rolled forward four days, and it
+  named the wrong FILE from 2026-08-22 until this correction. The unit
+  checks are pinned and will not rot. Refreshing the team-owned records is
   the fix — **never hardcode a fake "today"**.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
   Dennis's chatbot stays scoped to schedule + policies.
-- **Manny's staff dashboard has no `noindex`** and is live and public showing
-  member names and rosters. This brief used to add "`app/robots.txt` blocks
-  its crawl as a stopgap" — it does not, and never did on this deploy. That
-  file is served at `/PulseStudio/robots.txt` on a project page, while
+- **Manny's staff dashboard now carries `noindex, nofollow`**, and so does
+  the re-engagement tool. This item read "has no `noindex`" for as long as
+  it was true and for a while after it stopped being: both tags landed on
+  this branch. What has NOT changed is the reason the tag was the only
+  answer available — this brief used to add "`app/robots.txt` blocks its
+  crawl as a stopgap", which it does not, and never did on this deploy.
+  That file is served at `/PulseStudio/robots.txt` on a project page, while
   crawlers read the USER site's root, which is a different repository; its
   Disallow line was also missing the path prefix. Both corrected, and the
-  honest position is now written in three places: the robots file, the
-  sitemap, and `REQUESTFOR-A-B-C.md`. The dashboard has NO crawler
-  protection at all, and only its owner can add the tag.
+  honest position is written in three places: the robots file, the sitemap,
+  and `REQUESTFOR-A-B-C.md`. A meta tag is also not a fence: it asks a
+  well-behaved crawler not to index. What actually keeps the records off
+  the open web is that they no longer live under `app/` at all.
 - **The session ids in the shared studio are not stable.** Measured: 1900 of
   1900 move to a different date each day, because they are minted
   positionally over a window anchored on today. Product A persists
@@ -295,11 +323,13 @@ These cost real time. They are the most valuable part of this brief.
   have a stable id; these do not. The fix is content-derived ids, which
   changes every id in the dataset and everything pinned to them — a team
   decision, raised rather than improvised, per `app/shared/CLAUDE.md`.
-- **Three developer accents are below WCAG AA** as text on the light theme —
-  blue 3.68:1, amber 2.15:1, green 2.54:1. Violet was too and is fixed
-  without changing its identity hex. `scripts/check-contrast.mjs` measures
-  all of them every run; the other three are baselined against their owners,
-  who are the only people who may change them.
+- **All four accents now have a readable companion.** Three were below WCAG
+  AA as text on the light theme — blue 3.68:1, amber 2.15:1, green 2.54:1 —
+  and each owner's hue is untouched: the fix was a `--<name>-strong` token
+  used where an accent is TEXT, the same move violet made first.
+  `docs/contrast-baseline.json` is empty, and its note says the list only
+  shrinks, so a new entry is a regression rather than a plan.
+  `scripts/check-contrast.mjs` measures every pairing on every run.
 
 Raised since, each in `docs/REQUESTFOR-A-B-C.md` and each belonging to
 somebody else — none is mine to close:
@@ -317,10 +347,15 @@ somebody else — none is mine to close:
   gate no longer objects — a path is a name, not the word — but whether the
   repo should hold that filename is his call, and `.env.fixture` would
   satisfy the law and still read naturally.
-- **The contract's product map understates every product**, mine included
-  until I corrected my own row. Three rows still name fewer records than
-  their product reads. No data-law breach in any of them; the risk is that
-  a new teammate reads the table to learn what they may touch.
+- **The contract's product map is filled in now** (2026-08-23). It
+  understated every product, and Manny's row read "TBD | TBD | TBD" from
+  the first draft onward — in the table a new teammate reads to learn what
+  they may touch. Every row now names what its product actually reads and
+  writes, read off the code rather than the plan, and two of the "open
+  questions" columns were answered rather than left standing: C's hosted
+  key question (the studio's server holds it) and D's records path (through
+  `/api/staff/records`, not a file under `app/`). No data-law breach was
+  found in any row while checking.
 
 And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
 
@@ -328,12 +363,21 @@ And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
   suites — it reads `document` at module load. Proven by breaking it
   syntactically and watching every synthetic check pass. `tsc` still
   catches type and syntax errors.
-- **The engine and this product disagree about "today", latently.**
-  `validate.ts` skips attendance dated on the as-of date; `findQuietMembers`
-  counts a class attended today. They have never disagreed because the
-  generator schedules no attended record on that date — measured 0 at 60
-  members and 0 at 300 — but if that changes, a member who came in this
-  morning reads as quiet to the answer key and recent to this product.
+- **The engine and this product read "today" differently, and neither can
+  drift into the other quietly.** `validate.ts` treats attendance for a
+  class starting on or after the as-of date as a DEFECT
+  (`future-attendance`); `findQuietMembers` counts a class attended today
+  as recent activity. They have never disagreed because the generator
+  schedules no attended record on that date — measured 0 at 60 members and
+  0 at 300 — and this item used to end there, as a landmine waiting for a
+  generator change. It is not one: the synthetic suite pins
+  `problems.length === 0` on clean datasets at four scales, so a generator
+  that produced such a record fails before the record reaches a page, and
+  D's own suite pins the boundary from the other side — "no generated
+  class is dated on the as-of date" and "no attendance was recorded
+  against a class that has not happened". A CSV import CAN carry
+  attendance dated today, and counting it as recent is the right answer
+  for a member who actually came in this morning.
 
 ## 9. How to run, gate, and commit
 
@@ -341,14 +385,17 @@ And two facts about the shared engine, recorded in `app/shared/CLAUDE.md`:
 npm ci             # what CI runs; npm install is fine locally
 npm run check      # the gate — must pass before any commit
 npm run build      # tsc — emits the .js the browser runs
-npm run start      # serves app/ at http://localhost:4173
+npm run start      # builds, then runs the studio's server on :4173
 ```
 
 Then `http://localhost:4173/products/d-reengagement/` and its `tests.html`.
+The tool is behind the staff door now, so signing in needs `STAFF_PASSPHRASE`
+in the environment — copy `.env.example` and read `docs/the-server.md`. The
+`tests.html` pages are not gated; they check logic and hold no records.
 
 **`npm run check` is not `tsc --noEmit`,** which this page used to say. It is
-`tsc` — which EMITS — followed by every gate `package.json` lists and the
-three suites:
+`tsc` — which EMITS — followed by every gate `package.json` lists and every
+suite `run-suites` finds:
 
 | | what it fails on |
 | --- | --- |
@@ -364,12 +411,16 @@ three suites:
 | `check-sources.mjs` | a NEW tracked `.js` under `app/` — committed build output, or hand-written JavaScript no compiler reads |
 | `check-reachable.mjs` | a NEW module under `app/` that no page reaches (needs a build; types-only modules are not dead code) |
 | `check-mirrors.mjs` | an `AGENTS.md` that has stopped being a byte-equivalent mirror of its `CLAUDE.md` — the file every non-Claude assistant reads and edits |
-| `run-suites.mjs` | any of the three browser suites, run headlessly |
+| `check-brand.mjs` | a page that shows the studio's name without being wired to receive it |
+| `check-settings.mjs` | a second settings surface, a header carrying more than light/dark, or a built-in default that is not light |
+| `run-suites.mjs` | every browser suite it finds under `app/`, run headlessly |
 
 Each gate carries `--self-test`, which plants known-bad input and proves it
 still catches it — run one if you ever doubt a green. Do not read the list
 above as complete either: `package.json` is where the `check` script names
-them, and it is the only place that cannot drift.
+them, and it is the only place that cannot drift. This table has already
+proved that — it was two gates short, and the sentence above it said "the
+three suites" while six were running.
 
 `npm run mutate` is the other half and is deliberately NOT in the gate. It
 changes one token in a compiled module, reruns a suite, and puts the file
@@ -387,11 +438,29 @@ had been deliberately reverted to see the checks go red; they stayed green
 and said nothing. **A check proved against stale build output proves
 nothing.**
 
-Verified from a clean clone on 2026-08-21, not from a working tree with
-artefacts lying around: clone, `npm ci`, `npm run check` green, `npm run
-build`, `npm run start`, and every page — front door, the tool, all three
-proof suites, storytold and ready — served and rendered. The reviewer bundle
-builds there too.
+Verified from a clean clone again on 2026-08-23, because almost everything
+about how this runs changed after the first pass: clone the proposal branch,
+`npm ci`, `npm run check` — EXIT 0, 12 gates PASS and `check-lanes` SKIPPED
+with its reason stated ("no origin/main to compare against", which is what a
+shallow clone has), 1,583 checks across 6 suites, 0 failed.
+
+Then the part that did not exist on 2026-08-21. A clean clone has no `.env`,
+so it has NO staff passphrase, and that is the state the audience law's
+"never fails open" is about. Started on its own port and asked:
+
+| Asked of a fresh clone with no passphrase | Answer |
+| --- | --- |
+| the front door | 200 |
+| `/api/staff/records` | **503** — refused, no records |
+| `data/staff-records.json` at a URL | **404** — not served at all |
+| sign in with any passphrase | refused, and it says `Set STAFF_PASSPHRASE and restart` |
+| the dashboard and the tool in a browser | `<main>` holds ONE element, the door, reading "This is a staff surface. The server is running but has no staff passphrase set, so nobody can sign in yet." No member name anywhere on either page. |
+
+One correction worth keeping, because it nearly sent a fix at working code:
+scraping `document.body.textContent` showed a whole schedule-builder form on
+the gated dashboard, which looked like a leak. It is inside a CLOSED
+`<dialog>` — present in the DOM, zero-sized, invisible. `<main>` had only
+the door. The instrument answered the question it was asked.
 
 - **Compiled `.js` is gitignored on purpose.** Source is source; CI builds.
   `.github/workflows/pages.yml` runs the gate and only publishes if it passes,

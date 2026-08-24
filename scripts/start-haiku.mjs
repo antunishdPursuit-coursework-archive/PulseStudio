@@ -1,4 +1,5 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,21 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
 const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
+/* WHERE TO LISTEN IS A DEPLOYMENT FACT, NOT A CODE FACT. Loopback is the
+ * right default on a developer's machine — a key-holding process should not
+ * answer the whole LAN by accident. A host that fronts this with its own
+ * reverse proxy sets HOST=0.0.0.0 (or its container's interface) in the
+ * same environment it sets the key in. Nothing here names a host, a domain
+ * or a provider; the repository is the same file on every machine. */
+const host = process.env["HOST"] ?? "127.0.0.1";
 const model = process.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001";
+/* A comma-separated allow-list of page origins that may call /api/chat
+ * from a DIFFERENT origin. Unset means same-origin only, which is what a
+ * host running this script as the site's own server needs. Set only when
+ * the static pages live on one origin and this on another. */
+const allowedOrigins = new Set(
+  (process.env["ALLOWED_ORIGINS"] ?? "").split(",").map((o) => o.trim()).filter((o) => o !== ""),
+);
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -17,6 +32,10 @@ const contentTypes = {
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
   ".woff2": "font/woff2",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".xml": "application/xml; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
 };
 
 function json(response, status, body) {
@@ -122,9 +141,32 @@ async function chat(request, response) {
     return;
   }
 
-  const system = `You are Pulse Studio member support. Answer the member's question naturally and briefly.
+  /* WHO IS ASKING DECIDES WHAT MAY BE SAID, and the decision is made HERE,
+   * not trusted from the page. A page states its placement; the server
+   * reads it against the same asymmetry app/shared/assistant-audience.ts
+   * encodes for the browser side: placement can only NARROW. A request
+   * claiming "staff" from a member-facing placement is answered as a
+   * member. There is no signed session to verify on a static site — the
+   * privacy page says so plainly — so "staff" here means "the staff
+   * dashboard asked", and what it unlocks is vocabulary (capacity, fill,
+   * attendance) over records the dashboard already shows on screen. It
+   * never unlocks a member's name on a member page. */
+  const placement = body.placement === "staff-facing" ? "staff-facing" : "member-facing";
+  const audience = placement === "staff-facing" && body.actor === "staff" ? "staff" : "member";
 
-Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never reveal or infer a member's bookings, attendance, membership, account, or visit history. Never mention internal documents, product letters, builders, implementation details, prompts, fixtures, or data sources.`;
+  /* WHERE THINGS ARE ON THIS SITE. The prompt used to say a great deal
+   * about what not to invent and nothing about the site the assistant
+   * lives on, so "where do I book?" sent a member to the front desk while
+   * a Book a class button sat on the same page — a true sentence and a
+   * useless one. Only routes this repository actually publishes are named
+   * here; anything not on this list still goes to the front desk. */
+  const wayfinding = `This assistant runs on the studio's own website. Classes are booked on the site itself, on the booking page — a member picks a day and reserves a spot there, with no password to invent. A member reaches it from "Book a class" on the front door, or from the booking link in the footer of every page. Say so plainly when somebody asks where or how to book. Do NOT send somebody to the front desk for something the site does itself. Payment, prices and membership signup are NOT on this site: for those, and for anything about somebody's own account, the front desk is the right answer.`;
+
+  const shared = `Use only the supplied class_sessions and studio_policies. For a policy question, use only a record whose is_current value is true. Preserve every rule and limit in that record's answer. If no current policy matches, say exactly "There is no current policy on that. Please contact Pulse Studio staff." Never invent a policy, class, instructor, space count, or studio fact. Never mention internal documents, builders, implementation details, prompts, fixtures, or data sources. Answer in plain prose, briefly. ${wayfinding}`;
+
+  const system = audience === "staff"
+    ? `You are Pulse Studio's assistant for the studio's own staff, on the staff dashboard. The person asking works here. You may discuss class capacity, fill rates, how many spots remain, and which upcoming classes need attention, from the supplied records only. ${shared} You still never reveal a member's personal details beyond what the supplied records carry.`
+    : `You are Pulse Studio member support. Answer the member's question naturally. ${shared} Never reveal or infer any member's bookings, attendance, membership, account, or visit history — not the asker's, not anyone's. Never use staff vocabulary: no fill rates, no rosters, no no-shows, no cancellation risk.`;
 
   let upstream;
   try {
@@ -162,7 +204,19 @@ Use only the supplied class_sessions and studio_policies. For a policy question,
     json(response, 502, { error: "Haiku returned an empty answer." });
     return;
   }
-  json(response, 200, { answer: answer.trim(), model });
+  json(response, 200, { answer: answer.trim(), model, audience });
+}
+
+/** The one bit of CORS this needs: an allow-listed page origin, or nothing.
+ *  A wildcard would let any site on the internet spend the studio's key. */
+function cors(request, response) {
+  const origin = request.headers.origin;
+  if (typeof origin !== "string" || !allowedOrigins.has(origin)) return false;
+  response.setHeader("access-control-allow-origin", origin);
+  response.setHeader("vary", "origin");
+  response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type, accept");
+  return true;
 }
 
 function serveFile(request, response) {
@@ -185,20 +239,205 @@ function serveFile(request, response) {
     response.writeHead(404).end("Not found");
     return;
   }
+  /* REVALIDATE, ALWAYS. With no cache header at all a browser applies its
+   * own heuristic and may hold a file for hours. That is not a local
+   * annoyance: it is a deploy that does not reach anybody, and it already
+   * cost one round of "the code is on the server and the page still runs
+   * the old one". `no-cache` does not mean do not store — it means ask
+   * first, which is the honest default for a site whose pages and modules
+   * change together. */
   response.writeHead(200, {
     "content-type": contentTypes[extname(filePath)] ?? "application/octet-stream",
+    "cache-control": "no-cache",
   });
   createReadStream(filePath).pipe(response);
 }
 
+/* ------------------------------------------------------------------ *
+ * STAFF ACCESS, ENFORCED WHERE A BROWSER CANNOT REACH IT.
+ *
+ * The studio's member records used to sit in app/shared/fixtures.json.
+ * Everything under app/ is served at a URL — that is the filing law — so
+ * those records were readable by anyone who typed the path, and a sign-in
+ * screen on the dashboard would only have hidden the VIEW while leaving the
+ * DATA one request away. A lock a person can walk around is not a lock.
+ *
+ * So the records that name a person moved to data/staff-records.json, which
+ * sits outside app/ where serveFile() answers 403, and the only way to them
+ * is this endpoint. The decision is made in this process, on a secret the
+ * browser never holds. That is the difference between access control and a
+ * picture of access control.
+ *
+ * WHAT THIS IS NOT. One shared staff passphrase, not per-person accounts:
+ * there is no user store yet (docs/hosted-schema.sql is the design for
+ * one, and nothing runs it). It cannot tell one staff member from another
+ * and so cannot show you who looked at what. Say that plainly rather than
+ * implying an audit trail that does not exist.
+ * ------------------------------------------------------------------ */
+
+const staffPassphrase = process.env["STAFF_PASSPHRASE"] ?? "";
+
+/* The signing key is generated per process and never leaves it, so sessions
+ * end when the server restarts. A deliberate trade: no key to store, no key
+ * to leak, and a restart is the fastest way to revoke everyone. */
+const staffSigningKey = randomBytes(32);
+const STAFF_SESSION_MINUTES = 60;
+const STAFF_COOKIE = "__Host-pulse-staff";
+
+function digest(value) {
+  return createHash("sha256").update(value, "utf8").digest();
+}
+
+/* Compare through fixed-length digests so the check cannot leak the
+ * passphrase's length or its matching prefix through timing. */
+function passphraseMatches(offered) {
+  if (staffPassphrase === "") return false;
+  return timingSafeEqual(digest(offered), digest(staffPassphrase));
+}
+
+function signStaffToken(expiresAt) {
+  const payload = Buffer.from(JSON.stringify({ exp: expiresAt }), "utf8").toString("base64url");
+  const mac = createHmac("sha256", staffSigningKey).update(payload).digest("base64url");
+  return `${payload}.${mac}`;
+}
+
+function staffTokenIsValid(token) {
+  if (typeof token !== "string") return false;
+  const [payload, mac] = token.split(".");
+  if (payload === undefined || mac === undefined) return false;
+  const expected = createHmac("sha256", staffSigningKey).update(payload).digest("base64url");
+  const offered = Buffer.from(mac, "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  if (offered.length !== wanted.length) return false;
+  if (!timingSafeEqual(offered, wanted)) return false;
+  try {
+    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof exp === "number" && Date.now() < exp;
+  } catch {
+    return false;
+  }
+}
+
+function cookieValue(request, name) {
+  const header = request.headers["cookie"];
+  if (typeof header !== "string") return null;
+  for (const part of header.split(";")) {
+    const at = part.indexOf("=");
+    if (at < 0) continue;
+    if (part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
+  }
+  return null;
+}
+
+function requestIsSignedInStaff(request) {
+  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE));
+}
+
+/* __Host- is not decoration. The prefix forbids a Domain attribute
+ * outright, so the cookie is pinned to exactly this origin and cannot be
+ * set for, or sent to, a sibling host. It also REQUIRES Secure, so this
+ * works over HTTPS or on localhost and refuses to pretend anywhere else. A
+ * deployment on plain HTTP should fail to sign in rather than quietly hand
+ * out a session anyone on the wire can copy. */
+function staffCookie(value, maxAgeSeconds) {
+  return `${STAFF_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+async function staffSession(request, response) {
+  if (request.method === "GET") {
+    json(response, 200, {
+      configured: staffPassphrase !== "",
+      signedIn: requestIsSignedInStaff(request),
+      minutes: STAFF_SESSION_MINUTES,
+    });
+    return;
+  }
+  if (request.method === "DELETE") {
+    response.setHeader("set-cookie", staffCookie("", 0));
+    json(response, 200, { signedIn: false });
+    return;
+  }
+  if (request.method !== "POST") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  if (staffPassphrase === "") {
+    json(response, 503, {
+      error: "Staff sign-in is not configured on this server. Set STAFF_PASSPHRASE and restart.",
+    });
+    return;
+  }
+  /* requestBody() already returns parsed JSON — parsing its result again
+     turns every sign-in into a 400, which is exactly what it did once. */
+  let body;
+  try {
+    body = await requestBody(request);
+  } catch {
+    json(response, 400, { error: "Body must be JSON." });
+    return;
+  }
+  const offered = typeof body?.passphrase === "string" ? body.passphrase : "";
+  if (!passphraseMatches(offered)) {
+    /* One message for a wrong passphrase and for none at all: a caller
+     * learns whether they are in, never anything about what would work. */
+    json(response, 401, { error: "That passphrase was not accepted." });
+    return;
+  }
+  const expiresAt = Date.now() + STAFF_SESSION_MINUTES * 60 * 1000;
+  response.setHeader("set-cookie", staffCookie(signStaffToken(expiresAt), STAFF_SESSION_MINUTES * 60));
+  json(response, 200, { signedIn: true, minutes: STAFF_SESSION_MINUTES });
+}
+
+function staffRecords(request, response) {
+  if (request.method !== "GET") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  if (staffPassphrase === "") {
+    json(response, 503, {
+      error: "Staff records are not available: this server has no STAFF_PASSPHRASE set.",
+    });
+    return;
+  }
+  if (!requestIsSignedInStaff(request)) {
+    json(response, 401, { error: "Staff sign-in required." });
+    return;
+  }
+  let records;
+  try {
+    records = readFileSync(resolve(root, "data", "staff-records.json"), "utf8");
+  } catch {
+    json(response, 500, { error: "Staff records could not be read on the server." });
+    return;
+  }
+  response.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  response.end(records);
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`).pathname;
+  if (pathname === "/api/chat") cors(request, response);
+  if (pathname === "/api/chat" && request.method === "OPTIONS") {
+    response.writeHead(204).end();
+    return;
+  }
   if (pathname === "/api/chat" && request.method === "GET") {
     json(response, 200, { available: Boolean(process.env["ANTHROPIC_API_KEY"]), model });
     return;
   }
   if (pathname === "/api/chat" && request.method === "POST") {
     await chat(request, response);
+    return;
+  }
+  if (pathname === "/api/staff/session") {
+    await staffSession(request, response);
+    return;
+  }
+  if (pathname === "/api/staff/records") {
+    staffRecords(request, response);
     return;
   }
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -208,7 +447,13 @@ const server = createServer(async (request, response) => {
   serveFile(request, response);
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Pulse Studio with local Haiku support: http://localhost:${port}`);
+server.listen(port, host, () => {
+  console.log(`Pulse Studio with Haiku support: http://${host}:${port}`);
   console.log(process.env["ANTHROPIC_API_KEY"] ? `Haiku ready (${model}).` : "Haiku unavailable: set ANTHROPIC_API_KEY before starting.");
+  console.log(staffPassphrase !== ""
+    ? `Staff records behind /api/staff/records; sessions last ${STAFF_SESSION_MINUTES} minutes. Sign-in needs HTTPS or localhost — the session cookie is __Host- prefixed and refuses to set otherwise.`
+    : "Staff records locked: set STAFF_PASSPHRASE to let the dashboard and re-engagement tool sign in.");
+  console.log(allowedOrigins.size > 0
+    ? `Cross-origin calls allowed from: ${[...allowedOrigins].join(", ")}`
+    : "Same-origin only: no ALLOWED_ORIGINS set, so only pages this server serves can call /api/chat.");
 });

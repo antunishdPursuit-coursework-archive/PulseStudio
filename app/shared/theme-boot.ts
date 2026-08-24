@@ -27,6 +27,7 @@ import { mountSessionControl } from "./components/topbar.js";
 import { renderStudioBrand } from "./components/brand-header.js";
 import { readStored, writeStored, storageWorks } from "./storage.js";
 import { mountSiteFooter } from "./components/site-footer.js";
+import { mountAssistant } from "./components/assistant.js";
 import { ensureAlertRegion, showAlert } from "./components/alert.js";
 
 /* Every page's branded home links render their word from shared/brand.ts
@@ -470,5 +471,12 @@ if (!storageWorks()) {
 
 /* Last, so the footer lands under whatever the page has already drawn. */
 mountSiteFooter();
+
+/* One chatbox, on any page that asked for one — see components/assistant.ts
+ * for the whole design. Opt-in by attribute, not automatic: a proof page or
+ * a page mid-review should not gain a chat window nobody asked it to carry.
+ * `<body data-assistant="member-facing">` or `"staff-facing"` is the whole
+ * ask. */
+mountAssistant();
 
 export {};

@@ -29,7 +29,7 @@ import {
   SYNTHETIC_DEFAULT_CONFIG,
 } from "./deps.js";
 import { adaptAttendanceCsv, cleanName, identityKey, importProvenance, detectSlashDateOrder, normalizeDate, normalizeStatus, parseCsv, parseCsvRowsDetailed } from "./csv.js";
-import { fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
+import { currentScheduleReservations, fixtureSetFrom, parseRuntimeReservations } from "./live-studio.js";
 import type { Reservation } from "./deps.js";
 import { generateStudio } from "./generate.js";
 import { NOT_RECORDED, brand, classPhrase, draftMessage, outreachPolicy, proposedRules } from "./config.js";
@@ -503,6 +503,44 @@ check("today is computed in the studio timezone",
       recordsFor([{ id: "m2", name: "No Shows Only", status: "active", attended: ["2026-06-15"], noShows: ["2026-08-10"] }]),
       TODAY).outcomes[0]?.result,
     "stillQuiet");
+
+  /* A FUTURE-DATED OR UNREADABLE ATTENDANCE ROW IS NOT A RETURN EITHER —
+   * the same guard `findQuietMembers` already has (6g/6h above), but this
+   * is a SEPARATE copy of it in outreachResults, and nothing here had
+   * tried it. `npm run mutate` found both gaps: the future-date half and
+   * the not-finite half. Without the guard, a corrupt or future-dated row
+   * from a CSV import would read as proof a member came back when nothing
+   * real happened yet — the evidence panel staff read to decide whether
+   * to stop reaching out. */
+  {
+    const futureFx = recordsFor([{ id: "m3", name: "Future Only", status: "active", attended: ["2026-07-01"] }]);
+    futureFx.class_sessions.push({
+      session_id: "s_future_return", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "2027-01-01T09:00:00-04:00", ends_at: "2027-01-01T10:00:00-04:00",
+      capacity: 12, session_status: "completed",
+    });
+    futureFx.attendance.push({
+      attendance_id: "a_future_return", member_id: "m3", session_id: "s_future_return",
+      attendance_status: "attended", recorded_at: "2027-01-01T10:00:00-04:00",
+    });
+    const futureLedger = [{ memberId: "m3", lapseKey: "m3|a", takenAt: "2026-08-12", channel: "copy" as const }];
+    check("a future-dated attendance row is not read as a return",
+      outreachResults(futureLedger, futureFx, TODAY).outcomes[0]?.result, "stillQuiet");
+
+    const blankFx = recordsFor([{ id: "m4", name: "Blank Only", status: "active", attended: ["2026-07-01"] }]);
+    blankFx.class_sessions.push({
+      session_id: "s_blank_return", class_type: "yoga", level: "all levels", instructor_id: "i_1",
+      starts_at: "not-a-real-date", ends_at: "not-a-real-date",
+      capacity: 12, session_status: "completed",
+    });
+    blankFx.attendance.push({
+      attendance_id: "a_blank_return", member_id: "m4", session_id: "s_blank_return",
+      attendance_status: "attended", recorded_at: "2026-08-13T10:00:00-04:00",
+    });
+    const blankLedger = [{ memberId: "m4", lapseKey: "m4|a", takenAt: "2026-08-12", channel: "copy" as const }];
+    check("an unreadable session date is not read as a return either",
+      outreachResults(blankLedger, blankFx, TODAY).outcomes[0]?.result, "stillQuiet");
+  }
 }
 
 /* THE SEAT COUNTS ARE MEMOISED, AND A MEMO CAN GO STALE.
@@ -775,6 +813,16 @@ check("when somebody IS flagged there is nothing to explain",
     coverageOf(["2026-08-18", "2026-07-01"]).daysSinceAnyAttendance, 0);
   check("the most recent usable row wins, whatever order they arrive in",
     coverageOf(["2026-07-01", "2026-08-10", "2026-07-20"]).daysSinceAnyAttendance, 8);
+  /* A row dated AFTER today (past the "today" check above, not exactly on
+   * it) is unusable evidence the same way an unparsable date is — the
+   * comment on attendanceCoverage() names it as such but nothing had ever
+   * fed it one. Without the exclusion, a future row would win "most
+   * recent" outright and understate how long the records have actually
+   * been silent, defeating the broken-clipboard detection this function
+   * exists for. */
+  check("a genuinely future row is not evidence, so the real last row still wins",
+    coverageOf(["2026-08-25", "2026-07-01"]).daysSinceAnyAttendance,
+    coverageOf(["2026-07-01"]).daysSinceAnyAttendance);
 
   check("records exactly at the threshold have NOT gone quiet",
     coverageOf(["2026-08-04"]).recordsHaveGoneQuiet, false);
@@ -2683,6 +2731,144 @@ check("clean records produce no data-quality line",
     heldByNonMember, 0);
 }
 
+// 30h. Chasing the no-show sibling of the join-day boundary above turned
+//      up a bigger bug instead, and closing THAT moved this one out of
+//      reach.
+//
+//      The block above proves an ATTENDED class on the join day survives
+//      its clamp (`day < joinedDay`). The no-show a member is booked into
+//      and skips has its own, separate clamp — `missedDay < joinedDay` —
+//      and the same tightening (`<=`) would drop a no-show dated exactly
+//      on the join day the same way. Measuring for it (a sweep to 500
+//      seeds, one real hit at seed 81) is what surfaced `lastVisitDaysAgo`
+//      itself reaching PAST `startedDaysAgo`: longGone (max 140) and left
+//      (max 120) could both draw a "last visit" older than the member's
+//      own membership, clamping away their v=0 attendance row entirely and
+//      leaving them with ZERO attendance — misread by findQuietMembers()
+//      as "never attended — onboarding, not ours" and silently dropped
+//      from the outreach the archetype exists to produce. 53 longGone and
+//      4 left members hit it across 200 seeds.
+//
+//      generateStudio() now clamps `lastVisitDaysAgo` to never exceed
+//      `startedDaysAgo` (see its comment). That fix also closes the
+//      no-show coincidence this section went looking for: a clamped
+//      member's missed-class day is `lastVisitDaysAgo` minus an offset of
+//      at least 2, which is now provably less than `startedDaysAgo` and so
+//      never lands exactly on the join day, and an unclamped member's own
+//      range sits far enough below `startedDaysAgo`'s floor of 90 that the
+//      exact coincidence needs its own rare alignment on top. Measured
+//      after the fix: 0 hits swept to 30,000 seeds, against 1 in the first
+//      500 before it. The guard itself stays — it is still what stops a
+//      no-show predating a join — there is just no seed on hand that
+//      proves its exact boundary, the same honest limit `day <= today`
+//      already carries above.
+
+// 30j. Each archetype draws its "days since last visit" from ITS OWN
+//      range, not a neighbour's.
+//
+//      generateStudio() decides how quiet a member looks with a chain of
+//      `archetype === "loyal" ? ... : archetype === "fading" ? ... : ...`.
+//      Flip any ONE of those comparisons to `!==` and that archetype falls
+//      through to the NEXT branch's range instead of its own — a newcomer
+//      who should look 1-9 days quiet reads as 30-120 days quiet, which is
+//      the exact shape of member this tool exists to flag, silently
+//      relabelled as somebody who just joined. Members carry no archetype
+//      field in the output; STUDIO_MIX's own order and counts (loyal 24,
+//      fading 8, longGone 6, newcomer 8, neverCame 4, paused 6, left 4) are
+//      how generation assigns `gen<seed>_m_<N>` ids, so the id range names
+//      the archetype without this file importing anything private.
+{
+  const ARCHETYPE_RANGES: ReadonlyArray<{ name: string; count: number; min: number; max: number }> = [
+    { name: "loyal", count: 24, min: 1, max: 12 },
+    { name: "fading", count: 8, min: 16, max: 55 },
+    { name: "longGone", count: 6, min: 75, max: 140 },
+    { name: "newcomer", count: 8, min: 1, max: 9 },
+    { name: "neverCame", count: 4, min: NaN, max: NaN }, // no attendance at all
+    { name: "paused", count: 6, min: 20, max: 90 },
+    { name: "left", count: 4, min: 30, max: 120 },
+  ];
+  const today = "2026-08-18";
+  const outOfRange: string[] = [];
+  const SEEDS = 10;
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    const { records } = generateStudio(seed, today);
+    const lastAttendedDayByMember = new Map<string, string>();
+    for (const a of records.attendance) {
+      if (a.attendance_status !== "attended") continue;
+      const session = records.class_sessions.find((s) => s.session_id === a.session_id);
+      const day = session?.starts_at.slice(0, 10);
+      if (day === undefined) continue;
+      const current = lastAttendedDayByMember.get(a.member_id);
+      if (current === undefined || day > current) lastAttendedDayByMember.set(a.member_id, day);
+    }
+    let memberNumber = 0;
+    for (const archetype of ARCHETYPE_RANGES) {
+      for (let n = 0; n < archetype.count; n += 1) {
+        memberNumber += 1;
+        if (archetype.name === "neverCame") continue; // never attends; nothing to check
+        const memberId = `gen${seed}_m_${memberNumber}`;
+        const lastDay = lastAttendedDayByMember.get(memberId);
+        if (lastDay === undefined) { outOfRange.push(`seed ${seed} ${memberId} (${archetype.name}): no attendance at all`); continue; }
+        const daysAgo = dayNumberFromIso(today) - dayNumberFromIso(lastDay);
+        if (daysAgo < archetype.min || daysAgo > archetype.max) {
+          outOfRange.push(`seed ${seed} ${memberId} (${archetype.name}): ${daysAgo} days, expected ${archetype.min}-${archetype.max}`);
+        }
+      }
+    }
+  }
+  check(`across ${SEEDS} studios, every archetype's most recent visit falls in ITS OWN declared range`,
+    outOfRange, []);
+}
+
+// 30k. A newcomer gets 2-5 visits, everyone else 4-14 — a SECOND,
+//      separate ternary from 30j's, and a separate loop-bound risk.
+//
+//      `visitCount` decides how many attendance rows a member gets, not
+//      how recent the newest one is, so 30j's recency check cannot see
+//      either of this one's own two ways to be wrong: the newcomer
+//      comparison flipping (giving a newcomer the 4-14 range and everyone
+//      else 2-5), or the walk that builds those rows running one iteration
+//      too many (`v < visitCount` loosened to `<=`), which can only ever
+//      ADD a row. Both push a member's attended-row count past their
+//      archetype's declared ceiling, so the ceiling alone — never a floor,
+//      which the join-date clamp can legitimately undercut — is what a
+//      check can hold without also catching honest truncation as a fault.
+{
+  const VISIT_ARCHETYPES: ReadonlyArray<{ name: string; count: number; max: number }> = [
+    { name: "loyal", count: 24, max: 14 },
+    { name: "fading", count: 8, max: 14 },
+    { name: "longGone", count: 6, max: 14 },
+    { name: "newcomer", count: 8, max: 5 },
+    { name: "neverCame", count: 4, max: NaN },
+    { name: "paused", count: 6, max: 14 },
+    { name: "left", count: 4, max: 14 },
+  ];
+  const overMax: string[] = [];
+  const SEEDS = 50;
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    const { records } = generateStudio(seed, "2026-08-18");
+    const countByMember = new Map<string, number>();
+    for (const a of records.attendance) {
+      if (a.attendance_status !== "attended") continue;
+      countByMember.set(a.member_id, (countByMember.get(a.member_id) ?? 0) + 1);
+    }
+    let memberNumber = 0;
+    for (const archetype of VISIT_ARCHETYPES) {
+      for (let n = 0; n < archetype.count; n += 1) {
+        memberNumber += 1;
+        if (archetype.name === "neverCame") continue;
+        const memberId = `gen${seed}_m_${memberNumber}`;
+        const attended = countByMember.get(memberId) ?? 0;
+        if (attended > archetype.max) {
+          overMax.push(`seed ${seed} ${memberId} (${archetype.name}): ${attended} visits, max ${archetype.max}`);
+        }
+      }
+    }
+  }
+  check(`across ${SEEDS} studios, nobody's visit count exceeds their OWN archetype's ceiling`,
+    overMax, []);
+}
+
 // 30d. What a staff member is told when the browser hands back rubbish.
 //
 //      This decision ran inside main.ts until 2026-08-22, which no check
@@ -3123,6 +3309,19 @@ check("clean records produce no data-quality line",
     rows(JSON.stringify([{ ...rt, canceled_at: 7 }])), 0);
   check("one good row survives ten thousand junk ones",
     rows("[" + Array.from({ length: 10_000 }, () => "null").join(",") + "," + JSON.stringify(rt) + "]"), 1);
+
+  /* THE STALE-SCHEDULE GUARD. Booking's session ids slide with the studio
+   * date — measured 2026-08-23, 70 of 70 future classes changed CLASS TYPE
+   * under the same id one day later — and Booking only notices on ITS OWN
+   * page load. A log read here from yesterday is not evidence about
+   * today's classes, so it is discarded rather than trusted. */
+  check("a log stamped for today's schedule is kept",
+    currentScheduleReservations([rt], "2026-08-18", "2026-08-18"), [rt]);
+  check("a log stamped for another day is not evidence about today",
+    currentScheduleReservations([rt], "2026-08-17", "2026-08-18"), []);
+  check("a log with no stamp at all is the same as the wrong stamp",
+    currentScheduleReservations([rt], null, "2026-08-18"), []);
+  check("no rows, no stamp needed", currentScheduleReservations([], null, "2026-08-18"), []);
 
   /* A row carrying __proto__ must not reach Object.prototype. JSON.parse
    * makes it an ordinary own property, which is why this passes — the check
@@ -4017,6 +4216,62 @@ check("clean records produce no data-quality line",
     check("every line has the same number of columns as the header",
       new Set(lines.map((l) => l.split(",").length)).size, 1);
   }
+
+  /* WHICH LABEL GOES WITH WHICH RESULT, AND WHICH ROW IS WHOSE. The block
+   * above never exercises a "returned" outcome at all — both its ledger
+   * entries end up "stillQuiet" — so it cannot tell "came back" from
+   * "still quiet" apart, and it checks row COUNT and substring PRESENCE
+   * rather than which row belongs to which member. `npm run mutate` found
+   * both gaps: the label ternary can swap, and the not-yet-judged filter
+   * can misfire — and either one can pass count-and-substring checks by
+   * coincidence while attaching the wrong text to the wrong person. */
+  {
+    const csvFx = recordsFor([
+      { id: "m_returned", name: "Came Back Csv", status: "active", attended: ["2026-06-01", "2026-08-10"] },
+      { id: "m_quiet", name: "Stayed Quiet Csv", status: "active", attended: ["2026-06-01"] },
+    ]);
+    const csvLedger = [
+      { memberId: "m_returned", lapseKey: "m_returned|a", takenAt: "2026-07-01", channel: "copy" as const },
+      { memberId: "m_quiet", lapseKey: "m_quiet|a", takenAt: "2026-07-01", channel: "copy" as const },
+      { memberId: "m_ghost", lapseKey: "m_ghost|a", takenAt: "2026-07-01", channel: "email" as const },
+    ];
+    const csvResults = outreachResults(csvLedger, csvFx, TODAY);
+    const csvNames = new Map([
+      ["m_returned", "Came Back Csv"], ["m_quiet", "Stayed Quiet Csv"], ["m_ghost", "Ghost Csv"],
+    ]);
+    const csv2 = outreachLogCsv(csvResults, csvLedger, csvNames, csvField);
+    const rowFor = (name: string): string | undefined => csv2.split("\n").find((l) => l.includes(name));
+
+    check(`a member who returned reads "came back", by name`,
+      rowFor("Came Back Csv")?.includes("came back"), true);
+    check(`...never "still quiet"`, rowFor("Came Back Csv")?.includes("still quiet"), false);
+    check(`a member who did not return reads "still quiet", by name`,
+      rowFor("Stayed Quiet Csv")?.includes("still quiet"), true);
+    check(`...never "came back"`, rowFor("Stayed Quiet Csv")?.includes("came back"), false);
+    check("the unresolvable member's OWN row says so",
+      rowFor("Ghost Csv")?.includes("not in these records"), true);
+    check("...and a judged member's row never says that instead",
+      rowFor("Came Back Csv")?.includes("not in these records"), false);
+    check("exactly one row per ledger entry — no member appears twice",
+      csv2.trim().split("\n").length - 1, csvLedger.length);
+
+    /* THE "DAYS TO RETURN" COLUMN ITSELF, not just the label beside it.
+     * `npm run mutate` found this once the checks above existed: flipping
+     * `daysToReturn === null ? "" : String(daysToReturn)` to `!==` still
+     * leaves every check above green — the label still says "came back",
+     * the row count still matches — while the actual number a staff
+     * member reads goes blank for a returned member and prints the
+     * literal text "null" for one who is still quiet. */
+    const returnedOutcome = csvResults.outcomes.find((o) => o.record.memberId === "m_returned");
+    if (returnedOutcome?.daysToReturn == null) {
+      check("setup: the returned fixture actually has a days-to-return value", false, true);
+    } else {
+      check("the days-to-return column carries the real number, not blank",
+        rowFor("Came Back Csv")?.endsWith(`,${returnedOutcome.daysToReturn}`), true);
+    }
+    check("the still-quiet row's column is empty, never the text \"null\"",
+      rowFor("Stayed Quiet Csv")?.endsWith(",") && !rowFor("Stayed Quiet Csv")?.includes("null"), true);
+  }
 }
 
 /* COUNTING THINGS IN A SENTENCE A PERSON READS.
@@ -4471,6 +4726,15 @@ check("clean records produce no data-quality line",
     routineProblems(routine({ interestKeys: [] })).length > 0, true);
   check("an approval date in the future is refused",
     routineProblems(routine({ approvedAt: "2099-01-01" })).length > 0, true);
+  /* THE BOUNDARY ITSELF, not just a date far past it. "2099-01-01" is
+   * refused whether the guard is `>` or `>=` against today, so nothing
+   * above tells the two apart — `npm run mutate` found exactly this gap.
+   * An approval dated TODAY is an assertion that a person read this
+   * today, which must be accepted; one dated tomorrow must not be. */
+  check("an approval dated exactly today is accepted, not refused",
+    routineProblems(routine({ approvedAt: "2026-08-20" }), "2026-08-20"), []);
+  check("...while one dated the very next day is refused",
+    routineProblems(routine({ approvedAt: "2026-08-21" }), "2026-08-20").length > 0, true);
   check("a malformed approval date is refused",
     routineProblems(routine({ approvedAt: "22/08/2026" })).length > 0, true);
   check("an over-long title is refused",
@@ -4479,6 +4743,70 @@ check("clean records produce no data-quality line",
     routineProblems(routine({ safetyNotice: "" })).length > 0, true);
   check("duplicate step ids within one routine are refused",
     routineProblems(routine({ steps: [step(), step()] })).length > 0, true);
+
+  /* --- validation: the boundaries themselves, not just something past them ---
+   *
+   * Every check above proves SOME problem is reported, which cannot tell a
+   * `<` from a `<=` or a `||` from a `&&` apart — `npm run mutate` found
+   * every one of the gaps below the same way it found the approval-date
+   * boundary above. */
+  check("a routine that is not an object at all is refused, not a thrown error",
+    routineProblems(null).length > 0, true);
+  check("a step that is not an object at all is refused the same way",
+    routineProblems(routine({ steps: [null] })).length > 0, true);
+  check("a calendar date that fails on ROUND-TRIP is refused, not just a bad shape",
+    routineProblems(routine({ approvedAt: "2026-02-30" })).length > 0, true);
+  check("a summary right at the minimum length is accepted",
+    routineProblems(routine({ summary: "x" })), []);
+  check("an empty summary is refused, not accepted as a bare minimum",
+    routineProblems(routine({ summary: "" })).length > 0, true);
+  check("a summary right at the maximum length is accepted",
+    routineProblems(routine({ summary: "x".repeat(200) })), []);
+  check("one character past the maximum is refused",
+    routineProblems(routine({ summary: "x".repeat(201) })).length > 0, true);
+  check("a fractional duration is refused — whole minutes only",
+    routineProblems(routine({ durationMinutes: 10.5 })).length > 0, true);
+  check("the shortest real duration is accepted",
+    routineProblems(routine({ durationMinutes: 3 })), []);
+  check("one minute short of that is refused",
+    routineProblems(routine({ durationMinutes: 2 })).length > 0, true);
+  check("the longest real duration is accepted",
+    routineProblems(routine({ durationMinutes: 90 })), []);
+  check("one minute past that is refused",
+    routineProblems(routine({ durationMinutes: 91 })).length > 0, true);
+  check("an id at the 40-character ceiling is accepted",
+    routineProblems(routine({ id: `routine-${"a".repeat(32)}` })), []);
+  check("one character past the id ceiling is refused",
+    routineProblems(routine({ id: `routine-${"a".repeat(33)}` })).length > 0, true);
+  check("equipment given as something other than a list is refused",
+    routineProblems(routine({ equipment: "a mat" })).length > 0, true);
+  check("exactly 8 equipment items is accepted",
+    routineProblems(routine({ equipment: Array.from({ length: 8 }, (_, i) => `item ${i}`) })), []);
+  check("a 9th equipment item is refused",
+    routineProblems(routine({ equipment: Array.from({ length: 9 }, (_, i) => `item ${i}`) })).length > 0, true);
+  check("all 7 real interest keys at once is accepted",
+    routineProblems(routine({
+      interestKeys: ["yoga", "pilates", "strength", "mobility", "cardio", "hiit", "general"],
+    })), []);
+  check("8 interest keys is refused on count alone, before any key is even checked",
+    routineProblems(routine({ interestKeys: ["a", "b", "c", "d", "e", "f", "g", "h"] })).length > 0, true);
+  check("exactly 30 steps, each sound, is accepted",
+    routineProblems(routine({
+      steps: Array.from({ length: 30 }, (_, i) => step({ id: `step-${i + 1}` })),
+    })), []);
+  check("a 31st step is refused on count alone",
+    routineProblems(routine({
+      steps: Array.from({ length: 31 }, (_, i) => step({ id: `step-${i + 1}` })),
+    })).length > 0, true);
+  check("a step id that is not a string is refused",
+    routineProblems(routine({ steps: [step({ id: 1 })] })).length > 0, true);
+  check("a step id that IS a string but does not match the pattern is refused too",
+    routineProblems(routine({ steps: [step({ id: "warmup" })] })).length > 0, true);
+
+  /* --- the library: a malformed entry with no readable id names its POSITION --- */
+  const noId = loadLibrary([routine({ id: 42 as unknown as string, title: "" })]);
+  check("a malformed entry with no string id is named by position, not left blank or thrown",
+    noId.problems.some((p) => p.startsWith("entry 1:")), true);
 
   /* --- the library: a duplicate id is a defect, stated, never last-wins --- */
   const good = loadLibrary([
@@ -4502,6 +4830,35 @@ check("clean records produce no data-quality line",
     approvedRoutines(good).map((r) => r.id).join(","), "routine-b,routine-a");
   check("draft and retired routines are never browsable",
     approvedRoutines(good).every((r) => r.status === "approved"), true);
+
+  /* THE TIE-BREAKS HAD NO CHECK THAT COULD TELL THEM APART FROM DURATION.
+   * The pair above (20min "Bravo" vs 10min "Alpha") has the shorter one
+   * ALSO alphabetically first, so a mutation that skipped duration and
+   * compared titles instead produced the identical order by coincidence —
+   * `npm run mutate` found `!==` on durationMinutes could flip to `===`
+   * and nothing noticed. These three fixtures put duration, title and id
+   * in DISAGREEMENT, one at a time, so only the correct field can produce
+   * the expected order. */
+  const orderCheck = loadLibrary([
+    routine({ id: "routine-e", status: "approved", durationMinutes: 20, title: "Alpha" }),
+    routine({ id: "routine-f", status: "approved", durationMinutes: 10, title: "Zulu" }),
+  ]);
+  check("duration wins even when the shorter routine sorts LATER by title",
+    approvedRoutines(orderCheck).map((r) => r.id).join(","), "routine-f,routine-e");
+
+  const titleTie = loadLibrary([
+    routine({ id: "routine-g", status: "approved", durationMinutes: 15, title: "Zulu" }),
+    routine({ id: "routine-h", status: "approved", durationMinutes: 15, title: "Alpha" }),
+  ]);
+  check("equal duration falls back to title, not to import order",
+    approvedRoutines(titleTie).map((r) => r.id).join(","), "routine-h,routine-g");
+
+  const idTie = loadLibrary([
+    routine({ id: "routine-z", status: "approved", durationMinutes: 15, title: "Same" }),
+    routine({ id: "routine-a2", status: "approved", durationMinutes: 15, title: "Same" }),
+  ]);
+  check("equal duration AND title falls back to id",
+    approvedRoutines(idTie).map((r) => r.id).join(","), "routine-a2,routine-z");
 
   const many = loadLibrary([
     routine({ id: "routine-1", status: "approved", durationMinutes: 10, interestKeys: ["yoga"] }),
