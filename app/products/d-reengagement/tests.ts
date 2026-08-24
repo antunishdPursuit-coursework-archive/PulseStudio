@@ -813,6 +813,16 @@ check("when somebody IS flagged there is nothing to explain",
     coverageOf(["2026-08-18", "2026-07-01"]).daysSinceAnyAttendance, 0);
   check("the most recent usable row wins, whatever order they arrive in",
     coverageOf(["2026-07-01", "2026-08-10", "2026-07-20"]).daysSinceAnyAttendance, 8);
+  /* A row dated AFTER today (past the "today" check above, not exactly on
+   * it) is unusable evidence the same way an unparsable date is — the
+   * comment on attendanceCoverage() names it as such but nothing had ever
+   * fed it one. Without the exclusion, a future row would win "most
+   * recent" outright and understate how long the records have actually
+   * been silent, defeating the broken-clipboard detection this function
+   * exists for. */
+  check("a genuinely future row is not evidence, so the real last row still wins",
+    coverageOf(["2026-08-25", "2026-07-01"]).daysSinceAnyAttendance,
+    coverageOf(["2026-07-01"]).daysSinceAnyAttendance);
 
   check("records exactly at the threshold have NOT gone quiet",
     coverageOf(["2026-08-04"]).recordsHaveGoneQuiet, false);
@@ -4733,6 +4743,70 @@ check("clean records produce no data-quality line",
     routineProblems(routine({ safetyNotice: "" })).length > 0, true);
   check("duplicate step ids within one routine are refused",
     routineProblems(routine({ steps: [step(), step()] })).length > 0, true);
+
+  /* --- validation: the boundaries themselves, not just something past them ---
+   *
+   * Every check above proves SOME problem is reported, which cannot tell a
+   * `<` from a `<=` or a `||` from a `&&` apart — `npm run mutate` found
+   * every one of the gaps below the same way it found the approval-date
+   * boundary above. */
+  check("a routine that is not an object at all is refused, not a thrown error",
+    routineProblems(null).length > 0, true);
+  check("a step that is not an object at all is refused the same way",
+    routineProblems(routine({ steps: [null] })).length > 0, true);
+  check("a calendar date that fails on ROUND-TRIP is refused, not just a bad shape",
+    routineProblems(routine({ approvedAt: "2026-02-30" })).length > 0, true);
+  check("a summary right at the minimum length is accepted",
+    routineProblems(routine({ summary: "x" })), []);
+  check("an empty summary is refused, not accepted as a bare minimum",
+    routineProblems(routine({ summary: "" })).length > 0, true);
+  check("a summary right at the maximum length is accepted",
+    routineProblems(routine({ summary: "x".repeat(200) })), []);
+  check("one character past the maximum is refused",
+    routineProblems(routine({ summary: "x".repeat(201) })).length > 0, true);
+  check("a fractional duration is refused — whole minutes only",
+    routineProblems(routine({ durationMinutes: 10.5 })).length > 0, true);
+  check("the shortest real duration is accepted",
+    routineProblems(routine({ durationMinutes: 3 })), []);
+  check("one minute short of that is refused",
+    routineProblems(routine({ durationMinutes: 2 })).length > 0, true);
+  check("the longest real duration is accepted",
+    routineProblems(routine({ durationMinutes: 90 })), []);
+  check("one minute past that is refused",
+    routineProblems(routine({ durationMinutes: 91 })).length > 0, true);
+  check("an id at the 40-character ceiling is accepted",
+    routineProblems(routine({ id: `routine-${"a".repeat(32)}` })), []);
+  check("one character past the id ceiling is refused",
+    routineProblems(routine({ id: `routine-${"a".repeat(33)}` })).length > 0, true);
+  check("equipment given as something other than a list is refused",
+    routineProblems(routine({ equipment: "a mat" })).length > 0, true);
+  check("exactly 8 equipment items is accepted",
+    routineProblems(routine({ equipment: Array.from({ length: 8 }, (_, i) => `item ${i}`) })), []);
+  check("a 9th equipment item is refused",
+    routineProblems(routine({ equipment: Array.from({ length: 9 }, (_, i) => `item ${i}`) })).length > 0, true);
+  check("all 7 real interest keys at once is accepted",
+    routineProblems(routine({
+      interestKeys: ["yoga", "pilates", "strength", "mobility", "cardio", "hiit", "general"],
+    })), []);
+  check("8 interest keys is refused on count alone, before any key is even checked",
+    routineProblems(routine({ interestKeys: ["a", "b", "c", "d", "e", "f", "g", "h"] })).length > 0, true);
+  check("exactly 30 steps, each sound, is accepted",
+    routineProblems(routine({
+      steps: Array.from({ length: 30 }, (_, i) => step({ id: `step-${i + 1}` })),
+    })), []);
+  check("a 31st step is refused on count alone",
+    routineProblems(routine({
+      steps: Array.from({ length: 31 }, (_, i) => step({ id: `step-${i + 1}` })),
+    })).length > 0, true);
+  check("a step id that is not a string is refused",
+    routineProblems(routine({ steps: [step({ id: 1 })] })).length > 0, true);
+  check("a step id that IS a string but does not match the pattern is refused too",
+    routineProblems(routine({ steps: [step({ id: "warmup" })] })).length > 0, true);
+
+  /* --- the library: a malformed entry with no readable id names its POSITION --- */
+  const noId = loadLibrary([routine({ id: 42 as unknown as string, title: "" })]);
+  check("a malformed entry with no string id is named by position, not left blank or thrown",
+    noId.problems.some((p) => p.startsWith("entry 1:")), true);
 
   /* --- the library: a duplicate id is a defect, stated, never last-wins --- */
   const good = loadLibrary([
