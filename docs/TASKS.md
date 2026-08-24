@@ -108,6 +108,27 @@ suite would have called correct.
 - `main.ts` is deleted. It rendered the whole dashboard, no page loaded it,
   and the record split had quietly broken it while it still type-checked.
   `docs/reachable-baseline.json` is empty as a result.
+- **The red hand-off is green: a booking now reaches your meters.** Your
+  dashboard generated its own studio — seed `capacity-watch-2026`, frozen at
+  2026-08-19, 180 days of history — while Product A books against the shared
+  one dated today. No class id could ever match: measured 0 shared ids out of
+  75. Every real reservation arrived as "outside the current schedule", and
+  the readiness board called it the one red hand-off on the story map.
+
+  It now calls `sharedStudioWithFill(0.85)`, new in
+  `app/shared/auth/studio.ts` — so this is a SHARED change as well as one in
+  your folder, named here rather than made quietly. **You keep the full
+  week.** The fill knob was never the problem: generating with and without it
+  produced 1,900 of 1,900 sessions identical in id, start time, class type
+  and status, and mean upcoming occupancy is 82% with it against 6% without.
+  What moved the ids was the seed, the date and the history length. The new
+  function takes ONE argument for exactly that reason — none of those four is
+  on offer.
+
+  Watched end to end in a browser on 2026-08-23: Idris Boateng booked
+  strength for Mon 24 Aug 08:00 on Product A; your page then read "Member
+  bookings from the booking app: 1 in this schedule, 0 outside it", and his
+  name was on that class's roster, reserved.
 - **Your room panel could have sorted by name and passed.** Your check
   "rooms are grouped and the busiest leads" uses Loft and Studio — and Loft
   is both the busiest room and the first alphabetically, so it leads under

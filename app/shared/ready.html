@@ -181,20 +181,30 @@
 
     <h2 class="sect">Still open (red is red — say it in the room)</h2>
     <ul class="open">
-      <li><strong>A booking never reaches the Dashboard's meters</strong> — the
-      Dashboard reads Booking's log but generates its own studio, so the class
-      ids never match and every row is rejected. Measured on August 20, 2026:
-      zero shared class ids out of 75. This is the one hand-off on the story
-      map that is red. Owner: Manny — one config line.</li>
-      <li><strong><span class="chip b">B</span> converges onto the shared studio</strong> — the Dashboard reads Booking's live log, but still generates its own studio (its own seed, frozen at Aug 19), so a member's real reservation can be rejected or pinned to a different class. One config line. Owner: Manny (round-two instructions sent, code included).</li>
-      <li><strong><span class="chip a">A</span> polish round</strong> — member-voice header, Today/Tomorrow chips, your-classes-first, the winter-wrong -04:00. Owner: Kerrian (round-two instructions sent, code included).</li>
-      <li><strong>Eight dead files still sit in the repo root</strong> — the
-      site we had before Pages switched to publishing <code>app/</code>. All
-      unreachable: root <code>index.html</code> is shadowed by
-      <code>app/index.html</code>, the other seven return 404. Six are Manny's,
-      one Kerrian's, one the team lead's, so none could be removed from Product
-      D's lane. The asks are written per owner in
-      <code>docs/REQUESTFOR-A-B-C.md</code>.</li>
+      <li><strong>A booking reaching the Dashboard is no longer red — on the
+      proposal branch.</strong> The Dashboard generated its own studio (its own
+      seed, frozen at Aug 19), so no class id it knew about was one the Booking
+      app had ever booked: measured August 20, 2026, zero shared class ids out
+      of 75, and every real reservation arrived as "outside the current
+      schedule". It now reads the same studio as everything else, and the fuller
+      week it wanted came along: generating with and without the fill knob gives
+      1,900 of 1,900 sessions identical in id, start time, class type and
+      status, so the knob was never what broke the ids. Watched end to end on
+      August 23, 2026 in a browser — a member books, the Dashboard reads
+      "1 in this schedule, 0 outside it", and that member is on the roster for
+      that class. It is on <code>do-not-merge/v0.0.2</code> and lands when Manny
+      takes his folder; it touches <code>app/shared/auth/studio.ts</code> too,
+      so it is a shared change, not a one-line one.</li>
+      <li><strong><span class="chip a">A</span> polish round — done.</strong>
+      Member-voice header, Today/Tomorrow chips, your-classes-first and the
+      winter-wrong <code>-04:00</code> are all in. The only trace of the offset
+      left is the comment recording why it went.</li>
+      <li><strong>The eight dead root files are gone</strong> — the site we had
+      before Pages switched to publishing <code>app/</code>. This entry read
+      "still sit in the repo root" after they had been removed, which is the
+      failure this board exists to avoid; the root now holds the contract and
+      nothing else, and <code>scripts/check-published.mjs</code> counts it every
+      run so the claim is not prose.</li>
       <li><strong>The deploy boundary is a setting, not a fact</strong> —
       GitHub's legacy builder still records the repo root as its Pages source
       underneath the Actions deploy. If anyone flips Settings → Pages → Source
