@@ -139,9 +139,9 @@ way. Read a gate's score as being about its RULE; survivors in its
 self-test and its `run()` are noise. `check-styles` reports 48% with four
 of eleven survivors inside its own verdict.
 
-**The judge does not have to be a suite.** `npm run mutate` routed every
-module to one of the three browser suites, so anything they cannot reach
-reported "no suite covers this" and stopped. `app/shared/color.ts` was in
+**The judge does not have to be a suite.** `npm run mutate` routes every
+module to one of the browser suites, so anything they cannot reach
+reports "no suite covers this" and stops. `app/shared/color.ts` was in
 that position — the module that decides whether a person's chosen
 background and text are readable enough to accept, checked only by
 `check-contrast.mjs --self-test`. `--judge="<command>"` judges by exit

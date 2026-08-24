@@ -247,7 +247,7 @@ npm run build     # emits the .js the browser runs (gitignored by design)
 `npm run check` is NOT `tsc --noEmit`, whatever a doc tells you. It runs
 `tsc`, which emits, then every gate the `check` script in `package.json`
 names — read them there rather than from a list here, which is how this
-sentence came to omit one — then all three suites headlessly. Verifying a change with
+sentence came to omit one — then every suite `run-suites` finds, headlessly. Verifying a change with
 `--noEmit` compiles nothing, so the suites re-run the PREVIOUS build and
 report a clean pass over code you just edited — that has already happened
 here once, to a fix deliberately reverted to watch the checks go red. They
