@@ -245,14 +245,26 @@ export function generateStudio(
 
       if (archetype === "neverCame") continue;
 
-      // How long ago their last real visit was, per archetype.
-      const lastVisitDaysAgo =
+      /* How long ago their last real visit was, per archetype — never
+       * longer ago than they joined. longGone's range tops out at 140 and
+       * left's at 120, both past startedDaysAgo's floor of 90, so either
+       * archetype could draw a "last visit" that predates the member's own
+       * join date. The v=0 attendance row is then clamped away by the
+       * join-date guard below before it is ever added, leaving that member
+       * with ZERO attendance — which findQuietMembers() reads as "never
+       * attended — onboarding, not ours" (logic.ts), silently dropping
+       * them from the outreach this archetype exists to produce. Measured
+       * across 200 seeds before this clamp: longGone hit it 53 times, left
+       * 4 times. */
+      const lastVisitDaysAgo = Math.min(
+        startedDaysAgo,
         archetype === "loyal" ? intBetween(random, 1, 12)
         : archetype === "fading" ? intBetween(random, 16, 55)
         : archetype === "longGone" ? intBetween(random, 75, 140)
         : archetype === "newcomer" ? intBetween(random, 1, 9)
         : archetype === "paused" ? intBetween(random, 20, 90)
-        : /* left */ intBetween(random, 30, 120);
+        : /* left */ intBetween(random, 30, 120),
+      );
 
       // Their visits before that, roughly weekly, thinning out further back.
       const visitCount =
