@@ -271,20 +271,33 @@ These cost real time. They are the most valuable part of this brief.
 - **No real studio has used this.** No real member has received a note. The
   product has never been in front of a real user — that is the biggest gap and
   it is human work, not code.
-- **The shared fixtures age, and no page reads them.** `fixtures.json` has
-  fixed 2026 dates, and two active members could be flagged from it — Maria
-  Santos and James Okafor; Priya Patel is paused and Sofia Reyes is canceled,
-  so neither ever flags. What that costs has changed. This product's default
-  door is the running studio, not `loadFixtures()`, and as of 2026-08-22 no
-  page in the repo reaches the legacy fixture at all, so nothing a staff
-  member opens goes empty when it ages. What ages out is the GATE:
-  `scripts/check-fixtures.mjs` fails once the newest attended class is more
-  than 60 days old, and that blocks every deploy until somebody rolls the
-  file forward. Read the countdown there. This paragraph carried the dates in
-  prose instead and was wrong twice — it named the first member to age out
-  rather than the last until 2026-08-21, and then every date in it went stale
-  on 2026-08-22, when the fixture was rolled forward four days. The unit
-  checks are pinned and will not rot. Refreshing the team-owned fixture is
+- **The shared fixtures age, and this bullet has named the wrong file for
+  it since 2026-08-22.** The two active members that can be flagged from a
+  fixed 2026 date — Maria Santos and James Okafor; Priya Patel is paused
+  and Sofia Reyes is canceled, so neither ever flags — live in
+  `data/staff-records.json` now, not `fixtures.json`. Records naming a
+  person moved there that same day, because everything under `app/` is
+  served at a URL. `fixtures.json` kept only what any visitor may read —
+  the timetable, who teaches, the studio's policies — and has no `members`
+  field to carry a date at all.
+
+  This product's default door is the running studio, not `loadFixtures()`.
+  `loadFixtures()` itself is NOT unreached, either, which is the second
+  half of the correction: `c-chatbot/main.ts` calls it for the timetable
+  and policies a member asks the assistant about, so that half of the
+  split file is a live member-facing read. The half that ages —
+  `staff-records.json` — is reached only through `/api/staff/records`,
+  behind the staff gate, which is where the data law puts it.
+
+  What ages out is the GATE: `scripts/check-fixtures.mjs` fails once the
+  newest attended class is more than 60 days old, checking both files
+  together, and that blocks every deploy until somebody rolls the dates
+  forward. Read the countdown there — this paragraph has carried dates in
+  prose three times now and been wrong twice: it named the first member to
+  age out rather than the last until 2026-08-21, then every date in it went
+  stale on 2026-08-22 when the fixture rolled forward four days, and it
+  named the wrong FILE from 2026-08-22 until this correction. The unit
+  checks are pinned and will not rot. Refreshing the team-owned records is
   the fix — **never hardcode a fake "today"**.
 - **`REQUESTFOR-A-B-C.md` asks are unanswered:** where Kerrian stores runtime
   reservations, whether Manny's dashboard will record attendance, and whether
