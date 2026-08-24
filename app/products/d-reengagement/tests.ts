@@ -4484,6 +4484,15 @@ check("clean records produce no data-quality line",
     routineProblems(routine({ interestKeys: [] })).length > 0, true);
   check("an approval date in the future is refused",
     routineProblems(routine({ approvedAt: "2099-01-01" })).length > 0, true);
+  /* THE BOUNDARY ITSELF, not just a date far past it. "2099-01-01" is
+   * refused whether the guard is `>` or `>=` against today, so nothing
+   * above tells the two apart — `npm run mutate` found exactly this gap.
+   * An approval dated TODAY is an assertion that a person read this
+   * today, which must be accepted; one dated tomorrow must not be. */
+  check("an approval dated exactly today is accepted, not refused",
+    routineProblems(routine({ approvedAt: "2026-08-20" }), "2026-08-20"), []);
+  check("...while one dated the very next day is refused",
+    routineProblems(routine({ approvedAt: "2026-08-21" }), "2026-08-20").length > 0, true);
   check("a malformed approval date is refused",
     routineProblems(routine({ approvedAt: "22/08/2026" })).length > 0, true);
   check("an over-long title is refused",
@@ -4515,6 +4524,35 @@ check("clean records produce no data-quality line",
     approvedRoutines(good).map((r) => r.id).join(","), "routine-b,routine-a");
   check("draft and retired routines are never browsable",
     approvedRoutines(good).every((r) => r.status === "approved"), true);
+
+  /* THE TIE-BREAKS HAD NO CHECK THAT COULD TELL THEM APART FROM DURATION.
+   * The pair above (20min "Bravo" vs 10min "Alpha") has the shorter one
+   * ALSO alphabetically first, so a mutation that skipped duration and
+   * compared titles instead produced the identical order by coincidence —
+   * `npm run mutate` found `!==` on durationMinutes could flip to `===`
+   * and nothing noticed. These three fixtures put duration, title and id
+   * in DISAGREEMENT, one at a time, so only the correct field can produce
+   * the expected order. */
+  const orderCheck = loadLibrary([
+    routine({ id: "routine-e", status: "approved", durationMinutes: 20, title: "Alpha" }),
+    routine({ id: "routine-f", status: "approved", durationMinutes: 10, title: "Zulu" }),
+  ]);
+  check("duration wins even when the shorter routine sorts LATER by title",
+    approvedRoutines(orderCheck).map((r) => r.id).join(","), "routine-f,routine-e");
+
+  const titleTie = loadLibrary([
+    routine({ id: "routine-g", status: "approved", durationMinutes: 15, title: "Zulu" }),
+    routine({ id: "routine-h", status: "approved", durationMinutes: 15, title: "Alpha" }),
+  ]);
+  check("equal duration falls back to title, not to import order",
+    approvedRoutines(titleTie).map((r) => r.id).join(","), "routine-h,routine-g");
+
+  const idTie = loadLibrary([
+    routine({ id: "routine-z", status: "approved", durationMinutes: 15, title: "Same" }),
+    routine({ id: "routine-a2", status: "approved", durationMinutes: 15, title: "Same" }),
+  ]);
+  check("equal duration AND title falls back to id",
+    approvedRoutines(idTie).map((r) => r.id).join(","), "routine-a2,routine-z");
 
   const many = loadLibrary([
     routine({ id: "routine-1", status: "approved", durationMinutes: 10, interestKeys: ["yoga"] }),
