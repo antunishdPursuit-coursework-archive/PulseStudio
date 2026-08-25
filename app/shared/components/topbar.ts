@@ -46,7 +46,7 @@ import {
   readPulseSession,
   subscribeToPulseSession,
 } from "../auth/session.js";
-import { readStaffGate, signOutStaff } from "../auth/staff-gate.js";
+import { readStaffGate, signInStaff, signOutStaff } from "../auth/staff-gate.js";
 import {
   signInAsFrontDesk,
   signInAsMember,
@@ -178,7 +178,7 @@ async function openDialog(): Promise<void> {
   const state = dialog.querySelector(".pulse-session-state");
   const rows = dialog.querySelector(".pulse-session-rows");
   if (!(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
-  if (rows.childElementCount > 0) return; // already loaded once
+  if (rows.dataset["view"] === "choices") return; // already loaded once
 
   state.textContent = "Loading the member records…";
   try {
@@ -189,6 +189,7 @@ async function openDialog(): Promise<void> {
         : `${counted(members.length, "member")} in the shared studio. Pick who you are:`;
     for (const member of members) rows.appendChild(memberRow(member));
     rows.appendChild(staffRow());
+    rows.dataset["view"] = "choices";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     state.textContent = `The member records could not load: ${message}`;
@@ -208,10 +209,9 @@ function buildDialogShell(): HTMLDialogElement {
   const intro = document.createElement("p");
   intro.className = "pulse-session-intro";
   intro.textContent =
-    "Test sign-in, for testing purposes — no password. Every member below " +
-    "is fictional, and choosing one only decides what this browser shows " +
-    "you. Staff sign-in is not on this list: the studio's server checks it, " +
-    "and it is the only thing here that can refuse.";
+    "Member names below are fictional and choosing one only decides what " +
+    "this browser shows you. Staff sign-in is checked by the studio's " +
+    "server and is the only thing here that can unlock staff records.";
 
   const state = document.createElement("p");
   state.className = "pulse-session-state";
@@ -242,18 +242,116 @@ function memberRow(member: SyntheticMember): HTMLButtonElement {
   /* Presentation only: WHO may sign in and WHAT gets written is
    * auth/sign-in.ts's decision — this file just draws the rows. */
   return row(member.displayName, member.id, member.currentStatusSnapshot, () => {
-    signInAsMember(member);
+    void selectMember(member);
   });
+}
+
+async function selectMember(member: SyntheticMember): Promise<void> {
+  /* A stale server cookie must not coexist with a newly chosen member
+     persona. DELETE is harmless for an ordinary member and closes the only
+     path by which a direct staff login could outlive this choice. */
+  await signOutStaff();
+  signInAsMember(member);
 }
 
 function staffRow(): HTMLButtonElement {
   const { staff } = signInChoices();
-  return row(
+  const button = row(
     staff.display_name,
     staff.actor_type === "staff" ? staff.staff_id : "",
     "staff · front desk",
-    () => { signInAsFrontDesk(); },
+    () => { void openStaffLogin(); },
+    false,
   );
+  return button;
+}
+
+async function openStaffLogin(): Promise<void> {
+  const dialog = document.getElementById(DIALOG_ID);
+  const state = dialog?.querySelector(".pulse-session-state");
+  const rows = dialog?.querySelector(".pulse-session-rows");
+  if (!(dialog instanceof HTMLDialogElement) || !(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
+
+  state.textContent = "Checking the staff sign-in…";
+  rows.dataset["view"] = "staff";
+  rows.replaceChildren();
+  const gate = await readStaffGate();
+  if (!gate.configured) {
+    state.textContent = gate.reachable
+      ? "Staff sign-in is not configured on this server yet."
+      : "The studio's server did not answer, so staff sign-in is unavailable.";
+    rows.appendChild(backToSignInChoices());
+    return;
+  }
+
+  state.textContent = "Staff sign-in — enter the studio passphrase:";
+  const form = document.createElement("form");
+  form.className = "pulse-session-staff-form";
+  form.noValidate = true;
+
+  const label = document.createElement("label");
+  label.htmlFor = "pulse-session-staff-pass";
+  label.textContent = "Staff passphrase";
+  form.appendChild(label);
+
+  const field = document.createElement("input");
+  field.id = "pulse-session-staff-pass";
+  field.type = "password";
+  field.name = "passphrase";
+  field.autocomplete = "current-password";
+  field.required = true;
+  form.appendChild(field);
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.textContent = "Sign in as Front Desk";
+  form.appendChild(submit);
+
+  const problem = document.createElement("p");
+  problem.className = "pulse-session-staff-problem";
+  problem.setAttribute("role", "alert");
+  problem.hidden = true;
+  form.appendChild(problem);
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    submit.textContent = "Checking…";
+    void signInStaff(field.value).then((result) => {
+      if (result.ok) {
+        signInAsFrontDesk();
+        dialog.close();
+        window.location.reload();
+        return;
+      }
+      problem.textContent = result.message;
+      problem.hidden = false;
+      field.value = "";
+      field.focus();
+      submit.disabled = false;
+      submit.textContent = "Sign in as Front Desk";
+    });
+  });
+
+  rows.appendChild(form);
+  field.focus();
+}
+
+function backToSignInChoices(): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "pulse-session-row";
+  button.textContent = "← Back to sign-in choices";
+  button.addEventListener("click", () => {
+    const dialog = document.getElementById(DIALOG_ID);
+    const state = dialog?.querySelector(".pulse-session-state");
+    const rows = dialog?.querySelector(".pulse-session-rows");
+    if (!(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
+    state.textContent = "Choose a member or staff sign-in:";
+    rows.replaceChildren(...signInChoices().members.map(memberRow), staffRow());
+    rows.dataset["view"] = "choices";
+  });
+  return button;
 }
 
 function row(
@@ -261,6 +359,7 @@ function row(
   identity: string,
   note: string,
   choose: () => void,
+  closeAfter = true,
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
@@ -278,6 +377,7 @@ function row(
   button.appendChild(tag);
   button.addEventListener("click", () => {
     choose();
+    if (!closeAfter) return;
     const dialog = document.getElementById(DIALOG_ID);
     if (dialog instanceof HTMLDialogElement) dialog.close();
   });
@@ -343,6 +443,10 @@ function injectStylesOnce(): void {
 .pulse-session-row strong { grid-column: 1; }
 .pulse-session-row span { grid-column: 1; color: var(--muted); font-size: 0.85rem; }
 .pulse-session-row em { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; font-size: 0.78rem; color: var(--muted); }
+.pulse-session-staff-form { display: grid; gap: 8px; }
+.pulse-session-staff-form input { width: 100%; box-sizing: border-box; }
+.pulse-session-staff-form button { justify-self: start; }
+.pulse-session-staff-problem { margin: 0; color: var(--danger, var(--fg)); }
 `;
   document.head.appendChild(style);
 }

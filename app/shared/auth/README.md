@@ -76,7 +76,7 @@ lingering.
 | `studio.ts` | The one shared studio the dialog lists and sessions resolve against |
 | `docs/hosted-schema.sql` | The Postgres schema for the hosted version — `member_id` is the identity there too; email is the login credential. It sat here until 2026-08-23 and moved to `docs/` because everything under `app/` is served at a public URL |
 | `tests.html` / `tests.ts` | Browser-run checks, written failing-first against this API. The page states its own count — this table used to name one and it went stale. |
-| `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk as a separate staff row, chip + Sign out |
+| `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk passphrase form, chip + Sign out |
 
 ## The compatibility view (temporary, by design)
 
