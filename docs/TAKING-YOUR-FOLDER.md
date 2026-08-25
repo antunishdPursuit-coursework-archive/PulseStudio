@@ -125,51 +125,53 @@ suite `run-suites` finds. Each prints the count it reached. Read the counts.
 And note what a green gate does not do: **it never opens a browser.** Run
 `npm run start` and look at your pages before you open the pull request.
 
-## One live defect, in Manny's folder, on `main` today
+## A defect this hand-off found in Manny's folder — CLOSED 2026-08-24
 
-**Status: closed.** Product B now mounts the shared server-backed staff door
-before rendering, and the obsolete sibling page has been retired. The
-historical finding below is retained as a record of what was fixed.
+**Read this as history, not as a warning.** Manny fixed it in `0793e2b`
+("align dashboard with shared studio"). Re-verified in a browser afterwards:
+an anonymous visitor to `/products/b-dashboard/` now gets the staff door and
+nothing else — no capacity, no enrollment totals, no roster. The audience
+law's sentence, "a door on the dashboard and the re-engagement tool", is true
+of both halves again.
 
-Verified in a browser against `main` at `3457374`, not inferred from a gate:
+The record is kept because the CAUSE is still worth reading before you touch
+that folder.
 
-`GET /products/b-dashboard/` returns **200 to an anonymous visitor** and
-renders the whole staff dashboard — weekly operations, session counts,
-enrollment totals, and a **"View roster"** button on every class that opens a
-table of member names with reservation and attendance status. There is no
-door on it at all. The re-engagement tool, a staff surface of the same kind,
-correctly shows only a sign-in door.
+What was true, verified in a browser against `main` at `3457374`:
 
-**Be precise about the severity, because it decides the fix.** The names on
-that screen are not the studio's records. `staff-dashboard.js` calls
+`GET /products/b-dashboard/` returned **200 to an anonymous visitor** and
+rendered the whole staff dashboard — weekly operations, session counts,
+enrollment totals, and a **"View roster"** button on every class that opened a
+table of member names with reservation and attendance status. There was no
+door on it at all, while the re-engagement tool, a staff surface of the same
+kind, correctly showed only a sign-in door.
+
+**Severity was worth getting right, because it decided the fix.** The names on
+that screen were not the studio's records: `staff-dashboard.js` calls
 `generateStudio()` and invents a studio in the browser from a seed. The real
-records are gated and the gate holds: `GET /api/staff/records` with no cookie
-returns **401**, and `GET /data/staff-records.json` returns **404**. So this
-is not exposed member data. It is a **staff surface with no door**, which the
-audience law forbids outright — "STAFF surfaces are GATED, and the gate is
-real."
+records were gated throughout and the gate held — `GET /api/staff/records`
+with no cookie returns **401**, and `GET /data/staff-records.json` returns
+**404**. So no member data was ever exposed. It was a **staff surface with no
+door**, which the audience law forbids outright — "STAFF surfaces are GATED,
+and the gate is real." Had it been read as a data breach, the fix would have
+gone hunting in the wrong place.
 
-The cause is already written down in two baselines, which is the part worth
-sitting with. `b-dashboard/index.html` loads `staff-dashboard.js` — 69 lines
-of hand-written JavaScript with no TypeScript source, so `tsc` never opens it
+**The cause was written down in two baselines before anybody noticed the
+door was missing, and that is the part worth sitting with.**
+`b-dashboard/index.html` loads `staff-dashboard.js` — hand-written JavaScript
+with no TypeScript source, so `tsc` never opens it
 ([sources-baseline.json](./sources-baseline.json)). Meanwhile
-`b-dashboard/main.ts` is loaded by no page at all
+`b-dashboard/main.ts` was loaded by no page at all
 ([reachable-baseline.json](./reachable-baseline.json)). Two modules for one
-dashboard, and **the door went on the one nothing runs.**
+dashboard, and **the door had gone on the one nothing runs.** A door on an
+unreached module is a picture of a door.
 
-So the fix is not only "mount the door". It is:
-
-1. Decide which of the two dashboards is real.
-2. Put the door on the module `index.html` actually loads — or make the page
-   load the module that has the door. `app/products/d-reengagement/main.ts`
-   on `main` is the shape to copy: it imports `mountStaffDoor` from
-   `../../shared/auth/staff-gate.js` and draws nothing until the server says
-   yes.
-3. Clear whichever baseline line stops being true. Both lists only shrink.
-
-The shelf version of your folder adds `staff-dashboard.ts`, `tests.html` and
-`tests.ts` — that rewrite is already started. Check whether it is finished
-before assuming it is.
+**One half of that is still true.** The live module is still hand-written
+JavaScript with no TypeScript source, so no compiler reads the file the
+dashboard actually runs — which is exactly the condition that let a missing
+door go unnoticed. Its line in `sources-baseline.json` is still there, and
+that list only shrinks. Giving that module a TypeScript source is Manny's
+call and the next thing worth doing in that folder.
 
 ## What is NOT yours to take
 
