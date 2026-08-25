@@ -9,6 +9,12 @@ build/
 app/**/*.js
 app/**/*.js.map
 
+# The stamped build revision. scripts/stamp-revision.mjs regenerates this
+# from `git rev-parse HEAD` on every `npm run build`, before tsc compiles
+# it — a checked-in copy would go stale the moment the next commit landed,
+# the same reason the compiled .js above is never committed either.
+app/shared/revision.ts
+
 # Python environments and caches
 .venv/
 venv/

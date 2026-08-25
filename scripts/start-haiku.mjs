@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isValidRevision } from "./revision.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
@@ -16,6 +17,32 @@ const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
  * or a provider; the repository is the same file on every machine. */
 const host = process.env["HOST"] ?? "127.0.0.1";
 const model = process.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001";
+
+/* WHICH COMMIT IS ACTUALLY RUNNING, proven rather than assumed. The value
+ * is read ONCE, at process start, from the compiled `app/shared/revision.js`
+ * — a plain string constant that `scripts/stamp-revision.mjs` burns in from
+ * `git rev-parse HEAD` at BUILD time (see that script for why). There is no
+ * environment variable here on purpose: `HOST`, `PORT` and the rest above
+ * are deployment facts and are meant to be set per box, but a revision is
+ * not something a box gets to declare about itself — if an env var could
+ * override it, "prove which commit is running" would mean nothing more
+ * than "state whatever REVISION_OVERRIDE happens to be set to". A build
+ * that has not run yet, or a copy with no compiled module at all, reports
+ * `null` rather than guessing — the same as any other value this file
+ * refuses to treat as valid. */
+let stampedRevision = null;
+try {
+  ({ REVISION: stampedRevision } = await import(new URL("../app/shared/revision.js", import.meta.url).href));
+} catch {
+  stampedRevision = null;
+}
+/* Never trust the import blindly: a hand-edited stamp, a build run outside
+ * a git checkout, or a stale artifact copied in some other way could all
+ * leave a string here that is not a real 40-hex commit SHA. Anything that
+ * is not is reported as `null` — absent, not a fabricated-looking answer —
+ * exactly like "unknown", "dev", a blank string or an HTML fragment must
+ * all read as absent per this same rule. */
+const revision = isValidRevision(stampedRevision) ? stampedRevision : null;
 /* A comma-separated allow-list of page origins that may call /api/chat
  * from a DIFFERENT origin. Unset means same-origin only, which is what a
  * host running this script as the site's own server needs. Set only when
@@ -534,7 +561,7 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/chat" && request.method === "GET") {
-    json(response, 200, { available: Boolean(process.env["ANTHROPIC_API_KEY"]), model });
+    json(response, 200, { available: Boolean(process.env["ANTHROPIC_API_KEY"]), model, revision });
     return;
   }
   if (pathname === "/api/chat" && request.method === "POST") {
@@ -568,6 +595,7 @@ const server = createServer(async (request, response) => {
 
 server.listen(port, host, () => {
   console.log(`Pulse Studio with Haiku support: http://${host}:${port}`);
+  console.log(revision !== null ? `Running commit ${revision}.` : "Running commit unknown: app/shared/revision.js was missing, unbuilt, or not a valid 40-hex SHA. Run `npm run build` inside a git checkout.");
   console.log(process.env["ANTHROPIC_API_KEY"] ? `Haiku ready (${model}).` : "Haiku unavailable: set ANTHROPIC_API_KEY before starting.");
   console.log(staffPassphrase !== ""
     ? `Staff records behind /api/staff/records; sessions last ${STAFF_SESSION_MINUTES} minutes. Sign-in needs HTTPS or localhost — the session cookie is __Host- prefixed and refuses to set otherwise.`

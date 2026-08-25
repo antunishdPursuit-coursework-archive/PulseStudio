@@ -119,6 +119,38 @@ nowhere to keep a secret, so there is no honest way to open that door.
 The member-facing site — the timetable, booking, the front page — works fine
 on a static host. Staff surfaces need this process.
 
+## Proving which commit is deployed
+
+`GET /api/chat` also answers `revision`, alongside `available` and `model`.
+It is the full 40-character `git rev-parse HEAD` of the commit the running
+build was compiled from — not read at request time, and not read from
+`.git` at all once the process is running.
+
+`scripts/stamp-revision.mjs` runs once, at BUILD time (`npm run build` and
+`npm run check` both run it before `tsc`), reads `git rev-parse HEAD` in the
+checkout the build is happening in, and burns the result into
+`app/shared/revision.ts` — gitignored, exactly like the compiled `.js`
+beside it, and regenerated on every build so it can never be older than the
+source tree that produced it. The server imports the COMPILED constant at
+process start, never a live git command, so a production copy with no
+`.git` directory at all — a container image, a tarball, an rsync of build
+output only — still reports the exact commit it was built from. The box
+deploy is a plain `git clone` today; nothing here assumes that stays true.
+
+There is deliberately no environment variable for this. Every other row in
+the table above is a deployment fact a host is trusted to set — but a
+process cannot be allowed to simply *declare* which commit it is running,
+or "prove which commit is deployed" would mean nothing more than "state
+whatever variable happens to be set." The only way in is the build step.
+
+A value that is not a full 40-hex commit SHA — blank, `"dev"`,
+`"unknown"`, a short SHA, or an HTML fragment a proxy handed back instead
+of the real thing — is never reported as if it were one. `revision` reads
+`null` instead: absent, not a fabricated-looking guess. `scripts/
+check-revision.mjs` (part of `npm run check`) holds the same validator
+(`scripts/revision.mjs`) both the write side and the read side import, so
+the two cannot quietly disagree about what counts as valid.
+
 ## What a host has to give it
 
 The run contract is three lines and names no provider, because a provider's
