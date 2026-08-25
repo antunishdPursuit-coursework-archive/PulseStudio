@@ -108,6 +108,7 @@ publishes. A red gate never reaches the live URL.
 
 **And note what none of them do: a green gate does not open a browser.** Look
 at the pages your change could affect.
+
 ## The studio it models
 
 A single-location boutique fitness studio — yoga, cycling, HIIT. Members pay a
@@ -199,11 +200,15 @@ rather than left to be found on the day, and the open asks between developers
 live in [docs/REQUESTFOR-A-B-C.md](docs/REQUESTFOR-A-B-C.md) with an owner and
 one closing action each.
 
-One thing worth knowing before you read further:
-
-- **The support assistant answers nothing on the deployed site.** It posts every
-  question to an address a static build does not publish. It works locally with
-  a key; the hosted endpoint is its remaining blocker.
+This section used to list one thing worth knowing before reading further:
+that the support assistant answered nothing on the deployed site, because it
+posts every question to an address a static build does not publish. That
+stopped being true on 2026-08-25 — the same site now also runs at
+[pulse.githat.io](https://pulse.githat.io/), a real process, and the
+assistant answers there. It stayed listed here until the hosted copy
+actually existed, not until one was merely proposed. GitHub Pages, the
+static copy above, still cannot run it — that limit is architectural, not a
+remaining task.
 
 This section used to list a second item — a member's booking never reaching
 the dashboard's meters, because the dashboard generated its own studio
