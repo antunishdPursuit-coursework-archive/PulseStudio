@@ -21,6 +21,7 @@ import {
 } from "./reservations.js";
 import {
   bookRefusal,
+  currentPolicyAnswer,
   heldStatus,
   letGoLine,
   reservedMemberIds,
@@ -113,6 +114,13 @@ check("no rows, no stamp needed", reservationsForSchedule([], null, "2026-08-24"
 check("one reservation let go is singular", letGoLine(1), "1 reservation from another studio date was let go. ");
 check("several reservations let go are plural", letGoLine(2), "2 reservations from another studio date were let go. ");
 check("nothing let go is an empty line", letGoLine(0), "");
+
+const oldCancel = { topic: "cancellation", answer: "Cancel a reservation up to 24 hours before class starts at no charge.", isCurrent: false };
+const currentCancel = { topic: "cancellation", answer: "Cancel a reservation up to 12 hours before class starts at no charge. Later cancellations count against your monthly class allowance.", isCurrent: true };
+const bring = { topic: "what to bring", answer: "Bring a water bottle and a towel.", isCurrent: true };
+check("Cancel shows the current cancellation policy", currentPolicyAnswer([oldCancel, currentCancel, bring], "cancellation"), currentCancel.answer);
+check("a superseded cancellation policy is not shown", currentPolicyAnswer([oldCancel, currentCancel], "cancellation") === oldCancel.answer, false);
+check("no current cancellation policy is stated as none", currentPolicyAnswer([oldCancel], "cancellation"), null);
 
 const matching = memoryStore({
   [RUNTIME_KEY]: JSON.stringify([reserved]),
