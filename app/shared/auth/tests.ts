@@ -700,6 +700,34 @@ check("unreachable outranks unconfigured — both true says the door is down", (
   return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
+/* ---------- the door has to leave something for Sign out to end ---------- *
+ *
+ * Proven by hand against the real server first (STAFF_PASSPHRASE set,
+ * scripts/start-haiku.mjs): sign in at the staff door directly — never
+ * touching the topbar's own "Sign in" dialog — and the server session is
+ * real (/api/staff/records answers, the studio's records render), yet the
+ * top bar still reads plain "Sign in". topbar.ts's Sign out button is the
+ * ONLY caller of signOutStaff() anywhere in this app, and it only renders
+ * when readPulseSession() is non-null. A person who proved they are staff
+ * at the door alone had NO control anywhere to end that session early —
+ * only the sixty-minute expiry or clearing cookies by hand would do it.
+ *
+ * The fix has mountStaffDoor's success path remember Front Desk locally
+ * the moment the server confirms — the exact value signInAsMember's sibling
+ * signInAsFrontDesk() already writes and already round-trips (checked
+ * above). What THIS check pins is that the door's OWN success branch
+ * actually calls it: the surrounding sequence (fetch, a form submit,
+ * window.location.reload()) is exactly what this synchronous check()
+ * harness cannot run — the same limit doorMessage's neighboring comment
+ * names for the rest of this module — so the shipped source is read
+ * instead, the same way synthetic/tests.ts already reads topbar.ts's
+ * source for a property no execution here can reach. */
+const staffGateSource = await (await fetch("./staff-gate.ts")).text();
+check("a confirmed staff sign-in remembers Front Desk locally, so Sign out has something to end", () =>
+  /result\.ok[\s\S]{0,400}signInAsFrontDesk\(\)/.test(staffGateSource)
+    ? true
+    : "mountStaffDoor's success branch does not call signInAsFrontDesk()");
+
 /* ---------- run ---------- */
 
 /* ---------- the compatibility view Product A reads ---------- */

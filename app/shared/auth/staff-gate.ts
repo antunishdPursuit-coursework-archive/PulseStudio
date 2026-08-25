@@ -26,7 +26,24 @@
 
    And where there is no server at all — pages opened straight off a static
    host — this reports exactly that rather than failing open. A surface that
-   cannot check its own door stays shut and says so. */
+   cannot check its own door stays shut and says so.
+
+   ONE MORE THING A GRANTED SESSION NEEDS: A WAY BACK OUT. Proving the
+   passphrase to this door used to leave the browser's own remembered
+   persona untouched — a person who signed in here directly, never
+   touching the topbar's separate sign-in dialog, ended up with a real,
+   server-confirmed staff session and no local persona at all. The ONLY
+   Sign out control in this app lives in components/topbar.ts, it is the
+   only caller of signOutStaff() anywhere, and it renders only when a
+   local persona exists — so that session had no way to end early short
+   of the sixty-minute expiry or clearing cookies by hand. Confirmed
+   against the real server: sign in here, and the top bar still read plain
+   "Sign in" while /api/staff/records already answered. Remembering Front
+   Desk locally the moment the server confirms costs this door nothing —
+   the server session is still the only thing that grants anything — and
+   it is what lets the top bar show a name and a working Sign out. */
+
+import { signInAsFrontDesk } from "./sign-in.js";
 
 export interface StaffGate {
   /** The server answered, and a staff passphrase is configured on it. */
@@ -212,6 +229,11 @@ export async function mountStaffDoor(root: HTMLElement): Promise<boolean> {
       submit.textContent = "Checking…";
       void signInStaff(field.value).then((result) => {
         if (result.ok) {
+          /* The server is the one thing that just granted anything; this
+             only gives the rest of the page a name and a Sign out button
+             to show for it — see the file header for the session that had
+             neither until this line existed. */
+          signInAsFrontDesk();
           panel.remove();
           /* Reload rather than render in place: every staff module reads
              its records at start-up, and a half-loaded page drawn before
