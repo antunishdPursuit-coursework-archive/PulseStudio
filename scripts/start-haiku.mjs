@@ -4,6 +4,17 @@ import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isValidRevision } from "./revision.mjs";
+import {
+  beginOAuthTransaction,
+  buildAuthorizeUrl,
+  createJwksCache,
+  createTransactionStore,
+  createUsedCodeStore,
+  exchangeCodeForToken,
+  isAuthorizedStaffSubject,
+  parseStaffSubjects,
+  verifyGithatIdentityTokenLive,
+} from "../app/shared/auth/githat-oauth.js";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
@@ -413,7 +424,11 @@ function cookieValue(request, name) {
 }
 
 function requestIsSignedInStaff(request) {
-  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE));
+  /* EITHER DOOR GRANTS ACCESS. requestIsSignedInViaGithat is declared below
+   * this point in the file, in the GitHat block, but a top-level `function`
+   * declaration is hoisted for the whole module — this is not a
+   * forward-reference bug. */
+  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) || requestIsSignedInViaGithat(request);
 }
 
 /* __Host- is not decoration. The prefix forbids a Domain attribute
@@ -426,6 +441,221 @@ function staffCookie(value, maxAgeSeconds) {
   return `${STAFF_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
 }
 
+/* ------------------------------------------------------------------ *
+ * A SECOND STAFF DOOR: "Sign in with GitHat" — OAuth 2.0 authorization
+ * code + PKCE(S256) against the sibling GitHat service at api.githat.io.
+ * See app/shared/auth/githat-oauth.ts for the protocol logic itself
+ * (state, PKCE, JWT verification, JWKS caching, staff-subject matching —
+ * all of it browser-and-Node portable and unit-checked in auth/tests.ts).
+ * What lives HERE is only the HTTP plumbing and Pulse's own session
+ * cookie for this door.
+ *
+ * DEPLOYED ALONGSIDE THE PASSPHRASE DOOR ABOVE, not instead of it. The
+ * passphrase path is the tested rollback; removing it is a later, separate
+ * step, taken only after this door has run live and been verified.
+ *
+ * AUTHENTICATION IS NOT AUTHORIZATION. A valid GitHat identity proves who
+ * signed in; STAFF_GITHAT_SUBJECTS decides whether that person is staff
+ * HERE, by an exact match on the immutable `sub` claim only — never an
+ * email, display name, or provider username. Read ONCE at startup, the
+ * same way STAFF_PASSPHRASE is, so a running process has one fixed answer
+ * for its whole lifetime. Unset or empty denies everyone; nothing here
+ * ever falls back to allowing everyone. ------------------------------ */
+
+const staffGithatSubjects = parseStaffSubjects(process.env["STAFF_GITHAT_SUBJECTS"]);
+const oauthTransactions = createTransactionStore();
+const usedAuthorizationCodes = createUsedCodeStore();
+const jwksCache = createJwksCache();
+
+/* A signing key separate from staffSigningKey above, and a cookie name
+ * separate from STAFF_COOKIE (__Host-pulse_session, not __Host-pulse-staff)
+ * — so one door's cookie can never satisfy the other door's check: each
+ * verifies only against its own HMAC key. Same per-process-only lifetime
+ * as the passphrase door, for the same reason (no key to store, no key to
+ * leak; a restart is the fastest way to revoke everyone). */
+const githatSigningKey = randomBytes(32);
+const GITHAT_SESSION_MINUTES = 60;
+const GITHAT_COOKIE = "__Host-pulse_session";
+
+function signGithatToken(sub, expiresAt) {
+  const payload = Buffer.from(JSON.stringify({ sub, exp: expiresAt }), "utf8").toString("base64url");
+  const mac = createHmac("sha256", githatSigningKey).update(payload).digest("base64url");
+  return `${payload}.${mac}`;
+}
+
+function githatTokenIsValid(token) {
+  if (typeof token !== "string") return false;
+  const [payload, mac] = token.split(".");
+  if (payload === undefined || mac === undefined) return false;
+  const expected = createHmac("sha256", githatSigningKey).update(payload).digest("base64url");
+  const offered = Buffer.from(mac, "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  if (offered.length !== wanted.length) return false;
+  if (!timingSafeEqual(offered, wanted)) return false;
+  try {
+    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof exp === "number" && Date.now() < exp;
+  } catch {
+    return false;
+  }
+}
+
+/* Same __Host- discipline as staffCookie above: no Domain attribute (so
+ * this can never be shared across subdomains), Secure (so it refuses to
+ * set anywhere but HTTPS or localhost), HttpOnly (so no script on this
+ * origin — including a future one with an injected-content bug — can ever
+ * read it), SameSite=Lax. */
+function githatCookie(value, maxAgeSeconds) {
+  return `${GITHAT_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+function requestIsSignedInViaGithat(request) {
+  return githatTokenIsValid(cookieValue(request, GITHAT_COOKIE));
+}
+
+/* GET /auth/githat/start — the browser's own click on "Sign in with
+ * GitHat" (staff-gate.ts) lands here. A fresh state + PKCE pair is
+ * generated and held SERVER-SIDE, in oauthTransactions above — never in a
+ * cookie, never in the URL, never in browser storage — and the browser is
+ * redirected straight to GitHat's own authorize endpoint. */
+async function githatStart(request, response) {
+  if (request.method !== "GET") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  const now = Date.now();
+  const tx = await beginOAuthTransaction(now);
+  oauthTransactions.save(tx);
+  response.writeHead(302, {
+    location: buildAuthorizeUrl(tx.state, tx.codeChallenge),
+    "cache-control": "no-store",
+  });
+  response.end();
+}
+
+/* A small, self-contained confirmation page — never a redirect loop and
+ * never a bare generic error. `message` is ALWAYS one of the fixed literal
+ * strings each call site below passes; the `state`, `code`, and `error`
+ * query parameters this route reads are validated and then discarded,
+ * NEVER echoed into this HTML, so a crafted callback URL has nothing here
+ * to inject into. */
+function sendGithatResult(response, status, message, redirectTo) {
+  const script = redirectTo
+    ? `<script type="module">
+  import { signInAsFrontDesk } from "/shared/auth/sign-in.js";
+  signInAsFrontDesk();
+  window.location.replace(${JSON.stringify(redirectTo)});
+</script>`
+    : "";
+  response.writeHead(status, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+  response.end(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pulse Studio staff sign-in</title></head>` +
+      `<body><p>${message}</p><p><a href="/index.html">Back to Pulse Studio</a></p>${script}</body></html>`,
+  );
+}
+
+/* GET /auth/callback — GitHat redirects the browser back here with
+ * ?code=...&state=.... EVERY step below fails CLOSED: a state mismatch, a
+ * reused state, a reused code, a failed exchange, a token that does not
+ * verify, or a sub that is not on STAFF_GITHAT_SUBJECTS all end in a
+ * plain, specific refusal — never a partial session, never a silent
+ * redirect loop. NOTHING FROM THIS EXCHANGE — the code, the retained PKCE
+ * verifier, or the token itself — is ever logged; the one line this route
+ * logs on denial names only a short machine-readable reason. */
+async function githatCallback(request, response) {
+  if (request.method !== "GET") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  const state = requestUrl.searchParams.get("state");
+  const code = requestUrl.searchParams.get("code");
+  const errorParam = requestUrl.searchParams.get("error");
+
+  if (typeof errorParam === "string" && errorParam !== "") {
+    sendGithatResult(response, 400, "GitHat sign-in was not completed.", null);
+    return;
+  }
+  if (typeof state !== "string" || state === "" || typeof code !== "string" || code === "") {
+    sendGithatResult(response, 400, "This sign-in link is missing required information.", null);
+    return;
+  }
+
+  const now = Date.now();
+  const tx = oauthTransactions.take(state, now);
+  if (tx === null) {
+    sendGithatResult(
+      response,
+      400,
+      "This sign-in attempt has expired, was already used, or does not match. Please try again.",
+      null,
+    );
+    return;
+  }
+  if (!usedAuthorizationCodes.claim(code, now)) {
+    sendGithatResult(response, 400, "This authorization code was already used.", null);
+    return;
+  }
+
+  const exchange = await exchangeCodeForToken({ code, codeVerifier: tx.codeVerifier, fetcher: fetch });
+  if (!exchange.ok || exchange.identityToken === undefined) {
+    sendGithatResult(response, 502, "GitHat could not confirm this sign-in.", null);
+    return;
+  }
+
+  const verdict = await verifyGithatIdentityTokenLive(exchange.identityToken, {
+    fetcher: fetch,
+    now,
+    cache: jwksCache,
+  });
+  if (!verdict.ok) {
+    console.error(`githat sign-in rejected: ${verdict.reason}`); // never the token itself
+    sendGithatResult(response, 401, "GitHat could not verify this sign-in.", null);
+    return;
+  }
+
+  if (!isAuthorizedStaffSubject(verdict.sub, staffGithatSubjects)) {
+    sendGithatResult(response, 403, "Your GitHat account is not authorized for staff access here.", null);
+    return;
+  }
+
+  const expiresAt = now + GITHAT_SESSION_MINUTES * 60 * 1000;
+  response.setHeader("set-cookie", githatCookie(signGithatToken(verdict.sub, expiresAt), GITHAT_SESSION_MINUTES * 60));
+  sendGithatResult(response, 200, "Signed in with GitHat.", "/index.html");
+}
+
+/* CSRF, and why SameSite=Lax alone is judged sufficient for every
+ * state-changing request this app actually has.
+ *
+ * The state-changing staff operations that exist today are: signing in
+ * with the passphrase (POST /api/staff/session), signing out (DELETE
+ * /api/staff/session), publishing a schedule (POST /api/schedule), and now
+ * the GitHat exchange this route performs on the server's own initiative
+ * after a top-level GET redirect. None of them is reachable the way a
+ * classic CSRF attack needs:
+ *
+ *   - POST and DELETE cannot be issued by a plain cross-site <a> or a
+ *     browser navigation at all — only same-origin `fetch()` calls
+ *     (staff-gate.ts, topbar.ts) ever issue them, and SameSite=Lax cookies
+ *     are withheld from a cross-site POST/DELETE regardless of how it was
+ *     triggered (an auto-submitting cross-site FORM included) — Lax only
+ *     ever forwards a cookie on a cross-site TOP-LEVEL GET navigation.
+ *   - The one top-level GET a cross-site page COULD trigger is exactly
+ *     that class of request, and this app never treats a GET as
+ *     state-changing on its own: /auth/githat/start only ever *starts* a
+ *     transaction (nothing is granted yet), and /auth/callback requires a
+ *     `state` this server itself issued and a `code` GitHat itself issued
+ *     — a cross-site page cannot forge either, so tricking a signed-in
+ *     visitor into loading that URL grants the attacker nothing (they get
+ *     no cookie back; it lands in the VICTIM's browser) and cannot forge a
+ *     result on the victim's behalf either, because the code and state
+ *     must both come from a real GitHat sign-in the attacker does not
+ *     control.
+ *
+ * A double-submit token would add a second secret to manage for no
+ * request shape this app actually has to defend. If a state-changing POST
+ * ever moves behind a plain cross-site-triggerable form, add one then. */
+
 async function staffSession(request, response) {
   if (request.method === "GET") {
     json(response, 200, {
@@ -436,7 +666,11 @@ async function staffSession(request, response) {
     return;
   }
   if (request.method === "DELETE") {
-    response.setHeader("set-cookie", staffCookie("", 0));
+    // Both doors' cookies are cleared, whichever (if either) was set —
+    // "Sign out" ends the session regardless of which door opened it. Node
+    // sends multiple Set-Cookie headers for an array value on this header
+    // specifically; each clears its own cookie by name.
+    response.setHeader("set-cookie", [staffCookie("", 0), githatCookie("", 0)]);
     json(response, 200, { signedIn: false });
     return;
   }
@@ -586,6 +820,14 @@ const server = createServer(async (request, response) => {
     await publishedSchedule(request, response);
     return;
   }
+  if (pathname === "/auth/githat/start") {
+    await githatStart(request, response);
+    return;
+  }
+  if (pathname === "/auth/callback") {
+    await githatCallback(request, response);
+    return;
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405).end("Method not allowed");
     return;
@@ -600,6 +842,9 @@ server.listen(port, host, () => {
   console.log(staffPassphrase !== ""
     ? `Staff records behind /api/staff/records; sessions last ${STAFF_SESSION_MINUTES} minutes. Sign-in needs HTTPS or localhost — the session cookie is __Host- prefixed and refuses to set otherwise.`
     : "Staff records locked: set STAFF_PASSPHRASE to let the dashboard and re-engagement tool sign in.");
+  console.log(staffGithatSubjects.size > 0
+    ? `Sign in with GitHat is wired at /auth/githat/start, and ${staffGithatSubjects.size} GitHat subject(s) are authorized for staff access.`
+    : "Sign in with GitHat is wired at /auth/githat/start, but STAFF_GITHAT_SUBJECTS is unset — a valid GitHat identity will be denied staff access until an operator sets it.");
   console.log(allowedOrigins.size > 0
     ? `Other pages allowed to read /api/chat answers: ${[...allowedOrigins].join(", ")}`
     : "No ALLOWED_ORIGINS set, so no OTHER page may read an /api/chat answer in a browser.");

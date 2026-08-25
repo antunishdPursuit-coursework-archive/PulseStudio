@@ -77,6 +77,8 @@ lingering.
 | `docs/hosted-schema.sql` | The Postgres schema for the hosted version — `member_id` is the identity there too; email is the login credential. It sat here until 2026-08-23 and moved to `docs/` because everything under `app/` is served at a public URL |
 | `tests.html` / `tests.ts` | Browser-run checks, written failing-first against this API. The page states its own count — this table used to name one and it went stale. |
 | `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk as a separate staff row, chip + Sign out |
+| `staff-gate.ts` | The staff door: passphrase sign-in, plus (as of this writing, opened as a PR pending human security review — see its own header) a "Sign in with GitHat" link to `/auth/githat/start` |
+| `githat-oauth.ts` | The GitHat OAuth 2.0 + PKCE(S256) client — state/PKCE bookkeeping, JWT (RS256-only) verification, JWKS caching, and `STAFF_GITHAT_SUBJECTS` matching. Browser-and-Node portable on purpose (Web Crypto only, no `node:crypto`) — see its own file header for why. The HTTP plumbing that calls it (`/auth/githat/start`, `/auth/callback`) and Pulse's own session-cookie signing live in `scripts/start-haiku.mjs`, not here |
 
 ## The compatibility view (temporary, by design)
 

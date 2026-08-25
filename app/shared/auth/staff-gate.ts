@@ -191,6 +191,32 @@ export async function mountStaffDoor(root: HTMLElement): Promise<boolean> {
   said.textContent = doorMessage(gate);
   panel.append(said);
 
+  /* THE SECOND DOOR, ALONGSIDE THE FIRST — never instead of it.
+   *
+   * "Sign in with GitHat" is a plain link, not a form: everything about
+   * the OAuth exchange (the random state, the PKCE verifier, the
+   * server-to-server token exchange, the JWT verification, the
+   * STAFF_GITHAT_SUBJECTS check) happens on the server, in
+   * scripts/start-haiku.mjs and app/shared/auth/githat-oauth.ts. This
+   * browser module never touches a token, a code, or a PKCE verifier —
+   * there is nothing here FOR it to touch. Shown whenever the server
+   * answered at all (gate.reachable), independent of whether the
+   * passphrase is configured: the two doors are unrelated, and an operator
+   * who has set up GitHat but not the passphrase (or the reverse) should
+   * still see the door that works. If STAFF_GITHAT_SUBJECTS is unset, this
+   * link still renders — signing in with GitHat still works, and the
+   * server denies staff access afterward, exactly the "deny by default"
+   * shape the rest of this door already has for a missing passphrase. */
+  if (gate.reachable) {
+    const oauth = document.createElement("p");
+    oauth.className = "staff-door-oauth";
+    const link = document.createElement("a");
+    link.href = "/auth/githat/start";
+    link.textContent = "Sign in with GitHat";
+    oauth.append(link);
+    panel.append(oauth);
+  }
+
   if (gate.configured) {
     const form = document.createElement("form");
     form.className = "staff-door-form";
