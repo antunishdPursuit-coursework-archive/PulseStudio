@@ -286,6 +286,22 @@ h1, h2, h3, .display, .page-head .role, .brand {
   background: var(--bg);
 }
 
+/* The light-mode grade above darkens an already-dark room on purpose —
+   moody reads as considered against a white page. On a black page the
+   same photo has nowhere left to fall: brightness(0.92) on a picture
+   this dark, sat on var(--bg)'s #000000, reads as an empty frame, not a
+   room. Dark mode gets its own grade so the photo stays a photo; the
+   frame's border is unchanged, because #333 on #000 was never the part
+   that disappeared. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="custom"]) .studio-photo {
+    filter: saturate(0.55) contrast(1.05) brightness(1.35);
+  }
+}
+:root[data-theme="dark"] .studio-photo {
+  filter: saturate(0.55) contrast(1.05) brightness(1.35);
+}
+
 /* developer scoping — the color law in one class */
 .product-a { --accent: var(--kerrian); --accent-ink: var(--kerrian-ink); --accent-strong: var(--kerrian-strong); }
 .product-b { --accent: var(--manny);   --accent-ink: var(--manny-ink);   --accent-strong: var(--manny-strong); }
