@@ -121,7 +121,6 @@ body.home { overflow-x: hidden; }
   font-size: 1.12rem;
   color: var(--muted);
 }
-.home .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 /* CTA buttons are large text (>=18.66px bold) so white ink on the blue and
    violet accents clears the WCAG large-text contrast threshold */
 .home .btn-lg { padding: 15px 30px; font-size: 1.15rem; font-weight: 900; letter-spacing: 0.05em; border-radius: 10px; text-decoration: none; display: inline-block; }
