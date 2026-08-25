@@ -937,8 +937,10 @@ h1, h2, h3, .display, .page-head .role, .brand {
   .site-footer li a,
   .site-footer-base a,
   .site-footer-brand a,
+  .site-footer-heading a,
   .topnav .brand,
-  .page-head .home-brand {
+  .page-head .home-brand,
+  .staff-door a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
