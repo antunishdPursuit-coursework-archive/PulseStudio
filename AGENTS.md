@@ -163,6 +163,7 @@ list: on the day it landed no product folder violated any of them.
   | `scripts/check-audience.mjs` | the audience law — no builder name or product letter in copy a member reads |
   | `scripts/check-secrets.mjs` | the git law — no credential material in a public repo |
   | `scripts/check-sources.mjs` | the git law — no committed build output, and every module the site runs has a TypeScript source |
+  | `scripts/check-revision.mjs` | a deployed instance can prove exactly which commit it runs — only a well-formed 40-hex commit SHA is ever reported as one; blank, short, "dev", "unknown" and an HTML fragment all read as absent |
   | `scripts/check-reachable.mjs` | the filing law — no module under `app/` that no page reaches |
   | `scripts/check-mirrors.mjs` | every `AGENTS.md` is still a byte-equivalent mirror of its `CLAUDE.md` |
   | `scripts/check-brand.mjs` | the clone seam — a page that shows the studio's name is wired to receive it |
