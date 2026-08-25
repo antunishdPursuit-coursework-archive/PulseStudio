@@ -11,7 +11,16 @@ Four products — booking, a staff dashboard, a support assistant, and a
 re-engagement tool — share one studio's records, one visual system, and one
 gate that every change passes before it reaches the live site.
 
-**[Open the live site →](https://antunishdpursuit.github.io/PulseStudio/)**
+**[Open the live site →](https://antunishdpursuit.github.io/PulseStudio/)** — GitHub
+Pages, static: every member-facing page works, and the member support
+assistant and both staff doors say so and stay closed, honestly, because a
+static host has no process to hold a key or check a passphrase in.
+
+**[Or the server-backed copy →](https://pulse.githat.io/)** — same site, run
+by [scripts/start-haiku.mjs](scripts/start-haiku.mjs) on a real process, so
+the assistant answers and staff sign-in is a real gate. See
+[docs/the-server.md](docs/the-server.md) for what a process gives you that a
+static host cannot, and why the source names no host for it.
 
 | | |
 | --- | --- |

@@ -218,6 +218,9 @@ npm run start
 ```
 
 Then open http://localhost:4173 — the front door links to all four products.
+The same server also runs at https://pulse.githat.io/, a free student slug
+(see `docs/the-server.md`) — the assistant and both staff doors are real
+there, not the closed-by-design state the static GitHub Pages copy shows.
 
 ## Per-folder briefs and the multi-assistant mirrors
 
