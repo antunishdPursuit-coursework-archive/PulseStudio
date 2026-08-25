@@ -470,11 +470,45 @@ const jwksCache = createJwksCache();
 /* A signing key separate from staffSigningKey above, and a cookie name
  * separate from STAFF_COOKIE (__Host-pulse_session, not __Host-pulse-staff)
  * — so one door's cookie can never satisfy the other door's check: each
- * verifies only against its own HMAC key. Same per-process-only lifetime
- * as the passphrase door, for the same reason (no key to store, no key to
- * leak; a restart is the fastest way to revoke everyone). */
-const githatSigningKey = randomBytes(32);
-const GITHAT_SESSION_MINUTES = 60;
+ * verifies only against its own HMAC key.
+ *
+ * THIS DOOR DELIBERATELY DOES NOT SHARE THE PASSPHRASE DOOR'S
+ * per-process-only key. A GitHat sign-in is meant to last real weeks
+ * (GITHAT_SESSION_MINUTES below), and a key regenerated on every process
+ * start would silently cap every session at "until the next deploy or
+ * crash-restart" regardless of what the cookie's Max-Age claims — a
+ * a 30-day cookie that actually dies on tonight's restart is a false
+ * promise, not a shorter one. So the key is read from the environment
+ * (set once, persisted in Secrets Manager alongside ANTHROPIC_API_KEY and
+ * STAFF_PASSPHRASE) if present. A HOST THAT NEVER SETS IT gets the old
+ * behavior — a fresh random key per process, sessions that cannot survive
+ * a restart — which is a safe, working default, just not a 30-day one;
+ * this is logged once at startup so that gap is never silent. The
+ * tradeoff this accepts, and the passphrase door does not: a leaked
+ * cookie now grants access for its remaining lifetime even across a
+ * restart, not just until the next one — which is exactly why the
+ * lifetime below is real-days, not "however long the process happens to
+ * stay up", and why sign-out and STAFF_GITHAT_SUBJECTS remain the actual
+ * revocation levers, not a restart. */
+/* Buffer.from(str, "hex") does NOT throw on a malformed string — it stops
+ * at the first non-hex character and silently hands back whatever it
+ * parsed, which can be a short buffer or, for a string with no valid hex
+ * prefix at all, an EMPTY one. Signing every session with an empty HMAC
+ * key would make them trivially forgeable, so a persisted key is only
+ * ever trusted if it is EXACTLY 32 bytes of valid hex — anything else is
+ * treated as absent (never as a shorter, still-usable key), falling back
+ * to the safe ephemeral default and logged loudly below rather than
+ * silently accepted. */
+const githatSigningKeyRaw = process.env["GITHAT_SESSION_SIGNING_KEY"];
+const githatSigningKeyValid = typeof githatSigningKeyRaw === "string" && /^[0-9a-fA-F]{64}$/.test(githatSigningKeyRaw);
+const githatSigningKey = githatSigningKeyValid
+  ? Buffer.from(githatSigningKeyRaw, "hex")
+  : randomBytes(32);
+const githatKeyIsPersisted = githatSigningKeyValid;
+if (githatSigningKeyRaw !== undefined && !githatSigningKeyValid) {
+  console.log("GITHAT_SESSION_SIGNING_KEY is set but is not exactly 64 hex characters (32 bytes) — rejected, not used at any length. Falling back to a fresh per-process key.");
+}
+const GITHAT_SESSION_MINUTES = 30 * 24 * 60; // 30 days
 const GITHAT_COOKIE = "__Host-pulse_session";
 
 function signGithatToken(sub, expiresAt) {
@@ -845,6 +879,9 @@ server.listen(port, host, () => {
   console.log(staffGithatSubjects.size > 0
     ? `Sign in with GitHat is wired at /auth/githat/start, and ${staffGithatSubjects.size} GitHat subject(s) are authorized for staff access.`
     : "Sign in with GitHat is wired at /auth/githat/start, but STAFF_GITHAT_SUBJECTS is unset — a valid GitHat identity will be denied staff access until an operator sets it.");
+  console.log(githatKeyIsPersisted
+    ? `GitHat sessions last ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days and survive a restart — GITHAT_SESSION_SIGNING_KEY is set.`
+    : `GitHat sessions are stated as ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days but WILL NOT survive a restart — GITHAT_SESSION_SIGNING_KEY is unset, so this process generated its own key and every GitHat session ends the moment it stops.`);
   console.log(allowedOrigins.size > 0
     ? `Other pages allowed to read /api/chat answers: ${[...allowedOrigins].join(", ")}`
     : "No ALLOWED_ORIGINS set, so no OTHER page may read an /api/chat answer in a browser.");
