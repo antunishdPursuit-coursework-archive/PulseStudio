@@ -10,6 +10,7 @@
    pulse-session; this page never keeps a second key. */
 
 import type { Reservation } from "../../shared/contract.js";
+import { STUDIO_NAME } from "../../shared/brand.js";
 import { readPulseSession, subscribeToPulseSession } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
 import type {
@@ -33,6 +34,8 @@ import {
   waitlistRefusal,
   waitlistedInOrder,
 } from "./rules.js";
+
+document.title = `Book a class — ${STUDIO_NAME}`;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
