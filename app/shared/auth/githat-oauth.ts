@@ -153,10 +153,20 @@ export async function pkceMatches(verifier: string, expectedChallenge: string): 
   return (await codeChallengeFromVerifier(verifier)) === expectedChallenge;
 }
 
+/* GitHat's own API takes the callback address as `redirect_url`, not the
+   OAuth-standard `redirect_uri` — verified live against
+   https://api.githat.io/oauth/authorize: the spec-standard param name
+   alone gets a flat 400 ("redirect_url is required"), and swapping in
+   `redirect_url` turns that into a real 302 to GitHat's own sign-in page
+   with this exact authorize URL threaded through as where to return.
+   Nothing about PKCE, state, or the client id changes — only this one
+   query-parameter NAME, on both the authorize leg here and the token
+   exchange below, matches what the live service actually reads rather
+   than what the spec would suggest. */
 export function buildAuthorizeUrl(state: string, codeChallenge: string): string {
   const url = new URL(GITHAT_AUTHORIZE_ENDPOINT);
   url.searchParams.set("client_id", GITHAT_CLIENT_ID);
-  url.searchParams.set("redirect_uri", PULSE_REDIRECT_URI);
+  url.searchParams.set("redirect_url", PULSE_REDIRECT_URI);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", codeChallenge);
@@ -191,13 +201,19 @@ export interface OAuthTransaction {
   readonly codeVerifier: string;
   readonly codeChallenge: string;
   readonly expiresAt: number;
+  /** Set only when this sign-in started from an invite link
+   *  (`/auth/invite/:token`) rather than the plain "Sign in with GitHat"
+   *  door. The callback redeems this exact invite on a successful
+   *  identity check — never any other invite, and never this one twice. */
+  readonly inviteToken?: string;
 }
 
-export async function beginOAuthTransaction(now: number): Promise<OAuthTransaction> {
+export async function beginOAuthTransaction(now: number, inviteToken?: string): Promise<OAuthTransaction> {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await codeChallengeFromVerifier(codeVerifier);
-  return { state, codeVerifier, codeChallenge, expiresAt: now + OAUTH_STATE_TTL_MS };
+  const tx: OAuthTransaction = { state, codeVerifier, codeChallenge, expiresAt: now + OAUTH_STATE_TTL_MS };
+  return inviteToken === undefined ? tx : { ...tx, inviteToken };
 }
 
 export interface TransactionStore {
@@ -301,7 +317,7 @@ export async function exchangeCodeForToken(params: {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code: params.code,
-    redirect_uri: PULSE_REDIRECT_URI,
+    redirect_url: PULSE_REDIRECT_URI, // see buildAuthorizeUrl's comment: GitHat's own param name
     client_id: GITHAT_CLIENT_ID,
     code_verifier: params.codeVerifier,
   });
@@ -558,4 +574,105 @@ export function parseStaffSubjects(envValue: string | undefined): ReadonlySet<st
 export function isAuthorizedStaffSubject(sub: string, subjects: ReadonlySet<string>): boolean {
   if (subjects.size === 0) return false;
   return subjects.has(sub);
+}
+
+/* ---------------------------------------------------------------- *
+ * ROLES. The studio owner is one specific GitHat identity, set once as
+ * OWNER_GITHAT_SUBJECT alongside STAFF_GITHAT_SUBJECTS. Everyone else who
+ * reaches staff access — via the static subject list above, or by
+ * accepting an owner-issued invite (see the invite store below) — is an
+ * "employee". The role decides ONE thing in this MVP: only "owner" may
+ * mint a new invite. Nothing here grants a role by email, display name,
+ * or provider username — the immutable `sub` claim only, same as
+ * isAuthorizedStaffSubject above.
+ * ---------------------------------------------------------------- */
+
+export type StaffRole = "owner" | "employee";
+
+export function parseOwnerSubject(envValue: string | undefined): string | null {
+  const trimmed = (envValue ?? "").trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+export function resolveStaffRole(
+  sub: string,
+  params: {
+    readonly ownerSubject: string | null;
+    readonly staffSubjects: ReadonlySet<string>;
+    readonly directorySubjects: ReadonlySet<string>;
+  },
+): StaffRole | null {
+  if (params.ownerSubject !== null && sub === params.ownerSubject) return "owner";
+  if (isAuthorizedStaffSubject(sub, params.staffSubjects)) return "employee";
+  if (params.directorySubjects.has(sub)) return "employee";
+  return null;
+}
+
+/* ---------------------------------------------------------------- *
+ * STAFF INVITES. The owner's whole MVP tool for growing the staff list:
+ * mint a single-use, expiring link; send it themselves through their own
+ * channel (same discipline as Product D's drafted messages — this app
+ * never sends anything on anyone's behalf); the person who opens it signs
+ * in with their own GitHat account and is added to the directory as
+ * "employee" the moment that sign-in succeeds. Held server-side only,
+ * same shape as the OAuth transaction store above and for the same
+ * reason: never a cookie, never a URL the browser is trusted to keep
+ * honest, never localStorage.
+ * ---------------------------------------------------------------- */
+
+/* A week is long enough that an owner sending a link "I'll get to this
+   later" still works, short enough that a stale, forgotten invite is not
+   a standing door. */
+export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface StaffInvite {
+  readonly token: string;
+  readonly createdAt: number;
+  readonly expiresAt: number;
+  used: boolean;
+}
+
+export interface InviteStore {
+  create(now: number): StaffInvite;
+  /** Still pending (issued, not yet used, not yet expired) — read-only. */
+  peek(token: string, now: number): StaffInvite | null;
+  /** Single-use: returns the invite iff it was still pending, and marks it
+   *  used in the same call so a second claim of the same token always
+   *  fails, whether the second attempt is the same person reloading a page
+   *  or someone else who intercepted the link. */
+  claim(token: string, now: number): StaffInvite | null;
+  list(now: number): readonly StaffInvite[];
+}
+
+export function createInviteStore(ttlMs: number = INVITE_TTL_MS): InviteStore {
+  const invites = new Map<string, StaffInvite>();
+  function sweep(now: number): void {
+    for (const [token, invite] of invites) {
+      if (invite.used || invite.expiresAt < now) invites.delete(token);
+    }
+  }
+  return {
+    create(now) {
+      sweep(now);
+      const token = generateState(); // same shape as OAuth `state`: random, URL-safe, single-use
+      const invite: StaffInvite = { token, createdAt: now, expiresAt: now + ttlMs, used: false };
+      invites.set(token, invite);
+      return invite;
+    },
+    peek(token, now) {
+      const invite = invites.get(token);
+      if (invite === undefined || invite.used || invite.expiresAt < now) return null;
+      return invite;
+    },
+    claim(token, now) {
+      const invite = invites.get(token);
+      if (invite === undefined || invite.used || invite.expiresAt < now) return null;
+      invite.used = true;
+      return invite;
+    },
+    list(now) {
+      sweep(now);
+      return [...invites.values()];
+    },
+  };
 }

@@ -935,6 +935,16 @@ h1, h2, h3, .display, .page-head .role, .brand {
    display beats the UA's [hidden] unless we say so here. */
 .staff-door-problem[hidden] { display: none; }
 
+/* THE OWNER'S INVITE PANEL reuses .staff-door's card look (border, radius,
+   background) but is NOT the full-page pre-signin gate — it sits alongside
+   whatever the page is already showing, so it is repositioned to a small
+   corner card instead of centered at 8vh. See app/shared/auth/staff-gate.ts. */
+.owner-invite-panel { position: fixed; right: 16px; bottom: 16px; margin: 0; max-width: 22rem; z-index: 20; box-shadow: 0 4px 18px rgba(0, 0, 0, .18); }
+.owner-invite-panel h2 { font-size: 1rem; }
+.owner-invite-panel .staff-door-form div { display: flex; gap: 8px; }
+.owner-invite-panel .staff-door-form div input { flex: 1; min-width: 0; }
+.owner-invite-panel .staff-door-form div[hidden] { display: none; }
+
 /* A THUMB IS NOT A MOUSE POINTER.
  *
  * Measured on a 375px-wide viewport, this site had SEVENTEEN controls under

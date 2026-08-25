@@ -28,6 +28,7 @@ import {
   PULSE_TRUSTED_ORIGIN,
   beginOAuthTransaction,
   buildAuthorizeUrl,
+  createInviteStore,
   createJwksCache,
   createTransactionStore,
   createUsedCodeStore,
@@ -36,8 +37,10 @@ import {
   isAuthorizedStaffSubject,
   isTrustedOrigin,
   isTrustedRedirectUri,
+  parseOwnerSubject,
   parseStaffSubjects,
   pkceMatches,
+  resolveStaffRole,
   verifyGithatIdentityToken,
   verifyGithatIdentityTokenLive,
   type FetchLike,
@@ -694,16 +697,16 @@ check("an empty string escapes to itself", () => eq(escapeHtml(""), ""));
  * visitor. */
 
 check("no server answered: the door says so, not 'no passphrase'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
   return said.includes("No server answered") ? true : `unexpected: ${said}`;
 });
 check("a server answered but no passphrase is set: says THAT, not 'no server'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: true });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: true, role: null });
   return said.includes("no staff passphrase set") && !said.includes("No server answered")
     ? true : `unexpected: ${said}`;
 });
 check("configured and not signed in: asks for the passphrase", () => {
-  const said = doorMessage({ configured: true, signedIn: false, reachable: true });
+  const said = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
   return said.includes("Sign in with the studio's staff passphrase") ? true : `unexpected: ${said}`;
 });
 check("configured and ALREADY signed in reads the same as not signed in", () => {
@@ -712,12 +715,12 @@ check("configured and ALREADY signed in reads the same as not signed in", () => 
    * itself does with that combination, not a claim about what the page
    * shows. Pinned so `signedIn` staying out of the branching is a decision,
    * not an oversight the next edit trips over. */
-  const asked = doorMessage({ configured: true, signedIn: false, reachable: true });
-  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true });
+  const asked = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
+  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true, role: "front_desk" });
   return eq(asked, alsoSignedIn);
 });
 check("unreachable outranks unconfigured — both true says the door is down", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
   return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
@@ -751,6 +754,23 @@ check("a confirmed staff sign-in remembers Front Desk locally, so Sign out has s
 
 check("the staff door offers a GitHat sign-in link, alongside the passphrase form (not instead of it)", () =>
   /auth\/githat\/start/.test(staffGateSource) ? true : "no /auth/githat/start link found in staff-gate.ts");
+
+/* The owner's invite panel: same "read the source" limit as above — it
+ * only ever mounts after a real fetch() resolves signedIn/role, which
+ * this synchronous harness cannot drive. What is pinned instead is the
+ * ONE gate that decides whether it renders at all. */
+check("mountStaffDoor only mounts the owner invite panel for gate.role === \"owner\"", () =>
+  /gate\.role === "owner"[\s\S]{0,80}mountOwnerInvitePanel\(\)/.test(staffGateSource)
+    ? true
+    : "mountOwnerInvitePanel() is not gated on gate.role === \"owner\" in mountStaffDoor");
+check("mountOwnerInvitePanel is not reachable from anywhere except the owner branch above", () =>
+  // Two matches total: the function's own `(): void {` declaration, and
+  // the one call site inside the gate.role === "owner" branch above.
+  eq((staffGateSource.match(/mountOwnerInvitePanel\(\)/g) ?? []).length, 2));
+check("the invite panel's create button calls createStaffInvite(), never fetch() directly", () =>
+  /function mountOwnerInvitePanel[\s\S]*?createStaffInvite\(\)/.test(staffGateSource)
+    ? true
+    : "mountOwnerInvitePanel does not call createStaffInvite()");
 
 /* ---------- "Sign in with GitHat": OAuth 2.0 + PKCE(S256) against the
  * sibling GitHat service ----------
@@ -919,6 +939,29 @@ check("a valid token's sub present in STAFF_GITHAT_SUBJECTS is authorized", () =
     true,
   ));
 
+/* Roles: owner vs. employee vs. neither. An unset OWNER_GITHAT_SUBJECT
+ * denies the capability to everyone, same "deny by default" shape as an
+ * unset STAFF_GITHAT_SUBJECTS — never a fallback that hands "owner" to
+ * whoever happens to sign in first. */
+check("parseOwnerSubject treats unset as absent", () => eq(parseOwnerSubject(undefined), null));
+check("parseOwnerSubject treats blank/whitespace as absent", () => eq(parseOwnerSubject("   "), null));
+check("parseOwnerSubject trims a real subject", () => eq(parseOwnerSubject("  owner-sub  "), "owner-sub"));
+
+const roleParams = {
+  ownerSubject: parseOwnerSubject("owner-sub"),
+  staffSubjects: parseStaffSubjects("preset-employee"),
+  directorySubjects: new Set(["invited-employee"]),
+};
+check("resolveStaffRole: the owner subject resolves to owner", () => eq(resolveStaffRole("owner-sub", roleParams), "owner"));
+check("resolveStaffRole: a subject on the static STAFF_GITHAT_SUBJECTS list resolves to employee", () =>
+  eq(resolveStaffRole("preset-employee", roleParams), "employee"));
+check("resolveStaffRole: a subject only in the invited directory resolves to employee", () =>
+  eq(resolveStaffRole("invited-employee", roleParams), "employee"));
+check("resolveStaffRole: an unrecognized subject resolves to no role at all", () =>
+  eq(resolveStaffRole("nobody-in-particular", roleParams), null));
+check("resolveStaffRole: an unset owner subject never matches, even a literal empty string sub cannot slip through", () =>
+  eq(resolveStaffRole("", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
+
 /* Trusted origin / redirect_uri — exact match, checked against the exact
  * shapes an attacker would actually try. */
 check("isTrustedRedirectUri accepts the exact registered redirect_uri", () => eq(isTrustedRedirectUri(PULSE_REDIRECT_URI), true));
@@ -961,6 +1004,58 @@ check("an authorization code is accepted the first time it is claimed", () => eq
 check("the SAME authorization code is refused on replay", () => eq(codeStoreUnderTest.claim("code-1", OAUTH_NOW_MS), false));
 check("a DIFFERENT authorization code is still accepted", () => eq(codeStoreUnderTest.claim("code-2", OAUTH_NOW_MS), true));
 
+/* A sign-in that started from an invite link carries the invite token on
+ * its OAuth transaction, all the way to the callback — the one thing that
+ * lets the server redeem THAT specific invite and no other. */
+const inviteTx = await beginOAuthTransaction(OAUTH_NOW_MS, "invite-token-abc");
+check("beginOAuthTransaction threads an invite token onto the transaction when given one", () =>
+  eq(inviteTx.inviteToken, "invite-token-abc"));
+const plainTx = await beginOAuthTransaction(OAUTH_NOW_MS);
+check("beginOAuthTransaction carries no invite token for the plain sign-in door", () => eq(plainTx.inviteToken, undefined));
+
+/* THE INVITE STORE. Single-use and expiring, same shape as the state store
+ * above and for the same reason: a link is good for exactly one sign-in.
+ *
+ * Every read below is SNAPSHOTTED into a const at the point in the file
+ * where the action actually happens, exactly like countAfterCachedCalls
+ * above — check()'s own run() closures are not evaluated until every
+ * top-level statement in this file has already executed once, so a
+ * closure that called inviteStore.peek() itself would see the state as it
+ * stands at the very END of the file (after every claim() below has
+ * already run), not at the narrative point the test describes. */
+const inviteStore = createInviteStore(1000);
+const invite = inviteStore.create(OAUTH_NOW_MS);
+/* Primitive snapshots, not the object itself: claim() below mutates the
+ * SAME stored object in place (see its own comment), so a reference held
+ * here would read whatever it was mutated to by the time this file's
+ * deferred check() closures finally run — the same reason
+ * countAfterCachedCalls above snapshots a number, not the cache. */
+const tokenWhilePending = inviteStore.peek(invite.token, OAUTH_NOW_MS)?.token;
+const usedWhilePending = inviteStore.peek(invite.token, OAUTH_NOW_MS)?.used;
+check("a freshly created invite is pending", () => eq(tokenWhilePending, invite.token));
+check("an unknown invite token is not pending", () => eq(inviteStore.peek("no-such-token", OAUTH_NOW_MS), null));
+check("peek does not consume the invite", () => eq(usedWhilePending, false));
+const claimed = inviteStore.claim(invite.token, OAUTH_NOW_MS);
+check("claiming a pending invite succeeds and returns it", () => eq(claimed?.token, invite.token));
+const secondClaim = inviteStore.claim(invite.token, OAUTH_NOW_MS);
+check("the SAME invite token is refused on a second claim (single-use)", () => eq(secondClaim, null));
+const peekAfterClaim = inviteStore.peek(invite.token, OAUTH_NOW_MS);
+check("a used invite no longer peeks as pending either", () => eq(peekAfterClaim, null));
+
+const expiringInviteStore = createInviteStore(1000);
+const expiringInvite = expiringInviteStore.create(OAUTH_NOW_MS);
+const expiredClaim = expiringInviteStore.claim(expiringInvite.token, expiringInvite.expiresAt + 1);
+check("an expired invite is refused on claim", () => eq(expiredClaim, null));
+const expiredPeek = expiringInviteStore.peek(expiringInvite.token, expiringInvite.expiresAt + 1);
+check("an expired invite does not peek as pending", () => eq(expiredPeek, null));
+
+const listingInviteStore = createInviteStore(1000);
+const pendingA = listingInviteStore.create(OAUTH_NOW_MS);
+const pendingB = listingInviteStore.create(OAUTH_NOW_MS);
+listingInviteStore.claim(pendingA.token, OAUTH_NOW_MS);
+check("list() reports only still-pending invites, not a claimed one", () =>
+  eq(listingInviteStore.list(OAUTH_NOW_MS).map((entry) => entry.token), [pendingB.token]));
+
 /* Token exchange: the server-to-server leg. A fetcher is always supplied
  * explicitly — none of these calls ever touch a real network. */
 const rejectingTokenFetcher: FetchLike = async () => ({ ok: false, status: 400, json: async () => ({ error: "invalid_grant" }) });
@@ -994,11 +1089,14 @@ check("extractIdentityToken refuses a response with neither an id_token nor a JW
 const testAuthorizeUrl = new URL(buildAuthorizeUrl("state-under-test", "challenge-under-test"));
 check("buildAuthorizeUrl targets GitHat's authorize endpoint", () =>
   eq(testAuthorizeUrl.origin + testAuthorizeUrl.pathname, "https://api.githat.io/oauth/authorize"));
-check("buildAuthorizeUrl carries client_id, redirect_uri, response_type, state, and PKCE S256 params", () =>
+check("buildAuthorizeUrl carries client_id, redirect_url, response_type, state, and PKCE S256 params", () =>
   eq(
     [
       testAuthorizeUrl.searchParams.get("client_id"),
-      testAuthorizeUrl.searchParams.get("redirect_uri"),
+      /* GitHat's OWN param name, not the OAuth-standard "redirect_uri" —
+       * see buildAuthorizeUrl's own comment: verified live, the spec name
+       * alone gets a flat 400 from the real service. */
+      testAuthorizeUrl.searchParams.get("redirect_url"),
       testAuthorizeUrl.searchParams.get("response_type"),
       testAuthorizeUrl.searchParams.get("state"),
       testAuthorizeUrl.searchParams.get("code_challenge"),
@@ -1006,6 +1104,8 @@ check("buildAuthorizeUrl carries client_id, redirect_uri, response_type, state, 
     ],
     [GITHAT_CLIENT_ID, PULSE_REDIRECT_URI, "code", "state-under-test", "challenge-under-test", "S256"],
   ));
+check("buildAuthorizeUrl does NOT use the spec-standard redirect_uri param name (GitHat does not read it)", () =>
+  eq(testAuthorizeUrl.searchParams.get("redirect_uri"), null));
 
 /* Source-text properties this synchronous harness cannot exercise by
  * running the server — the same limit, and the same remedy, already named

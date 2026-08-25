@@ -7,18 +7,21 @@ import { isValidRevision } from "./revision.mjs";
 import {
   beginOAuthTransaction,
   buildAuthorizeUrl,
+  createInviteStore,
   createJwksCache,
   createTransactionStore,
   createUsedCodeStore,
   exchangeCodeForToken,
-  isAuthorizedStaffSubject,
+  parseOwnerSubject,
   parseStaffSubjects,
+  resolveStaffRole,
   verifyGithatIdentityTokenLive,
 } from "../app/shared/auth/githat-oauth.js";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = resolve(root, "app");
 const publishedSchedulePath = resolve(root, "data", "published-schedule.json");
+const staffDirectoryPath = resolve(root, "data", "staff-directory.json");
 const port = Number.parseInt(process.env["PORT"] ?? "4173", 10);
 /* WHERE TO LISTEN IS A DEPLOYMENT FACT, NOT A CODE FACT. Loopback is the
  * right default on a developer's machine — a key-holding process should not
@@ -463,9 +466,40 @@ function staffCookie(value, maxAgeSeconds) {
  * ever falls back to allowing everyone. ------------------------------ */
 
 const staffGithatSubjects = parseStaffSubjects(process.env["STAFF_GITHAT_SUBJECTS"]);
+/* The one GitHat identity that may invite others. Unset means nobody can
+ * mint an invite yet — same "deny by default" shape as an unset
+ * STAFF_GITHAT_SUBJECTS, never a fallback that grants the power to
+ * whoever happens to sign in first. */
+const ownerGithatSubject = parseOwnerSubject(process.env["OWNER_GITHAT_SUBJECT"]);
 const oauthTransactions = createTransactionStore();
 const usedAuthorizationCodes = createUsedCodeStore();
 const jwksCache = createJwksCache();
+const staffInvites = createInviteStore();
+
+/* THE STAFF DIRECTORY. Everyone the owner has invited and who has actually
+ * accepted (signed in with their own GitHat account) — as opposed to
+ * STAFF_GITHAT_SUBJECTS, which is a fixed env-var allowlist an operator
+ * sets by hand. This is the ONE piece of the GitHat door that grows at
+ * runtime, so — like data/staff-records.json and data/published-schedule.json
+ * before it — it lives outside app/ under data/, never under a path a
+ * browser can fetch directly. It names no member, only GitHat subjects a
+ * real person authenticated as, which is why it is not itself a
+ * staff-records-shaped file: it is an access list, not a person's record. */
+function readStaffDirectory() {
+  try {
+    const parsed = JSON.parse(readFileSync(staffDirectoryPath, "utf8"));
+    return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry?.sub === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function addToStaffDirectory(sub) {
+  const directory = readStaffDirectory();
+  if (directory.some((entry) => entry.sub === sub)) return; // already there — invite accepted twice is not a second grant
+  directory.push({ sub, role: "employee", addedAt: new Date().toISOString() });
+  writeFileSync(staffDirectoryPath, JSON.stringify(directory, null, 2) + "\n");
+}
 
 /* A signing key separate from staffSigningKey above, and a cookie name
  * separate from STAFF_COOKIE (__Host-pulse_session, not __Host-pulse-staff)
@@ -547,24 +581,75 @@ function requestIsSignedInViaGithat(request) {
   return githatTokenIsValid(cookieValue(request, GITHAT_COOKIE));
 }
 
+/* The GitHat subject a request's cookie proves, or null. Used only to
+ * decide what to SHOW (the signed-in role) and who may mint an invite —
+ * never to decide staff access on its own; requestIsSignedInStaff (via
+ * githatTokenIsValid) is still the one check that grants that. Re-verifies
+ * the HMAC and expiry exactly as githatTokenIsValid does, because a sub
+ * read off a payload nobody has authenticated yet would be a forgeable
+ * claim, not a fact. */
+function githatSubjectFromRequest(request) {
+  const token = cookieValue(request, GITHAT_COOKIE);
+  if (!githatTokenIsValid(token)) return null;
+  try {
+    const [payload] = token.split(".");
+    const { sub } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof sub === "string" && sub !== "" ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+function requestStaffRole(request) {
+  const sub = githatSubjectFromRequest(request);
+  if (sub === null) return requestIsSignedInStaff(request) ? "front_desk" : null;
+  return resolveStaffRole(sub, {
+    ownerSubject: ownerGithatSubject,
+    staffSubjects: staffGithatSubjects,
+    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+  });
+}
+
 /* GET /auth/githat/start — the browser's own click on "Sign in with
  * GitHat" (staff-gate.ts) lands here. A fresh state + PKCE pair is
  * generated and held SERVER-SIDE, in oauthTransactions above — never in a
  * cookie, never in the URL, never in browser storage — and the browser is
  * redirected straight to GitHat's own authorize endpoint. */
-async function githatStart(request, response) {
+async function githatStart(request, response, inviteToken) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
     return;
   }
   const now = Date.now();
-  const tx = await beginOAuthTransaction(now);
+  const tx = await beginOAuthTransaction(now, inviteToken);
   oauthTransactions.save(tx);
   response.writeHead(302, {
     location: buildAuthorizeUrl(tx.state, tx.codeChallenge),
     "cache-control": "no-store",
   });
   response.end();
+}
+
+/* GET /auth/invite/:token — an owner-sent link, opened by the invited
+ * person. It does not itself grant anything: it only threads the invite
+ * token through to the same OAuth transaction /auth/githat/start begins,
+ * so the callback below can redeem it AFTER a real GitHat identity comes
+ * back. An invalid, expired, or already-used token fails closed with a
+ * plain message rather than silently falling through to a bare sign-in —
+ * a person who thinks they are accepting an invite should not end up
+ * denied for an unrelated reason (no STAFF_GITHAT_SUBJECTS entry) without
+ * being told which thing actually failed. */
+async function githatInvite(request, response, token) {
+  if (request.method !== "GET") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  const invite = staffInvites.peek(token, Date.now());
+  if (invite === null) {
+    sendGithatResult(response, 400, "This invite link is invalid, expired, or has already been used.", null);
+    return;
+  }
+  await githatStart(request, response, token);
 }
 
 /* A small, self-contained confirmation page — never a redirect loop and
@@ -648,7 +733,28 @@ async function githatCallback(request, response) {
     return;
   }
 
-  if (!isAuthorizedStaffSubject(verdict.sub, staffGithatSubjects)) {
+  /* An invite thread on this transaction is redeemed BEFORE the ordinary
+   * authorization check, and only that exact invite: a token that has
+   * since expired or was already claimed by someone else fails here with
+   * its own message, never silently falling through to "not authorized"
+   * as if no invite had been offered at all. Redeeming adds this sub to
+   * the directory — resolveStaffRole below then sees it whether it came
+   * from the directory just written or (already) from an env var. */
+  if (tx.inviteToken !== undefined) {
+    const invite = staffInvites.claim(tx.inviteToken, now);
+    if (invite === null) {
+      sendGithatResult(response, 400, "This invite link is invalid, expired, or has already been used.", null);
+      return;
+    }
+    addToStaffDirectory(verdict.sub);
+  }
+
+  const role = resolveStaffRole(verdict.sub, {
+    ownerSubject: ownerGithatSubject,
+    staffSubjects: staffGithatSubjects,
+    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+  });
+  if (role === null) {
     sendGithatResult(response, 403, "Your GitHat account is not authorized for staff access here.", null);
     return;
   }
@@ -696,6 +802,7 @@ async function staffSession(request, response) {
       configured: staffPassphrase !== "",
       signedIn: requestIsSignedInStaff(request),
       minutes: STAFF_SESSION_MINUTES,
+      role: requestStaffRole(request),
     });
     return;
   }
@@ -821,6 +928,38 @@ async function publishedSchedule(request, response) {
   json(response, 200, { published: body.sessions.length, sessions });
 }
 
+/* Owner-only: mint or list invite links. Gated on requestStaffRole, which
+ * only ever reads "owner" off a GitHat cookie this process itself signed —
+ * the passphrase door's shared Front Desk session never resolves to
+ * "owner", because it carries no per-person identity to attribute the
+ * invite to. */
+function staffInvitesRoute(request, response) {
+  if (requestStaffRole(request) !== "owner") {
+    json(response, 403, { error: "Only the studio owner may manage invites." });
+    return;
+  }
+  const now = Date.now();
+  if (request.method === "GET") {
+    json(response, 200, {
+      invites: staffInvites.list(now).map((invite) => ({
+        url: `/auth/invite/${invite.token}`,
+        createdAt: new Date(invite.createdAt).toISOString(),
+        expiresAt: new Date(invite.expiresAt).toISOString(),
+      })),
+    });
+    return;
+  }
+  if (request.method !== "POST") {
+    response.writeHead(405).end("Method not allowed");
+    return;
+  }
+  const invite = staffInvites.create(now);
+  json(response, 200, {
+    url: `/auth/invite/${invite.token}`,
+    expiresAt: new Date(invite.expiresAt).toISOString(),
+  });
+}
+
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`).pathname;
   if (pathname === "/api/chat") cors(request, response);
@@ -862,6 +1001,14 @@ const server = createServer(async (request, response) => {
     await githatCallback(request, response);
     return;
   }
+  if (pathname.startsWith("/auth/invite/")) {
+    await githatInvite(request, response, pathname.slice("/auth/invite/".length));
+    return;
+  }
+  if (pathname === "/api/staff/invites") {
+    staffInvitesRoute(request, response);
+    return;
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405).end("Method not allowed");
     return;
@@ -879,6 +1026,9 @@ server.listen(port, host, () => {
   console.log(staffGithatSubjects.size > 0
     ? `Sign in with GitHat is wired at /auth/githat/start, and ${staffGithatSubjects.size} GitHat subject(s) are authorized for staff access.`
     : "Sign in with GitHat is wired at /auth/githat/start, but STAFF_GITHAT_SUBJECTS is unset — a valid GitHat identity will be denied staff access until an operator sets it.");
+  console.log(ownerGithatSubject !== null
+    ? `OWNER_GITHAT_SUBJECT is set — that GitHat account may mint staff invites at /api/staff/invites. ${readStaffDirectory().length} invited employee(s) on file.`
+    : "OWNER_GITHAT_SUBJECT is unset — nobody can mint a staff invite yet, though STAFF_GITHAT_SUBJECTS and any already-invited employees still sign in normally.");
   console.log(githatKeyIsPersisted
     ? `GitHat sessions last ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days and survive a restart — GITHAT_SESSION_SIGNING_KEY is set.`
     : `GitHat sessions are stated as ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days but WILL NOT survive a restart — GITHAT_SESSION_SIGNING_KEY is unset, so this process generated its own key and every GitHat session ends the moment it stops.`);
