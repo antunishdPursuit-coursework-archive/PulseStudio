@@ -77,6 +77,46 @@ lingering.
 | `docs/hosted-schema.sql` | The Postgres schema for the hosted version — `member_id` is the identity there too; email is the login credential. It sat here until 2026-08-23 and moved to `docs/` because everything under `app/` is served at a public URL |
 | `tests.html` / `tests.ts` | Browser-run checks, written failing-first against this API. The page states its own count — this table used to name one and it went stale. |
 | `../components/topbar.ts` | The sign-in control: member picker (name · member id · status — no emails), Front Desk as a separate staff row, chip + Sign out |
+| `staff-gate.ts` | The staff door: passphrase sign-in, a "Sign in with GitHat" link to `/auth/githat/start`, and — for the one signed-in identity resolved as "owner" — a small "Invite an employee" panel |
+| `githat-oauth.ts` | The GitHat OAuth 2.0 + PKCE(S256) client — state/PKCE bookkeeping, JWT (RS256-only) verification, JWKS caching, `STAFF_GITHAT_SUBJECTS`/`OWNER_GITHAT_SUBJECT` matching (`resolveStaffRole`), and the invite-token store (`createInviteStore`). Browser-and-Node portable on purpose (Web Crypto only, no `node:crypto`) — see its own file header for why. The HTTP plumbing that calls it (`/auth/githat/start`, `/auth/callback`, `/auth/invite/:token`, `/api/staff/invites`) and Pulse's own session-cookie signing live in `scripts/start-haiku.mjs`, not here |
+
+## Routes, and who they're for
+
+Member surfaces (Products A and C) carry no gate at all and never call
+anything below — every route here is either staff-only or a plain
+server-to-server redirect step nobody links to from a member page.
+
+| Route | Who reaches it | What it does |
+| --- | --- | --- |
+| `/api/staff/session` | Both staff surfaces, on every load | GET reports `{configured, signedIn, role, minutes}`; POST is the passphrase door; DELETE signs out of BOTH doors at once |
+| `/api/staff/records` | Signed-in staff only (either door) | The one path to `data/staff-records.json` — 401 without a session |
+| `/api/schedule` | GET: anyone; POST: signed-in staff only | Product B publishes next week's classes here |
+| `/auth/githat/start` → `/auth/callback` | Anyone who clicks "Sign in with GitHat" | The OAuth round trip itself; never rendered as a page, never linked from a member surface |
+| `/auth/invite/:token` | Whoever the owner sent the link to | Threads that one invite token through the SAME round trip above; redeems it into `data/staff-directory.json` only on a successful GitHat identity check |
+| `/api/staff/invites` | The signed-in "owner" identity only | GET lists pending invite links; POST mints a new one — a 403 to anyone else, including the shared Front Desk persona and any "employee" |
+
+## Staff roles: owner vs. employee vs. Front Desk
+
+Three things can walk through the staff door, and they are not the same
+kind of identity:
+
+- **Front Desk** — the passphrase door. One shared secret, no per-person
+  identity, `role: "front_desk"`. Cannot mint an invite: there is no
+  individual to attribute one to.
+- **Owner** — the one GitHat account named by `OWNER_GITHAT_SUBJECT`. The
+  only identity `/api/staff/invites` will act for. Unset denies the
+  capability to everyone, same "deny by default" shape as an unset
+  `STAFF_GITHAT_SUBJECTS`.
+- **Employee** — any GitHat account either pre-listed in
+  `STAFF_GITHAT_SUBJECTS` (an operator's env var, set once) or added to
+  `data/staff-directory.json` by accepting an owner's invite link
+  (`resolveStaffRole` in `githat-oauth.ts` checks both). Growing the
+  second list is the entire "invite an employee" feature: no email is
+  sent, no account is created anywhere — the owner copies a link from
+  their own signed-in staff-door panel and sends it themselves, through
+  their own channel, exactly like every drafted message elsewhere in this
+  repo. The invite is single-use and expires in 7 days; the directory
+  entry it produces does not.
 
 ## The compatibility view (temporary, by design)
 
