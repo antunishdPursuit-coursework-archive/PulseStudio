@@ -11,6 +11,15 @@ deployed assistant there reports that it is unavailable. That is not a
 defect to route around — any key a static page can read, every visitor can
 read — it is the reason this service exists as a separate process.
 
+**As of 2026-08-25, this process is actually running** at
+[pulse.githat.io](https://pulse.githat.io/) — a free student slug on GitHat
+(see its own docs for what that hosting shape is). The assistant answers
+there and both staff doors are a real gate, not the closed-by-design state
+the static copy shows. Check `GET https://pulse.githat.io/api/chat` for
+`"available"` rather than trusting this paragraph as it ages — a hosted
+instance can move or stop, and this file is the place that statement was
+true on the date given, not a promise it stays true.
+
 ## Local
 
 From the repository root:
