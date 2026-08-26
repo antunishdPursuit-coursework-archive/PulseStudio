@@ -38,6 +38,7 @@ import {
   isTrustedRedirectUri,
   parseOwnerSubject,
   parseStaffSubjects,
+  hasAnyOwnerConfigured,
   resolveStaffRole,
   unauthorizedDetail,
   type FetchLike,
@@ -902,6 +903,34 @@ check("resolveStaffRole: an unrecognized subject resolves to no role at all", ()
 check("resolveStaffRole: an unset owner subject never matches, even a literal empty string sub cannot slip through", () =>
   eq(resolveStaffRole("", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
 
+/* A directory-recorded owner (the auto-bootstrap path) resolves the same
+ * as an env-var owner, and the two are independent: neither list needs
+ * the other's shape. */
+check("resolveStaffRole: a subject the directory itself records as owner resolves to owner", () =>
+  eq(
+    resolveStaffRole("bootstrapped-owner", {
+      ownerSubject: null,
+      staffSubjects: parseStaffSubjects(undefined),
+      directorySubjects: new Set(),
+      directoryOwnerSubjects: new Set(["bootstrapped-owner"]),
+    }),
+    "owner",
+  ));
+check("resolveStaffRole: omitting directoryOwnerSubjects entirely is the same as an empty one", () =>
+  eq(resolveStaffRole("bootstrapped-owner", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
+
+/* THE BOOTSTRAP GATE ITSELF. This is what start-haiku.mjs checks before
+ * auto-granting owner to a first sign-in — get this wrong and either
+ * nobody can ever bootstrap, or worse, a SECOND stranger could. */
+check("hasAnyOwnerConfigured: false when neither mechanism has an owner", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: null, directoryOwnerSubjects: new Set() }), false));
+check("hasAnyOwnerConfigured: true from the env var alone", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: "env-owner", directoryOwnerSubjects: new Set() }), true));
+check("hasAnyOwnerConfigured: true from a directory owner alone", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: null, directoryOwnerSubjects: new Set(["dir-owner"]) }), true));
+check("hasAnyOwnerConfigured: true when both mechanisms agree", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: "env-owner", directoryOwnerSubjects: new Set(["dir-owner"]) }), true));
+
 /* THE BOOTSTRAP RULE. Authorizing the first person requires their GitHat
  * account id, and nothing in GitHat's dashboard shows it — so the denial
  * page is the only place it can come from. These pin that it is actually
@@ -1168,6 +1197,23 @@ check("the per-request role resolution actually consults both authorization list
   return /staffSubjects/.test(fn) && /directorySubjects/.test(fn) && /ownerSubject/.test(fn)
     ? true
     : `githatRoleFromRequest no longer consults every list: ${fn}`;
+});
+
+/* THE BOOTSTRAP WIRING ITSELF. resolveStaffRole and hasAnyOwnerConfigured
+ * are proven correct in isolation above — this pins that githatCallback
+ * actually CALLS them the way it has to: gated on hasAnyOwnerConfigured
+ * (so it can fire for at most one subject, ever), and only grants
+ * "owner", never anything looser. Proven to matter: disabling the real
+ * wiring (replacing the whole gated block with a no-op) left every other
+ * check in this suite passing — the synchronous harness cannot exercise
+ * a live GitHat callback, so a source-text pin is the only thing that
+ * would have caught it. */
+check("githatCallback's owner-bootstrap is gated on hasAnyOwnerConfigured", () => {
+  const body = serverSource.slice(serverSource.indexOf("async function githatCallback"));
+  const fn = body.slice(0, body.indexOf("\nasync function"));
+  return /hasAnyOwnerConfigured\s*\(/.test(fn) && /addToStaffDirectory\s*\(\s*verdict\.sub\s*,\s*"owner"\s*\)/.test(fn)
+    ? true
+    : "githatCallback no longer both checks hasAnyOwnerConfigured and grants \"owner\" via addToStaffDirectory";
 });
 
 check("the GitHat door and the passphrase door issue distinctly named cookies", () =>

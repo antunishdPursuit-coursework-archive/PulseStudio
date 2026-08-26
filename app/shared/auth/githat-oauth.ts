@@ -460,12 +460,28 @@ export function resolveStaffRole(
     readonly ownerSubject: string | null;
     readonly staffSubjects: ReadonlySet<string>;
     readonly directorySubjects: ReadonlySet<string>;
+    /** Subjects the directory itself records as "owner" — distinct from
+     *  `directorySubjects` (which always means "employee") so a
+     *  directory-granted owner and an env-var owner both resolve to the
+     *  same role without the two lists needing to agree on shape. */
+    readonly directoryOwnerSubjects?: ReadonlySet<string>;
   },
 ): StaffRole | null {
   if (params.ownerSubject !== null && sub === params.ownerSubject) return "owner";
+  if (params.directoryOwnerSubjects?.has(sub)) return "owner";
   if (isAuthorizedStaffSubject(sub, params.staffSubjects)) return "employee";
   if (params.directorySubjects.has(sub)) return "employee";
   return null;
+}
+
+/** True once ANY owner exists, by either mechanism — the gate on the
+ *  auto-bootstrap below. Deliberately conservative: as soon as one owner
+ *  exists, by any means, bootstrap can never fire for a second subject. */
+export function hasAnyOwnerConfigured(params: {
+  readonly ownerSubject: string | null;
+  readonly directoryOwnerSubjects: ReadonlySet<string>;
+}): boolean {
+  return params.ownerSubject !== null || params.directoryOwnerSubjects.size > 0;
 }
 
 /* ---------------------------------------------------------------- *
