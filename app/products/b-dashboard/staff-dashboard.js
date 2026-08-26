@@ -2,7 +2,7 @@ import { sharedStudioWithFill } from '../../shared/auth/studio.js';
 import { mountStaffDoor } from '../../shared/auth/staff-gate.js';
 // The arithmetic lives in dashboard.ts so a gate type-checks it and tests.ts can
 // pin it; this file keeps only the DOM wiring. See dashboard.ts for why.
-import { bookingDataLine, confirmedCount, formatSessionTime, isPublicDashboardHost, needsAttention, nextActionText, spotsLeftText, status, statusCount } from './dashboard.js';
+import { bookingDataLine, confirmedCount, formatSessionTime, isPublicDashboardHost, needsAttention, nextActionText, spotsLeftText, status, statusCount } from './dashboard.js?v=public-pages-1';
 import { counted } from '../../shared/text.js';
 
 const isPublishedStaticSurface=isPublicDashboardHost(window.location.hostname);
