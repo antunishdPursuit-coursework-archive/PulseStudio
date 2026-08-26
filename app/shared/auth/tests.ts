@@ -29,11 +29,10 @@ import {
   beginOAuthTransaction,
   buildAuthorizeUrl,
   createInviteStore,
-  createJwksCache,
   createTransactionStore,
   createUsedCodeStore,
   exchangeCodeForToken,
-  extractIdentityToken,
+  extractIdentity,
   isAuthorizedStaffSubject,
   isTrustedOrigin,
   isTrustedRedirectUri,
@@ -41,8 +40,7 @@ import {
   parseStaffSubjects,
   pkceMatches,
   resolveStaffRole,
-  verifyGithatIdentityToken,
-  verifyGithatIdentityTokenLive,
+  unauthorizedDetail,
   type FetchLike,
 } from "./githat-oauth.js";
 import { escapeHtml } from "../html.js";
@@ -788,142 +786,85 @@ check("the invite panel's create button calls createStaffInvite(), never fetch()
 const OAUTH_NOW_SECONDS = 1_800_000_000; // a fixed instant, so a token minted "expired" here stays expired regardless of when this suite runs
 const OAUTH_NOW_MS = OAUTH_NOW_SECONDS * 1000;
 
-function testBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function testBase64UrlJson(value: unknown): string {
-  return testBase64Url(new TextEncoder().encode(JSON.stringify(value)));
-}
+/* THE TOKEN-ENDPOINT RESPONSE, which is the only thing this door reads.
+ *
+ * This block used to generate a real RSA key pair and check RS256
+ * signature verification, `alg:none`, algorithm confusion, unknown `kid`,
+ * issuer/audience pinning and JWKS cache behaviour — about thirty checks
+ * over roughly two hundred lines of `githat-oauth.ts`.
+ *
+ * All of it verified a token GitHat does not mint. Measured against the
+ * live service on 2026-08-25: `POST /oauth/token` returns RFC 6749 §5.1
+ * only, there is no `id_token`, the identity claim is `userId` rather
+ * than `sub`, and `aud` is the fleet-wide constant `githat` rather than
+ * this client. The checks all PASSED, against a fixture token shaped the
+ * way the code wished the provider behaved — which is exactly the failure
+ * mode worth naming: a green suite proving a module agrees with itself.
+ *
+ * What replaced it is smaller because the trust argument is smaller and
+ * real: the identity arrives in the body of a direct server-to-server
+ * HTTPS POST that this process makes itself, carrying a single-use code
+ * and a PKCE verifier that never left it. So what has to be checked is
+ * that the body is parsed defensively and that a malformed one fails
+ * CLOSED — never that a signature validates. */
 
-/* One RSA key pair, generated once for this whole suite, standing in for
- * GitHat's own signing key — the JWKS "fetched" below is this key's own
- * public half, exported as a JWK, so every negative case is checked
- * against real RSASSA-PKCS1-v1_5 signature verification rather than a
- * stubbed-out yes. */
-const testKeyPair = await crypto.subtle.generateKey(
-  { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-  true,
-  ["sign", "verify"],
-);
-const testPublicJwk = await crypto.subtle.exportKey("jwk", testKeyPair.publicKey);
-const TEST_KID = "test-key-1";
-const testJwks = [{ ...testPublicJwk, kid: TEST_KID }];
-
-async function signTestJwt(header: Record<string, unknown>, payload: Record<string, unknown>): Promise<string> {
-  const signingInput = `${testBase64UrlJson(header)}.${testBase64UrlJson(payload)}`;
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    testKeyPair.privateKey,
-    new TextEncoder().encode(signingInput),
-  );
-  return `${signingInput}.${testBase64Url(new Uint8Array(signature))}`;
-}
-
-const validClaims = {
-  iss: GITHAT_ISSUER,
-  aud: GITHAT_CLIENT_ID,
-  sub: "githat-user-1",
-  exp: OAUTH_NOW_SECONDS + 3600,
-  iat: OAUTH_NOW_SECONDS - 10,
-  nbf: OAUTH_NOW_SECONDS - 10,
+const GITHAT_TOKEN_RESPONSE = {
+  access_token: "fixture-opaque-access-token",
+  token_type: "Bearer",
+  expires_in: 900,
+  refresh_token: "fixture-opaque-refresh-token",
+  scope: "githat",
+  user: {
+    id: "githat-user-1",
+    email: "front.desk@pulse.test",
+    name: "Front Desk",
+    avatarUrl: null,
+    emailVerified: true,
+  },
+  org: { id: "org-1", name: "Pulse Studio", slug: "pulse", role: "owner", tier: "free" },
 };
 
-const validToken = await signTestJwt({ alg: "RS256", kid: TEST_KID }, validClaims);
-const validVerify = await verifyGithatIdentityToken(validToken, testJwks, OAUTH_NOW_SECONDS);
-check("a correctly signed, fully valid GitHat token verifies and yields its sub", () =>
-  validVerify.ok === true && validVerify.sub === "githat-user-1" ? true : `unexpected: ${JSON.stringify(validVerify)}`);
+const extracted = extractIdentity(GITHAT_TOKEN_RESPONSE);
+check("the real GitHat token-response shape yields the signed-in identity", () =>
+  eq(extracted, {
+    sub: "githat-user-1",
+    email: "front.desk@pulse.test",
+    emailVerified: true,
+    name: "Front Desk",
+  }));
 
-const wrongIssuerToken = await signTestJwt({ alg: "RS256", kid: TEST_KID }, { ...validClaims, iss: "https://evil.example.com" });
-const wrongIssuerVerify = await verifyGithatIdentityToken(wrongIssuerToken, testJwks, OAUTH_NOW_SECONDS);
-check("a token with the wrong issuer is rejected", () => eq(wrongIssuerVerify, { ok: false, reason: "wrong_issuer" }));
+/* Every one of these is a FAIL-CLOSED case. The blank-id pair matter most:
+ * an empty subject would otherwise reach resolveStaffRole, and while an
+ * empty STAFF_GITHAT_SUBJECTS denies it anyway, a door should never depend
+ * on a second check to refuse an identity it could not read. */
+check("a response with no user object at all is refused", () =>
+  eq(extractIdentity({ access_token: "x", token_type: "Bearer" }), null));
+check("a response whose user is null is refused", () => eq(extractIdentity({ user: null }), null));
+check("a response whose user is a string is refused", () => eq(extractIdentity({ user: "githat-user-1" }), null));
+check("a user with no id is refused", () =>
+  eq(extractIdentity({ user: { email: "someone@pulse.test" } }), null));
+check("a user whose id is an empty string is refused", () => eq(extractIdentity({ user: { id: "" } }), null));
+check("a user whose id is only whitespace is refused", () => eq(extractIdentity({ user: { id: "   " } }), null));
+check("a user whose id is a number is refused (never coerced to a string)", () =>
+  eq(extractIdentity({ user: { id: 12345 } }), null));
+check("a null response is refused", () => eq(extractIdentity(null), null));
+check("a string response is refused", () => eq(extractIdentity("githat-user-1"), null));
+check("an array response is refused", () => eq(extractIdentity([{ id: "githat-user-1" }]), null));
 
-const wrongAudienceToken = await signTestJwt({ alg: "RS256", kid: TEST_KID }, { ...validClaims, aud: "some-other-client" });
-const wrongAudienceVerify = await verifyGithatIdentityToken(wrongAudienceToken, testJwks, OAUTH_NOW_SECONDS);
-check("a token for a different audience/client is rejected", () => eq(wrongAudienceVerify, { ok: false, reason: "wrong_audience" }));
-
-const expiredToken = await signTestJwt({ alg: "RS256", kid: TEST_KID }, { ...validClaims, exp: OAUTH_NOW_SECONDS - 1000 });
-const expiredVerify = await verifyGithatIdentityToken(expiredToken, testJwks, OAUTH_NOW_SECONDS);
-check("an expired token is rejected", () => eq(expiredVerify, { ok: false, reason: "expired" }));
-
-const notYetValidToken = await signTestJwt({ alg: "RS256", kid: TEST_KID }, { ...validClaims, nbf: OAUTH_NOW_SECONDS + 1000 });
-const notYetValidVerify = await verifyGithatIdentityToken(notYetValidToken, testJwks, OAUTH_NOW_SECONDS);
-check("a not-yet-valid token (nbf in the future) is rejected", () => eq(notYetValidVerify, { ok: false, reason: "not_yet_valid" }));
-
-/* alg:none — the classic JWT bypass: assert no signature at all and hope
- * a verifier trusts the header. The empty final segment is deliberate. */
-const algNoneToken = `${testBase64UrlJson({ alg: "none", kid: TEST_KID })}.${testBase64UrlJson(validClaims)}.`;
-const algNoneVerify = await verifyGithatIdentityToken(algNoneToken, testJwks, OAUTH_NOW_SECONDS);
-check("an alg:none token is rejected before any signature is even checked", () =>
-  eq(algNoneVerify, { ok: false, reason: "unsupported_alg" }));
-
-/* Algorithm confusion: a token that CLAIMS HS256. What matters is that
- * this is refused on the `alg` header alone — no HMAC is ever computed or
- * trusted here, so the "signature" below is deliberately not one. */
-const hs256Token = `${testBase64UrlJson({ alg: "HS256", kid: TEST_KID })}.${testBase64UrlJson(validClaims)}.` +
-  testBase64Url(new TextEncoder().encode("not-a-real-hmac-signature"));
-const hs256Verify = await verifyGithatIdentityToken(hs256Token, testJwks, OAUTH_NOW_SECONDS);
-check("an HS256-signed token is rejected (algorithm confusion)", () => eq(hs256Verify, { ok: false, reason: "unsupported_alg" }));
-
-const unknownKidToken = await signTestJwt({ alg: "RS256", kid: "a-key-not-in-the-jwks" }, validClaims);
-const unknownKidVerify = await verifyGithatIdentityToken(unknownKidToken, testJwks, OAUTH_NOW_SECONDS);
-check("a token whose kid is not in the JWKS is rejected", () => eq(unknownKidVerify, { ok: false, reason: "unknown_kid" }));
-
-const tamperedToken = `${validToken.slice(0, -4)}${validToken.slice(-4) === "abcd" ? "dcba" : "abcd"}`;
-const tamperedVerify = await verifyGithatIdentityToken(tamperedToken, testJwks, OAUTH_NOW_SECONDS);
-check("a token with a tampered signature is rejected", () =>
-  tamperedVerify.ok === false ? true : `unexpectedly verified: ${JSON.stringify(tamperedVerify)}`);
-
-const malformedVerify = await verifyGithatIdentityToken("not-a-jwt-at-all", testJwks, OAUTH_NOW_SECONDS);
-check("a malformed token (not three dot-separated parts) is rejected", () => eq(malformedVerify, { ok: false, reason: "malformed" }));
-
-/* JWKS fetch/cache: fails CLOSED on any fetch problem, and never serves a
- * cache entry past its own TTL. */
-const failingJwksFetcher: FetchLike = async () => {
-  throw new Error("simulated network failure — stands in for a fetch failure or a timeout");
-};
-const jwksUnavailableVerify = await verifyGithatIdentityTokenLive(validToken, {
-  fetcher: failingJwksFetcher,
-  now: OAUTH_NOW_MS,
-  cache: createJwksCache(),
-});
-check("a JWKS fetch failure (or timeout) denies access — fails CLOSED, never open", () =>
-  eq(jwksUnavailableVerify, { ok: false, reason: "jwks_unavailable" }));
-
-const workingJwksFetcher: FetchLike = async () => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ keys: testJwks }),
-});
-const liveVerify = await verifyGithatIdentityTokenLive(validToken, {
-  fetcher: workingJwksFetcher,
-  now: OAUTH_NOW_MS,
-  cache: createJwksCache(),
-});
-check("verifyGithatIdentityTokenLive succeeds through an injected JWKS fetcher (no real network in this suite)", () =>
-  liveVerify.ok === true && liveVerify.sub === "githat-user-1" ? true : `unexpected: ${JSON.stringify(liveVerify)}`);
-
-let jwksFetchCount = 0;
-const countingJwksFetcher: FetchLike = async () => {
-  jwksFetchCount += 1;
-  return { ok: true, status: 200, json: async () => ({ keys: testJwks }) };
-};
-const jwksCacheUnderTest = createJwksCache(1000);
-await jwksCacheUnderTest.keys(countingJwksFetcher, 0);
-await jwksCacheUnderTest.keys(countingJwksFetcher, 500);
-/* Snapshotted into a `const` right here, rather than read from
- * `jwksFetchCount` inside the check's deferred `run` — every check() call
- * only RUNS at the very end of this file (see `checks.map` below), so a
- * closure reading the mutable counter directly would see whatever it grew
- * to by then, including the THIRD call three lines down. That is not a
- * hypothetical: it is exactly what this check reported before being
- * fixed to snapshot here. */
-const countAfterCachedCalls = jwksFetchCount;
-check("a cached JWKS fetch is reused within its TTL", () => eq(countAfterCachedCalls, 1));
-await jwksCacheUnderTest.keys(countingJwksFetcher, 2000);
-const countAfterTtlExpired = jwksFetchCount;
-check("a JWKS fetch happens again once the cache TTL has passed", () => eq(countAfterTtlExpired, 2));
+/* Optional fields degrade to null rather than to a wrong value, and
+ * emailVerified is TRUE only for a literal true — never for "true", 1, or
+ * any other truthy stand-in. */
+check("a user with an id but no email yields a null email, not a missing identity", () =>
+  eq(extractIdentity({ user: { id: "githat-user-1" } }), {
+    sub: "githat-user-1",
+    email: null,
+    emailVerified: false,
+    name: null,
+  }));
+check("emailVerified is false unless it is literally true", () =>
+  eq(extractIdentity({ user: { id: "u", emailVerified: "true" } })?.emailVerified, false));
+check("emailVerified true is carried through", () =>
+  eq(extractIdentity({ user: { id: "u", emailVerified: true } })?.emailVerified, true));
 
 /* Staff authorization: separate from authentication. A valid identity
  * grants nothing by itself. */
@@ -932,10 +873,10 @@ check("an unset STAFF_GITHAT_SUBJECTS denies every subject, including one that w
 check("an empty STAFF_GITHAT_SUBJECTS denies every subject", () =>
   eq(isAuthorizedStaffSubject("githat-user-1", parseStaffSubjects("   ")), false));
 check("a valid token's sub NOT on STAFF_GITHAT_SUBJECTS is denied staff access", () =>
-  eq(isAuthorizedStaffSubject(validVerify.ok ? validVerify.sub : "", parseStaffSubjects("someone-else")), false));
+  eq(isAuthorizedStaffSubject(extracted?.sub ?? "", parseStaffSubjects("someone-else")), false));
 check("a valid token's sub present in STAFF_GITHAT_SUBJECTS is authorized", () =>
   eq(
-    isAuthorizedStaffSubject(validVerify.ok ? validVerify.sub : "", parseStaffSubjects("someone-else, githat-user-1 ,a-third-one")),
+    isAuthorizedStaffSubject(extracted?.sub ?? "", parseStaffSubjects("someone-else, githat-user-1 ,a-third-one")),
     true,
   ));
 
@@ -961,6 +902,25 @@ check("resolveStaffRole: an unrecognized subject resolves to no role at all", ()
   eq(resolveStaffRole("nobody-in-particular", roleParams), null));
 check("resolveStaffRole: an unset owner subject never matches, even a literal empty string sub cannot slip through", () =>
   eq(resolveStaffRole("", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
+
+/* THE BOOTSTRAP RULE. Authorizing the first person requires their GitHat
+ * account id, and nothing in GitHat's dashboard shows it — so the denial
+ * page is the only place it can come from. These pin that it is actually
+ * there, because a well-meaning edit that trimmed the message back to a
+ * bare "not authorized" would silently restore a dead end that costs shell
+ * access on the server to escape. */
+check("the denial detail names the account id that was refused", () =>
+  unauthorizedDetail("githat-user-1").includes("githat-user-1")
+    ? true
+    : `the sub is missing from: ${unauthorizedDetail("githat-user-1")}`);
+check("the denial detail names both env vars an operator could add it to", () => {
+  const detail = unauthorizedDetail("githat-user-1");
+  return detail.includes("OWNER_GITHAT_SUBJECT") && detail.includes("STAFF_GITHAT_SUBJECTS")
+    ? true
+    : `expected both env var names in: ${detail}`;
+});
+check("the denial detail says a restart is required, since both are read once at startup", () =>
+  /restart/i.test(unauthorizedDetail("githat-user-1")) ? true : "the restart requirement is not stated");
 
 /* Trusted origin / redirect_uri — exact match, checked against the exact
  * shapes an attacker would actually try. */
@@ -1072,17 +1032,37 @@ check("a token endpoint that cannot be reached fails the exchange rather than si
 const acceptingTokenFetcher: FetchLike = async () => ({
   ok: true,
   status: 200,
-  json: async () => ({ access_token: validToken, token_type: "bearer" }),
+  json: async () => GITHAT_TOKEN_RESPONSE,
 });
 const acceptedExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: oauthTx.codeVerifier, fetcher: acceptingTokenFetcher });
-check("a successful exchange with a JWT access_token yields it as the identity token", () =>
-  eq(acceptedExchange, { ok: true, identityToken: validToken }));
+check("a successful exchange yields the identity from the response body", () =>
+  eq(acceptedExchange, {
+    ok: true,
+    identity: { sub: "githat-user-1", email: "front.desk@pulse.test", emailVerified: true, name: "Front Desk" },
+  }));
 
-check("extractIdentityToken prefers id_token when present", () =>
-  eq(extractIdentityToken({ id_token: validToken, access_token: "not-a-jwt" }), validToken));
-check("extractIdentityToken falls back to a JWT-shaped access_token", () => eq(extractIdentityToken({ access_token: validToken }), validToken));
-check("extractIdentityToken refuses a response with neither an id_token nor a JWT-shaped access_token", () =>
-  eq(extractIdentityToken({ access_token: "fixture-opaque-string-with-no-dots" }), null));
+/* A 200 whose body is the WRONG SHAPE must fail closed. This is the case
+ * the old JWT path got wrong in production without anyone noticing: it
+ * treated "no identity found" as a reason string and the callback turned
+ * it into a 502, which is right — but nothing ever exercised it against
+ * the shape GitHat actually sends. */
+const shapelessTokenFetcher: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ access_token: "opaque", token_type: "Bearer" }),
+});
+const shapelessExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "v", fetcher: shapelessTokenFetcher });
+check("a 200 with no user object fails the exchange closed", () =>
+  eq(shapelessExchange, { ok: false, reason: "no_identity_in_response" }));
+
+const badJsonFetcher: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => { throw new Error("not json"); },
+});
+const badJsonExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "v", fetcher: badJsonFetcher });
+check("a 200 whose body is not JSON fails the exchange closed", () =>
+  eq(badJsonExchange, { ok: false, reason: "token_endpoint_bad_json" }));
 
 /* buildAuthorizeUrl: every required OAuth + PKCE parameter, aimed at
  * GitHat's real authorize endpoint. */
@@ -1120,7 +1100,7 @@ check("the callback route logs only a reason string on denial, never the token/c
   const suspiciousLogLines = serverSource
     .split("\n")
     .filter((line) => /console\.(log|error|warn)/.test(line))
-    .filter((line) => /\bidentityToken\b|\bcodeVerifier\b|\bcode_verifier\b|verdict\.token/.test(line));
+    .filter((line) => /\bidentity\.sub\b|\bcodeVerifier\b|\bcode_verifier\b|\baccess_token\b/.test(line));
   return suspiciousLogLines.length === 0 ? true : `suspicious log line(s): ${suspiciousLogLines.join(" | ")}`;
 });
 
@@ -1130,6 +1110,41 @@ check("both staff session cookies are HttpOnly, Secure, SameSite=Lax, with no Do
   return cookieLines.length >= 2 && !hasDomainAttribute
     ? true
     : `cookie-shaped lines found: ${cookieLines.length}, a Domain= attribute present: ${hasDomainAttribute}`;
+});
+
+/* The denial page is the ONE place this server prints a value it did not
+ * author. It arrives over TLS from GitHat rather than from the callback
+ * URL, so it is not attacker-controlled today — but "today" is the kind of
+ * assumption that rots, and the blast radius is stored XSS on the staff
+ * door, so the escaping is pinned rather than trusted. */
+check("the value interpolated into the denial page is HTML-escaped, not trusted raw", () =>
+  /const detailHtml = detail === null \? "" : `<p>\$\{escapeHtml\(detail\)\}<\/p>`/.test(serverSource)
+    ? true
+    : "sendGithatResult no longer escapes its detail before interpolating it");
+
+/* REVOCATION MUST STAY REAL. This door's signed-in check was once the
+ * cookie's HMAC and expiry alone, so the authorization lists were read
+ * once at callback time and never again: removing somebody from
+ * STAFF_GITHAT_SUBJECTS left their cookie opening /api/staff/records for
+ * the rest of its 30 days, ACROSS the restart meant to apply the removal
+ * (measured: signedIn:true beside role:null, and a 200 with every member
+ * record). The fix is that the role is resolved per request. Pinned here
+ * because the tempting "optimisation" is to trust the cookie again. */
+check("the GitHat signed-in check resolves the role per request, never the cookie alone", () => {
+  const body = serverSource.slice(serverSource.indexOf("function requestIsSignedInViaGithat"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  if (/githatTokenIsValid\s*\(/.test(fn)) {
+    return "requestIsSignedInViaGithat is back to trusting the cookie's HMAC alone — a removed staff member would keep access";
+  }
+  return /githatRoleFromRequest\s*\(/.test(fn) ? true : `unrecognised shape: ${fn}`;
+});
+
+check("the per-request role resolution actually consults both authorization lists", () => {
+  const body = serverSource.slice(serverSource.indexOf("function githatRoleFromRequest"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  return /staffSubjects/.test(fn) && /directorySubjects/.test(fn) && /ownerSubject/.test(fn)
+    ? true
+    : `githatRoleFromRequest no longer consults every list: ${fn}`;
 });
 
 check("the GitHat door and the passphrase door issue distinctly named cookies", () =>

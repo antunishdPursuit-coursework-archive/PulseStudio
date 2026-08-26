@@ -4,18 +4,18 @@ import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isValidRevision } from "./revision.mjs";
+import { escapeHtml } from "../app/shared/html.js";
 import {
   beginOAuthTransaction,
   buildAuthorizeUrl,
   createInviteStore,
-  createJwksCache,
   createTransactionStore,
   createUsedCodeStore,
   exchangeCodeForToken,
   parseOwnerSubject,
   parseStaffSubjects,
   resolveStaffRole,
-  verifyGithatIdentityTokenLive,
+  unauthorizedDetail,
 } from "../app/shared/auth/githat-oauth.js";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -473,7 +473,6 @@ const staffGithatSubjects = parseStaffSubjects(process.env["STAFF_GITHAT_SUBJECT
 const ownerGithatSubject = parseOwnerSubject(process.env["OWNER_GITHAT_SUBJECT"]);
 const oauthTransactions = createTransactionStore();
 const usedAuthorizationCodes = createUsedCodeStore();
-const jwksCache = createJwksCache();
 const staffInvites = createInviteStore();
 
 /* THE STAFF DIRECTORY. Everyone the owner has invited and who has actually
@@ -523,7 +522,14 @@ function addToStaffDirectory(sub) {
  * restart, not just until the next one — which is exactly why the
  * lifetime below is real-days, not "however long the process happens to
  * stay up", and why sign-out and STAFF_GITHAT_SUBJECTS remain the actual
- * revocation levers, not a restart. */
+ * revocation levers, not a restart.
+ *
+ * That last clause was a promise this file did not keep until
+ * githatRoleFromRequest existed: the lists were read once in the callback
+ * and never again, so a persisted key meant a removed person's cookie went
+ * on working across the very restart meant to remove them. The lever is
+ * real now because the authorization lists are consulted on every request
+ * that asks for anything. */
 /* Buffer.from(str, "hex") does NOT throw on a malformed string — it stops
  * at the first non-hex character and silently hands back whatever it
  * parsed, which can be a short buffer or, for a string with no valid hex
@@ -577,8 +583,36 @@ function githatCookie(value, maxAgeSeconds) {
   return `${GITHAT_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
 }
 
+/* THE ROLE IS RESOLVED ON EVERY REQUEST, NOT ONCE AT SIGN-IN.
+ *
+ * This used to be `githatTokenIsValid(cookie)` and nothing else — an HMAC
+ * and an expiry. That made the cookie itself the grant, and the
+ * authorization lists were consulted exactly once, in the callback. The
+ * consequence was the opposite of what the comment above this door
+ * claimed: taking somebody OUT of STAFF_GITHAT_SUBJECTS, or deleting
+ * their row from the staff directory, revoked nothing. Their cookie kept
+ * verifying, so `/api/staff/records` kept answering with every member
+ * record — for the remaining 30 days, and ACROSS the restart that was
+ * supposed to apply the removal, precisely because
+ * GITHAT_SESSION_SIGNING_KEY is persisted on purpose. The server even
+ * said so out loud: `/api/staff/session` answered `signedIn: true` beside
+ * `role: null`, two fields disagreeing about the same request.
+ *
+ * Resolving per request costs one small file read and makes removal mean
+ * removal. The only revocation lever used to be rotating the signing key,
+ * which signs EVERYBODY out; now the lists are the lever, as documented. */
+function githatRoleFromRequest(request) {
+  const sub = githatSubjectFromRequest(request);
+  if (sub === null) return null;
+  return resolveStaffRole(sub, {
+    ownerSubject: ownerGithatSubject,
+    staffSubjects: staffGithatSubjects,
+    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+  });
+}
+
 function requestIsSignedInViaGithat(request) {
-  return githatTokenIsValid(cookieValue(request, GITHAT_COOKIE));
+  return githatRoleFromRequest(request) !== null;
 }
 
 /* The GitHat subject a request's cookie proves, or null. Used only to
@@ -600,14 +634,16 @@ function githatSubjectFromRequest(request) {
   }
 }
 
+/* One resolved answer for "what is this request allowed to be". The GitHat
+ * door is asked first because it carries a real per-person identity; the
+ * passphrase door has none, so it can only ever be the shared Front Desk
+ * persona. Deliberately NOT routed through requestIsSignedInStaff, which
+ * calls back into the GitHat check — asking the same question twice by two
+ * names is how the two used to be able to disagree. */
 function requestStaffRole(request) {
-  const sub = githatSubjectFromRequest(request);
-  if (sub === null) return requestIsSignedInStaff(request) ? "front_desk" : null;
-  return resolveStaffRole(sub, {
-    ownerSubject: ownerGithatSubject,
-    staffSubjects: staffGithatSubjects,
-    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
-  });
+  const githatRole = githatRoleFromRequest(request);
+  if (githatRole !== null) return githatRole;
+  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) ? "front_desk" : null;
 }
 
 /* GET /auth/githat/start — the browser's own click on "Sign in with
@@ -658,7 +694,7 @@ async function githatInvite(request, response, token) {
  * query parameters this route reads are validated and then discarded,
  * NEVER echoed into this HTML, so a crafted callback URL has nothing here
  * to inject into. */
-function sendGithatResult(response, status, message, redirectTo) {
+function sendGithatResult(response, status, message, redirectTo, detail = null) {
   const script = redirectTo
     ? `<script type="module">
   import { signInAsFrontDesk } from "/shared/auth/sign-in.js";
@@ -666,10 +702,19 @@ function sendGithatResult(response, status, message, redirectTo) {
   window.location.replace(${JSON.stringify(redirectTo)});
 </script>`
     : "";
+  /* `message` is always one of this file's own fixed literals. `detail` is
+   * NOT: it carries a GitHat account id, which arrives in a response body
+   * from api.githat.io. That value is not attacker-controlled here — it
+   * comes over TLS from the token endpoint, not from the callback URL —
+   * but it is the only thing on this page that did not originate in this
+   * source file, so it is escaped rather than trusted. The cost of being
+   * wrong about "this can never contain markup" is stored XSS on the
+   * staff door; the cost of escaping is nothing. */
+  const detailHtml = detail === null ? "" : `<p>${escapeHtml(detail)}</p>`;
   response.writeHead(status, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
   response.end(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pulse Studio staff sign-in</title></head>` +
-      `<body><p>${message}</p><p><a href="/index.html">Back to Pulse Studio</a></p>${script}</body></html>`,
+      `<body><p>${message}</p>${detailHtml}<p><a href="/index.html">Back to Pulse Studio</a></p>${script}</body></html>`,
   );
 }
 
@@ -716,22 +761,20 @@ async function githatCallback(request, response) {
     return;
   }
 
+  /* The exchange IS the verification — see the long comment above
+   * extractIdentity in app/shared/auth/githat-oauth.ts. This is a direct
+   * server-to-server HTTPS POST carrying a single-use code and a PKCE
+   * verifier that never left this process, so the identity it answers
+   * with is authoritative because of where it came from. `reason` is a
+   * short machine string by construction and never carries the code, the
+   * verifier, or any part of a token. */
   const exchange = await exchangeCodeForToken({ code, codeVerifier: tx.codeVerifier, fetcher: fetch });
-  if (!exchange.ok || exchange.identityToken === undefined) {
+  if (!exchange.ok || exchange.identity === undefined) {
+    console.error(`githat sign-in rejected: ${exchange.reason}`); // never the token itself
     sendGithatResult(response, 502, "GitHat could not confirm this sign-in.", null);
     return;
   }
-
-  const verdict = await verifyGithatIdentityTokenLive(exchange.identityToken, {
-    fetcher: fetch,
-    now,
-    cache: jwksCache,
-  });
-  if (!verdict.ok) {
-    console.error(`githat sign-in rejected: ${verdict.reason}`); // never the token itself
-    sendGithatResult(response, 401, "GitHat could not verify this sign-in.", null);
-    return;
-  }
+  const verdict = exchange.identity;
 
   /* An invite thread on this transaction is redeemed BEFORE the ordinary
    * authorization check, and only that exact invite: a token that has
@@ -755,7 +798,27 @@ async function githatCallback(request, response) {
     directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
   });
   if (role === null) {
-    sendGithatResult(response, 403, "Your GitHat account is not authorized for staff access here.", null);
+    /* THE BOOTSTRAP PROBLEM, ANSWERED HERE. Authorizing anyone means
+     * putting their GitHat account id in OWNER_GITHAT_SUBJECT or
+     * STAFF_GITHAT_SUBJECTS — and until this line existed there was no way
+     * to LEARN that id: it is not shown anywhere in GitHat's own dashboard,
+     * and the only other place it appears is inside a token this server
+     * never hands out. So the very first operator could not authorize
+     * themselves without already knowing the value being asked for.
+     *
+     * Showing a person their OWN account id, after they have just proved
+     * they control it, discloses nothing they could not already learn about
+     * themselves — it is an identifier, not a credential, and it grants
+     * nothing on its own (this exact request is being refused as it is
+     * printed). What it removes is a chicken-and-egg that otherwise needs
+     * shell access on the server to break. */
+    sendGithatResult(
+      response,
+      403,
+      "Your GitHat account is not authorized for staff access here.",
+      null,
+      unauthorizedDetail(verdict.sub),
+    );
     return;
   }
 

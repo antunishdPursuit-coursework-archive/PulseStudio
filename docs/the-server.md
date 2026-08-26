@@ -14,11 +14,30 @@ read — it is the reason this service exists as a separate process.
 **As of 2026-08-25, this process is actually running** at
 [pulse.githat.io](https://pulse.githat.io/) — a free student slug on GitHat
 (see its own docs for what that hosting shape is). The assistant answers
-there and both staff doors are a real gate, not the closed-by-design state
-the static copy shows. Check `GET https://pulse.githat.io/api/chat` for
-`"available"` rather than trusting this paragraph as it ages — a hosted
-instance can move or stop, and this file is the place that statement was
-true on the date given, not a promise it stays true.
+there. **The staff doors do not**, and this paragraph claimed they did for
+a day without anyone probing them.
+
+What is actually deployed there, measured 2026-08-25:
+
+| Probe | Result |
+| --- | --- |
+| `GET /api/chat` | `200 {"available":true, …}` — the assistant is real |
+| `GET /api/staff/session` | `200 {"configured":false, …}` — no `STAFF_PASSPHRASE` |
+| `GET /auth/githat/start` | `404` — the GitHat door is not in the running build |
+| `GET /api/staff/invites` | `404` — same |
+| `GET /api/chat` → `revision` | absent — predates the commit that stamps it |
+
+A 404 on a route that exists in `main` is the useful signal: it means the
+host is running OLD CODE, not that something is misconfigured. Setting
+`OWNER_GITHAT_SUBJECT` or `GITHAT_SESSION_SIGNING_KEY` on that box today
+would change nothing, because the process there has no code that reads
+either name. The order is deploy, then set, then restart — never the
+reverse.
+
+Run those probes rather than trusting this table as it ages. A deployed
+instance drifts from the repository the moment nothing checks it, and the
+`revision` key exists precisely so the drift is answerable instead of
+argued about.
 
 ## Local
 

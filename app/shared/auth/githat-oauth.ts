@@ -35,19 +35,17 @@
    secret that never needs to leave that one process), the same way it
    already signs the passphrase door's cookie.
 
-   TWO ASSUMPTIONS THIS FILE MAKES, because no live GitHat token was
-   available to read from this session, and the sibling backend task's
-   response-shape source was not available either. Both are named here so
-   the one seam to fix is obvious if either is wrong:
-
-     1. The client identifier lives in the standard `aud` claim (a string
-        equal to "pulse", or an array containing it) — see
-        `audienceMatches` below.
-     2. The token exchange may return an OIDC `id_token`, or the identity
-        may simply BE the `access_token` if GitHat issues JWT access
-        tokens — see `extractIdentityToken` below. Whichever field parses
-        as a three-part JWT is treated as the identity token; if neither
-        does, the exchange fails closed rather than guessing.
+   THOSE TWO ASSUMPTIONS ARE NOW MEASURED, AND BOTH WERE WRONG. This
+   header used to name them as guesses — that the client id would arrive
+   in `aud`, and that the exchange would return an OIDC `id_token` — made
+   because no live GitHat token was readable when the file was written.
+   Both were checked against the running service and its source on
+   2026-08-25: GitHat mints no ID token at all, its identity claim is
+   `userId` rather than `sub`, and `aud` is the fleet-wide constant
+   `githat`, never `pulse`. Every genuine sign-in would have been refused.
+   See the long comment above `extractIdentity` for the measurements and
+   for why this door now trusts the server-to-server exchange itself
+   instead of a signature over its payload.
 
    TESTS: see `./tests.ts`. The synchronous pieces (state/PKCE bookkeeping,
    JWT parsing, claim checks, staff authorization) are proven directly by
@@ -71,7 +69,6 @@
 export const GITHAT_ISSUER = "https://api.githat.io";
 export const GITHAT_AUTHORIZE_ENDPOINT = "https://api.githat.io/oauth/authorize";
 export const GITHAT_TOKEN_ENDPOINT = "https://api.githat.io/oauth/token";
-export const GITHAT_JWKS_ENDPOINT = "https://api.githat.io/.well-known/jwks.json";
 export const GITHAT_CLIENT_ID = "pulse";
 export const PULSE_REDIRECT_URI = "https://pulse.githat.io/auth/callback";
 export const PULSE_TRUSTED_ORIGIN = "https://pulse.githat.io";
@@ -83,43 +80,19 @@ export const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
    this only bounds how long THIS PROCESS remembers a code as "already
    spent" for replay detection, not how long GitHat itself honors one. */
 export const OAUTH_CODE_TTL_MS = 5 * 60 * 1000;
-/* Bounded so a rotated signing key is picked up within a quarter hour
-   rather than being cached indefinitely — long enough that an ordinary
-   run of sign-ins costs one fetch, short enough that key rotation is not a
-   multi-hour outage. */
-export const JWKS_CACHE_TTL_MS = 15 * 60 * 1000;
-/* Small tolerance for clock drift between this server and GitHat's. */
-export const CLOCK_SKEW_SECONDS = 60;
-
 /* ---------------------------------------------------------------- *
- * BASE64URL, written by hand because `Buffer` does not exist in a browser
- * and this module has to run in both places (see the file header).
+ * BASE64URL. Only the ENCODE half survives: it is what turns random bytes
+ * into a URL-safe `state`, PKCE verifier, and invite token. The matching
+ * decoders existed solely to unpack a JWT's three parts, and went with the
+ * JWT verification — nothing here reads a token's insides any more.
+ * Still hand-written rather than reaching for `Buffer`, because this
+ * module has to run in a real browser too (see the file header).
  * ---------------------------------------------------------------- */
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/* Typed `Uint8Array<ArrayBuffer>` rather than the bare, wider
-   `Uint8Array<ArrayBufferLike>` alias — the signature bytes this produces
-   are handed straight to `crypto.subtle.verify`, which (as of the DOM
-   types shipped with TypeScript 5.7+) wants a buffer it can prove is a
-   real `ArrayBuffer`, not merely "some ArrayBuffer-like thing". `new
-   Uint8Array(length)` always allocates a real one; naming that in the
-   return type is what lets it flow through untouched. */
-function base64UrlDecodeToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-function base64UrlDecodeToString(value: string): string {
-  return new TextDecoder().decode(base64UrlDecodeToBytes(value));
 }
 
 /* ---------------------------------------------------------------- *
@@ -287,25 +260,102 @@ export interface FetchLike {
   }>;
 }
 
-function looksLikeJwt(value: unknown): value is string {
-  return typeof value === "string" && value.split(".").length === 3;
+/* WHAT COMES BACK, AND WHY NOTHING HERE VERIFIES A JWT.
+ *
+ * This module used to treat the exchange as OpenID Connect: pull an
+ * `id_token` (or a JWT-shaped `access_token`) out of the response and
+ * verify it RS256 against GitHat's JWKS, checking `iss`, `aud` and `sub`.
+ * The file header carried that as an explicitly UNVERIFIED assumption,
+ * because no live GitHat token was available to read when it was written.
+ *
+ * It was wrong, and measured against the running service on 2026-08-25 it
+ * was wrong three separate ways at once:
+ *
+ *   1. GITHAT MINTS NO ID TOKEN. `POST /oauth/token` answers RFC 6749
+ *      §5.1 and nothing more — `{ access_token, token_type, expires_in,
+ *      refresh_token, scope, user, org }`. There is no `id_token` field to
+ *      find. (GitHat's own discovery document advertised OIDC anyway; its
+ *      maintainers documented that as an overclaim and are correcting it.)
+ *   2. THE IDENTITY CLAIM IS `userId`, NOT `sub`. GitHat's access token
+ *      carries `{ userId, email, type, tv, app, ... }`. A `sub` lookup
+ *      finds nothing, so every real sign-in read as an empty subject.
+ *   3. THE AUDIENCE IS `githat`, NOT `pulse`. `aud` is
+ *      `appId || app || 'githat'`, and Pulse has no registered appId, so
+ *      the check for `"pulse"` refused every genuine token.
+ *
+ * So the verification was not merely unnecessary — it could never have
+ * admitted a single real user. Deleting it removes ~200 lines that
+ * implied a security property this door does not actually rest on.
+ *
+ * WHAT IT RESTS ON INSTEAD, which is the ordinary RFC 6749 §4.1 + RFC 7636
+ * public-client argument, and is strictly stronger here than checking a
+ * bearer token's claims would have been:
+ *
+ *   - The `state` is 32 random bytes this server minted, held SERVER-SIDE
+ *     and single-use, so a callback nobody here started is refused before
+ *     any exchange happens.
+ *   - The `code_verifier` never left this process, and GitHat enforces the
+ *     S256 match at the token endpoint (verified in its own source).
+ *   - The exchange is a DIRECT server-to-server HTTPS POST from this
+ *     process to api.githat.io. TLS authenticates the responder, and no
+ *     browser or third party is in the path to tamper with the reply.
+ *
+ * Given all three, the `user` object in that response is authoritative
+ * BECAUSE OF WHERE IT CAME FROM, not because of a signature over it. A
+ * JWT `aud` check would have added nothing on top: `aud` is the constant
+ * `githat` for every app in the fleet, so it distinguishes nothing — a
+ * token minted for any other GitHat app carries exactly the same value.
+ * Trusting the transport we opened ourselves is the honest boundary. */
+
+/** The identity GitHat returns for the person who just signed in.
+ *  `sub` is GitHat's own immutable user id — the value that goes in
+ *  STAFF_GITHAT_SUBJECTS / OWNER_GITHAT_SUBJECT. It is named `sub` here,
+ *  rather than `userId`, because that is the vocabulary the rest of this
+ *  door already speaks; the mapping from GitHat's wire name happens once,
+ *  in extractIdentity below, so exactly one line has to change if GitHat
+ *  ever renames it. */
+export interface GithatIdentity {
+  readonly sub: string;
+  readonly email: string | null;
+  readonly emailVerified: boolean;
+  readonly name: string | null;
 }
 
-/** Which field of a token response is the identity token to verify. See
- *  the file header's second assumption: prefers an OIDC `id_token`, falls
- *  back to `access_token` when GitHat issues JWT access tokens, and
- *  refuses to guess further than that. */
-export function extractIdentityToken(tokenResponse: unknown): string | null {
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+/** Read the identity out of a token-endpoint response, treating the body
+ *  as hostile input the same way readPulseSession treats storage: any
+ *  shape that is not exactly what GitHat documents reads as null, never a
+ *  partially-filled identity and never a throw. A missing or blank user
+ *  id is the one thing that MUST fail closed — an empty subject would
+ *  otherwise sail through resolveStaffRole against an empty allowlist. */
+export function extractIdentity(tokenResponse: unknown): GithatIdentity | null {
   if (typeof tokenResponse !== "object" || tokenResponse === null) return null;
   const body = tokenResponse as Record<string, unknown>;
-  if (looksLikeJwt(body["id_token"])) return body["id_token"];
-  if (looksLikeJwt(body["access_token"])) return body["access_token"];
-  return null;
+  const user = body["user"];
+  if (typeof user !== "object" || user === null) return null;
+  const fields = user as Record<string, unknown>;
+  /* GitHat's wire name for the identity is `id` inside `user` (the same
+     value its access token carries as `userId`). This is the ONE place
+     that mapping is written down. */
+  const sub = nonEmptyString(fields["id"]);
+  if (sub === null) return null;
+  return {
+    sub,
+    email: nonEmptyString(fields["email"]),
+    emailVerified: fields["emailVerified"] === true,
+    name: nonEmptyString(fields["name"]),
+  };
 }
 
 export interface TokenExchangeResult {
   readonly ok: boolean;
-  readonly identityToken?: string;
+  readonly identity?: GithatIdentity;
+  /** A short machine-readable reason. NEVER contains the code, the
+   *  verifier, or any part of a token — the callback route logs this
+   *  string verbatim. */
   readonly reason?: string;
 }
 
@@ -338,218 +388,9 @@ export async function exchangeCodeForToken(params: {
   } catch {
     return { ok: false, reason: "token_endpoint_bad_json" };
   }
-  const identityToken = extractIdentityToken(json);
-  if (identityToken === null) return { ok: false, reason: "no_identity_token" };
-  return { ok: true, identityToken };
-}
-
-/* ---------------------------------------------------------------- *
- * JWT VERIFICATION. RS256 only, hand-written against Web Crypto rather
- * than trusting a library — and rather than trusting the token's own
- * `alg` header past a hard-coded comparison against the one string this
- * door accepts. `none`, `HS256`, and anything else are refused before any
- * key lookup or signature check even runs, which is what keeps an
- * algorithm-confusion attack (an attacker resigning a token with a
- * different algorithm, or asserting no signature at all) from ever
- * reaching the part of this function that would grant anything.
- * ---------------------------------------------------------------- */
-
-export interface DecodedJwt {
-  readonly header: Record<string, unknown>;
-  readonly payload: Record<string, unknown>;
-  readonly signingInput: string;
-  readonly signature: Uint8Array<ArrayBuffer>;
-}
-
-/* The DOM lib's own `JsonWebKey` interface does not carry `kid` (it is a
-   real, optional JWK member the type just omits), so it is extended
-   locally rather than reached around with a cast at every use. */
-interface GithatJwk extends JsonWebKey {
-  readonly kid?: string;
-}
-
-export function decodeJwt(token: string): DecodedJwt | null {
-  if (typeof token !== "string" || token === "") return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [headerB64, payloadB64, signatureB64] = parts;
-  if (headerB64 === undefined || payloadB64 === undefined || signatureB64 === undefined) return null;
-  let header: unknown;
-  let payload: unknown;
-  try {
-    header = JSON.parse(base64UrlDecodeToString(headerB64));
-    payload = JSON.parse(base64UrlDecodeToString(payloadB64));
-  } catch {
-    return null;
-  }
-  if (typeof header !== "object" || header === null || Array.isArray(header)) return null;
-  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return null;
-  let signature: Uint8Array<ArrayBuffer>;
-  try {
-    signature = base64UrlDecodeToBytes(signatureB64);
-  } catch {
-    return null;
-  }
-  return {
-    header: header as Record<string, unknown>,
-    payload: payload as Record<string, unknown>,
-    signingInput: `${headerB64}.${payloadB64}`,
-    signature,
-  };
-}
-
-export type JwtVerifyResult =
-  | { readonly ok: true; readonly sub: string }
-  | { readonly ok: false; readonly reason: string };
-
-async function verifyJwtSignature(
-  decoded: DecodedJwt,
-  jwks: readonly GithatJwk[],
-): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
-  /* THE ALGORITHM CHECK COMES FIRST, AND IS A STRING COMPARISON, NOT A
-   * DISPATCH. Nothing below this line ever asks the token which algorithm
-   * to use — RS256 is the only value that gets past it, so a token
-   * asserting "none" or "HS256" is refused right here, before any key
-   * lookup, before any bytes are compared. */
-  if (decoded.header["alg"] !== "RS256") {
-    return { ok: false, reason: "unsupported_alg" };
-  }
-  const kid = decoded.header["kid"];
-  if (typeof kid !== "string" || kid === "") {
-    return { ok: false, reason: "missing_kid" };
-  }
-  const jwk = jwks.find((k) => k.kid === kid && k.kty === "RSA");
-  if (jwk === undefined) {
-    return { ok: false, reason: "unknown_kid" };
-  }
-  let key: CryptoKey;
-  try {
-    key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, [
-      "verify",
-    ]);
-  } catch {
-    return { ok: false, reason: "bad_key" };
-  }
-  let verified = false;
-  try {
-    verified = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      decoded.signature,
-      new TextEncoder().encode(decoded.signingInput),
-    );
-  } catch {
-    verified = false;
-  }
-  return verified ? { ok: true } : { ok: false, reason: "bad_signature" };
-}
-
-function audienceMatches(payload: Record<string, unknown>): boolean {
-  /* ASSUMPTION (see the file header): the client id rides in the standard
-   * `aud` claim, as a lone string or inside an array. This is the one seam
-   * to edit if GitHat's tokens name the client a different way. */
-  const aud = payload["aud"];
-  if (typeof aud === "string") return aud === GITHAT_CLIENT_ID;
-  if (Array.isArray(aud)) return aud.includes(GITHAT_CLIENT_ID);
-  return false;
-}
-
-/** The claim checks alone, given an already signature-verified payload.
- *  Exported separately from signature verification so each half can be
- *  proven wrong on its own — a check that only ever exercised both
- *  together could not tell "the signature check is broken" from "the
- *  claim check is broken" when one produces a false pass. */
-export function verifyIdentityClaims(payload: Record<string, unknown>, nowSeconds: number): JwtVerifyResult {
-  if (payload["iss"] !== GITHAT_ISSUER) return { ok: false, reason: "wrong_issuer" };
-  if (!audienceMatches(payload)) return { ok: false, reason: "wrong_audience" };
-  const exp = payload["exp"];
-  if (typeof exp !== "number" || nowSeconds > exp + CLOCK_SKEW_SECONDS) {
-    return { ok: false, reason: "expired" };
-  }
-  const nbf = payload["nbf"];
-  if (typeof nbf === "number" && nowSeconds < nbf - CLOCK_SKEW_SECONDS) {
-    return { ok: false, reason: "not_yet_valid" };
-  }
-  const iat = payload["iat"];
-  if (typeof iat === "number" && iat > nowSeconds + CLOCK_SKEW_SECONDS) {
-    return { ok: false, reason: "issued_in_future" };
-  }
-  const sub = payload["sub"];
-  if (typeof sub !== "string" || sub.trim() === "") return { ok: false, reason: "missing_sub" };
-  return { ok: true, sub };
-}
-
-/** Full verification given an already-fetched JWKS key set: parse, check
- *  `alg`/`kid`, verify the RSA signature, then check every claim. */
-export async function verifyGithatIdentityToken(
-  token: string,
-  jwks: readonly GithatJwk[],
-  nowSeconds: number,
-): Promise<JwtVerifyResult> {
-  const decoded = decodeJwt(token);
-  if (decoded === null) return { ok: false, reason: "malformed" };
-  const signature = await verifyJwtSignature(decoded, jwks);
-  if (!signature.ok) return signature;
-  return verifyIdentityClaims(decoded.payload, nowSeconds);
-}
-
-/* ---------------------------------------------------------------- *
- * JWKS FETCH + CACHE. Bounded TTL (JWKS_CACHE_TTL_MS, named above), and a
- * fetch failure or timeout is NEVER papered over with a stale cache — it
- * fails closed, every time, even when a perfectly good cached key set is
- * sitting right there. A rotated-out key that still verified because the
- * fetch to notice the rotation happened to fail is the wrong kind of
- * leniency for a door that decides who is staff.
- * ---------------------------------------------------------------- */
-
-export async function fetchJwksOnce(fetcher: FetchLike): Promise<readonly GithatJwk[] | null> {
-  let response;
-  try {
-    response = await fetcher(GITHAT_JWKS_ENDPOINT);
-  } catch {
-    return null;
-  }
-  if (!response.ok) return null;
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return null;
-  }
-  if (typeof body !== "object" || body === null) return null;
-  const keys = (body as Record<string, unknown>)["keys"];
-  if (!Array.isArray(keys)) return null;
-  return keys as readonly GithatJwk[];
-}
-
-export interface JwksCache {
-  keys(fetcher: FetchLike, now: number): Promise<readonly GithatJwk[] | null>;
-}
-
-export function createJwksCache(ttlMs: number = JWKS_CACHE_TTL_MS): JwksCache {
-  let cached: { readonly keys: readonly GithatJwk[]; readonly fetchedAt: number } | null = null;
-  return {
-    async keys(fetcher, now) {
-      if (cached !== null && now - cached.fetchedAt < ttlMs) return cached.keys;
-      const fetched = await fetchJwksOnce(fetcher);
-      if (fetched === null) return null; // fail closed — see the block comment above
-      cached = { keys: fetched, fetchedAt: now };
-      return cached.keys;
-    },
-  };
-}
-
-/** The end-to-end verification the callback route actually calls: fetch
- *  (or reuse a cached) JWKS through the injected fetcher, then verify. A
- *  JWKS fetch failure denies access — it never falls through to "assume
- *  valid". */
-export async function verifyGithatIdentityTokenLive(
-  token: string,
-  options: { readonly fetcher: FetchLike; readonly now: number; readonly cache: JwksCache },
-): Promise<JwtVerifyResult> {
-  const keys = await options.cache.keys(options.fetcher, options.now);
-  if (keys === null) return { ok: false, reason: "jwks_unavailable" };
-  return verifyGithatIdentityToken(token, keys, Math.floor(options.now / 1000));
+  const identity = extractIdentity(json);
+  if (identity === null) return { ok: false, reason: "no_identity_in_response" };
+  return { ok: true, identity };
 }
 
 /* ---------------------------------------------------------------- *
@@ -574,6 +415,22 @@ export function parseStaffSubjects(envValue: string | undefined): ReadonlySet<st
 export function isAuthorizedStaffSubject(sub: string, subjects: ReadonlySet<string>): boolean {
   if (subjects.size === 0) return false;
   return subjects.has(sub);
+}
+
+/** The sentence a person sees when GitHat confirmed who they are and this
+ *  studio still will not let them in.
+ *
+ *  It exists as a FUNCTION rather than a string literal inside the server
+ *  for the reason app/shared/CLAUDE.md already gives twice: the server is a
+ *  module no suite can import, so anything in it that becomes a RULE rather
+ *  than markup moves somewhere a check can load. The rule here is "a denied
+ *  person is told their own account id, because otherwise nobody can ever
+ *  be authorized for the first time" — and that it is exactly this string,
+ *  so a later edit cannot quietly drop the id and reintroduce the
+ *  chicken-and-egg. */
+export function unauthorizedDetail(sub: string): string {
+  return `Your GitHat account id is ${sub} — an operator can authorize it by adding it to ` +
+    `OWNER_GITHAT_SUBJECT (for the studio owner) or STAFF_GITHAT_SUBJECTS, then restarting the server.`;
 }
 
 /* ---------------------------------------------------------------- *
