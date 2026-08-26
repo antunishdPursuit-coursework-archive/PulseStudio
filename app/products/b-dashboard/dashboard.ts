@@ -21,6 +21,12 @@ export const UNDERBOOKED_BELOW = 70;
 export const FILLING_SOON_AT = 90;
 export const FULL_AT = 100;
 
+/** The one static publication where the team intentionally shows the
+ * browser-generated class-project records without a server-backed door. */
+export function isPublicDashboardHost(hostname: string): boolean {
+  return hostname === "antunishdpursuit.github.io";
+}
+
 export type SessionStatus = "Underbooked" | "On track" | "Filling soon" | "Full";
 
 export interface RosterMember {

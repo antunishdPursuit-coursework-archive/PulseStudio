@@ -13,7 +13,7 @@
 
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
-  bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
+  bookingDataLine, confirmedCount, formatSessionTime, isPublicDashboardHost, needsAttention, nextActionText,
   occupancy, roomDemand, spotsLeftText, status, statusCount,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
@@ -40,6 +40,8 @@ const session = (capacity: number, reserved: number, extras: RosterMember[] = []
 check("underbooked band starts below 70", UNDERBOOKED_BELOW, 70);
 check("filling-soon band starts at 90", FILLING_SOON_AT, 90);
 check("full is 100", FULL_AT, 100);
+check("the team GitHub Pages host opens the public dashboard", isPublicDashboardHost("antunishdpursuit.github.io"), true);
+check("another host keeps the staff door", isPublicDashboardHost("pulse.githat.io"), false);
 
 // Only reserved rows hold a seat — the brief's riskiest boundary.
 check("waitlisted rows never count as confirmed", confirmedCount(session(10, 3, [member(90, "waitlisted")])), 3);

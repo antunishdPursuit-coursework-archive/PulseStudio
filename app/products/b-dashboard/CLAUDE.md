@@ -7,8 +7,9 @@ folder.
 
 ## What this product is (proven in code, not aspiration)
 
-(A staff view of upcoming class sessions is protected by the shared
-server-backed staff door before any dashboard content renders.) Fill rates
+The GitHub Pages copy is a public class-project surface that renders only the
+browser-generated studio records. Server-backed copies remain protected by
+the shared staff door before any dashboard content renders. Fill rates
 with attention flags
 (Underbooked / Filling soon / Full — computed from generator `booked`
 bookings, then overridden per member by the latest matching row in the
@@ -21,9 +22,11 @@ published schedule writes also cross the authenticated server boundary.
 ## THE structural facts to know before touching anything
 
 **The live page is `index.html` + `staff-dashboard.js` + `dashboard.ts`.**
-`staff-dashboard.js` mounts `../../shared/auth/staff-gate.js` first; an
-anonymous visitor sees only the shared staff sign-in door, and the dashboard
-DOM is not initialized until the server confirms a signed staff session.
+`staff-dashboard.js` detects the exact GitHub Pages hostname and initializes
+the dashboard there from the browser-generated studio. On every other host it
+mounts `../../shared/auth/staff-gate.js` first; an anonymous visitor sees only
+the shared staff sign-in door, and the dashboard DOM is not initialized until
+the server confirms a signed staff session.
 `staff-dashboard.js` is hand-written, git-tracked SOURCE, despite being a
 `.js` in a TypeScript repo (it has no `.ts` twin; do not delete it as
 "compiled output"). It keeps the DOM wiring; the arithmetic — fill bands,
@@ -66,9 +69,11 @@ dashboard, and it carries its own `noindex` and favicon lines.
   string `"Studio"`; a session added in the dialog carries whatever room
   was typed. The demand panel groups by that field, busiest room first,
   and `#fastestRoom` ("Busiest room") is the top row's label.
-- **Publish writes the shared schedule**: confirming a draft sends the
-  week's `local-N` sessions to `/api/schedule` through the staff session and
-  also caches the accepted result in this browser under `pulse-schedule-b`.
+- **Publish writes the shared schedule on a server-backed host**: confirming a
+  draft sends the week's `local-N` sessions to `/api/schedule` through the
+  staff session and also caches the accepted result in this browser under
+  `pulse-schedule-b`. On the GitHub Pages copy, there is no server endpoint;
+  confirmation writes only that same browser-local cache.
   Product A does not read the endpoint yet; its consumer is a separate,
   approved change for Kerrian's lane.
 - The roster locally re-maps generator camelCase into contract-style
