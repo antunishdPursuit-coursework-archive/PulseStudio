@@ -222,8 +222,15 @@ npm run start
 
 Then open http://localhost:4173 — the front door links to all four products.
 The same server also runs at https://pulse.githat.io/, a free student slug
-(see `docs/the-server.md`) — the assistant and both staff doors are real
-there, not the closed-by-design state the static GitHub Pages copy shows.
+(see `docs/the-server.md`). **The assistant is real there; the staff doors
+are not yet.** Measured 2026-08-25: `/api/chat` answers `available:true`,
+while `/auth/githat/start` and `/api/staff/invites` both 404 and
+`/api/staff/session` reports `configured:false` — that host is running a
+build from before the staff doors existed, and no `STAFF_PASSPHRASE` is
+set on it. These lines said "both staff doors are real there" for a day,
+which was never measured and was wrong the whole time. Probe the three
+paths above rather than trusting this paragraph; a deployed instance
+drifts from the repository the moment nothing checks it.
 
 ## Per-folder briefs and the multi-assistant mirrors
 
