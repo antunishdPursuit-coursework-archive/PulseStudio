@@ -84,3 +84,13 @@ export function letGoLine(dropped: number): string {
   const verb = dropped === 1 ? "was" : "were";
   return `${counted(dropped, "reservation")} from another studio date ${verb} let go. `;
 }
+
+/** The current answer for a topic, or null when none is current.
+ *  A superseded row with the same topic is not this — there is one
+ *  current cancellation policy, and Cancel has to show that one. */
+export function currentPolicyAnswer(
+  policies: readonly { topic: string; answer: string; isCurrent: boolean }[],
+  topic: string,
+): string | null {
+  return policies.find((policy) => policy.topic === topic && policy.isCurrent)?.answer ?? null;
+}

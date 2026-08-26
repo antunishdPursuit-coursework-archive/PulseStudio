@@ -10,7 +10,7 @@ A client-side booking page over the shared deterministic synthetic studio:
 the member-facing H1 is "Book a class" (blue is the color-law signature;
 the builder's name stays off the page). Signed-in members see "Your
 classes" above the public schedule, with a next-class line when they hold
-a reserved spot. Day chips say Today / Tomorrow. Book / waitlist / cancel
+a reserved spot, and the current cancellation policy beside Cancel. Day chips say Today / Tomorrow. Book / waitlist / cancel
 with a full guard chain, automatic waitlist promotion, and `?session=<id>`
 deep links.
 Occupancy is the generator's own bookings plus rows the signed-in member
@@ -35,7 +35,7 @@ suite `npm run check` already labels "class booking".
 | `rules.ts` | Pure booking rules the suite imports: last-row-wins occupancy, spots left, book / waitlist refusals, the let-go line |
 | `reservations.ts` | The storage module: `RUNTIME_KEY = "pulse-reservations-a"`, `SCHEDULE_KEY = "pulse-reservations-a-schedule"`, load/save via `readStored` / `writeStored`, `latestReservation()` (last row wins), `reservationsForSchedule()`. A refused write returns false so Book can say the browser is not saving. |
 | `index.html` | The page shell; favicon link; carries the DOM anchors `main.ts` requires (`requiredElement()` throws if one is missing) |
-| `tests.html` / `tests.ts` | Checks that can fail: capacity, duplicate book, waitlist only when full, last-row-wins, date stamp, storage refusal |
+| `tests.html` / `tests.ts` | Checks that can fail: capacity, duplicate book, waitlist only when full, last-row-wins, date stamp, storage refusal, current cancellation policy |
 | `styles.css` | Product-local styling; every color is a theme token |
 
 ## Identity and sign-in

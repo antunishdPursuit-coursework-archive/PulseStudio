@@ -10,6 +10,7 @@
    pulse-session; this page never keeps a second key. */
 
 import type { Reservation } from "../../shared/contract.js";
+import { STUDIO_NAME } from "../../shared/brand.js";
 import { readPulseSession, subscribeToPulseSession } from "../../shared/auth/session.js";
 import { sharedStudio } from "../../shared/auth/studio.js";
 import type {
@@ -25,6 +26,7 @@ import {
 } from "./reservations.js";
 import {
   bookRefusal,
+  currentPolicyAnswer,
   heldStatus,
   letGoLine,
   reservedMemberIds,
@@ -32,6 +34,8 @@ import {
   waitlistRefusal,
   waitlistedInOrder,
 } from "./rules.js";
+
+document.title = `Book a class — ${STUDIO_NAME}`;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -77,6 +81,7 @@ const TOMORROW_ISO = (() => {
   return d.toISOString().slice(0, 10);
 })();
 const scheduleSync = reconcileSchedule(TODAY_ISO);
+const cancellationPolicy = currentPolicyAnswer(dataset.studioPolicies, "cancellation");
 
 const classTypeById = new Map(dataset.classTypes.map((item) => [item.id, item]));
 const instructorById = new Map(dataset.instructors.map((item) => [item.id, item]));
@@ -457,6 +462,9 @@ function renderMine(memberId: string): void {
     mineEl.innerHTML = `<p class="status">${upcomingSessions().length} scheduled classes checked, 0 reserved under your name.</p>`;
     return;
   }
+  const policyLine = cancellationPolicy
+    ? cancellationPolicy
+    : "No current cancellation policy in the studio records.";
   const next = held.find(({ status }) => status === "reserved");
   const nextLine = next
     ? `<p class="next-class">Your next class: <strong>${escapeHtml(sessionLabel(next.session).name)}</strong> — ${escapeHtml(formatWhen(next.session))} with ${escapeHtml(sessionLabel(next.session).instructor)}.</p>`
@@ -473,7 +481,10 @@ function renderMine(memberId: string): void {
             <h3>${escapeHtml(label.name)}</h3>
             <p class="meta">${escapeHtml(formatWhen(session))} · ${escapeHtml(label.instructor)} · ${state}</p>
           </div>
-          <button class="btn ghost" type="button" data-cancel="${escapeHtml(session.id)}">Cancel</button>
+          <div class="session-actions">
+            <p class="cancel-policy">${escapeHtml(policyLine)}</p>
+            <button class="btn ghost" type="button" data-cancel="${escapeHtml(session.id)}">Cancel</button>
+          </div>
         </div>
       </article>`;
     })
