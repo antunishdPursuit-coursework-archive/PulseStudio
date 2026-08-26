@@ -1,11 +1,30 @@
 /* Pulse Studio — the GitHat OAuth client. TEAM-OWNED.
 
    WHAT THIS IS. GitHat (a sibling project, a separate live service at
-   api.githat.io) runs its own OAuth 2.0 authorization-code + PKCE(S256)
-   server. This module is PULSE'S SIDE of that conversation: everything
-   needed to send a staff member to GitHat to sign in, get back an
-   authorization code, exchange it for an identity token server-to-server,
-   and verify that token ourselves rather than trusting it on sight.
+   api.githat.io) runs its own "Continue with GitHat" authorization-code
+   flow — its own dialect, not standard OAuth 2.0, measured against five
+   other fleet apps that already use it in production (SebasTN, Colmado,
+   Quantl, and others, via a shared `@fleet/auth` package or hand-rolled
+   equivalents). This module is PULSE'S SIDE of that conversation: send a
+   staff member to GitHat to sign in, get back a single-use code, exchange
+   it for their identity server-to-server.
+
+   THIS FILE USED TO SPEAK STANDARD OAUTH — `client_id`, `response_type`,
+   PKCE (S256 challenge/verifier), a form-encoded token POST — none of
+   which any working fleet consumer sends. Measured 2026-08-26 by reading
+   every proven-working integration and GitHat's own backend source: the
+   real wire contract is `app` (a slug, not `client_id`) + `redirect_url` +
+   `state` on the authorize leg, and a bare JSON `{code}` on the token
+   leg. PKCE appears nowhere in the fleet — GitHat's backend happens to
+   support a code_challenge/code_verifier pair if a caller sends one, but
+   nothing verifies that support actually works, and Pulse was the only
+   caller ever exercising it. Real sign-ins failed at the token exchange
+   every time this was tried for real, and the PKCE gate was the leading
+   suspect precisely because it was the one code path unique to Pulse.
+   Removed rather than kept "just in case" — inert crypto plumbing implies
+   a security property nothing here has verified GitHat honors, which is
+   worse than not having it. `state` alone, single-use and server-held,
+   still gates CSRF the same way it does for every other fleet consumer.
 
    THIS IS AN AUTHENTICATION-PROTOCOL ADDITION, laid in ALONGSIDE the
    existing staff passphrase (staff-gate.ts, and STAFF_PASSPHRASE in
@@ -47,29 +66,32 @@
    for why this door now trusts the server-to-server exchange itself
    instead of a signature over its payload.
 
-   TESTS: see `./tests.ts`. The synchronous pieces (state/PKCE bookkeeping,
-   JWT parsing, claim checks, staff authorization) are proven directly by
-   this repo's ordinary check() harness. The two genuinely asynchronous
-   seams (RSA signature verification, JWKS fetching) are resolved with a
-   top-level `await` before being handed to check() — the same technique
-   `synthetic/tests.ts` already uses for its own `await fetch(...)` calls —
-   because the harness itself has no async support (see the comment next to
-   `mountSessionControl` in tests.ts). A test-only JWKS source is injected
-   as a plain function argument (`FetchLike`); there is no fallback inside
-   this module that would let a test double reach a production call by
-   accident — every call site must supply its own fetcher explicitly. */
+   TESTS: see `./tests.ts`. The synchronous pieces (state bookkeeping,
+   claim checks, staff authorization) are proven directly by this repo's
+   ordinary check() harness. The one genuinely asynchronous seam left
+   (the token exchange itself) is resolved with a top-level `await`
+   before being handed to check() — the same technique `synthetic/tests.ts`
+   already uses for its own `await fetch(...)` calls — because the harness
+   itself has no async support (see the comment next to `mountSessionControl`
+   in tests.ts). A test-only fetcher is injected as a plain function
+   argument (`FetchLike`); there is no fallback inside this module that
+   would let a test double reach a production call by accident — every
+   call site must supply its own fetcher explicitly. */
 
 /* ---------------------------------------------------------------- *
- * THE REGISTERED FACTS. Not secrets — GitHat's endpoints are public, and
- * Pulse's client_id and redirect_uri are what GitHat's own dashboard has on
- * file for this client. Pulse is a PUBLIC client (no client secret was
- * provisioned), which is exactly what PKCE exists to make safe.
+ * THE REGISTERED FACTS. Not secrets — GitHat's endpoints are public. The
+ * "pulse" slug is what GitHat's own dashboard/registry has on file, sent
+ * as the `app` query param (not `client_id` — see buildAuthorizeUrl).
+ * Pulse has no client secret and never sends one; there is no equivalent
+ * of PKCE in the real fleet protocol to make that safe with, and none is
+ * needed — `redirect_url` is allowlist-checked server-side by GitHat, and
+ * `state`, generated and held here, is what actually stops CSRF.
  * ---------------------------------------------------------------- */
 
 export const GITHAT_ISSUER = "https://api.githat.io";
 export const GITHAT_AUTHORIZE_ENDPOINT = "https://api.githat.io/oauth/authorize";
 export const GITHAT_TOKEN_ENDPOINT = "https://api.githat.io/oauth/token";
-export const GITHAT_CLIENT_ID = "pulse";
+export const GITHAT_APP_SLUG = "pulse";
 export const PULSE_REDIRECT_URI = "https://pulse.githat.io/auth/callback";
 export const PULSE_TRUSTED_ORIGIN = "https://pulse.githat.io";
 
@@ -81,12 +103,9 @@ export const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
    spent" for replay detection, not how long GitHat itself honors one. */
 export const OAUTH_CODE_TTL_MS = 5 * 60 * 1000;
 /* ---------------------------------------------------------------- *
- * BASE64URL. Only the ENCODE half survives: it is what turns random bytes
- * into a URL-safe `state`, PKCE verifier, and invite token. The matching
- * decoders existed solely to unpack a JWT's three parts, and went with the
- * JWT verification — nothing here reads a token's insides any more.
- * Still hand-written rather than reaching for `Buffer`, because this
- * module has to run in a real browser too (see the file header).
+ * BASE64URL. What turns random bytes into a URL-safe `state` and invite
+ * token. Still hand-written rather than reaching for `Buffer`, because
+ * this module has to run in a real browser too (see the file header).
  * ---------------------------------------------------------------- */
 
 function base64UrlEncode(bytes: Uint8Array): string {
@@ -96,34 +115,12 @@ function base64UrlEncode(bytes: Uint8Array): string {
 }
 
 /* ---------------------------------------------------------------- *
- * STATE + PKCE. Generated together, once per sign-in attempt.
+ * STATE. One per sign-in attempt — the whole CSRF defense (see the file
+ * header for why PKCE is not part of this any more).
  * ---------------------------------------------------------------- */
 
 export function generateState(): string {
   return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-export function generateCodeVerifier(): string {
-  /* RFC 7636 wants 43-128 characters from [A-Za-z0-9-._~]. base64url of 32
-     random bytes is 43 characters — the shortest RFC-legal length, drawn
-     from cryptographically random bytes rather than trimmed down from
-     something longer. */
-  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-export async function codeChallengeFromVerifier(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  return base64UrlEncode(new Uint8Array(digest));
-}
-
-/** Defense in depth: even though nothing in this app accepts a
- *  caller-supplied verifier or challenge, this recomputes the relationship
- *  independently of whatever GitHat's own token endpoint decides, so a
- *  future bug that let a mismatched verifier through this process is
- *  caught here too rather than resting entirely on the far end. */
-export async function pkceMatches(verifier: string, expectedChallenge: string): Promise<boolean> {
-  if (typeof verifier !== "string" || verifier === "") return false;
-  return (await codeChallengeFromVerifier(verifier)) === expectedChallenge;
 }
 
 /* GitHat's own API takes the callback address as `redirect_url`, not the
@@ -132,18 +129,15 @@ export async function pkceMatches(verifier: string, expectedChallenge: string): 
    alone gets a flat 400 ("redirect_url is required"), and swapping in
    `redirect_url` turns that into a real 302 to GitHat's own sign-in page
    with this exact authorize URL threaded through as where to return.
-   Nothing about PKCE, state, or the client id changes — only this one
+   Nothing about state or the app slug changes — only this one
    query-parameter NAME, on both the authorize leg here and the token
    exchange below, matches what the live service actually reads rather
    than what the spec would suggest. */
-export function buildAuthorizeUrl(state: string, codeChallenge: string): string {
+export function buildAuthorizeUrl(state: string): string {
   const url = new URL(GITHAT_AUTHORIZE_ENDPOINT);
-  url.searchParams.set("client_id", GITHAT_CLIENT_ID);
+  url.searchParams.set("app", GITHAT_APP_SLUG);
   url.searchParams.set("redirect_url", PULSE_REDIRECT_URI);
-  url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge", codeChallenge);
-  url.searchParams.set("code_challenge_method", "S256");
   return url.toString();
 }
 
@@ -171,8 +165,6 @@ export function isTrustedOrigin(origin: string): boolean {
 
 export interface OAuthTransaction {
   readonly state: string;
-  readonly codeVerifier: string;
-  readonly codeChallenge: string;
   readonly expiresAt: number;
   /** Set only when this sign-in started from an invite link
    *  (`/auth/invite/:token`) rather than the plain "Sign in with GitHat"
@@ -184,15 +176,9 @@ export interface OAuthTransaction {
   readonly returnTo?: string;
 }
 
-export async function beginOAuthTransaction(
-  now: number,
-  inviteToken?: string,
-  returnTo?: string,
-): Promise<OAuthTransaction> {
+export function beginOAuthTransaction(now: number, inviteToken?: string, returnTo?: string): OAuthTransaction {
   const state = generateState();
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await codeChallengeFromVerifier(codeVerifier);
-  const tx: OAuthTransaction = { state, codeVerifier, codeChallenge, expiresAt: now + OAUTH_STATE_TTL_MS };
+  const tx: OAuthTransaction = { state, expiresAt: now + OAUTH_STATE_TTL_MS };
   return {
     ...tx,
     ...(inviteToken === undefined ? {} : { inviteToken }),
@@ -298,20 +284,28 @@ export interface FetchLike {
  * admitted a single real user. Deleting it removes ~200 lines that
  * implied a security property this door does not actually rest on.
  *
- * WHAT IT RESTS ON INSTEAD, which is the ordinary RFC 6749 §4.1 + RFC 7636
- * public-client argument, and is strictly stronger here than checking a
- * bearer token's claims would have been:
+ * WHAT IT RESTS ON INSTEAD — the ordinary RFC 6749 §4.1 authorization-code
+ * argument every proven-working fleet consumer (SebasTN, Quantl, and the
+ * shared `@fleet/auth` package) already relies on, measured by reading
+ * their actual client code rather than assumed:
  *
  *   - The `state` is 32 random bytes this server minted, held SERVER-SIDE
  *     and single-use, so a callback nobody here started is refused before
  *     any exchange happens.
- *   - The `code_verifier` never left this process, and GitHat enforces the
- *     S256 match at the token endpoint (verified in its own source).
+ *   - The code itself is single-use (GitHat flips it atomically on first
+ *     redemption) and short-lived.
  *   - The exchange is a DIRECT server-to-server HTTPS POST from this
  *     process to api.githat.io. TLS authenticates the responder, and no
  *     browser or third party is in the path to tamper with the reply.
  *
- * Given all three, the `user` object in that response is authoritative
+ * PKCE (code_challenge/code_verifier) used to sit alongside this. It is
+ * gone: no fleet consumer uses it, GitHat's support for it was never
+ * proven correct against a real sign-in, and it was the one code path
+ * unique to Pulse when every real "Sign in with GitHat" attempt failed at
+ * the token exchange. Removed rather than kept for defense-in-depth —
+ * unverified crypto plumbing is not depth, it is a guess dressed as one.
+ *
+ * Given all this, the `user` object in that response is authoritative
  * BECAUSE OF WHERE IT CAME FROM, not because of a signature over it. A
  * JWT `aud` check would have added nothing on top: `aud` is the constant
  * `githat` for every app in the fleet, so it distinguishes nothing — a
@@ -372,22 +366,20 @@ export interface TokenExchangeResult {
 
 export async function exchangeCodeForToken(params: {
   readonly code: string;
-  readonly codeVerifier: string;
   readonly fetcher: FetchLike;
 }): Promise<TokenExchangeResult> {
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code: params.code,
-    redirect_url: PULSE_REDIRECT_URI, // see buildAuthorizeUrl's comment: GitHat's own param name
-    client_id: GITHAT_CLIENT_ID,
-    code_verifier: params.codeVerifier,
-  });
+  /* Every proven-working fleet consumer POSTs exactly this — no
+     grant_type, no client_id, no redirect_url echoed back, no
+     code_verifier. GitHat's own oauth-token.js never reads any of those
+     four fields; the code lookup alone (single-use, short-lived) is what
+     it checks. Matching the verified-working shape byte-for-byte rather
+     than the OAuth-spec shape is the whole fix (see the file header). */
   let response;
   try {
     response = await params.fetcher(GITHAT_TOKEN_ENDPOINT, {
       method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-      body: body.toString(),
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ code: params.code }),
     });
   } catch {
     return { ok: false, reason: "token_endpoint_unreachable" };

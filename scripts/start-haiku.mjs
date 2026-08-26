@@ -445,13 +445,16 @@ function staffCookie(value, maxAgeSeconds) {
 }
 
 /* ------------------------------------------------------------------ *
- * A SECOND STAFF DOOR: "Sign in with GitHat" — OAuth 2.0 authorization
- * code + PKCE(S256) against the sibling GitHat service at api.githat.io.
- * See app/shared/auth/githat-oauth.ts for the protocol logic itself
- * (state, PKCE, JWT verification, JWKS caching, staff-subject matching —
- * all of it browser-and-Node portable and unit-checked in auth/tests.ts).
- * What lives HERE is only the HTTP plumbing and Pulse's own session
- * cookie for this door.
+ * A SECOND STAFF DOOR: "Sign in with GitHat" — the fleet's own
+ * authorization-code flow against the sibling GitHat service at
+ * api.githat.io, matched to the ACTUAL wire contract measured from five
+ * other working fleet consumers (SebasTN, Quantl, and the shared
+ * `@fleet/auth` package) on 2026-08-26, not the OAuth-standard shape this
+ * door originally guessed at. See app/shared/auth/githat-oauth.ts for the
+ * protocol logic itself (state, staff-subject matching — all of it
+ * browser-and-Node portable and unit-checked in auth/tests.ts). What
+ * lives HERE is only the HTTP plumbing and Pulse's own session cookie
+ * for this door.
  *
  * DEPLOYED ALONGSIDE THE PASSPHRASE DOOR ABOVE, not instead of it. The
  * passphrase path is the tested rollback; removing it is a later, separate
@@ -646,11 +649,6 @@ function requestStaffRole(request) {
   return staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) ? "front_desk" : null;
 }
 
-/* GET /auth/githat/start — the browser's own click on "Sign in with
- * GitHat" (staff-gate.ts) lands here. A fresh state + PKCE pair is
- * generated and held SERVER-SIDE, in oauthTransactions above — never in a
- * cookie, never in the URL, never in browser storage — and the browser is
- * redirected straight to GitHat's own authorize endpoint. */
 function dashboardReturnTo(request) {
   const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
   /* This is deliberately a one-route allow-list. A caller controls `next`,
@@ -661,16 +659,21 @@ function dashboardReturnTo(request) {
     : undefined;
 }
 
+/* GET /auth/githat/start — the browser's own click on "Sign in with
+ * GitHat" (staff-gate.ts) lands here. A fresh `state` is generated and
+ * held SERVER-SIDE, in oauthTransactions above — never in a cookie, never
+ * in the URL, never in browser storage — and the browser is redirected
+ * straight to GitHat's own authorize endpoint. */
 async function githatStart(request, response, inviteToken) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
     return;
   }
   const now = Date.now();
-  const tx = await beginOAuthTransaction(now, inviteToken, dashboardReturnTo(request));
+  const tx = beginOAuthTransaction(now, inviteToken, dashboardReturnTo(request));
   oauthTransactions.save(tx);
   response.writeHead(302, {
-    location: buildAuthorizeUrl(tx.state, tx.codeChallenge),
+    location: buildAuthorizeUrl(tx.state),
     "cache-control": "no-store",
   });
   response.end();
@@ -730,12 +733,12 @@ function sendGithatResult(response, status, message, redirectTo, detail = null) 
 
 /* GET /auth/callback — GitHat redirects the browser back here with
  * ?code=...&state=.... EVERY step below fails CLOSED: a state mismatch, a
- * reused state, a reused code, a failed exchange, a token that does not
- * verify, or a sub that is not on STAFF_GITHAT_SUBJECTS all end in a
- * plain, specific refusal — never a partial session, never a silent
- * redirect loop. NOTHING FROM THIS EXCHANGE — the code, the retained PKCE
- * verifier, or the token itself — is ever logged; the one line this route
- * logs on denial names only a short machine-readable reason. */
+ * reused state, a reused code, a failed exchange, or a sub that is not on
+ * STAFF_GITHAT_SUBJECTS all end in a plain, specific refusal — never a
+ * partial session, never a silent redirect loop. NOTHING FROM THIS
+ * EXCHANGE — the code or any part of a token — is ever logged; the one
+ * line this route logs on denial names only a short machine-readable
+ * reason. */
 async function githatCallback(request, response) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
@@ -773,12 +776,11 @@ async function githatCallback(request, response) {
 
   /* The exchange IS the verification — see the long comment above
    * extractIdentity in app/shared/auth/githat-oauth.ts. This is a direct
-   * server-to-server HTTPS POST carrying a single-use code and a PKCE
-   * verifier that never left this process, so the identity it answers
-   * with is authoritative because of where it came from. `reason` is a
-   * short machine string by construction and never carries the code, the
-   * verifier, or any part of a token. */
-  const exchange = await exchangeCodeForToken({ code, codeVerifier: tx.codeVerifier, fetcher: fetch });
+   * server-to-server HTTPS POST carrying a single-use code that never
+   * left this process, so the identity it answers with is authoritative
+   * because of where it came from. `reason` is a short machine string by
+   * construction and never carries the code or any part of a token. */
+  const exchange = await exchangeCodeForToken({ code, fetcher: fetch });
   if (!exchange.ok || exchange.identity === undefined) {
     console.error(`githat sign-in rejected: ${exchange.reason}`); // never the token itself
     sendGithatResult(response, 502, "GitHat could not confirm this sign-in.", null);

@@ -22,7 +22,7 @@ import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
 import { doorMessage } from "./staff-gate.js";
 import {
-  GITHAT_CLIENT_ID,
+  GITHAT_APP_SLUG,
   GITHAT_ISSUER,
   PULSE_REDIRECT_URI,
   PULSE_TRUSTED_ORIGIN,
@@ -38,7 +38,6 @@ import {
   isTrustedRedirectUri,
   parseOwnerSubject,
   parseStaffSubjects,
-  pkceMatches,
   resolveStaffRole,
   unauthorizedDetail,
   type FetchLike,
@@ -935,14 +934,13 @@ check("isTrustedOrigin accepts the trusted Pulse origin", () => eq(isTrustedOrig
 check("isTrustedOrigin rejects an untrusted origin", () => eq(isTrustedOrigin("https://evil.example.com"), false));
 check("isTrustedOrigin rejects a subdomain-confusion look-alike", () => eq(isTrustedOrigin("https://evil.pulse.githat.io"), false));
 
-/* PKCE + state + authorization-code replay. */
-const oauthTx = await beginOAuthTransaction(OAUTH_NOW_MS);
-const pkceOk = await pkceMatches(oauthTx.codeVerifier, oauthTx.codeChallenge);
-check("a fresh transaction's own verifier matches its own stored challenge", () => eq(pkceOk, true));
-const pkceWrongVerifier = await pkceMatches("a-verifier-nobody-generated", oauthTx.codeChallenge);
-check("a WRONG PKCE code_verifier does not match the stored challenge", () => eq(pkceWrongVerifier, false));
-const pkceMissingVerifier = await pkceMatches("", oauthTx.codeChallenge);
-check("a MISSING PKCE code_verifier does not match the stored challenge", () => eq(pkceMissingVerifier, false));
+/* STATE + authorization-code replay. PKCE checks used to live here —
+ * removed along with the rest of the PKCE machinery (see githat-oauth.ts's
+ * file header): no fleet consumer uses it, and it was the one code path
+ * unique to Pulse when every real sign-in attempt failed at the token
+ * exchange. `state` alone, single-use and server-held, is the actual CSRF
+ * defense, proven below. */
+const oauthTx = beginOAuthTransaction(OAUTH_NOW_MS);
 
 const transactionStore = createTransactionStore();
 check("state store: an unknown state is not found", () => eq(transactionStore.take("no-such-state", OAUTH_NOW_MS), null));
@@ -1019,13 +1017,29 @@ check("list() reports only still-pending invites, not a claimed one", () =>
 /* Token exchange: the server-to-server leg. A fetcher is always supplied
  * explicitly — none of these calls ever touch a real network. */
 const rejectingTokenFetcher: FetchLike = async () => ({ ok: false, status: 400, json: async () => ({ error: "invalid_grant" }) });
-const rejectedExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "any-verifier", fetcher: rejectingTokenFetcher });
-check("a token endpoint rejection (e.g. a wrong PKCE verifier) fails the exchange", () => eq(rejectedExchange.ok, false));
+const rejectedExchange = await exchangeCodeForToken({ code: "any-code", fetcher: rejectingTokenFetcher });
+check("a token endpoint rejection fails the exchange", () => eq(rejectedExchange.ok, false));
+
+/* THE PROVEN FLEET SHAPE, PINNED. Matched 2026-08-26 to what SebasTN and
+ * Quantl's shared @fleet/auth package actually send — every real sign-in
+ * failed at this exact leg while Pulse sent grant_type/client_id/
+ * code_verifier/form-encoding instead, none of which GitHat's oauth-token.js
+ * reads. A regression here silently reintroduces the outage. */
+let capturedInit: RequestInit | undefined;
+const capturingFetcher: FetchLike = async (_url, init) => {
+  capturedInit = init;
+  return { ok: true, status: 200, json: async () => GITHAT_TOKEN_RESPONSE };
+};
+await exchangeCodeForToken({ code: "the-code-under-test", fetcher: capturingFetcher });
+check("the token POST sends Content-Type: application/json", () =>
+  eq((capturedInit?.headers as Record<string, string> | undefined)?.["content-type"], "application/json"));
+check("the token POST body is JSON {code} — nothing else", () =>
+  eq(typeof capturedInit?.body === "string" ? JSON.parse(capturedInit.body) : null, { code: "the-code-under-test" }));
 
 const unreachableTokenFetcher: FetchLike = async () => {
   throw new Error("simulated network failure");
 };
-const unreachableExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "any-verifier", fetcher: unreachableTokenFetcher });
+const unreachableExchange = await exchangeCodeForToken({ code: "any-code", fetcher: unreachableTokenFetcher });
 check("a token endpoint that cannot be reached fails the exchange rather than silently succeeding", () =>
   eq(unreachableExchange.ok, false));
 
@@ -1034,7 +1048,7 @@ const acceptingTokenFetcher: FetchLike = async () => ({
   status: 200,
   json: async () => GITHAT_TOKEN_RESPONSE,
 });
-const acceptedExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: oauthTx.codeVerifier, fetcher: acceptingTokenFetcher });
+const acceptedExchange = await exchangeCodeForToken({ code: "any-code", fetcher: acceptingTokenFetcher });
 check("a successful exchange yields the identity from the response body", () =>
   eq(acceptedExchange, {
     ok: true,
@@ -1051,7 +1065,7 @@ const shapelessTokenFetcher: FetchLike = async () => ({
   status: 200,
   json: async () => ({ access_token: "opaque", token_type: "Bearer" }),
 });
-const shapelessExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "v", fetcher: shapelessTokenFetcher });
+const shapelessExchange = await exchangeCodeForToken({ code: "any-code", fetcher: shapelessTokenFetcher });
 check("a 200 with no user object fails the exchange closed", () =>
   eq(shapelessExchange, { ok: false, reason: "no_identity_in_response" }));
 
@@ -1060,32 +1074,41 @@ const badJsonFetcher: FetchLike = async () => ({
   status: 200,
   json: async () => { throw new Error("not json"); },
 });
-const badJsonExchange = await exchangeCodeForToken({ code: "any-code", codeVerifier: "v", fetcher: badJsonFetcher });
+const badJsonExchange = await exchangeCodeForToken({ code: "any-code", fetcher: badJsonFetcher });
 check("a 200 whose body is not JSON fails the exchange closed", () =>
   eq(badJsonExchange, { ok: false, reason: "token_endpoint_bad_json" }));
 
-/* buildAuthorizeUrl: every required OAuth + PKCE parameter, aimed at
- * GitHat's real authorize endpoint. */
-const testAuthorizeUrl = new URL(buildAuthorizeUrl("state-under-test", "challenge-under-test"));
+/* buildAuthorizeUrl: matched to the ACTUAL fleet wire contract (measured
+ * 2026-08-26 from SebasTN, Quantl, and the shared @fleet/auth package) —
+ * `app`, `redirect_url`, `state`. Not `client_id`/`response_type`/PKCE:
+ * see the file's own header for why those were removed rather than kept. */
+const testAuthorizeUrl = new URL(buildAuthorizeUrl("state-under-test"));
 check("buildAuthorizeUrl targets GitHat's authorize endpoint", () =>
   eq(testAuthorizeUrl.origin + testAuthorizeUrl.pathname, "https://api.githat.io/oauth/authorize"));
-check("buildAuthorizeUrl carries client_id, redirect_url, response_type, state, and PKCE S256 params", () =>
+check("buildAuthorizeUrl carries exactly app, redirect_url, and state — the proven fleet shape", () =>
   eq(
     [
-      testAuthorizeUrl.searchParams.get("client_id"),
+      testAuthorizeUrl.searchParams.get("app"),
       /* GitHat's OWN param name, not the OAuth-standard "redirect_uri" —
        * see buildAuthorizeUrl's own comment: verified live, the spec name
        * alone gets a flat 400 from the real service. */
       testAuthorizeUrl.searchParams.get("redirect_url"),
-      testAuthorizeUrl.searchParams.get("response_type"),
       testAuthorizeUrl.searchParams.get("state"),
-      testAuthorizeUrl.searchParams.get("code_challenge"),
-      testAuthorizeUrl.searchParams.get("code_challenge_method"),
     ],
-    [GITHAT_CLIENT_ID, PULSE_REDIRECT_URI, "code", "state-under-test", "challenge-under-test", "S256"],
+    [GITHAT_APP_SLUG, PULSE_REDIRECT_URI, "state-under-test"],
   ));
 check("buildAuthorizeUrl does NOT use the spec-standard redirect_uri param name (GitHat does not read it)", () =>
   eq(testAuthorizeUrl.searchParams.get("redirect_uri"), null));
+check("buildAuthorizeUrl carries no client_id, response_type, or PKCE params — no fleet consumer sends them", () =>
+  eq(
+    [
+      testAuthorizeUrl.searchParams.get("client_id"),
+      testAuthorizeUrl.searchParams.get("response_type"),
+      testAuthorizeUrl.searchParams.get("code_challenge"),
+      testAuthorizeUrl.searchParams.get("code_challenge_method"),
+    ],
+    [null, null, null, null],
+  ));
 
 /* Source-text properties this synchronous harness cannot exercise by
  * running the server — the same limit, and the same remedy, already named
