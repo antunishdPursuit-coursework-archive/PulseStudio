@@ -179,14 +179,25 @@ export interface OAuthTransaction {
    *  door. The callback redeems this exact invite on a successful
    *  identity check — never any other invite, and never this one twice. */
   readonly inviteToken?: string;
+  /** A server-approved route to resume after this exact sign-in succeeds.
+   *  It is selected by the server, never trusted from the callback URL. */
+  readonly returnTo?: string;
 }
 
-export async function beginOAuthTransaction(now: number, inviteToken?: string): Promise<OAuthTransaction> {
+export async function beginOAuthTransaction(
+  now: number,
+  inviteToken?: string,
+  returnTo?: string,
+): Promise<OAuthTransaction> {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await codeChallengeFromVerifier(codeVerifier);
   const tx: OAuthTransaction = { state, codeVerifier, codeChallenge, expiresAt: now + OAUTH_STATE_TTL_MS };
-  return inviteToken === undefined ? tx : { ...tx, inviteToken };
+  return {
+    ...tx,
+    ...(inviteToken === undefined ? {} : { inviteToken }),
+    ...(returnTo === undefined ? {} : { returnTo }),
+  };
 }
 
 export interface TransactionStore {

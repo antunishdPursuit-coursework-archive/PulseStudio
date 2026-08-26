@@ -14,8 +14,9 @@
   <link rel="stylesheet" href="staff-dashboard.css">
 </head>
 <body class="product-b">
-  <header class="topbar"><a class="home-brand" href="../../index.html" aria-label="Return to Pulse Studio home"><span class="home-arrow" aria-hidden="true">←</span><span class="brand-word">PULSE<span>STUDIO</span></span></a><span class="role">Staff Dashboard</span><a href="../a-booking/index.html">Member view ↗</a></header>
-  <aside class="side-panel" aria-label="Staff dashboard navigation">
+  <header class="topbar"><a class="home-brand" href="../../index.html" aria-label="Return to Pulse Studio home"><span class="home-arrow" aria-hidden="true">←</span><span class="brand-word">PULSE<span>STUDIO</span></span></a><span class="role">Staff Dashboard</span></header>
+  <div class="dashboard-layout">
+    <aside class="side-panel" aria-label="Staff dashboard navigation">
     <p class="side-panel-label">Staff tools</p>
     <nav class="side-nav" aria-label="Dashboard sections">
       <button class="side-nav-link active" type="button" data-view="overview">Overview</button>
@@ -25,8 +26,8 @@
       <a class="side-nav-link side-nav-anchor" href="../../shared/settings.html">Settings</a>
       <button class="side-nav-link" type="button" data-view="admin">Admin</button>
     </nav>
-  </aside>
-  <main class="shell">
+    </aside>
+    <main class="shell">
     <section class="hero"><div><p class="eyebrow">Weekly operations</p><h1>Keep every room moving.</h1><p class="lede">Publish weekly schedules, then use the week selector to move between upcoming weeks.</p></div></section>
     <div class="current-week-row"><button class="current-week-link" id="currentWeek" type="button">Return to current week</button></div>
     <nav class="week-picker" aria-label="Weekly schedules"><button class="week-arrow" id="previousWeeks" type="button" aria-label="Show previous four weeks">←</button><div class="week-options" id="weekOptions"></div><button class="week-arrow" id="nextWeeks" type="button" aria-label="Show next four weeks">→</button></nav>
@@ -37,7 +38,8 @@
     </section>
     <section class="panel instructors-panel" aria-labelledby="instructorHeading"><div class="panel-head"><div><p class="eyebrow">Instructor details</p><h2 id="instructorHeading">Instructors</h2></div></div><div id="instructorDetails" class="instructor-list"></div></section>
     <section id="workspaceView" class="workspace-view" hidden aria-live="polite"></section>
-  </main>
+    </main>
+  </div>
   <dialog id="scheduleDialog"><form method="dialog" id="scheduleForm"><button class="close" id="closeSchedule" type="button" aria-label="Close">×</button><p class="eyebrow">Weekly schedule</p><h2>Add a class session</h2><p class="dialog-week" id="draftWeekLabel"></p><label>Date and Time<input id="startsAt" name="startsAt" required type="datetime-local" aria-describedby="startsAtHelp"><small id="startsAtHelp">Choose a date after 08/19/2026.</small></label><label>Class category<select id="classType" name="classType" required></select></label><label>Room<input name="room" required placeholder="Loft"></label><label>Capacity<input name="capacity" required type="number" min="1" value="18"></label><button class="primary" type="submit" value="default">Add to schedule</button><section class="schedule-draft" aria-labelledby="draftHeading"><div class="draft-head"><h3 id="draftHeading">Classes added for this week</h3><span id="draftCount">0 classes</span></div><div class="draft-table-wrap"><table class="draft-table"><thead><tr><th scope="col">Class</th><th scope="col">Level</th><th scope="col">Date and Time</th><th scope="col">Room</th><th scope="col">Capacity</th></tr></thead><tbody id="draftRows"></tbody></table><p class="draft-empty" id="draftEmpty">0 classes added for this week.</p></div></section><p class="schedule-status" id="scheduleStatus" aria-live="polite"></p><button class="primary confirm-schedule" id="confirmSchedule" type="button" disabled>Confirm weekly schedule</button></form></dialog>
   <script type="module" src="../../shared/theme-boot.js"></script>
   <script type="module" src="staff-dashboard.js"></script>
