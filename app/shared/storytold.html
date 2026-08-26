@@ -257,6 +257,7 @@
           <li><strong><span class="chip s">shared</span> → everyone:</strong> one deterministic 60-member studio that <span class="chip a">A</span> books against, sign-in lists, <span class="chip c">C</span> answers from, <span class="chip b">B</span> now reads too, and <span class="chip d">D</span> reconciles against independent truth. <em>(This bullet said <span class="chip b">B</span> did not watch it, from an audit on August 22, 2026 until the fix landed 2026-08-24 — the Dashboard generated its own studio from its own seed, which listed the same hand-off as green above and red below at once. Fixed: it calls the same shared generator A and D use.)</em></li>
           
           <li><strong><span class="chip s">shared</span> → <span class="chip c">C</span>:</strong> support reads only scheduled classes and current policies from the shared fixture; <code>pol_001</code> supplies the same 12-hour cancellation rule other products can quote.</li>
+          <li><strong><span class="chip c">C</span> talks through Haiku on the hosted copy:</strong> <a href="https://pulse.githat.io/products/c-chatbot/">pulse.githat.io</a> runs the server that keeps the Anthropic key private and answers from the member-safe schedule and policies. The GitHub Pages copy remains static and correctly reports that conversational support is unavailable there.</li>
           <li><strong><span class="chip b">B</span> publishes for real:</strong> confirmed weekly schedules persist in this browser after a reload.</li>
           <li><strong>One person everywhere:</strong> the shared session follows a member or Front Desk across all four products, and its <a href="./auth/tests.html">own suite</a> states how deeply it is checked.</li>
           <li><strong>One name everywhere:</strong> the brand seam renders every header from a single shared file, and a gate holds the wire — a page that shows the name but is not wired to receive it fails the build. A clone edits four shared files; three product page titles are read before any module runs and stay a one-word edit each, in their owner’s lane.</li>
@@ -264,19 +265,6 @@
           <li><strong><span class="chip b">B</span> reads the log:</strong> the Dashboard reads Booking's reservation log defensively, with per-row reasons — and since 2026-08-24 the studios agree, so a real booking is no longer one of those rejected reasons.</li>
           <li><strong>The occupancy engine:</strong> the generator can fill a week to a realistic mix on demand — deterministic, capacity-safe, and proven by the shared engine's own suite.</li>
           <li><strong><span class="chip d">D</span> reads the live trail:</strong> re-engagement's default records are the running studio plus Booking's own reservation log — and a quiet member already booked back in is stated by name and left alone, never nagged.</li>
-        </ul>
-      </section>
-      <section class="off">
-        <h2><span class="state">Red — 1 waiting, and it was never a road</span></h2>
-        <ul>
-          <li><strong><span class="chip c">C</span> talks through Haiku locally</strong>
-          <em>(not a road on the map — C's hand-offs are wired and firing; what
-          is missing is somewhere to keep a key):</em>
-          member support can answer from the current safe schedule and policies
-          when the local server has an Anthropic key. The deployed GitHub Pages
-          site cannot run that conversation yet
-          because it has no backend service where the key can stay secret. That
-          hosted endpoint is Product C's only remaining deployment blocker.</li>
         </ul>
       </section>
     </div>
