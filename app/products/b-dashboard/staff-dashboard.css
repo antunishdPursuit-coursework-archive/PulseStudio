@@ -56,6 +56,10 @@ h2 { margin: 0; }
 .stats article, .panel { border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 10px; padding: 16px 20px; background: var(--bg); }
 .stats span, .stats small { display: block; color: var(--muted); }
 .stats strong { display: block; color: var(--accent); font-size: 1.8rem; margin: 4px 0; }
+.condition-underbooked strong { color: var(--accent); }
+.condition-pair-counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+.condition-on-track strong { color: var(--fg); }
+.condition-filling-soon strong { color: var(--muted); }
 
 .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr); gap: 24px; }
 .wide { min-width: 0; }
@@ -146,3 +150,4 @@ form { display: grid; gap: 14px; width: min(90vw, 760px); padding: 28px; }
 
 @media (min-width: 801px) { .dashboard-layout { display: grid; grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr); } }
 @media (max-width: 800px) { .topbar { flex-wrap: wrap; } .side-panel { margin: 16px 16px 0; position: sticky; top: 12px; z-index: 1; } .shell { padding: 16px; } .week-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .publish-row { align-items: stretch; flex-direction: column; } .stats, .grid, .app-status-list, .billing-grid { grid-template-columns: 1fr; } .session { grid-template-columns: 1fr 1fr; } .session .fill { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .condition-pair-counts { grid-template-columns: 1fr; } }
