@@ -75,4 +75,21 @@ const refreshRuntimeReservations=()=>{const next=readRuntimeReservations();const
 window.addEventListener('storage',event=>{if(event.key===RUNTIME_RESERVATIONS_KEY)refreshRuntimeReservations();if(event.key===SCHEDULE_STORAGE_KEY){localSessionsByWeek=readPublishedSchedules();render();}});
 window.addEventListener('focus',refreshRuntimeReservations);
 render();
+
+const workspaceView=document.querySelector('#workspaceView');
+const overviewShell=workspaceView?.parentElement;
+const renderWorkspace=view=>{
+  if(!(workspaceView instanceof HTMLElement)||!(overviewShell instanceof HTMLElement))return;
+  overviewShell.dataset.view=view;
+  workspaceView.hidden=view==='overview';
+  if(view==='overview')return;
+  const views={
+    apps:`<section class="workspace-panel"><p class="eyebrow">Connected surfaces</p><h1>Apps</h1><p class="workspace-intro">Current connections are documented from the source paths this dashboard can read.</p><div class="app-status-list"><article><h2>Member Booking</h2><p>Members book class sessions and create reservations. Product B reads the shared browser reservation log when both pages use the same origin.</p><span class="availability connected">Connection present</span></article><article><h2>Staff Dashboard</h2><p>Schedules, capacity, rosters, attendance, and publishing live here behind the staff session.</p><span class="availability connected">Current page</span></article><article><h2>Member Support</h2><p>The support assistant answers schedule and policy questions through the server when its service is configured.</p><span class="availability unavailable">Hosted status requires server verification</span></article><article><h2>Member Re-engagement</h2><p>Staff review quiet-member signals and prepare outreach drafts. No message is sent automatically.</p><span class="availability connected">Staff surface</span></article></div></section>`,
+    members:`<section class="workspace-panel"><p class="eyebrow">Membership records</p><h1>Members</h1><p class="unavailable-state"><strong>Currently unavailable.</strong> A live membership subscription source is not connected to this dashboard. No member or plan records are invented here.</p></section>`,
+    billing:`<section class="workspace-panel"><p class="eyebrow">Plan reference</p><h1>Billing</h1><p class="workspace-intro">These are industry pricing references, not active Pulse Studio plans. Studio billing is under construction.</p><div class="billing-grid"><article><h2>Budget access</h2><strong>$10–$30/month</strong><p>Typical range for basic equipment and home-club access.</p></article><article><h2>Standard group fitness</h2><strong>$25–$60/month</strong><p>Reference tier for broader access and selected classes.</p></article><article><h2>Premium club</h2><strong>$50–$150+/month</strong><p>Reference tier for expanded classes, recovery, and coaching.</p></article></div><p class="source-note">Sources: Planet Fitness and Crunch public pricing pages. Final studio plans and prices are currently unavailable.</p></section>`,
+    admin:`<section class="workspace-panel"><p class="eyebrow">Restricted portal</p><h1>Admin</h1><p class="unavailable-state"><strong>Under construction.</strong> An Admin role, ticket system, and live cross-product statistics are not implemented. No admin data is displayed.</p></section>`,
+  };
+  workspaceView.innerHTML=views[view]??'';
+};
+document.querySelectorAll('.side-nav-link[data-view]').forEach(button=>button.addEventListener('click',()=>{const view=button.dataset.view??'overview';document.querySelectorAll('.side-nav-link[data-view]').forEach(item=>item.classList.toggle('active',item===button));renderWorkspace(view);}));
 }
