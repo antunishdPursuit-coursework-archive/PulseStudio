@@ -1603,7 +1603,7 @@ check("...and the word carries BOTH the lead and the accent, not just the lead",
    * one. */
   const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/");
   const word = f.querySelector(".brand-word");
-  return eq([word?.textContent, word?.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+  return eq([word?.textContent, word?.querySelector("span")?.textContent], ["HEARTBEATSTUDIO", "STUDIO"]);
 });
 
 check("the footer carries the mark, and only one of it", () => {
@@ -1706,7 +1706,7 @@ check("the brand word fills as lead + accent, split on the first space", () => {
   home.append(word);
   root.append(home);
   renderStudioBrand(root);
-  return eq([word.textContent, word.querySelector("span")?.textContent], ["PULSESTUDIO", "STUDIO"]);
+  return eq([word.textContent, word.querySelector("span")?.textContent], ["HEARTBEATSTUDIO", "STUDIO"]);
 });
 check("the home link gets a real aria-label naming the studio, not a leftover placeholder", () => {
   const root = document.createElement("div");
@@ -1714,7 +1714,7 @@ check("the home link gets a real aria-label naming the studio, not a leftover pl
   home.className = "home-brand";
   root.append(home);
   renderStudioBrand(root);
-  return eq(home.getAttribute("aria-label"), "Return to Pulse Studio home");
+  return eq(home.getAttribute("aria-label"), "Return to HeartBeat Studio home");
 });
 check("the home link gets exactly one mark, even mounted twice", () => {
   const root = document.createElement("div");
@@ -1740,7 +1740,7 @@ check("any element asking for the plain name gets it, unsplit", () => {
   label.dataset["studioName"] = "";
   root.append(label);
   renderStudioBrand(root);
-  return eq(label.textContent, "Pulse Studio");
+  return eq(label.textContent, "HeartBeat Studio");
 });
 
 /* The legal pages are linked from every page's footer, and a footer link to
