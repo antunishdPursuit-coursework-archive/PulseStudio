@@ -14,6 +14,7 @@ import {
   exchangeCodeForToken,
   parseOwnerSubject,
   parseStaffSubjects,
+  hasAnyOwnerConfigured,
   resolveStaffRole,
   unauthorizedDetail,
 } from "../app/shared/auth/githat-oauth.js";
@@ -445,13 +446,16 @@ function staffCookie(value, maxAgeSeconds) {
 }
 
 /* ------------------------------------------------------------------ *
- * A SECOND STAFF DOOR: "Sign in with GitHat" — OAuth 2.0 authorization
- * code + PKCE(S256) against the sibling GitHat service at api.githat.io.
- * See app/shared/auth/githat-oauth.ts for the protocol logic itself
- * (state, PKCE, JWT verification, JWKS caching, staff-subject matching —
- * all of it browser-and-Node portable and unit-checked in auth/tests.ts).
- * What lives HERE is only the HTTP plumbing and Pulse's own session
- * cookie for this door.
+ * A SECOND STAFF DOOR: "Sign in with GitHat" — the fleet's own
+ * authorization-code flow against the sibling GitHat service at
+ * api.githat.io, matched to the ACTUAL wire contract measured from five
+ * other working fleet consumers (SebasTN, Quantl, and the shared
+ * `@fleet/auth` package) on 2026-08-26, not the OAuth-standard shape this
+ * door originally guessed at. See app/shared/auth/githat-oauth.ts for the
+ * protocol logic itself (state, staff-subject matching — all of it
+ * browser-and-Node portable and unit-checked in auth/tests.ts). What
+ * lives HERE is only the HTTP plumbing and Pulse's own session cookie
+ * for this door.
  *
  * DEPLOYED ALONGSIDE THE PASSPHRASE DOOR ABOVE, not instead of it. The
  * passphrase path is the tested rollback; removing it is a later, separate
@@ -493,11 +497,15 @@ function readStaffDirectory() {
   }
 }
 
-function addToStaffDirectory(sub) {
+function addToStaffDirectory(sub, role = "employee") {
   const directory = readStaffDirectory();
   if (directory.some((entry) => entry.sub === sub)) return; // already there — invite accepted twice is not a second grant
-  directory.push({ sub, role: "employee", addedAt: new Date().toISOString() });
+  directory.push({ sub, role, addedAt: new Date().toISOString() });
   writeFileSync(staffDirectoryPath, JSON.stringify(directory, null, 2) + "\n");
+}
+
+function directoryOwnerSubjects() {
+  return new Set(readStaffDirectory().filter((entry) => entry.role === "owner").map((entry) => entry.sub));
 }
 
 /* A signing key separate from staffSigningKey above, and a cookie name
@@ -608,6 +616,7 @@ function githatRoleFromRequest(request) {
     ownerSubject: ownerGithatSubject,
     staffSubjects: staffGithatSubjects,
     directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+    directoryOwnerSubjects: directoryOwnerSubjects(),
   });
 }
 
@@ -646,11 +655,6 @@ function requestStaffRole(request) {
   return staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) ? "front_desk" : null;
 }
 
-/* GET /auth/githat/start — the browser's own click on "Sign in with
- * GitHat" (staff-gate.ts) lands here. A fresh state + PKCE pair is
- * generated and held SERVER-SIDE, in oauthTransactions above — never in a
- * cookie, never in the URL, never in browser storage — and the browser is
- * redirected straight to GitHat's own authorize endpoint. */
 function dashboardReturnTo(request) {
   const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
   /* This is deliberately a one-route allow-list. A caller controls `next`,
@@ -661,16 +665,21 @@ function dashboardReturnTo(request) {
     : undefined;
 }
 
+/* GET /auth/githat/start — the browser's own click on "Sign in with
+ * GitHat" (staff-gate.ts) lands here. A fresh `state` is generated and
+ * held SERVER-SIDE, in oauthTransactions above — never in a cookie, never
+ * in the URL, never in browser storage — and the browser is redirected
+ * straight to GitHat's own authorize endpoint. */
 async function githatStart(request, response, inviteToken) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
     return;
   }
   const now = Date.now();
-  const tx = await beginOAuthTransaction(now, inviteToken, dashboardReturnTo(request));
+  const tx = beginOAuthTransaction(now, inviteToken, dashboardReturnTo(request));
   oauthTransactions.save(tx);
   response.writeHead(302, {
-    location: buildAuthorizeUrl(tx.state, tx.codeChallenge),
+    location: buildAuthorizeUrl(tx.state),
     "cache-control": "no-store",
   });
   response.end();
@@ -730,12 +739,12 @@ function sendGithatResult(response, status, message, redirectTo, detail = null) 
 
 /* GET /auth/callback — GitHat redirects the browser back here with
  * ?code=...&state=.... EVERY step below fails CLOSED: a state mismatch, a
- * reused state, a reused code, a failed exchange, a token that does not
- * verify, or a sub that is not on STAFF_GITHAT_SUBJECTS all end in a
- * plain, specific refusal — never a partial session, never a silent
- * redirect loop. NOTHING FROM THIS EXCHANGE — the code, the retained PKCE
- * verifier, or the token itself — is ever logged; the one line this route
- * logs on denial names only a short machine-readable reason. */
+ * reused state, a reused code, a failed exchange, or a sub that is not on
+ * STAFF_GITHAT_SUBJECTS all end in a plain, specific refusal — never a
+ * partial session, never a silent redirect loop. NOTHING FROM THIS
+ * EXCHANGE — the code or any part of a token — is ever logged; the one
+ * line this route logs on denial names only a short machine-readable
+ * reason. */
 async function githatCallback(request, response) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
@@ -773,12 +782,11 @@ async function githatCallback(request, response) {
 
   /* The exchange IS the verification — see the long comment above
    * extractIdentity in app/shared/auth/githat-oauth.ts. This is a direct
-   * server-to-server HTTPS POST carrying a single-use code and a PKCE
-   * verifier that never left this process, so the identity it answers
-   * with is authoritative because of where it came from. `reason` is a
-   * short machine string by construction and never carries the code, the
-   * verifier, or any part of a token. */
-  const exchange = await exchangeCodeForToken({ code, codeVerifier: tx.codeVerifier, fetcher: fetch });
+   * server-to-server HTTPS POST carrying a single-use code that never
+   * left this process, so the identity it answers with is authoritative
+   * because of where it came from. `reason` is a short machine string by
+   * construction and never carries the code or any part of a token. */
+  const exchange = await exchangeCodeForToken({ code, fetcher: fetch });
   if (!exchange.ok || exchange.identity === undefined) {
     console.error(`githat sign-in rejected: ${exchange.reason}`); // never the token itself
     sendGithatResult(response, 502, "GitHat could not confirm this sign-in.", null);
@@ -802,11 +810,41 @@ async function githatCallback(request, response) {
     addToStaffDirectory(verdict.sub);
   }
 
-  const role = resolveStaffRole(verdict.sub, {
+  let role = resolveStaffRole(verdict.sub, {
     ownerSubject: ownerGithatSubject,
     staffSubjects: staffGithatSubjects,
     directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+    directoryOwnerSubjects: directoryOwnerSubjects(),
   });
+
+  /* AUTOMATIC OWNER BOOTSTRAP — replaces the manual "sign in, get denied,
+   * copy your printed sub, paste it into OWNER_GITHAT_SUBJECT yourself,
+   * restart" dance with: sign in once. Gated on hasAnyOwnerConfigured, so
+   * this can fire for AT MOST one subject, ever — the instant any owner
+   * exists (by either mechanism), every later stranger falls straight
+   * through to the ordinary denial below, exactly as before. No invite
+   * token on this transaction: an invite in flight means someone specific
+   * was already expected, which is a different story than "nobody has
+   * claimed this studio yet". Logged loudly (never a token, never a
+   * secret) because a self-granting security decision is exactly the
+   * kind of thing that must never happen quietly.
+   *
+   * NOT CLAIMED ATOMIC: readStaffDirectory/addToStaffDirectory are a
+   * plain read-then-write against one JSON file, no lock. Two people
+   * completing a real GitHat sign-in within the same instant, before
+   * either write lands, could both read "no owner yet" and both grant
+   * themselves the role. Accepted for a single-studio, low-traffic staff
+   * tool — the same class of gap the invite store already carries — but
+   * a real race, not a theoretical one, and worth fixing with a proper
+   * lock or an atomic conditional write if this ever sees concurrent
+   * staff sign-ins at the moment nobody has claimed the studio yet. */
+  if (role === null && tx.inviteToken === undefined &&
+      !hasAnyOwnerConfigured({ ownerSubject: ownerGithatSubject, directoryOwnerSubjects: directoryOwnerSubjects() })) {
+    addToStaffDirectory(verdict.sub, "owner");
+    console.log(`githat: no owner was configured — ${verdict.sub} is now the studio owner (first real sign-in).`);
+    role = "owner";
+  }
+
   if (role === null) {
     /* THE BOOTSTRAP PROBLEM, ANSWERED HERE. Authorizing anyone means
      * putting their GitHat account id in OWNER_GITHAT_SUBJECT or
@@ -1099,9 +1137,9 @@ server.listen(port, host, () => {
   console.log(staffGithatSubjects.size > 0
     ? `Sign in with GitHat is wired at /auth/githat/start, and ${staffGithatSubjects.size} GitHat subject(s) are authorized for staff access.`
     : "Sign in with GitHat is wired at /auth/githat/start, but STAFF_GITHAT_SUBJECTS is unset — a valid GitHat identity will be denied staff access until an operator sets it.");
-  console.log(ownerGithatSubject !== null
-    ? `OWNER_GITHAT_SUBJECT is set — that GitHat account may mint staff invites at /api/staff/invites. ${readStaffDirectory().length} invited employee(s) on file.`
-    : "OWNER_GITHAT_SUBJECT is unset — nobody can mint a staff invite yet, though STAFF_GITHAT_SUBJECTS and any already-invited employees still sign in normally.");
+  console.log(hasAnyOwnerConfigured({ ownerSubject: ownerGithatSubject, directoryOwnerSubjects: directoryOwnerSubjects() })
+    ? `An owner is configured (${ownerGithatSubject !== null ? "OWNER_GITHAT_SUBJECT env var" : "auto-bootstrapped from the first sign-in"}) — that GitHat account may mint staff invites at /api/staff/invites. ${readStaffDirectory().length} directory entr${readStaffDirectory().length === 1 ? "y" : "ies"} on file.`
+    : "No owner configured yet — the FIRST real GitHat sign-in with no owner set becomes owner automatically. STAFF_GITHAT_SUBJECTS and any already-invited employees still sign in normally in the meantime.");
   console.log(githatKeyIsPersisted
     ? `GitHat sessions last ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days and survive a restart — GITHAT_SESSION_SIGNING_KEY is set.`
     : `GitHat sessions are stated as ${Math.round(GITHAT_SESSION_MINUTES / 60 / 24)} days but WILL NOT survive a restart — GITHAT_SESSION_SIGNING_KEY is unset, so this process generated its own key and every GitHat session ends the moment it stops.`);
