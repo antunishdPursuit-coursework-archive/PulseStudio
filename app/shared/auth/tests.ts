@@ -1122,6 +1122,31 @@ check("the value interpolated into the denial page is HTML-escaped, not trusted 
     ? true
     : "sendGithatResult no longer escapes its detail before interpolating it");
 
+/* REVOCATION MUST STAY REAL. This door's signed-in check was once the
+ * cookie's HMAC and expiry alone, so the authorization lists were read
+ * once at callback time and never again: removing somebody from
+ * STAFF_GITHAT_SUBJECTS left their cookie opening /api/staff/records for
+ * the rest of its 30 days, ACROSS the restart meant to apply the removal
+ * (measured: signedIn:true beside role:null, and a 200 with every member
+ * record). The fix is that the role is resolved per request. Pinned here
+ * because the tempting "optimisation" is to trust the cookie again. */
+check("the GitHat signed-in check resolves the role per request, never the cookie alone", () => {
+  const body = serverSource.slice(serverSource.indexOf("function requestIsSignedInViaGithat"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  if (/githatTokenIsValid\s*\(/.test(fn)) {
+    return "requestIsSignedInViaGithat is back to trusting the cookie's HMAC alone — a removed staff member would keep access";
+  }
+  return /githatRoleFromRequest\s*\(/.test(fn) ? true : `unrecognised shape: ${fn}`;
+});
+
+check("the per-request role resolution actually consults both authorization lists", () => {
+  const body = serverSource.slice(serverSource.indexOf("function githatRoleFromRequest"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  return /staffSubjects/.test(fn) && /directorySubjects/.test(fn) && /ownerSubject/.test(fn)
+    ? true
+    : `githatRoleFromRequest no longer consults every list: ${fn}`;
+});
+
 check("the GitHat door and the passphrase door issue distinctly named cookies", () =>
   serverSource.includes('"__Host-pulse_session"') && serverSource.includes('"__Host-pulse-staff"')
     ? true

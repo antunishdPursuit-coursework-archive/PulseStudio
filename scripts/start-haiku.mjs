@@ -522,7 +522,14 @@ function addToStaffDirectory(sub) {
  * restart, not just until the next one — which is exactly why the
  * lifetime below is real-days, not "however long the process happens to
  * stay up", and why sign-out and STAFF_GITHAT_SUBJECTS remain the actual
- * revocation levers, not a restart. */
+ * revocation levers, not a restart.
+ *
+ * That last clause was a promise this file did not keep until
+ * githatRoleFromRequest existed: the lists were read once in the callback
+ * and never again, so a persisted key meant a removed person's cookie went
+ * on working across the very restart meant to remove them. The lever is
+ * real now because the authorization lists are consulted on every request
+ * that asks for anything. */
 /* Buffer.from(str, "hex") does NOT throw on a malformed string — it stops
  * at the first non-hex character and silently hands back whatever it
  * parsed, which can be a short buffer or, for a string with no valid hex
@@ -576,8 +583,36 @@ function githatCookie(value, maxAgeSeconds) {
   return `${GITHAT_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
 }
 
+/* THE ROLE IS RESOLVED ON EVERY REQUEST, NOT ONCE AT SIGN-IN.
+ *
+ * This used to be `githatTokenIsValid(cookie)` and nothing else — an HMAC
+ * and an expiry. That made the cookie itself the grant, and the
+ * authorization lists were consulted exactly once, in the callback. The
+ * consequence was the opposite of what the comment above this door
+ * claimed: taking somebody OUT of STAFF_GITHAT_SUBJECTS, or deleting
+ * their row from the staff directory, revoked nothing. Their cookie kept
+ * verifying, so `/api/staff/records` kept answering with every member
+ * record — for the remaining 30 days, and ACROSS the restart that was
+ * supposed to apply the removal, precisely because
+ * GITHAT_SESSION_SIGNING_KEY is persisted on purpose. The server even
+ * said so out loud: `/api/staff/session` answered `signedIn: true` beside
+ * `role: null`, two fields disagreeing about the same request.
+ *
+ * Resolving per request costs one small file read and makes removal mean
+ * removal. The only revocation lever used to be rotating the signing key,
+ * which signs EVERYBODY out; now the lists are the lever, as documented. */
+function githatRoleFromRequest(request) {
+  const sub = githatSubjectFromRequest(request);
+  if (sub === null) return null;
+  return resolveStaffRole(sub, {
+    ownerSubject: ownerGithatSubject,
+    staffSubjects: staffGithatSubjects,
+    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
+  });
+}
+
 function requestIsSignedInViaGithat(request) {
-  return githatTokenIsValid(cookieValue(request, GITHAT_COOKIE));
+  return githatRoleFromRequest(request) !== null;
 }
 
 /* The GitHat subject a request's cookie proves, or null. Used only to
@@ -599,14 +634,16 @@ function githatSubjectFromRequest(request) {
   }
 }
 
+/* One resolved answer for "what is this request allowed to be". The GitHat
+ * door is asked first because it carries a real per-person identity; the
+ * passphrase door has none, so it can only ever be the shared Front Desk
+ * persona. Deliberately NOT routed through requestIsSignedInStaff, which
+ * calls back into the GitHat check — asking the same question twice by two
+ * names is how the two used to be able to disagree. */
 function requestStaffRole(request) {
-  const sub = githatSubjectFromRequest(request);
-  if (sub === null) return requestIsSignedInStaff(request) ? "front_desk" : null;
-  return resolveStaffRole(sub, {
-    ownerSubject: ownerGithatSubject,
-    staffSubjects: staffGithatSubjects,
-    directorySubjects: new Set(readStaffDirectory().map((entry) => entry.sub)),
-  });
+  const githatRole = githatRoleFromRequest(request);
+  if (githatRole !== null) return githatRole;
+  return staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) ? "front_desk" : null;
 }
 
 /* GET /auth/githat/start — the browser's own click on "Sign in with
