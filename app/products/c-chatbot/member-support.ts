@@ -5,12 +5,11 @@ import { loadFixtures } from "../../shared/data.js";
 import { todayIsoInZone } from "../../shared/today.js";
 import {
   asksForPrivateMemberData,
-  PRESET_QUESTIONS,
-  presetAnswer,
   QUESTION_MAX_LENGTH,
   recordStatus,
   safeStudioContext,
 } from "./support.js";
+import { PRESET_QUESTIONS, presetAnswer } from "./presets.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);

@@ -1,6 +1,7 @@
 import type { ClassSession, FixtureSet, StudioPolicy } from "../../shared/contract.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
-import { asksForPrivateMemberData, isUpcoming, normalizeQuestion, presetAnswer, recordStatus, safeStudioContext } from "./support.js";
+import { asksForPrivateMemberData, isUpcoming, normalizeQuestion, recordStatus, safeStudioContext } from "./support.js";
+import { presetAnswer } from "./presets.js";
 
 const results: Array<{ name: string; passed: boolean }> = [];
 function check(name: string, actual: unknown, expected: unknown): void {
