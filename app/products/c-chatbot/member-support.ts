@@ -1,6 +1,7 @@
 import type { FixtureSet } from "../../shared/contract.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
 import { readPulseSession } from "../../shared/auth/session.js";
+import { STUDIO_NAME } from "../../shared/brand.js";
 import { loadFixtures } from "../../shared/data.js";
 import { todayIsoInZone } from "../../shared/today.js";
 import {
@@ -95,7 +96,7 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   if (fixtures === null) {
-    addMessage("The studio schedule and policies are unavailable right now. Please contact Pulse Studio staff for help.", "assistant");
+    addMessage(`The studio schedule and policies are unavailable right now. Please contact ${STUDIO_NAME} staff for help.`, "assistant");
     input.focus();
     return;
   }
@@ -116,7 +117,7 @@ form.addEventListener("submit", async (event) => {
     addMessage(answerProblems(answer, memberPolicy).length > 0 ? memberPolicy.refusal : answer, "assistant");
     status.textContent = recordStatus(fixtures, Date.now(), true);
   } catch {
-    addMessage("Conversational member support is unavailable right now. Please contact Pulse Studio staff for help.", "assistant");
+    addMessage(`Conversational member support is unavailable right now. Please contact ${STUDIO_NAME} staff for help.`, "assistant");
     status.textContent = recordStatus(fixtures, Date.now(), false);
   } finally {
     sendButton.disabled = false;

@@ -1,17 +1,17 @@
-# Pulse Studio
+# HeartBeat Studio
 
 > Software for a single boutique fitness studio: members book classes, staff
 > run the schedule, and nobody who quietly stops coming goes unnoticed. Four
 > products, one shared set of studio records, four developers each owning one
 > product end to end.
 
-Pulse Studio is one location offering group classes (yoga, cycling, HIIT,
+HeartBeat Studio is one location offering group classes (yoga, cycling, HIIT,
 pilates, strength) on recurring monthly memberships. Everything below runs as
 a static site — no server, no member data leaving the browser.
 
 ## Public pages
 
-- [Pulse Studio](https://antunishdpursuit.github.io/PulseStudio/): the front door, linking to
+- [HeartBeat Studio](https://antunishdpursuit.github.io/PulseStudio/): the front door, linking to
   every product.
 - [Member Booking](https://antunishdpursuit.github.io/PulseStudio/products/a-booking/): a
   member views the week's classes and reserves a spot.
