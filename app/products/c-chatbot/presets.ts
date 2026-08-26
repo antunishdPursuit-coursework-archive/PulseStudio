@@ -1,4 +1,5 @@
 import type { FixtureSet } from "../../shared/contract.js";
+import { STUDIO_NAME } from "../../shared/brand.js";
 import { isUpcoming, normalizeQuestion } from "./support.js";
 
 export const PRESET_QUESTIONS = [
@@ -10,7 +11,7 @@ export const PRESET_QUESTIONS = [
 
 function currentPolicyAnswer(records: FixtureSet, topic: string): string {
   return records.studio_policies.find((policy) => policy.is_current && policy.topic === topic)?.answer
-    ?? `There is no current policy on ${topic}. Please contact Pulse Studio staff for help.`;
+    ?? `There is no current policy on ${topic}. Please contact ${STUDIO_NAME} staff for help.`;
 }
 
 export function presetAnswer(question: string, records: FixtureSet, now: number): string | null {

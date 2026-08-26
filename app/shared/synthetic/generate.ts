@@ -42,6 +42,7 @@ import { buildSchedule, roomsPerSlot } from "./schedule.js";
 import { demandFactor, planCohorts, type CohortPlan } from "./scenarios.js";
 import { buildIdentities, DEFAULT_NAME_POOL, type NamePool } from "./identity.js";
 import { activeOn, deriveStatusOn } from "./lifecycle.js";
+import { STUDIO_NAME } from "../brand.js";
 
 export interface GenerateOptions {
   /** Substituting the pool must change names ONLY — a test hook proving
@@ -72,7 +73,7 @@ export function generateStudio(
   // occupancy stays far below the ceiling either way.
   const studio: SyntheticStudio = {
     id: makeId("studio", 1),
-    name: "Pulse Studio",
+    name: STUDIO_NAME,
     timezone: config.timezone,
     facilityCapacity:
       config.facilityCapacity ?? Math.max(30, roomsPerSlot(config.memberCount) * 16),
