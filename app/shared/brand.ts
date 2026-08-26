@@ -23,7 +23,7 @@
  * through its deps.ts seam into its config.ts.
  */
 
-export const STUDIO_NAME = "Pulse Studio";
+export const STUDIO_NAME = "HeartBeat Studio";
 
 /** Where the studio is and how to reach it.
  *
