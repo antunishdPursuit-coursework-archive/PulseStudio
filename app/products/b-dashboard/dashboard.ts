@@ -21,6 +21,12 @@ export const UNDERBOOKED_BELOW = 70;
 export const FILLING_SOON_AT = 90;
 export const FULL_AT = 100;
 
+/** The one static publication where the team intentionally shows the
+ * browser-generated class-project records without a server-backed door. */
+export function isPublicDashboardHost(hostname: string): boolean {
+  return hostname === "antunishdpursuit.github.io";
+}
+
 export type SessionStatus = "Underbooked" | "On track" | "Filling soon" | "Full";
 
 export interface RosterMember {
@@ -51,6 +57,13 @@ export function status(session: DashboardSession): SessionStatus {
   if (fill >= FILLING_SOON_AT) return "Filling soon";
   if (fill < UNDERBOOKED_BELOW) return "Underbooked";
   return "On track";
+}
+
+/** Count one named fill-rate condition for the selected week. The summary
+ *  cards call this rather than repeating the status boundaries in browser
+ *  wiring, so their numbers cannot drift from the session labels. */
+export function statusCount(sessions: DashboardSession[], target: SessionStatus): number {
+  return sessions.filter((session) => status(session) === target).length;
 }
 
 /** "Needs attention" means a staff person can still do something: promote

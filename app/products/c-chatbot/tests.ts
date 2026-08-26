@@ -1,6 +1,7 @@
 import type { ClassSession, FixtureSet, StudioPolicy } from "../../shared/contract.js";
 import { answerProblems, audiencePolicy } from "../../shared/assistant-audience.js";
 import { asksForPrivateMemberData, isUpcoming, normalizeQuestion, recordStatus, safeStudioContext } from "./support.js";
+import { presetAnswer } from "./presets.js";
 
 const results: Array<{ name: string; passed: boolean }> = [];
 function check(name: string, actual: unknown, expected: unknown): void {
@@ -42,6 +43,9 @@ const context = safeStudioContext(records, "2026-08-23", now);
 check("context includes only the upcoming class", context.class_sessions.map((item) => item.session_id), ["future"]);
 check("context includes only pol_001", context.studio_policies.map((item) => item.policy_id), ["pol_001"]);
 check("context exposes no instructor or capacity", Object.keys(context.class_sessions[0] ?? {}).sort(), ["class_type", "ends_at", "level", "session_id", "session_status", "starts_at"]);
+check("preset cancellation uses pol_001", presetAnswer("What is the cancellation policy?", records, now), currentPolicy.answer);
+check("preset schedule uses upcoming sessions", presetAnswer("What classes are coming up?", records, now)?.includes("yoga (all)"), true);
+check("an unlisted question is not matched", presetAnswer("Can you help me?", records, now), null);
 check("status uses singular class", recordStatus({ ...records, class_sessions: [future] }, now, false), "1 upcoming class and 1 current policy ready, but conversational support is unavailable on this site.");
 
 const memberPolicy = audiencePolicy("staff", "member-facing");

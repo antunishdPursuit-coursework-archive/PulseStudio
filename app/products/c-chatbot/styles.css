@@ -5,6 +5,9 @@
 .message { max-width: 80%; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; white-space: pre-line; }
 .message.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .message.assistant { align-self: flex-start; }
+.suggested-questions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
+.suggested-question { border: 1px solid var(--accent); border-radius: 999px; padding: 8px 12px; background: var(--bg); color: var(--fg); font: inherit; cursor: pointer; }
+.suggested-question:hover, .suggested-question:focus-visible { background: var(--accent); color: var(--accent-ink); }
 .composer { border-top: 1px solid var(--line); padding: 16px; }
 .composer label { display: block; font-weight: 600; margin-bottom: 6px; }
 .composer-row { display: flex; gap: 8px; }

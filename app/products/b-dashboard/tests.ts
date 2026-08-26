@@ -13,8 +13,8 @@
 
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
-  bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
-  occupancy, roomDemand, spotsLeftText, status,
+  bookingDataLine, confirmedCount, formatSessionTime, isPublicDashboardHost, needsAttention, nextActionText,
+  occupancy, roomDemand, spotsLeftText, status, statusCount,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
 
@@ -40,6 +40,8 @@ const session = (capacity: number, reserved: number, extras: RosterMember[] = []
 check("underbooked band starts below 70", UNDERBOOKED_BELOW, 70);
 check("filling-soon band starts at 90", FILLING_SOON_AT, 90);
 check("full is 100", FULL_AT, 100);
+check("the team GitHub Pages host opens the public dashboard", isPublicDashboardHost("antunishdpursuit.github.io"), true);
+check("another host keeps the staff door", isPublicDashboardHost("pulse.githat.io"), false);
 
 // Only reserved rows hold a seat — the brief's riskiest boundary.
 check("waitlisted rows never count as confirmed", confirmedCount(session(10, 3, [member(90, "waitlisted")])), 3);
@@ -60,6 +62,15 @@ check("Underbooked needs attention", needsAttention(session(100, 50)), true);
 check("Filling soon needs attention", needsAttention(session(100, 95)), true);
 check("On track does not need attention", needsAttention(session(100, 80)), false);
 check("Full does NOT need attention", needsAttention(session(100, 100)), false);
+check("condition summary separates every fill-rate status", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "Underbooked"), 1);
+check("condition summary counts On track separately", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "On track"), 1);
+check("condition summary counts Filling soon separately", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "Filling soon"), 1);
 
 // Seats left: plural, singular, zero, and the over-capacity case stated out loud.
 check("spots left pluralises", spotsLeftText(session(10, 7)), "3 spots left");

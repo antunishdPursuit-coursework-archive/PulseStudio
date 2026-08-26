@@ -9,6 +9,7 @@ import {
   recordStatus,
   safeStudioContext,
 } from "./support.js";
+import { PRESET_QUESTIONS, presetAnswer } from "./presets.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -23,6 +24,7 @@ const greeting = requiredElement<HTMLParagraphElement>("#greeting");
 const scope = requiredElement<HTMLParagraphElement>("#scope");
 const status = requiredElement<HTMLParagraphElement>("#status");
 const sendButton = requiredElement<HTMLButtonElement>("button[type='submit']");
+const suggestedQuestions = requiredElement<HTMLElement>("#suggested-questions");
 const CHAT_ENDPOINT = new URL("../../api/chat", import.meta.url);
 const session = readPulseSession();
 const memberPolicy = audiencePolicy(
@@ -35,6 +37,18 @@ scope.textContent = memberPolicy.scope;
 input.maxLength = QUESTION_MAX_LENGTH;
 
 let fixtures: FixtureSet | null = null;
+
+for (const question of PRESET_QUESTIONS) {
+  const button = document.createElement("button");
+  button.className = "suggested-question";
+  button.type = "button";
+  button.textContent = question;
+  button.addEventListener("click", () => {
+    input.value = question;
+    form.requestSubmit();
+  });
+  suggestedQuestions.append(button);
+}
 
 function isChatResponse(value: unknown): value is { answer: string } {
   return (
@@ -86,6 +100,14 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  const directAnswer = presetAnswer(question, fixtures, Date.now());
+  if (directAnswer !== null) {
+    addMessage(directAnswer, "assistant");
+    status.textContent = recordStatus(fixtures, Date.now(), true);
+    input.focus();
+    return;
+  }
+
   sendButton.disabled = true;
   form.setAttribute("aria-busy", "true");
   status.textContent = "Checking the current studio information.";
@@ -118,11 +140,11 @@ async function start(): Promise<void> {
     const available = response.ok && typeof result === "object" && result !== null && (result as Record<string, unknown>)["available"] === true;
     status.textContent = recordStatus(fixtures, Date.now(), available);
     if (!available) {
-      greeting.textContent = "The studio schedule and policies are loaded, but conversational support is unavailable on this site. The front desk can help with urgent questions.";
+      greeting.textContent = "Choose a suggested question below. Other conversational questions need the studio support service.";
     }
   } catch {
     status.textContent = recordStatus(fixtures, Date.now(), false);
-    greeting.textContent = "The studio schedule and policies are loaded, but conversational support is unavailable on this site. The front desk can help with urgent questions.";
+    greeting.textContent = "Choose a suggested question below. Other conversational questions need the studio support service.";
   }
 }
 

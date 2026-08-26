@@ -440,8 +440,78 @@ function ensureFavicon(): void {
   document.head.append(link);
 }
 
+/* THE TAB DOES NOT ANIMATE AN SVG ICON ON ITS OWN. Chrome and Safari both
+ * rasterize a favicon once when the <link> is read and ignore any CSS or
+ * SMIL animation inside it after that — there is no browser-native way to
+ * make a tab's own icon move. The only real mechanism, the same one behind
+ * every "3 new messages" favicon badge, is to keep swapping the <link>'s
+ * href ourselves, on a timer, between small static frames.
+ *
+ * Six frames trace the SAME zigzag favicon.svg already draws — a bright
+ * dot travelling the six vertices of that exact path (walked once, by
+ * hand, from favicon.svg's own `d` attribute, so this cannot silently draw
+ * a different line if that path ever changes) — at roughly a resting
+ * heart rate (~75bpm here; six frames at 200ms is one full beat every
+ * 1.2s). Monochrome only: this runs in every tab regardless of which
+ * product a person is on, and shared infrastructure carries no product
+ * colour, so the dot is the SAME ink as the line, just a firmer stroke.
+ *
+ * Honest limits: (1) prefers-reduced-motion stops it before the first
+ * frame swap — one static icon, matching the same rule theme.css holds
+ * for every other motion here. (2) document.hidden pauses it — a
+ * backgrounded tab gets no visible benefit and most browsers throttle a
+ * hidden tab's timers anyway, so this stops asking rather than losing a
+ * race with the throttle. (3) this cannot be watched rendering correctly
+ * by anything in this repo's own suites — they read markup and computed
+ * styles, never a browser's own tab strip — so treat "the frames are
+ * correct SVGs, in the right order, and the timer starts/stops on the
+ * right signals" as what was actually verified, not "it visibly beats". */
+function animateFavicon(): void {
+  const link = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
+  if (link === null || !link.href.endsWith(".svg")) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  /* Read the RESOLVED --fg rather than re-deriving light/dark from
+   * matchMedia: --fg already carries every theme state theme.css
+   * defines — OS light, OS dark, an explicit [data-theme] override that
+   * disagrees with the OS, and a custom pair — so this follows whichever
+   * one actually won, including a custom text colour that is neither
+   * pure black nor pure white, without this file needing to know the
+   * rules that decided it. */
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--fg").trim() || "#0a0a0a";
+  /* The six vertices of favicon.svg's own path:
+     M2 16h5.5l3-8.5l5 17l3.5-10l2.5 1.5H30 */
+  const beat: ReadonlyArray<readonly [number, number]> = [
+    [2, 16], [7.5, 16], [10.5, 7.5], [15.5, 24.5], [19, 14.5], [21.5, 16],
+  ];
+  const frames = beat.map(([dotX, dotY]) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">`
+      + `<path d="M2 16h5.5l3-8.5l5 17l3.5-10l2.5 1.5H30" fill="none" `
+      + `stroke="${ink}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<circle cx="${dotX}" cy="${dotY}" r="2.6" fill="${ink}"/>`
+      + `</svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  });
+
+  let i = 0;
+  const FRAME_MS = 200;
+  const tick = (): void => {
+    if (document.hidden) return;
+    i = (i + 1) % frames.length;
+    link.href = frames[i] ?? frames[0] ?? link.href;
+  };
+  window.setInterval(tick, FRAME_MS);
+}
+
 ensureFavicon();
+/* AFTER initialTheme, not before: it applies an explicit [data-theme]
+   override synchronously, and animateFavicon reads the resolved --fg
+   ONCE at call time. Read first, this always saw the OS default instead
+   of the override -- caught live: switched the page to explicit light
+   while the OS stayed dark, reloaded, and every frame still carried
+   white ink. */
 initialTheme();
+animateFavicon();
 mountAppearance();
 
 const sessionHost = document.querySelector(".topnav, .page-head, .topbar");

@@ -27,6 +27,7 @@ import {
   type PulseSession,
   type SessionChangeOrigin,
 } from "./auth/session.js";
+import { readStaffGate } from "./auth/staff-gate.js";
 import { mountFigures } from "./components/figures.js";
 
 /* THE STUDIO FLOOR. The front door's markup names which figure goes where
@@ -69,8 +70,8 @@ function applyView(session: PulseSession | null): void {
       session !== null && session.actor_type === "staff"
         ? `Signed in as ${session.display_name} — these are your tools.`
         : session !== null
-          ? "The studio team's tools. Staff sign in as Front Desk from the top bar."
-          : "Staff only — sign in as Front Desk from the top bar.";
+          ? "The studio team's tools. Staff sign in through Front Desk in the top bar."
+          : "Staff only — sign in through Front Desk in the top bar.";
   }
 
   /* ONE DOOR INTO THE STAFF ROOM, NOT THREE. A signed-in member could reach
@@ -95,11 +96,20 @@ function applyView(session: PulseSession | null): void {
   }
 }
 
+function applyStaffLinks(signedIn: boolean): void {
+  const label = signedIn ? "Open the Dashboard" : "Staff sign-in required";
+  for (const id of ["staff-door-link", "dashboard-link"]) {
+    const link = document.getElementById(id);
+    if (link !== null) link.textContent = label;
+  }
+}
+
 /* The page's own memory of who was signed in a moment ago. Seeded from
  * the CURRENT session at load, which is precisely what makes rule 1 work:
  * arriving already signed in is not a transition, so nothing moves. */
 let previous = readPulseSession();
 applyView(previous);
+void readStaffGate().then((gate) => applyStaffLinks(gate.signedIn));
 
 /* The pending landing, so a later change can cancel it. */
 let pendingNavigation: number | null = null;
@@ -119,6 +129,7 @@ subscribeToPulseSession((session, origin) => {
   const signedInJustNow = previous === null && session !== null;
   previous = session;
   applyView(session);
+  void readStaffGate().then((gate) => applyStaffLinks(gate.signedIn));
 
   /* Any change at all cancels a landing already in flight — signing out
      during the pause must not still send you to a members-only page. */
@@ -171,6 +182,7 @@ window.addEventListener("pageshow", (event) => {
   }
   previous = readPulseSession();
   applyView(previous);
+  void readStaffGate().then((gate) => applyStaffLinks(gate.signedIn));
 });
 
 /* ---------- scroll reveal (the Pudding touch) ----------

@@ -46,7 +46,7 @@ import {
   readPulseSession,
   subscribeToPulseSession,
 } from "../auth/session.js";
-import { readStaffGate, signOutStaff } from "../auth/staff-gate.js";
+import { readStaffGate, signInStaff, signOutStaff } from "../auth/staff-gate.js";
 import {
   signInAsFrontDesk,
   signInAsMember,
@@ -252,8 +252,76 @@ function staffRow(): HTMLButtonElement {
     staff.display_name,
     staff.actor_type === "staff" ? staff.staff_id : "",
     "staff · front desk",
-    () => { signInAsFrontDesk(); },
+    () => { void startFrontDeskSignIn(); },
+    false,
   );
+}
+
+/* A local browser persona is not authorization. Front Desk verifies the
+ * existing staff passphrase here, then the server-held session and local
+ * name arrive together at Product B. If the passphrase is unavailable,
+ * GitHat remains the separate server-held route. */
+async function startFrontDeskSignIn(): Promise<void> {
+  const gate = await readStaffGate();
+  if (gate.signedIn) {
+    signInAsFrontDesk();
+    window.location.assign("/products/b-dashboard/");
+    return;
+  }
+  if (!gate.reachable) {
+    window.location.assign("/products/b-dashboard/");
+    return;
+  }
+  if (!gate.configured) {
+    window.location.assign("/auth/githat/start?next=/products/b-dashboard/");
+    return;
+  }
+  showFrontDeskPassphrase();
+}
+
+function showFrontDeskPassphrase(): void {
+  const dialog = document.getElementById(DIALOG_ID);
+  if (!(dialog instanceof HTMLDialogElement)) return;
+  const intro = dialog.querySelector(".pulse-session-intro");
+  const state = dialog.querySelector(".pulse-session-state");
+  const rows = dialog.querySelector(".pulse-session-rows");
+  if (!(intro instanceof HTMLElement) || !(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
+
+  intro.textContent = "Enter the staff passphrase to open the staff dashboard.";
+  state.textContent = "";
+  const form = document.createElement("form");
+  form.className = "pulse-session-staff-form";
+  const label = document.createElement("label");
+  label.htmlFor = "pulse-session-staff-passphrase";
+  label.textContent = "Staff passphrase";
+  const field = document.createElement("input");
+  field.id = "pulse-session-staff-passphrase";
+  field.type = "password";
+  field.autocomplete = "current-password";
+  field.required = true;
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.textContent = "Open staff dashboard";
+  form.append(label, field, submit);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    submit.textContent = "Checking…";
+    void signInStaff(field.value).then((result) => {
+      if (result.ok) {
+        signInAsFrontDesk();
+        window.location.assign("/products/b-dashboard/");
+        return;
+      }
+      state.textContent = result.message;
+      field.value = "";
+      field.focus();
+      submit.disabled = false;
+      submit.textContent = "Open staff dashboard";
+    });
+  });
+  rows.replaceChildren(form);
+  field.focus();
 }
 
 function row(
@@ -261,6 +329,7 @@ function row(
   identity: string,
   note: string,
   choose: () => void,
+  closeOnChoose: boolean = true,
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
@@ -278,6 +347,7 @@ function row(
   button.appendChild(tag);
   button.addEventListener("click", () => {
     choose();
+    if (!closeOnChoose) return;
     const dialog = document.getElementById(DIALOG_ID);
     if (dialog instanceof HTMLDialogElement) dialog.close();
   });
@@ -343,6 +413,11 @@ function injectStylesOnce(): void {
 .pulse-session-row strong { grid-column: 1; }
 .pulse-session-row span { grid-column: 1; color: var(--muted); font-size: 0.85rem; }
 .pulse-session-row em { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; font-size: 0.78rem; color: var(--muted); }
+.pulse-session-staff-form { display: grid; gap: 10px; }
+.pulse-session-staff-form label { color: var(--fg); display: grid; font-size: .85rem; font-weight: 600; gap: 6px; }
+.pulse-session-staff-form input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font: inherit; padding: 9px 11px; }
+.pulse-session-staff-form button { background: var(--accent, var(--fg)); border: 0; border-radius: 8px; color: var(--accent-ink, var(--bg)); cursor: pointer; font: inherit; font-weight: 600; padding: 9px 11px; }
+.pulse-session-staff-form button:focus-visible, .pulse-session-staff-form input:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 `;
   document.head.appendChild(style);
 }

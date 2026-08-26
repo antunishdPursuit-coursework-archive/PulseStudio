@@ -21,6 +21,28 @@ import {
 import { signInAsFrontDesk, signInAsMember, signInChoices } from "./sign-in.js";
 import { sharedStudio, sharedStudioMembers, sharedStudioWithFill } from "./studio.js";
 import { doorMessage } from "./staff-gate.js";
+import {
+  GITHAT_APP_SLUG,
+  GITHAT_ISSUER,
+  PULSE_REDIRECT_URI,
+  PULSE_TRUSTED_ORIGIN,
+  beginOAuthTransaction,
+  buildAuthorizeUrl,
+  createInviteStore,
+  createTransactionStore,
+  createUsedCodeStore,
+  exchangeCodeForToken,
+  extractIdentity,
+  isAuthorizedStaffSubject,
+  isTrustedOrigin,
+  isTrustedRedirectUri,
+  parseOwnerSubject,
+  parseStaffSubjects,
+  hasAnyOwnerConfigured,
+  resolveStaffRole,
+  unauthorizedDetail,
+  type FetchLike,
+} from "./githat-oauth.js";
 import { escapeHtml } from "../html.js";
 import { answerProblems, audienceFor, audiencePolicy } from "../assistant-audience.js";
 import {
@@ -673,16 +695,16 @@ check("an empty string escapes to itself", () => eq(escapeHtml(""), ""));
  * visitor. */
 
 check("no server answered: the door says so, not 'no passphrase'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
   return said.includes("No server answered") ? true : `unexpected: ${said}`;
 });
 check("a server answered but no passphrase is set: says THAT, not 'no server'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: true });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: true, role: null });
   return said.includes("no staff passphrase set") && !said.includes("No server answered")
     ? true : `unexpected: ${said}`;
 });
 check("configured and not signed in: asks for the passphrase", () => {
-  const said = doorMessage({ configured: true, signedIn: false, reachable: true });
+  const said = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
   return said.includes("Sign in with the studio's staff passphrase") ? true : `unexpected: ${said}`;
 });
 check("configured and ALREADY signed in reads the same as not signed in", () => {
@@ -691,12 +713,12 @@ check("configured and ALREADY signed in reads the same as not signed in", () => 
    * itself does with that combination, not a claim about what the page
    * shows. Pinned so `signedIn` staying out of the branching is a decision,
    * not an oversight the next edit trips over. */
-  const asked = doorMessage({ configured: true, signedIn: false, reachable: true });
-  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true });
+  const asked = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
+  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true, role: "front_desk" });
   return eq(asked, alsoSignedIn);
 });
 check("unreachable outranks unconfigured — both true says the door is down", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false });
+  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
   return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
@@ -727,6 +749,489 @@ check("a confirmed staff sign-in remembers Front Desk locally, so Sign out has s
   /result\.ok[\s\S]{0,400}signInAsFrontDesk\(\)/.test(staffGateSource)
     ? true
     : "mountStaffDoor's success branch does not call signInAsFrontDesk()");
+
+check("the staff door offers a GitHat sign-in link, alongside the passphrase form (not instead of it)", () =>
+  /auth\/githat\/start/.test(staffGateSource) ? true : "no /auth/githat/start link found in staff-gate.ts");
+
+/* The owner's invite panel: same "read the source" limit as above — it
+ * only ever mounts after a real fetch() resolves signedIn/role, which
+ * this synchronous harness cannot drive. What is pinned instead is the
+ * ONE gate that decides whether it renders at all. */
+check("mountStaffDoor only mounts the owner invite panel for gate.role === \"owner\"", () =>
+  /gate\.role === "owner"[\s\S]{0,80}mountOwnerInvitePanel\(\)/.test(staffGateSource)
+    ? true
+    : "mountOwnerInvitePanel() is not gated on gate.role === \"owner\" in mountStaffDoor");
+check("mountOwnerInvitePanel is not reachable from anywhere except the owner branch above", () =>
+  // Two matches total: the function's own `(): void {` declaration, and
+  // the one call site inside the gate.role === "owner" branch above.
+  eq((staffGateSource.match(/mountOwnerInvitePanel\(\)/g) ?? []).length, 2));
+check("the invite panel's create button calls createStaffInvite(), never fetch() directly", () =>
+  /function mountOwnerInvitePanel[\s\S]*?createStaffInvite\(\)/.test(staffGateSource)
+    ? true
+    : "mountOwnerInvitePanel does not call createStaffInvite()");
+
+/* ---------- "Sign in with GitHat": OAuth 2.0 + PKCE(S256) against the
+ * sibling GitHat service ----------
+ *
+ * Written failing-first the same way this whole suite was: every negative
+ * case below is proven to fail for the SPECIFIC reason it should, not just
+ * to return "not ok". The genuinely asynchronous seams — RSA signature
+ * verification and JWKS fetching both go through `crypto.subtle`, which
+ * has no synchronous form — are resolved with a top-level `await` before
+ * being handed to this file's check() harness, exactly the way
+ * `synthetic/tests.ts` already resolves its own `await fetch(...)` calls
+ * before registering a check; see the comment beside `mountSessionControl`
+ * above for why the harness itself cannot await anything. */
+
+const OAUTH_NOW_SECONDS = 1_800_000_000; // a fixed instant, so a token minted "expired" here stays expired regardless of when this suite runs
+const OAUTH_NOW_MS = OAUTH_NOW_SECONDS * 1000;
+
+/* THE TOKEN-ENDPOINT RESPONSE, which is the only thing this door reads.
+ *
+ * This block used to generate a real RSA key pair and check RS256
+ * signature verification, `alg:none`, algorithm confusion, unknown `kid`,
+ * issuer/audience pinning and JWKS cache behaviour — about thirty checks
+ * over roughly two hundred lines of `githat-oauth.ts`.
+ *
+ * All of it verified a token GitHat does not mint. Measured against the
+ * live service on 2026-08-25: `POST /oauth/token` returns RFC 6749 §5.1
+ * only, there is no `id_token`, the identity claim is `userId` rather
+ * than `sub`, and `aud` is the fleet-wide constant `githat` rather than
+ * this client. The checks all PASSED, against a fixture token shaped the
+ * way the code wished the provider behaved — which is exactly the failure
+ * mode worth naming: a green suite proving a module agrees with itself.
+ *
+ * What replaced it is smaller because the trust argument is smaller and
+ * real: the identity arrives in the body of a direct server-to-server
+ * HTTPS POST that this process makes itself, carrying a single-use code
+ * and a PKCE verifier that never left it. So what has to be checked is
+ * that the body is parsed defensively and that a malformed one fails
+ * CLOSED — never that a signature validates. */
+
+const GITHAT_TOKEN_RESPONSE = {
+  access_token: "fixture-opaque-access-token",
+  token_type: "Bearer",
+  expires_in: 900,
+  refresh_token: "fixture-opaque-refresh-token",
+  scope: "githat",
+  user: {
+    id: "githat-user-1",
+    email: "front.desk@pulse.test",
+    name: "Front Desk",
+    avatarUrl: null,
+    emailVerified: true,
+  },
+  org: { id: "org-1", name: "Pulse Studio", slug: "pulse", role: "owner", tier: "free" },
+};
+
+const extracted = extractIdentity(GITHAT_TOKEN_RESPONSE);
+check("the real GitHat token-response shape yields the signed-in identity", () =>
+  eq(extracted, {
+    sub: "githat-user-1",
+    email: "front.desk@pulse.test",
+    emailVerified: true,
+    name: "Front Desk",
+  }));
+
+/* Every one of these is a FAIL-CLOSED case. The blank-id pair matter most:
+ * an empty subject would otherwise reach resolveStaffRole, and while an
+ * empty STAFF_GITHAT_SUBJECTS denies it anyway, a door should never depend
+ * on a second check to refuse an identity it could not read. */
+check("a response with no user object at all is refused", () =>
+  eq(extractIdentity({ access_token: "x", token_type: "Bearer" }), null));
+check("a response whose user is null is refused", () => eq(extractIdentity({ user: null }), null));
+check("a response whose user is a string is refused", () => eq(extractIdentity({ user: "githat-user-1" }), null));
+check("a user with no id is refused", () =>
+  eq(extractIdentity({ user: { email: "someone@pulse.test" } }), null));
+check("a user whose id is an empty string is refused", () => eq(extractIdentity({ user: { id: "" } }), null));
+check("a user whose id is only whitespace is refused", () => eq(extractIdentity({ user: { id: "   " } }), null));
+check("a user whose id is a number is refused (never coerced to a string)", () =>
+  eq(extractIdentity({ user: { id: 12345 } }), null));
+check("a null response is refused", () => eq(extractIdentity(null), null));
+check("a string response is refused", () => eq(extractIdentity("githat-user-1"), null));
+check("an array response is refused", () => eq(extractIdentity([{ id: "githat-user-1" }]), null));
+
+/* Optional fields degrade to null rather than to a wrong value, and
+ * emailVerified is TRUE only for a literal true — never for "true", 1, or
+ * any other truthy stand-in. */
+check("a user with an id but no email yields a null email, not a missing identity", () =>
+  eq(extractIdentity({ user: { id: "githat-user-1" } }), {
+    sub: "githat-user-1",
+    email: null,
+    emailVerified: false,
+    name: null,
+  }));
+check("emailVerified is false unless it is literally true", () =>
+  eq(extractIdentity({ user: { id: "u", emailVerified: "true" } })?.emailVerified, false));
+check("emailVerified true is carried through", () =>
+  eq(extractIdentity({ user: { id: "u", emailVerified: true } })?.emailVerified, true));
+
+/* Staff authorization: separate from authentication. A valid identity
+ * grants nothing by itself. */
+check("an unset STAFF_GITHAT_SUBJECTS denies every subject, including one that would otherwise match", () =>
+  eq(isAuthorizedStaffSubject("githat-user-1", parseStaffSubjects(undefined)), false));
+check("an empty STAFF_GITHAT_SUBJECTS denies every subject", () =>
+  eq(isAuthorizedStaffSubject("githat-user-1", parseStaffSubjects("   ")), false));
+check("a valid token's sub NOT on STAFF_GITHAT_SUBJECTS is denied staff access", () =>
+  eq(isAuthorizedStaffSubject(extracted?.sub ?? "", parseStaffSubjects("someone-else")), false));
+check("a valid token's sub present in STAFF_GITHAT_SUBJECTS is authorized", () =>
+  eq(
+    isAuthorizedStaffSubject(extracted?.sub ?? "", parseStaffSubjects("someone-else, githat-user-1 ,a-third-one")),
+    true,
+  ));
+
+/* Roles: owner vs. employee vs. neither. An unset OWNER_GITHAT_SUBJECT
+ * denies the capability to everyone, same "deny by default" shape as an
+ * unset STAFF_GITHAT_SUBJECTS — never a fallback that hands "owner" to
+ * whoever happens to sign in first. */
+check("parseOwnerSubject treats unset as absent", () => eq(parseOwnerSubject(undefined), null));
+check("parseOwnerSubject treats blank/whitespace as absent", () => eq(parseOwnerSubject("   "), null));
+check("parseOwnerSubject trims a real subject", () => eq(parseOwnerSubject("  owner-sub  "), "owner-sub"));
+
+const roleParams = {
+  ownerSubject: parseOwnerSubject("owner-sub"),
+  staffSubjects: parseStaffSubjects("preset-employee"),
+  directorySubjects: new Set(["invited-employee"]),
+};
+check("resolveStaffRole: the owner subject resolves to owner", () => eq(resolveStaffRole("owner-sub", roleParams), "owner"));
+check("resolveStaffRole: a subject on the static STAFF_GITHAT_SUBJECTS list resolves to employee", () =>
+  eq(resolveStaffRole("preset-employee", roleParams), "employee"));
+check("resolveStaffRole: a subject only in the invited directory resolves to employee", () =>
+  eq(resolveStaffRole("invited-employee", roleParams), "employee"));
+check("resolveStaffRole: an unrecognized subject resolves to no role at all", () =>
+  eq(resolveStaffRole("nobody-in-particular", roleParams), null));
+check("resolveStaffRole: an unset owner subject never matches, even a literal empty string sub cannot slip through", () =>
+  eq(resolveStaffRole("", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
+
+/* A directory-recorded owner (the auto-bootstrap path) resolves the same
+ * as an env-var owner, and the two are independent: neither list needs
+ * the other's shape. */
+check("resolveStaffRole: a subject the directory itself records as owner resolves to owner", () =>
+  eq(
+    resolveStaffRole("bootstrapped-owner", {
+      ownerSubject: null,
+      staffSubjects: parseStaffSubjects(undefined),
+      directorySubjects: new Set(),
+      directoryOwnerSubjects: new Set(["bootstrapped-owner"]),
+    }),
+    "owner",
+  ));
+check("resolveStaffRole: omitting directoryOwnerSubjects entirely is the same as an empty one", () =>
+  eq(resolveStaffRole("bootstrapped-owner", { ownerSubject: null, staffSubjects: parseStaffSubjects(undefined), directorySubjects: new Set() }), null));
+
+/* THE BOOTSTRAP GATE ITSELF. This is what start-haiku.mjs checks before
+ * auto-granting owner to a first sign-in — get this wrong and either
+ * nobody can ever bootstrap, or worse, a SECOND stranger could. */
+check("hasAnyOwnerConfigured: false when neither mechanism has an owner", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: null, directoryOwnerSubjects: new Set() }), false));
+check("hasAnyOwnerConfigured: true from the env var alone", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: "env-owner", directoryOwnerSubjects: new Set() }), true));
+check("hasAnyOwnerConfigured: true from a directory owner alone", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: null, directoryOwnerSubjects: new Set(["dir-owner"]) }), true));
+check("hasAnyOwnerConfigured: true when both mechanisms agree", () =>
+  eq(hasAnyOwnerConfigured({ ownerSubject: "env-owner", directoryOwnerSubjects: new Set(["dir-owner"]) }), true));
+
+/* THE BOOTSTRAP RULE. Authorizing the first person requires their GitHat
+ * account id, and nothing in GitHat's dashboard shows it — so the denial
+ * page is the only place it can come from. These pin that it is actually
+ * there, because a well-meaning edit that trimmed the message back to a
+ * bare "not authorized" would silently restore a dead end that costs shell
+ * access on the server to escape. */
+check("the denial detail names the account id that was refused", () =>
+  unauthorizedDetail("githat-user-1").includes("githat-user-1")
+    ? true
+    : `the sub is missing from: ${unauthorizedDetail("githat-user-1")}`);
+check("the denial detail names both env vars an operator could add it to", () => {
+  const detail = unauthorizedDetail("githat-user-1");
+  return detail.includes("OWNER_GITHAT_SUBJECT") && detail.includes("STAFF_GITHAT_SUBJECTS")
+    ? true
+    : `expected both env var names in: ${detail}`;
+});
+check("the denial detail says a restart is required, since both are read once at startup", () =>
+  /restart/i.test(unauthorizedDetail("githat-user-1")) ? true : "the restart requirement is not stated");
+
+/* Trusted origin / redirect_uri — exact match, checked against the exact
+ * shapes an attacker would actually try. */
+check("isTrustedRedirectUri accepts the exact registered redirect_uri", () => eq(isTrustedRedirectUri(PULSE_REDIRECT_URI), true));
+check("isTrustedRedirectUri rejects an unrelated, untrusted origin", () =>
+  eq(isTrustedRedirectUri("https://evil.example.com/auth/callback"), false));
+check("isTrustedRedirectUri rejects a one-character difference", () =>
+  eq(isTrustedRedirectUri(PULSE_REDIRECT_URI.slice(0, -1)), false));
+check("isTrustedRedirectUri rejects a subdomain-confusion look-alike (evil.pulse.githat.io)", () =>
+  eq(isTrustedRedirectUri("https://evil.pulse.githat.io/auth/callback"), false));
+check("isTrustedOrigin accepts the trusted Pulse origin", () => eq(isTrustedOrigin(PULSE_TRUSTED_ORIGIN), true));
+check("isTrustedOrigin rejects an untrusted origin", () => eq(isTrustedOrigin("https://evil.example.com"), false));
+check("isTrustedOrigin rejects a subdomain-confusion look-alike", () => eq(isTrustedOrigin("https://evil.pulse.githat.io"), false));
+
+/* STATE + authorization-code replay. PKCE checks used to live here —
+ * removed along with the rest of the PKCE machinery (see githat-oauth.ts's
+ * file header): no fleet consumer uses it, and it was the one code path
+ * unique to Pulse when every real sign-in attempt failed at the token
+ * exchange. `state` alone, single-use and server-held, is the actual CSRF
+ * defense, proven below. */
+const oauthTx = beginOAuthTransaction(OAUTH_NOW_MS);
+
+const transactionStore = createTransactionStore();
+check("state store: an unknown state is not found", () => eq(transactionStore.take("no-such-state", OAUTH_NOW_MS), null));
+transactionStore.save(oauthTx);
+check("state store: a missing state (never saved) is not found", () => eq(transactionStore.take("still-unknown", OAUTH_NOW_MS), null));
+const firstStateTake = transactionStore.take(oauthTx.state, OAUTH_NOW_MS);
+check("state store: the saved transaction is found on its first use", () => eq(firstStateTake?.state, oauthTx.state));
+check("state store: the SAME state is refused on reuse (single-use, not merely time-limited)", () =>
+  eq(transactionStore.take(oauthTx.state, OAUTH_NOW_MS), null));
+
+const expiringTx = await beginOAuthTransaction(0);
+const expiringStore = createTransactionStore();
+expiringStore.save(expiringTx);
+check("state store: an expired transaction is treated as not found", () =>
+  eq(expiringStore.take(expiringTx.state, expiringTx.expiresAt + 1), null));
+
+const codeStoreUnderTest = createUsedCodeStore();
+check("an authorization code is accepted the first time it is claimed", () => eq(codeStoreUnderTest.claim("code-1", OAUTH_NOW_MS), true));
+check("the SAME authorization code is refused on replay", () => eq(codeStoreUnderTest.claim("code-1", OAUTH_NOW_MS), false));
+check("a DIFFERENT authorization code is still accepted", () => eq(codeStoreUnderTest.claim("code-2", OAUTH_NOW_MS), true));
+
+/* A sign-in that started from an invite link carries the invite token on
+ * its OAuth transaction, all the way to the callback — the one thing that
+ * lets the server redeem THAT specific invite and no other. */
+const inviteTx = await beginOAuthTransaction(OAUTH_NOW_MS, "invite-token-abc");
+check("beginOAuthTransaction threads an invite token onto the transaction when given one", () =>
+  eq(inviteTx.inviteToken, "invite-token-abc"));
+const plainTx = await beginOAuthTransaction(OAUTH_NOW_MS);
+check("beginOAuthTransaction carries no invite token for the plain sign-in door", () => eq(plainTx.inviteToken, undefined));
+
+/* THE INVITE STORE. Single-use and expiring, same shape as the state store
+ * above and for the same reason: a link is good for exactly one sign-in.
+ *
+ * Every read below is SNAPSHOTTED into a const at the point in the file
+ * where the action actually happens, exactly like countAfterCachedCalls
+ * above — check()'s own run() closures are not evaluated until every
+ * top-level statement in this file has already executed once, so a
+ * closure that called inviteStore.peek() itself would see the state as it
+ * stands at the very END of the file (after every claim() below has
+ * already run), not at the narrative point the test describes. */
+const inviteStore = createInviteStore(1000);
+const invite = inviteStore.create(OAUTH_NOW_MS);
+/* Primitive snapshots, not the object itself: claim() below mutates the
+ * SAME stored object in place (see its own comment), so a reference held
+ * here would read whatever it was mutated to by the time this file's
+ * deferred check() closures finally run — the same reason
+ * countAfterCachedCalls above snapshots a number, not the cache. */
+const tokenWhilePending = inviteStore.peek(invite.token, OAUTH_NOW_MS)?.token;
+const usedWhilePending = inviteStore.peek(invite.token, OAUTH_NOW_MS)?.used;
+check("a freshly created invite is pending", () => eq(tokenWhilePending, invite.token));
+check("an unknown invite token is not pending", () => eq(inviteStore.peek("no-such-token", OAUTH_NOW_MS), null));
+check("peek does not consume the invite", () => eq(usedWhilePending, false));
+const claimed = inviteStore.claim(invite.token, OAUTH_NOW_MS);
+check("claiming a pending invite succeeds and returns it", () => eq(claimed?.token, invite.token));
+const secondClaim = inviteStore.claim(invite.token, OAUTH_NOW_MS);
+check("the SAME invite token is refused on a second claim (single-use)", () => eq(secondClaim, null));
+const peekAfterClaim = inviteStore.peek(invite.token, OAUTH_NOW_MS);
+check("a used invite no longer peeks as pending either", () => eq(peekAfterClaim, null));
+
+const expiringInviteStore = createInviteStore(1000);
+const expiringInvite = expiringInviteStore.create(OAUTH_NOW_MS);
+const expiredClaim = expiringInviteStore.claim(expiringInvite.token, expiringInvite.expiresAt + 1);
+check("an expired invite is refused on claim", () => eq(expiredClaim, null));
+const expiredPeek = expiringInviteStore.peek(expiringInvite.token, expiringInvite.expiresAt + 1);
+check("an expired invite does not peek as pending", () => eq(expiredPeek, null));
+
+const listingInviteStore = createInviteStore(1000);
+const pendingA = listingInviteStore.create(OAUTH_NOW_MS);
+const pendingB = listingInviteStore.create(OAUTH_NOW_MS);
+listingInviteStore.claim(pendingA.token, OAUTH_NOW_MS);
+check("list() reports only still-pending invites, not a claimed one", () =>
+  eq(listingInviteStore.list(OAUTH_NOW_MS).map((entry) => entry.token), [pendingB.token]));
+
+/* Token exchange: the server-to-server leg. A fetcher is always supplied
+ * explicitly — none of these calls ever touch a real network. */
+const rejectingTokenFetcher: FetchLike = async () => ({ ok: false, status: 400, json: async () => ({ error: "invalid_grant" }) });
+const rejectedExchange = await exchangeCodeForToken({ code: "any-code", fetcher: rejectingTokenFetcher });
+check("a token endpoint rejection fails the exchange", () => eq(rejectedExchange.ok, false));
+
+/* THE PROVEN FLEET SHAPE, PINNED. Matched 2026-08-26 to what SebasTN and
+ * Quantl's shared @fleet/auth package actually send — every real sign-in
+ * failed at this exact leg while Pulse sent grant_type/client_id/
+ * code_verifier/form-encoding instead, none of which GitHat's oauth-token.js
+ * reads. A regression here silently reintroduces the outage. */
+let capturedInit: RequestInit | undefined;
+const capturingFetcher: FetchLike = async (_url, init) => {
+  capturedInit = init;
+  return { ok: true, status: 200, json: async () => GITHAT_TOKEN_RESPONSE };
+};
+await exchangeCodeForToken({ code: "the-code-under-test", fetcher: capturingFetcher });
+check("the token POST sends Content-Type: application/json", () =>
+  eq((capturedInit?.headers as Record<string, string> | undefined)?.["content-type"], "application/json"));
+check("the token POST body is JSON {code} — nothing else", () =>
+  eq(typeof capturedInit?.body === "string" ? JSON.parse(capturedInit.body) : null, { code: "the-code-under-test" }));
+
+const unreachableTokenFetcher: FetchLike = async () => {
+  throw new Error("simulated network failure");
+};
+const unreachableExchange = await exchangeCodeForToken({ code: "any-code", fetcher: unreachableTokenFetcher });
+check("a token endpoint that cannot be reached fails the exchange rather than silently succeeding", () =>
+  eq(unreachableExchange.ok, false));
+
+const acceptingTokenFetcher: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => GITHAT_TOKEN_RESPONSE,
+});
+const acceptedExchange = await exchangeCodeForToken({ code: "any-code", fetcher: acceptingTokenFetcher });
+check("a successful exchange yields the identity from the response body", () =>
+  eq(acceptedExchange, {
+    ok: true,
+    identity: { sub: "githat-user-1", email: "front.desk@pulse.test", emailVerified: true, name: "Front Desk" },
+  }));
+
+/* A 200 whose body is the WRONG SHAPE must fail closed. This is the case
+ * the old JWT path got wrong in production without anyone noticing: it
+ * treated "no identity found" as a reason string and the callback turned
+ * it into a 502, which is right — but nothing ever exercised it against
+ * the shape GitHat actually sends. */
+const shapelessTokenFetcher: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ access_token: "opaque", token_type: "Bearer" }),
+});
+const shapelessExchange = await exchangeCodeForToken({ code: "any-code", fetcher: shapelessTokenFetcher });
+check("a 200 with no user object fails the exchange closed", () =>
+  eq(shapelessExchange, { ok: false, reason: "no_identity_in_response" }));
+
+const badJsonFetcher: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => { throw new Error("not json"); },
+});
+const badJsonExchange = await exchangeCodeForToken({ code: "any-code", fetcher: badJsonFetcher });
+check("a 200 whose body is not JSON fails the exchange closed", () =>
+  eq(badJsonExchange, { ok: false, reason: "token_endpoint_bad_json" }));
+
+/* buildAuthorizeUrl: matched to the ACTUAL fleet wire contract (measured
+ * 2026-08-26 from SebasTN, Quantl, and the shared @fleet/auth package) —
+ * `app`, `redirect_url`, `state`. Not `client_id`/`response_type`/PKCE:
+ * see the file's own header for why those were removed rather than kept. */
+const testAuthorizeUrl = new URL(buildAuthorizeUrl("state-under-test"));
+check("buildAuthorizeUrl targets GitHat's authorize endpoint", () =>
+  eq(testAuthorizeUrl.origin + testAuthorizeUrl.pathname, "https://api.githat.io/oauth/authorize"));
+check("buildAuthorizeUrl carries exactly app, redirect_url, and state — the proven fleet shape", () =>
+  eq(
+    [
+      testAuthorizeUrl.searchParams.get("app"),
+      /* GitHat's OWN param name, not the OAuth-standard "redirect_uri" —
+       * see buildAuthorizeUrl's own comment: verified live, the spec name
+       * alone gets a flat 400 from the real service. */
+      testAuthorizeUrl.searchParams.get("redirect_url"),
+      testAuthorizeUrl.searchParams.get("state"),
+    ],
+    [GITHAT_APP_SLUG, PULSE_REDIRECT_URI, "state-under-test"],
+  ));
+check("buildAuthorizeUrl does NOT use the spec-standard redirect_uri param name (GitHat does not read it)", () =>
+  eq(testAuthorizeUrl.searchParams.get("redirect_uri"), null));
+check("buildAuthorizeUrl carries no client_id, response_type, or PKCE params — no fleet consumer sends them", () =>
+  eq(
+    [
+      testAuthorizeUrl.searchParams.get("client_id"),
+      testAuthorizeUrl.searchParams.get("response_type"),
+      testAuthorizeUrl.searchParams.get("code_challenge"),
+      testAuthorizeUrl.searchParams.get("code_challenge_method"),
+    ],
+    [null, null, null, null],
+  ));
+
+/* Source-text properties this synchronous harness cannot exercise by
+ * running the server — the same limit, and the same remedy, already named
+ * beside the Front-Desk-remembering check just above. */
+const githatOauthSource = await (await fetch("./githat-oauth.ts")).text();
+const serverSource = await (await fetch("../../../scripts/start-haiku.mjs")).text();
+
+check("the OAuth client module never imports node:crypto, so it still loads in a real browser tab", () =>
+  !/from\s+["']node:crypto["']/.test(githatOauthSource) ? true : "githat-oauth.ts imports node:crypto");
+
+check("the callback route logs only a reason string on denial, never the token/code/verifier themselves", () => {
+  const suspiciousLogLines = serverSource
+    .split("\n")
+    .filter((line) => /console\.(log|error|warn)/.test(line))
+    .filter((line) => /\bidentity\.sub\b|\bcodeVerifier\b|\bcode_verifier\b|\baccess_token\b/.test(line));
+  return suspiciousLogLines.length === 0 ? true : `suspicious log line(s): ${suspiciousLogLines.join(" | ")}`;
+});
+
+check("both staff session cookies are HttpOnly, Secure, SameSite=Lax, with no Domain attribute anywhere in the server", () => {
+  const cookieLines = serverSource.split("\n").filter((line) => line.includes("HttpOnly; Secure; SameSite=Lax"));
+  const hasDomainAttribute = /;\s*Domain=/.test(serverSource);
+  return cookieLines.length >= 2 && !hasDomainAttribute
+    ? true
+    : `cookie-shaped lines found: ${cookieLines.length}, a Domain= attribute present: ${hasDomainAttribute}`;
+});
+
+/* The denial page is the ONE place this server prints a value it did not
+ * author. It arrives over TLS from GitHat rather than from the callback
+ * URL, so it is not attacker-controlled today — but "today" is the kind of
+ * assumption that rots, and the blast radius is stored XSS on the staff
+ * door, so the escaping is pinned rather than trusted. */
+check("the value interpolated into the denial page is HTML-escaped, not trusted raw", () =>
+  /const detailHtml = detail === null \? "" : `<p>\$\{escapeHtml\(detail\)\}<\/p>`/.test(serverSource)
+    ? true
+    : "sendGithatResult no longer escapes its detail before interpolating it");
+
+/* REVOCATION MUST STAY REAL. This door's signed-in check was once the
+ * cookie's HMAC and expiry alone, so the authorization lists were read
+ * once at callback time and never again: removing somebody from
+ * STAFF_GITHAT_SUBJECTS left their cookie opening /api/staff/records for
+ * the rest of its 30 days, ACROSS the restart meant to apply the removal
+ * (measured: signedIn:true beside role:null, and a 200 with every member
+ * record). The fix is that the role is resolved per request. Pinned here
+ * because the tempting "optimisation" is to trust the cookie again. */
+check("the GitHat signed-in check resolves the role per request, never the cookie alone", () => {
+  const body = serverSource.slice(serverSource.indexOf("function requestIsSignedInViaGithat"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  if (/githatTokenIsValid\s*\(/.test(fn)) {
+    return "requestIsSignedInViaGithat is back to trusting the cookie's HMAC alone — a removed staff member would keep access";
+  }
+  return /githatRoleFromRequest\s*\(/.test(fn) ? true : `unrecognised shape: ${fn}`;
+});
+
+check("the per-request role resolution actually consults both authorization lists", () => {
+  const body = serverSource.slice(serverSource.indexOf("function githatRoleFromRequest"));
+  const fn = body.slice(0, body.indexOf("\n}") + 2);
+  return /staffSubjects/.test(fn) && /directorySubjects/.test(fn) && /ownerSubject/.test(fn)
+    ? true
+    : `githatRoleFromRequest no longer consults every list: ${fn}`;
+});
+
+/* THE BOOTSTRAP WIRING ITSELF. resolveStaffRole and hasAnyOwnerConfigured
+ * are proven correct in isolation above — this pins that githatCallback
+ * actually CALLS them the way it has to: gated on hasAnyOwnerConfigured
+ * (so it can fire for at most one subject, ever), and only grants
+ * "owner", never anything looser. Proven to matter: disabling the real
+ * wiring (replacing the whole gated block with a no-op) left every other
+ * check in this suite passing — the synchronous harness cannot exercise
+ * a live GitHat callback, so a source-text pin is the only thing that
+ * would have caught it. */
+check("githatCallback's owner-bootstrap is gated on hasAnyOwnerConfigured", () => {
+  const body = serverSource.slice(serverSource.indexOf("async function githatCallback"));
+  const fn = body.slice(0, body.indexOf("\nasync function"));
+  return /hasAnyOwnerConfigured\s*\(/.test(fn) && /addToStaffDirectory\s*\(\s*verdict\.sub\s*,\s*"owner"\s*\)/.test(fn)
+    ? true
+    : "githatCallback no longer both checks hasAnyOwnerConfigured and grants \"owner\" via addToStaffDirectory";
+});
+
+check("the GitHat door and the passphrase door issue distinctly named cookies", () =>
+  serverSource.includes('"__Host-pulse_session"') && serverSource.includes('"__Host-pulse-staff"')
+    ? true
+    : "expected both distinct cookie-name constants in scripts/start-haiku.mjs");
+
+check("the passphrase door's own check is still wired into requestIsSignedInStaff, unchanged", () =>
+  /staffTokenIsValid\(cookieValue\(request, STAFF_COOKIE\)\)/.test(serverSource)
+    ? true
+    : "requestIsSignedInStaff no longer checks the passphrase cookie");
+
+check("requestIsSignedInStaff accepts EITHER door's session, not only the passphrase one", () =>
+  serverSource.includes(
+    "staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) || requestIsSignedInViaGithat(request)",
+  )
+    ? true
+    : "requestIsSignedInStaff does not also check the GitHat session");
 
 /* ---------- run ---------- */
 
