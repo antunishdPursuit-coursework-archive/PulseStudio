@@ -10,8 +10,8 @@ A single-page member support chat that loads the shared fixture through
 `loadFixtures()`, sends only upcoming scheduled `class_session` records and current
 `studio_policy` records to Claude Haiku, and keeps a fail-closed privacy
 refusal in the browser. Its pure support rules live in `support.ts` and are
-checked by `tests.ts`. The deployed GitHub Pages site has no backend and
-states that conversational support is unavailable. The local server lives in
+checked by `tests.ts`. The deployed GitHub Pages site answers four suggested
+questions directly from those records without a backend. The local server lives in
 `scripts/start-haiku.mjs`; setup is documented in
 `docs/the-server.md` by team agreement.
 
