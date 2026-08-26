@@ -651,13 +651,23 @@ function requestStaffRole(request) {
  * generated and held SERVER-SIDE, in oauthTransactions above — never in a
  * cookie, never in the URL, never in browser storage — and the browser is
  * redirected straight to GitHat's own authorize endpoint. */
+function dashboardReturnTo(request) {
+  const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  /* This is deliberately a one-route allow-list. A caller controls `next`,
+   * so reflecting it into the success redirect would create an open
+   * redirect after a staff sign-in. */
+  return requestUrl.searchParams.get("next") === "/products/b-dashboard/"
+    ? "/products/b-dashboard/"
+    : undefined;
+}
+
 async function githatStart(request, response, inviteToken) {
   if (request.method !== "GET") {
     response.writeHead(405).end("Method not allowed");
     return;
   }
   const now = Date.now();
-  const tx = await beginOAuthTransaction(now, inviteToken);
+  const tx = await beginOAuthTransaction(now, inviteToken, dashboardReturnTo(request));
   oauthTransactions.save(tx);
   response.writeHead(302, {
     location: buildAuthorizeUrl(tx.state, tx.codeChallenge),
@@ -824,7 +834,7 @@ async function githatCallback(request, response) {
 
   const expiresAt = now + GITHAT_SESSION_MINUTES * 60 * 1000;
   response.setHeader("set-cookie", githatCookie(signGithatToken(verdict.sub, expiresAt), GITHAT_SESSION_MINUTES * 60));
-  sendGithatResult(response, 200, "Signed in with GitHat.", "/index.html");
+  sendGithatResult(response, 200, "Signed in with GitHat.", tx.returnTo ?? "/index.html");
 }
 
 /* CSRF, and why SameSite=Lax alone is judged sufficient for every
