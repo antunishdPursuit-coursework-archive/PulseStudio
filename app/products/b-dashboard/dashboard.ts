@@ -53,6 +53,13 @@ export function status(session: DashboardSession): SessionStatus {
   return "On track";
 }
 
+/** Count one named fill-rate condition for the selected week. The summary
+ *  cards call this rather than repeating the status boundaries in browser
+ *  wiring, so their numbers cannot drift from the session labels. */
+export function statusCount(sessions: DashboardSession[], target: SessionStatus): number {
+  return sessions.filter((session) => status(session) === target).length;
+}
+
 /** "Needs attention" means a staff person can still do something: promote
  *  an underbooked class or watch one about to fill. A Full class needs no
  *  action and has its own filter, so it is not in this set. The count

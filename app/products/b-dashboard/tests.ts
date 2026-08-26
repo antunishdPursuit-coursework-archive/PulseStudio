@@ -14,7 +14,7 @@
 import {
   FILLING_SOON_AT, FULL_AT, UNDERBOOKED_BELOW,
   bookingDataLine, confirmedCount, formatSessionTime, needsAttention, nextActionText,
-  occupancy, roomDemand, spotsLeftText, status,
+  occupancy, roomDemand, spotsLeftText, status, statusCount,
 } from "./dashboard.js";
 import type { DashboardSession, RosterMember } from "./dashboard.js";
 
@@ -60,6 +60,15 @@ check("Underbooked needs attention", needsAttention(session(100, 50)), true);
 check("Filling soon needs attention", needsAttention(session(100, 95)), true);
 check("On track does not need attention", needsAttention(session(100, 80)), false);
 check("Full does NOT need attention", needsAttention(session(100, 100)), false);
+check("condition summary separates every fill-rate status", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "Underbooked"), 1);
+check("condition summary counts On track separately", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "On track"), 1);
+check("condition summary counts Filling soon separately", statusCount([
+  session(100, 20), session(100, 80), session(100, 95), session(100, 100),
+], "Filling soon"), 1);
 
 // Seats left: plural, singular, zero, and the over-capacity case stated out loud.
 check("spots left pluralises", spotsLeftText(session(10, 7)), "3 spots left");
