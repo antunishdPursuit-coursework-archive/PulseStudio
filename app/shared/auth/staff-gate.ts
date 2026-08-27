@@ -28,22 +28,17 @@
    host — this reports exactly that rather than failing open. A surface that
    cannot check its own door stays shut and says so.
 
-   ONE MORE THING A GRANTED SESSION NEEDS: A WAY BACK OUT. Proving the
-   passphrase to this door used to leave the browser's own remembered
-   persona untouched — a person who signed in here directly, never
-   touching the topbar's separate sign-in dialog, ended up with a real,
-   server-confirmed staff session and no local persona at all. The ONLY
-   Sign out control in this app lives in components/topbar.ts, it is the
-   only caller of signOutStaff() anywhere, and it renders only when a
-   local persona exists — so that session had no way to end early short
-   of the sixty-minute expiry or clearing cookies by hand. Confirmed
-   against the real server: sign in here, and the top bar still read plain
-   "Sign in" while /api/staff/records already answered. Remembering Front
-   Desk locally the moment the server confirms costs this door nothing —
-   the server session is still the only thing that grants anything — and
-   it is what lets the top bar show a name and a working Sign out. */
-
-import { signInAsFrontDesk } from "./sign-in.js";
+   ONE SIGN-IN, NOT TWO. This panel used to draw its OWN "Sign in with
+   GitHat" link and its own passphrase form, standing next to the "Sign in"
+   control components/topbar.ts already renders into every page's header —
+   two doors describing the same lock, one of them (this one) never
+   threading the returnTo a person actually needs to land back where they
+   were. topbar.ts's control is the one sign-in now: its Front Desk choice
+   already reaches this exact decision — passphrase form if configured,
+   GitHat redirect otherwise — through startFrontDeskSignIn(), and it is
+   the only place either sign-in path runs. This module only ASKS the
+   server who is signed in and states what it learns; it draws no form of
+   its own. */
 
 /** "front_desk" is the shared passphrase-door persona (no per-person
  *  identity to attribute anything to); "owner" and "employee" are real
@@ -235,96 +230,37 @@ export async function mountStaffDoor(root: HTMLElement): Promise<boolean> {
   said.textContent = doorMessage(gate);
   panel.append(said);
 
-  /* THE SECOND DOOR, ALONGSIDE THE FIRST — never instead of it.
-   *
-   * "Sign in with GitHat" is a plain link, not a form: everything about
-   * the OAuth exchange (the random state, the PKCE verifier, the
-   * server-to-server token exchange, the JWT verification, the
-   * STAFF_GITHAT_SUBJECTS check) happens on the server, in
-   * scripts/start-haiku.mjs and app/shared/auth/githat-oauth.ts. This
-   * browser module never touches a token, a code, or a PKCE verifier —
-   * there is nothing here FOR it to touch. Shown whenever the server
-   * answered at all (gate.reachable), independent of whether the
-   * passphrase is configured: the two doors are unrelated, and an operator
-   * who has set up GitHat but not the passphrase (or the reverse) should
-   * still see the door that works. If STAFF_GITHAT_SUBJECTS is unset, this
-   * link still renders — signing in with GitHat still works, and the
-   * server denies staff access afterward, exactly the "deny by default"
-   * shape the rest of this door already has for a missing passphrase. */
+  /* ONE SIGN-IN, IN THE HEADER — not here. This panel used to draw its own
+   * "Sign in with GitHat" link plus, when a passphrase was configured, its
+   * own separate passphrase form: a second sign-in UI standing next to the
+   * one components/topbar.ts already renders into every page's header,
+   * both claiming to do the same thing. topbar.ts's "Sign in" button
+   * already reaches exactly this decision (passphrase form if configured,
+   * GitHat redirect with the right returnTo otherwise) through
+   * startFrontDeskSignIn() — so this panel now only STATES the door, and
+   * points at the one control that opens it. */
   if (gate.reachable) {
-    const oauth = document.createElement("p");
-    oauth.className = "staff-door-oauth";
-    const link = document.createElement("a");
-    link.href = "/auth/githat/start";
-    link.textContent = "Sign in with GitHat";
-    oauth.append(link);
-    panel.append(oauth);
+    const said2 = document.createElement("p");
+    said2.className = "staff-door-said";
+    said2.textContent = "Use “Sign in”, above, to continue.";
+    panel.append(said2);
   }
 
-  if (gate.configured) {
-    const form = document.createElement("form");
-    form.className = "staff-door-form";
-    form.noValidate = true;
-
-    const label = document.createElement("label");
-    label.htmlFor = `${DOOR_ID}-pass`;
-    label.textContent = "Staff passphrase";
-    form.append(label);
-
-    const field = document.createElement("input");
-    field.id = `${DOOR_ID}-pass`;
-    field.type = "password";
-    field.name = "passphrase";
-    field.autocomplete = "current-password";
-    field.required = true;
-    form.append(field);
-
-    const submit = document.createElement("button");
-    submit.type = "submit";
-    submit.textContent = "Sign in";
-    form.append(submit);
-
-    /* The failure line is created EMPTY and stays in the tree, so a screen
-       reader is already listening when the first refusal arrives. A live
-       region added at the moment it has something to say announces nothing. */
-    const problem = document.createElement("p");
-    problem.className = "staff-door-problem";
-    problem.setAttribute("role", "alert");
-    problem.hidden = true;
-    form.append(problem);
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      submit.disabled = true;
-      submit.textContent = "Checking…";
-      void signInStaff(field.value).then((result) => {
-        if (result.ok) {
-          /* The server is the one thing that just granted anything; this
-             only gives the rest of the page a name and a Sign out button
-             to show for it — see the file header for the session that had
-             neither until this line existed. */
-          signInAsFrontDesk();
-          panel.remove();
-          /* Reload rather than render in place: every staff module reads
-             its records at start-up, and a half-loaded page drawn before
-             the session existed is harder to reason about than one honest
-             second reload. */
-          window.location.reload();
-          return;
-        }
-        problem.textContent = result.message;
-        problem.hidden = false;
-        field.value = "";
-        field.focus();
-        submit.disabled = false;
-        submit.textContent = "Sign in";
-      });
-    });
-
-    panel.append(form);
-  }
-
-  root.replaceChildren(panel);
+  /* BOTH STAFF SURFACES CALL THIS WITH document.body — so a bare
+   * `root.replaceChildren(panel)` erased the page's own <header> (the ONE
+   * sign-in control lives there, per the comment above) and, once
+   * mounted, its <footer>, along with whatever the product had started
+   * rendering. The point of replaceChildren was to make sure no staff
+   * data renders underneath an unsigned-in visitor; it never meant to take
+   * the shared chrome with it. Keep the elements theme-boot mounted before
+   * this ran, and put them back either side of the panel — header above,
+   * footer below — rather than both shoved ahead of it, which would read
+   * top-to-bottom as header, footer, panel. */
+  const header = [...root.children].find(
+    (el) => el.tagName === "HEADER" || el.matches(".topnav, .page-head, .topbar"),
+  );
+  const footer = [...root.children].find((el) => el.tagName === "FOOTER");
+  root.replaceChildren(...(header ? [header] : []), panel, ...(footer ? [footer] : []));
   return false;
 }
 
