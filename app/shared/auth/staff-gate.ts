@@ -10,12 +10,11 @@
    nothing a page checks about itself can stop a person who can edit the
    page. A gate written in the browser is a picture of a gate.
 
-   What changed is that the studio now runs a server. It holds a passphrase
-   the browser never sees, it signs the session cookie itself, and it will
-   not hand over data/staff-records.json to a request that cannot present
-   one. So the answer to "is this person staff?" is no longer something the
-   page decides — it is something the page ASKS, and the reply is computed
-   somewhere a visitor cannot reach.
+   What changed is that the studio now runs a server. It signs the GitHat
+   session cookie itself, and it will not hand over data/staff-records.json
+   to a request that cannot present one. So the answer to "is this person
+   staff?" is no longer something the page decides — it is something the
+   page ASKS, and the reply is computed somewhere a visitor cannot reach.
 
    WHAT IT STILL IS NOT. This gate stops a person from reading the studio's
    records. It does not stop a determined person from editing this file in
@@ -28,37 +27,35 @@
    host — this reports exactly that rather than failing open. A surface that
    cannot check its own door stays shut and says so.
 
-   ONE SIGN-IN, NOT TWO. This panel used to draw its OWN "Sign in with
-   GitHat" link and its own passphrase form, standing next to the "Sign in"
-   control components/topbar.ts already renders into every page's header —
-   two doors describing the same lock, one of them (this one) never
-   threading the returnTo a person actually needs to land back where they
-   were. topbar.ts's control is the one sign-in now: its Front Desk choice
-   already reaches this exact decision — passphrase form if configured,
-   GitHat redirect otherwise — through startFrontDeskSignIn(), and it is
-   the only place either sign-in path runs. This module only ASKS the
-   server who is signed in and states what it learns; it draws no form of
-   its own. */
+   ONE SIGN-IN. This panel used to draw its OWN "Sign in with GitHat" link
+   and, when a passphrase was configured on the server, its own passphrase
+   form too — standing next to the "Sign in" control components/topbar.ts
+   already renders into every page's header. The passphrase door is gone
+   entirely now (GitHat is the one sign-in, proven live), and this panel
+   draws no form of its own either way: topbar.ts's control is the only
+   place any sign-in runs. This module only ASKS the server who is signed
+   in and states what it learns. */
 
-/** "front_desk" is the shared passphrase-door persona (no per-person
- *  identity to attribute anything to); "owner" and "employee" are real
- *  GitHat identities — see app/shared/auth/githat-oauth.ts's resolveStaffRole.
- *  null only while signedIn is false. */
-export type StaffRole = "front_desk" | "owner" | "employee";
+/** "owner" and "employee" are real GitHat identities — see
+ *  app/shared/auth/githat-oauth.ts's resolveStaffRole. null only while
+ *  signedIn is false. */
+export type StaffRole = "owner" | "employee";
 
 export interface StaffGate {
-  /** The server answered, and a staff passphrase is configured on it. */
-  readonly configured: boolean;
   /** This browser holds a session the server signed and still accepts. */
   readonly signedIn: boolean;
   /** No server answered at all — a static host, or one that is down. */
   readonly reachable: boolean;
   readonly role: StaffRole | null;
+  /** The signed-in GitHat account's email — proof this is a real, per-person
+   *  identity remembered by the server, not just a browser guess. null
+   *  whenever nobody is signed in via GitHat. */
+  readonly email: string | null;
 }
 
 const SESSION_ENDPOINT = "/api/staff/session";
 const INVITES_ENDPOINT = "/api/staff/invites";
-const UNREACHABLE: StaffGate = { configured: false, signedIn: false, reachable: false, role: null };
+const UNREACHABLE: StaffGate = { signedIn: false, reachable: false, role: null, email: null };
 
 /* ONE ANSWER PER PAGE LOAD. The top bar re-renders on every session change
    and each render used to ask the server again, so a page could fire this
@@ -83,49 +80,21 @@ async function askStaffGate(): Promise<StaffGate> {
   }
   if (!response.ok) return UNREACHABLE;
   try {
-    const body = (await response.json()) as { configured?: unknown; signedIn?: unknown; role?: unknown };
-    const role = body.role === "front_desk" || body.role === "owner" || body.role === "employee" ? body.role : null;
+    const body = (await response.json()) as {
+      signedIn?: unknown;
+      role?: unknown;
+      email?: unknown;
+    };
+    const role = body.role === "owner" || body.role === "employee" ? body.role : null;
     return {
-      configured: body.configured === true,
       signedIn: body.signedIn === true,
       reachable: true,
       role,
+      email: typeof body.email === "string" && body.email !== "" ? body.email : null,
     };
   } catch {
     return UNREACHABLE;
   }
-}
-
-export interface SignInResult {
-  readonly ok: boolean;
-  /** Shown to the person as-is. Never says which half was wrong. */
-  readonly message: string;
-}
-
-export async function signInStaff(passphrase: string): Promise<SignInResult> {
-  let response: Response;
-  try {
-    response = await fetch(SESSION_ENDPOINT, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ passphrase }),
-    });
-  } catch {
-    return { ok: false, message: "The studio's server did not answer." };
-  }
-  if (response.ok) {
-    pending = null; // the answer just changed
-    return { ok: true, message: "" };
-  }
-  let message = "That passphrase was not accepted.";
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error !== "") message = body.error;
-  } catch {
-    /* Keep the default: a server that cannot explain itself still refused. */
-  }
-  return { ok: false, message };
 }
 
 export async function signOutStaff(): Promise<void> {
@@ -187,11 +156,7 @@ export function doorMessage(gate: StaffGate): string {
     return "This is a staff surface, and it needs the studio's own server to check who you are. " +
       "No server answered, so nothing is shown here.";
   }
-  if (!gate.configured) {
-    return "This is a staff surface. The server is running but has no staff passphrase set, " +
-      "so nobody can sign in yet.";
-  }
-  return "This is a staff surface. Sign in with the studio's staff passphrase to see it.";
+  return "This is a staff surface. Sign in with GitHat to see it.";
 }
 
 /* ---------------------------------------------------------------- *
@@ -231,12 +196,10 @@ export async function mountStaffDoor(root: HTMLElement): Promise<boolean> {
   panel.append(said);
 
   /* ONE SIGN-IN, IN THE HEADER — not here. This panel used to draw its own
-   * "Sign in with GitHat" link plus, when a passphrase was configured, its
-   * own separate passphrase form: a second sign-in UI standing next to the
+   * "Sign in with GitHat" link, a second sign-in UI standing next to the
    * one components/topbar.ts already renders into every page's header,
    * both claiming to do the same thing. topbar.ts's "Sign in" button
-   * already reaches exactly this decision (passphrase form if configured,
-   * GitHat redirect with the right returnTo otherwise) through
+   * already reaches GitHat directly, with the right returnTo, through
    * startFrontDeskSignIn() — so this panel now only STATES the door, and
    * points at the one control that opens it. */
   if (gate.reachable) {
@@ -270,8 +233,8 @@ export async function mountStaffDoor(root: HTMLElement): Promise<boolean> {
  * Appended to document.body, never into `root` — the caller's own content
  * already lives there and this has nothing to do with it. Mounted once per
  * page load, only for the one signed-in identity resolveStaffRole calls
- * "owner"; an employee or the shared Front Desk persona never sees it, and
- * the server refuses the endpoint to them regardless. Reuses the staff
+ * "owner"; an employee never sees it, and the server refuses the endpoint
+ * to them regardless. Reuses the staff
  * door's own card styling (`.staff-door`, `.staff-door-form`) so a new
  * owner-only surface does not need a second visual language, and — like
  * every shared-chrome piece in this file — carries no product colour.
