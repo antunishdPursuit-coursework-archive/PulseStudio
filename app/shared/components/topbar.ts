@@ -46,7 +46,7 @@ import {
   readPulseSession,
   subscribeToPulseSession,
 } from "../auth/session.js";
-import { readStaffGate, signInStaff, signOutStaff } from "../auth/staff-gate.js";
+import { readStaffGate, signOutStaff } from "../auth/staff-gate.js";
 import {
   signInAsFrontDesk,
   signInAsMember,
@@ -101,7 +101,7 @@ export function mountSessionControl(host: Element): void {
    believe neither.
 
    There is exactly one thing that can answer "is this staff?" now — the
-   server, which holds the passphrase and signs the cookie. So the tag is
+   server, which signs the GitHat cookie. So the tag is
    NOT drawn from the local session at all. It is drawn only after
    readStaffGate() comes back confirming a session this browser could not
    have forged, and until then nothing is claimed. Rendering the unproven
@@ -154,7 +154,11 @@ function render(root: HTMLElement): void {
       if (!who.isConnected) return; // a re-render happened first
       const tag = document.createElement("em");
       tag.className = "pulse-session-role";
-      tag.textContent = "staff · front desk";
+      /* A real GitHat identity shows its OWN email — proof this is a
+       * specific, remembered person, not a browser guess. The shared
+       * passphrase Front Desk persona has no email at all (there is no
+       * person to attribute it to), so it keeps the old generic label. */
+      tag.textContent = gate.email ?? "staff · front desk";
       who.appendChild(tag);
     });
   }
@@ -270,10 +274,10 @@ function staffRow(): HTMLButtonElement {
   );
 }
 
-/* A local browser persona is not authorization. Front Desk verifies the
- * existing staff passphrase here, then the server-held session and local
- * name arrive together at Product B. If the passphrase is unavailable,
- * GitHat remains the separate server-held route. */
+/* A local browser persona is not authorization. Sign-in is GitHat only now
+ * — one click, straight to the real door, no intermediate form. A person
+ * already signed in just lands on the dashboard; anyone else goes straight
+ * to /auth/githat/start. */
 async function startFrontDeskSignIn(): Promise<void> {
   const gate = await readStaffGate();
   if (gate.signedIn) {
@@ -282,68 +286,13 @@ async function startFrontDeskSignIn(): Promise<void> {
     return;
   }
   if (!gate.reachable) {
+    // No server to redirect to either — land on the dashboard, which
+    // states the unreachable door itself rather than bouncing to a
+    // sign-in endpoint that would fail the same way.
     window.location.assign("/products/b-dashboard/");
     return;
   }
-  if (!gate.configured) {
-    window.location.assign("/auth/githat/start?next=/products/b-dashboard/");
-    return;
-  }
-  showFrontDeskPassphrase();
-}
-
-function showFrontDeskPassphrase(): void {
-  /* This used to assume openDialog() had already run and built the shell —
-   * true whenever the member-picker dialog opened first. Now that a
-   * staff-gated page's "Sign in" button calls startFrontDeskSignIn()
-   * directly (never touching openDialog()), the shell may not exist yet:
-   * build it exactly the way openDialog() does. */
-  let dialog = document.getElementById(DIALOG_ID) as HTMLDialogElement | null;
-  if (dialog === null) {
-    dialog = buildDialogShell();
-    document.body.appendChild(dialog);
-  }
-  if (!dialog.open) dialog.showModal();
-  const intro = dialog.querySelector(".pulse-session-intro");
-  const state = dialog.querySelector(".pulse-session-state");
-  const rows = dialog.querySelector(".pulse-session-rows");
-  if (!(intro instanceof HTMLElement) || !(state instanceof HTMLElement) || !(rows instanceof HTMLElement)) return;
-
-  intro.textContent = "Enter the staff passphrase to open the staff dashboard.";
-  state.textContent = "";
-  const form = document.createElement("form");
-  form.className = "pulse-session-staff-form";
-  const label = document.createElement("label");
-  label.htmlFor = "pulse-session-staff-passphrase";
-  label.textContent = "Staff passphrase";
-  const field = document.createElement("input");
-  field.id = "pulse-session-staff-passphrase";
-  field.type = "password";
-  field.autocomplete = "current-password";
-  field.required = true;
-  const submit = document.createElement("button");
-  submit.type = "submit";
-  submit.textContent = "Open staff dashboard";
-  form.append(label, field, submit);
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submit.disabled = true;
-    submit.textContent = "Checking…";
-    void signInStaff(field.value).then((result) => {
-      if (result.ok) {
-        signInAsFrontDesk();
-        window.location.assign("/products/b-dashboard/");
-        return;
-      }
-      state.textContent = result.message;
-      field.value = "";
-      field.focus();
-      submit.disabled = false;
-      submit.textContent = "Open staff dashboard";
-    });
-  });
-  rows.replaceChildren(form);
-  field.focus();
+  window.location.assign("/auth/githat/start?next=/products/b-dashboard/");
 }
 
 function row(
@@ -435,11 +384,6 @@ function injectStylesOnce(): void {
 .pulse-session-row strong { grid-column: 1; }
 .pulse-session-row span { grid-column: 1; color: var(--muted); font-size: 0.85rem; }
 .pulse-session-row em { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; font-size: 0.78rem; color: var(--muted); }
-.pulse-session-staff-form { display: grid; gap: 10px; }
-.pulse-session-staff-form label { color: var(--fg); display: grid; font-size: .85rem; font-weight: 600; gap: 6px; }
-.pulse-session-staff-form input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font: inherit; padding: 9px 11px; }
-.pulse-session-staff-form button { background: var(--accent, var(--fg)); border: 0; border-radius: 8px; color: var(--accent-ink, var(--bg)); cursor: pointer; font: inherit; font-weight: 600; padding: 9px 11px; }
-.pulse-session-staff-form button:focus-visible, .pulse-session-staff-form input:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 `;
   document.head.appendChild(style);
 }

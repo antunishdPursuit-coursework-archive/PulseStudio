@@ -685,41 +685,32 @@ check("an empty string escapes to itself", () => eq(escapeHtml(""), ""));
  * doorMessage() had NO check on it at all until `npm run mutate` reached
  * this module for the first time and scored it 0% — every mutation
  * survived, because nothing here called it. The rest of staff-gate.ts asks
- * a real server (readStaffGate, signInStaff, signOutStaff,
- * loadStaffRecords), which this synchronous check() harness cannot stub;
- * that is verified by hand against a throwaway server instead, the same
- * way the rest of the staff door was proven this branch. doorMessage has
- * no such excuse — it is a plain function from a StaffGate value to a
- * sentence, and it is the ONE thing standing between "the server is down"
- * and "no passphrase is set" and "sign in" ever reading the same to a
- * visitor. */
+ * a real server (readStaffGate, signOutStaff, loadStaffRecords), which this
+ * synchronous check() harness cannot stub; that is verified by hand against
+ * a throwaway server instead, the same way the rest of the staff door was
+ * proven this branch. doorMessage has no such excuse — it is a plain
+ * function from a StaffGate value to a sentence, and it is the ONE thing
+ * standing between "the server is down" and "sign in" ever reading the
+ * same to a visitor. */
 
-check("no server answered: the door says so, not 'no passphrase'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
+check("no server answered: the door says so", () => {
+  const said = doorMessage({ signedIn: false, reachable: false, role: null, email: null });
   return said.includes("No server answered") ? true : `unexpected: ${said}`;
 });
-check("a server answered but no passphrase is set: says THAT, not 'no server'", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: true, role: null });
-  return said.includes("no staff passphrase set") && !said.includes("No server answered")
+check("a server answered: sign in with GitHat", () => {
+  const said = doorMessage({ signedIn: false, reachable: true, role: null, email: null });
+  return said.includes("Sign in with GitHat") && !said.includes("No server answered")
     ? true : `unexpected: ${said}`;
 });
-check("configured and not signed in: asks for the passphrase", () => {
-  const said = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
-  return said.includes("Sign in with the studio's staff passphrase") ? true : `unexpected: ${said}`;
-});
-check("configured and ALREADY signed in reads the same as not signed in", () => {
+check("reads the same whether or not signed in — mountStaffDoor decides that, not this function", () => {
   /* mountStaffDoor never calls doorMessage once gate.signedIn is true — it
    * returns before building the panel — so this is what the function
    * itself does with that combination, not a claim about what the page
    * shows. Pinned so `signedIn` staying out of the branching is a decision,
    * not an oversight the next edit trips over. */
-  const asked = doorMessage({ configured: true, signedIn: false, reachable: true, role: null });
-  const alsoSignedIn = doorMessage({ configured: true, signedIn: true, reachable: true, role: "front_desk" });
+  const asked = doorMessage({ signedIn: false, reachable: true, role: null, email: null });
+  const alsoSignedIn = doorMessage({ signedIn: true, reachable: true, role: "owner", email: "owner@studio.test" });
   return eq(asked, alsoSignedIn);
-});
-check("unreachable outranks unconfigured — both true says the door is down", () => {
-  const said = doorMessage({ configured: false, signedIn: false, reachable: false, role: null });
-  return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
 /* ---------- one sign-in, in the header — not a second one on the door ---------- *
@@ -1166,10 +1157,10 @@ check("the callback route logs only a reason string on denial, never the token/c
   return suspiciousLogLines.length === 0 ? true : `suspicious log line(s): ${suspiciousLogLines.join(" | ")}`;
 });
 
-check("both staff session cookies are HttpOnly, Secure, SameSite=Lax, with no Domain attribute anywhere in the server", () => {
+check("the staff session cookie is HttpOnly, Secure, SameSite=Lax, with no Domain attribute anywhere in the server", () => {
   const cookieLines = serverSource.split("\n").filter((line) => line.includes("HttpOnly; Secure; SameSite=Lax"));
   const hasDomainAttribute = /;\s*Domain=/.test(serverSource);
-  return cookieLines.length >= 2 && !hasDomainAttribute
+  return cookieLines.length >= 1 && !hasDomainAttribute
     ? true
     : `cookie-shaped lines found: ${cookieLines.length}, a Domain= attribute present: ${hasDomainAttribute}`;
 });
@@ -1226,22 +1217,10 @@ check("githatCallback's owner-bootstrap is gated on hasAnyOwnerConfigured", () =
     : "githatCallback no longer both checks hasAnyOwnerConfigured and grants \"owner\" via addToStaffDirectory";
 });
 
-check("the GitHat door and the passphrase door issue distinctly named cookies", () =>
-  serverSource.includes('"__Host-pulse_session"') && serverSource.includes('"__Host-pulse-staff"')
+check("the passphrase door is gone — no passphrase cookie, token, or check remains", () =>
+  !/STAFF_COOKIE|staffTokenIsValid|passphraseMatches|staffPassphrase|requestIsSignedInStaff/.test(serverSource)
     ? true
-    : "expected both distinct cookie-name constants in scripts/start-haiku.mjs");
-
-check("the passphrase door's own check is still wired into requestIsSignedInStaff, unchanged", () =>
-  /staffTokenIsValid\(cookieValue\(request, STAFF_COOKIE\)\)/.test(serverSource)
-    ? true
-    : "requestIsSignedInStaff no longer checks the passphrase cookie");
-
-check("requestIsSignedInStaff accepts EITHER door's session, not only the passphrase one", () =>
-  serverSource.includes(
-    "staffTokenIsValid(cookieValue(request, STAFF_COOKIE)) || requestIsSignedInViaGithat(request)",
-  )
-    ? true
-    : "requestIsSignedInStaff does not also check the GitHat session");
+    : "a passphrase-door remnant is still present in scripts/start-haiku.mjs");
 
 /* ---------- run ---------- */
 
