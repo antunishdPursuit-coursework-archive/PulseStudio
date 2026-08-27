@@ -121,7 +121,20 @@ function render(root: HTMLElement): void {
     button.type = "button";
     button.className = "pulse-session-signin";
     button.textContent = "Sign in";
-    button.addEventListener("click", () => { void openDialog(); });
+    /* A STAFF PAGE HAS NO MEMBER TO PICK. auth/staff-gate.ts's door panel
+     * (#staff-door) only ever mounts on the dashboard and the re-engagement
+     * tool, and on those pages the member-picker dialog below is the wrong
+     * question — there is no fictional member to choose, only the staff
+     * decision startFrontDeskSignIn() already knows how to make (passphrase
+     * form if configured, a GitHat redirect otherwise). Everywhere else,
+     * the dialog opens as before. */
+    button.addEventListener("click", () => {
+      if (document.getElementById("staff-door") !== null) {
+        void startFrontDeskSignIn();
+        return;
+      }
+      void openDialog();
+    });
     root.appendChild(button);
     return;
   }
@@ -280,8 +293,17 @@ async function startFrontDeskSignIn(): Promise<void> {
 }
 
 function showFrontDeskPassphrase(): void {
-  const dialog = document.getElementById(DIALOG_ID);
-  if (!(dialog instanceof HTMLDialogElement)) return;
+  /* This used to assume openDialog() had already run and built the shell —
+   * true whenever the member-picker dialog opened first. Now that a
+   * staff-gated page's "Sign in" button calls startFrontDeskSignIn()
+   * directly (never touching openDialog()), the shell may not exist yet:
+   * build it exactly the way openDialog() does. */
+  let dialog = document.getElementById(DIALOG_ID) as HTMLDialogElement | null;
+  if (dialog === null) {
+    dialog = buildDialogShell();
+    document.body.appendChild(dialog);
+  }
+  if (!dialog.open) dialog.showModal();
   const intro = dialog.querySelector(".pulse-session-intro");
   const state = dialog.querySelector(".pulse-session-state");
   const rows = dialog.querySelector(".pulse-session-rows");

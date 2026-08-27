@@ -722,36 +722,46 @@ check("unreachable outranks unconfigured — both true says the door is down", (
   return !said.includes("no staff passphrase set") ? true : `unexpected: ${said}`;
 });
 
-/* ---------- the door has to leave something for Sign out to end ---------- *
+/* ---------- one sign-in, in the header — not a second one on the door ---------- *
  *
- * Proven by hand against the real server first (STAFF_PASSPHRASE set,
- * scripts/start-haiku.mjs): sign in at the staff door directly — never
- * touching the topbar's own "Sign in" dialog — and the server session is
- * real (/api/staff/records answers, the studio's records render), yet the
- * top bar still reads plain "Sign in". topbar.ts's Sign out button is the
- * ONLY caller of signOutStaff() anywhere in this app, and it only renders
- * when readPulseSession() is non-null. A person who proved they are staff
- * at the door alone had NO control anywhere to end that session early —
- * only the sixty-minute expiry or clearing cookies by hand would do it.
- *
- * The fix has mountStaffDoor's success path remember Front Desk locally
- * the moment the server confirms — the exact value signInAsMember's sibling
- * signInAsFrontDesk() already writes and already round-trips (checked
- * above). What THIS check pins is that the door's OWN success branch
- * actually calls it: the surrounding sequence (fetch, a form submit,
- * window.location.reload()) is exactly what this synchronous check()
- * harness cannot run — the same limit doorMessage's neighboring comment
- * names for the rest of this module — so the shipped source is read
- * instead, the same way synthetic/tests.ts already reads topbar.ts's
- * source for a property no execution here can reach. */
+ * mountStaffDoor used to draw its OWN "Sign in with GitHat" link and its own
+ * passphrase form, standing next to the "Sign in" control topbar.ts already
+ * renders into every page's header — two doors describing the same lock,
+ * and the door's own link never threaded a returnTo, so a sign-in started
+ * there landed on the front door instead of back on the staff page. Both
+ * are gone from staff-gate.ts now: the door only STATES what readStaffGate()
+ * answered and points at the header control. The signed-in-locally memory
+ * (so Sign out has something to end — see the git history of this file for
+ * the incident that made that necessary) and the GitHat redirect both live
+ * in topbar.ts's startFrontDeskSignIn()/showFrontDeskPassphrase() now, which
+ * is the one place either sign-in path runs. Read as source for the same
+ * reason the neighboring doorMessage comment gives: the surrounding
+ * sequence (fetch, a form submit, a redirect) is exactly what this
+ * synchronous check() harness cannot run. */
 const staffGateSource = await (await fetch("./staff-gate.ts")).text();
-check("a confirmed staff sign-in remembers Front Desk locally, so Sign out has something to end", () =>
-  /result\.ok[\s\S]{0,400}signInAsFrontDesk\(\)/.test(staffGateSource)
-    ? true
-    : "mountStaffDoor's success branch does not call signInAsFrontDesk()");
+const topbarSource = await (await fetch("../components/topbar.ts")).text();
 
-check("the staff door offers a GitHat sign-in link, alongside the passphrase form (not instead of it)", () =>
-  /auth\/githat\/start/.test(staffGateSource) ? true : "no /auth/githat/start link found in staff-gate.ts");
+/* Narrowly on the REMOVED markup markers, not on prose that is free to
+ * mention them — this file's own header comment explains the removal by
+ * name, and "staff-door-form" as a bare class name is reused (legitimately)
+ * by mountOwnerInvitePanel()'s own, unrelated form. */
+check("the staff door draws no sign-in UI of its own — no form, no GitHat link", () =>
+  !/staff-door-oauth|href = "\/auth\/githat\/start"/.test(staffGateSource)
+    ? true
+    : "staff-gate.ts still renders its own sign-in form or GitHat link");
+
+check("a signed-in-locally memory exists so Sign out has something to end", () =>
+  /signInAsFrontDesk\(\)/.test(topbarSource)
+    ? true
+    : "topbar.ts no longer calls signInAsFrontDesk() anywhere");
+
+check("the header's Sign in offers GitHat when no passphrase is configured", () =>
+  /auth\/githat\/start/.test(topbarSource) ? true : "no /auth/githat/start redirect found in topbar.ts");
+
+check("on a staff-gated page, the header's Sign in skips the member picker", () =>
+  /getElementById\("staff-door"\)[\s\S]{0,120}startFrontDeskSignIn\(\)/.test(topbarSource)
+    ? true
+    : "topbar.ts's Sign in button does not check for #staff-door before opening the member dialog");
 
 /* The owner's invite panel: same "read the source" limit as above — it
  * only ever mounts after a real fetch() resolves signedIn/role, which
@@ -1551,7 +1561,7 @@ check("every link resolves from the site root, not from the page it is on", () =
   const fromDeep = hrefsOn("https://studio.example/base/shared/synthetic/tests.html").join("|");
   if (fromRoot !== fromProduct) return `a product page got different links: ${fromProduct}`;
   if (fromRoot !== fromDeep) return `a two-deep page got different links: ${fromDeep}`;
-  return eq(fromRoot.split("|")[0], "https://studio.example/base/products/a-booking/");
+  return eq(fromRoot.split("|")[0], "https://studio.example/base/shared/storytold.html");
 });
 
 /* EVERY href CARRIES ITS OWN SCHEME. A relative href in a shared footer is
@@ -1571,10 +1581,10 @@ check("no footer link is left relative, which would break at depth", () => {
 });
 
 check("the page you are on is marked, not hidden", () => {
-  const here = "https://studio.example/base/products/a-booking/index.html";
+  const here = "https://studio.example/base/shared/storytold.html";
   const f = siteFooter(ROOT_AT("./"), here);
   const marked = [...f.querySelectorAll("a[aria-current=\"page\"]")].map((a) => a.textContent);
-  return eq(marked, ["Book a class"]);
+  return eq(marked, ["How the records flow"]);
 });
 
 check("index.html and the bare folder are the same page", () =>
@@ -1754,56 +1764,6 @@ check("the footer links terms and privacy, resolved from the site root", () => {
     "https://studio.example/base/shared/terms.html",
     "https://studio.example/base/shared/privacy.html",
   ]);
-});
-
-/* ONE DOOR INTO THE STAFF ROOM. A signed-in member used to be shown the
- * dashboard three ways — front-door card, footer list, sign-in landing —
- * on a page that had just greeted them by name. The law keeps every route
- * reachable, so nothing may DISAPPEAR: for a member the staff group folds
- * to one link that is the heading itself. Staff and the signed-out see the
- * group whole. These pin the fold, the reachability, and the asymmetry. */
-check("a signed-out reader sees the staff group whole", () => {
-  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", null);
-  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
-    (g) => g.getAttribute("aria-label") === "For staff",
-  );
-  return eq(staff?.querySelectorAll("ul a").length, 2);
-});
-
-check("a staff reader sees it whole too", () => {
-  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "staff");
-  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
-    (g) => g.getAttribute("aria-label") === "For staff",
-  );
-  return eq([staff?.querySelectorAll("ul a").length, staff?.dataset["folded"] ?? "false"].join("|"), "2|false");
-});
-
-check("a member sees the staff group folded to one door", () => {
-  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
-  const staff = [...f.querySelectorAll<HTMLElement>(".site-footer-group")].find(
-    (g) => g.getAttribute("aria-label") === "For staff",
-  );
-  const door = staff?.querySelector(".site-footer-heading a") as HTMLAnchorElement | null;
-  return eq(
-    [staff?.dataset["folded"], staff?.querySelectorAll("ul").length, door?.textContent, door?.href].join("|"),
-    "true|0|For staff|https://studio.example/base/products/b-dashboard/",
-  );
-});
-
-/* THE ROUTE IS STILL THERE. Folding is not hiding: the dashboard href a
- * member is shown is the same one staff are shown, and it resolves. */
-check("...and the door still reaches the dashboard, not a dead end", () => {
-  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
-  const hrefs = [...f.querySelectorAll("a")].map((a) => (a as HTMLAnchorElement).href);
-  return eq(hrefs.includes("https://studio.example/base/products/b-dashboard/"), true);
-});
-
-check("only the staff group folds; the member's own links never do", () => {
-  const f = siteFooter(ROOT_AT("./"), "https://studio.example/base/", "member");
-  const folded = [...f.querySelectorAll<HTMLElement>(".site-footer-group")]
-    .filter((g) => g.dataset["folded"] === "true")
-    .map((g) => g.getAttribute("aria-label"));
-  return eq(folded, ["For staff"]);
 });
 
 /* ------------------------------------------------------------------ */

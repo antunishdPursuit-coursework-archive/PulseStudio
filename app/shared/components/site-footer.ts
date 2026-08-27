@@ -81,26 +81,6 @@ export type FooterReader = "member" | "staff" | null;
  * member reads here is "Brand and colours". */
 export const FOOTER_GROUPS: readonly FooterGroup[] = [
   {
-    heading: "For members",
-    links: [
-      { label: "Book a class", href: "products/a-booking/" },
-      { label: "Ask a question", href: "products/c-chatbot/" },
-    ],
-  },
-  {
-    heading: "For staff",
-    /* FOLDS FOR A SIGNED-IN MEMBER. The law keeps every route reachable
-     * (a session is convenience, never access control), and this keeps it:
-     * for a member the two links become one — the heading itself, pointed
-     * at the dashboard — so the staff room has a door and not a corridor of
-     * them. Staff and the signed-out see both links, as before. */
-    audience: "staff",
-    links: [
-      { label: "The Dashboard", href: "products/b-dashboard/" },
-      { label: "Re-engagement", href: "products/d-reengagement/" },
-    ],
-  },
-  {
     heading: "The studio",
     links: [
       { label: "How the records flow", href: "shared/storytold.html" },
